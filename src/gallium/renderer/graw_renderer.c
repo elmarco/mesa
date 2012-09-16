@@ -39,6 +39,12 @@ struct graw_renderer_context {
    struct pipe_context base;
 };
 
+struct graw_renderer_vertex_element {
+   unsigned count;
+   struct pipe_vertex_element elements[PIPE_MAX_ATTRIBS];
+   GLuint vboids[PIPE_MAX_ATTRIBS];
+};
+
 boolean tgsi_text_translate(const char *text,
 			    struct tgsi_token *tokens,
                             uint num_tokens)
@@ -149,20 +155,34 @@ static void *graw_renderer_create_vertex_elements_state(struct pipe_context *ctx
                                                         unsigned num_elements,
                                                         const struct pipe_vertex_element *elements)
 {
-   return NULL;
+   struct graw_renderer_vertex_element *v = CALLOC_STRUCT(graw_renderer_vertex_element);
+   int i;
+   int max_vbo_index = 0;
+   v->count = num_elements;
+   memcpy(v->elements, elements, sizeof(struct pipe_vertex_element) * num_elements);
+
+   return v;
 }
 
 static void graw_renderer_bind_vertex_elements_state(struct pipe_context *ctx,
                                                      void *ve)
 {
-
+   
 }
 
 static void graw_renderer_set_vertex_buffers(struct pipe_context *ctx,
                                              unsigned num_buffers,
                                              const struct pipe_vertex_buffer *buffers)
 {
+   int i;
 
+   for (i = 0; i < num_buffers; i++) {
+      struct graw_renderer_buffer *buf = buffers[i].buffer;
+
+      glBindBufferARB(GL_ARRAY_BUFFER_ARB, buf->base.id);
+      glBufferDataARB(GL_ARRAY_BUFFER_ARB, buffers[i].stride, NULL, GL_STATIC_DRAW_ARB);
+
+   }
 }
 
 static void graw_renderer_transfer_inline_write(struct pipe_context *ctx,
@@ -298,6 +318,7 @@ static struct pipe_resource *graw_renderer_resource_create(struct pipe_screen *p
       buf->base.base = *template;
       buf->base.base.screen = pscreen;
       pipe_reference_init(&buf->base.base.reference, 1);
+      glGenBuffersARB(1, &buf->base.id);
       return &buf->base.base;
    } else {
       tex = CALLOC_STRUCT(graw_renderer_texture);
@@ -337,7 +358,7 @@ graw_create_window_and_screen( int x,
    
    glutInitWindowSize(width, height);
  
-   glutInitDisplayMode(GLUT_RGB);
+   glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE);
 
    glutCreateWindow("test");
 

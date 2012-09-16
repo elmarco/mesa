@@ -51,7 +51,8 @@ SUBDIRS +=			\
 	gallium/drivers		\
 	gallium/state_trackers	\
 	gallium/winsys		\
-	gallium/targets
+	gallium/targets		\
+	gallium/renderer
 
 if HAVE_GALLIUM_TESTS
 SUBDIRS +=			\

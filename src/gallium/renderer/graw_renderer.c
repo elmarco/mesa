@@ -2,6 +2,7 @@
 #include <GL/gl.h>
 #include <GL/glut.h>
 
+#include <stdio.h>
 #include "pipe/p_shader_tokens.h"
 
 #include "pipe/p_context.h"
@@ -10,9 +11,61 @@
 #include "pipe/p_state.h"
 #include "util/u_inlines.h"
 #include "util/u_memory.h"
+#include "util/u_transfer.h"
 #include "tgsi/tgsi_text.h"
 
 #include "state_tracker/graw.h"
+
+const GLchar* VertexShader =
+{
+    "#version 130\n"
+    "#extension GL_ARB_explicit_attrib_location: enable\n"
+    "layout(location=0) in vec4 in_Position;\n"
+    "layout(location=1) in vec4 in_Color;\n"
+    "out vec4 ex_Color;\n"
+    "void main(void)\n"
+    "{\n"
+    "   gl_Position = in_Position;\n"
+    "   ex_Color = in_Color;\n"
+    "}\n"
+};
+
+const GLchar* FragmentShader =
+{
+	"#version 130\n"
+	"in vec4 ex_Color;\n"
+	"out vec4 out_Color;\n"
+	"void main(void)\n"
+	"{\n"
+	"	out_Color = ex_Color;\n"
+	"}\n"
+};
+
+GLuint VertexShaderId, FragmentShaderId, ProgramId;
+
+static void hack_shaders(void)
+{
+   static GLuint shaders_hacked;
+
+   if (shaders_hacked) {
+      glUseProgram(ProgramId);
+      return;
+   }
+
+   shaders_hacked = 1;
+   VertexShaderId = glCreateShader(GL_VERTEX_SHADER);
+   glShaderSource(VertexShaderId, 1, &VertexShader, NULL);
+   glCompileShader(VertexShaderId);
+
+   FragmentShaderId = glCreateShader(GL_FRAGMENT_SHADER);
+   glShaderSource(FragmentShaderId, 1, &FragmentShader, NULL);
+   glCompileShader(FragmentShaderId);
+
+   ProgramId = glCreateProgram();
+   glAttachShader(ProgramId, VertexShaderId);
+   glAttachShader(ProgramId, FragmentShaderId);
+   glLinkProgram(ProgramId);
+}
 
 struct graw_renderer_screen;
 
@@ -35,14 +88,19 @@ struct graw_renderer_surface {
    GLuint id;
 };
 
-struct graw_renderer_context {
-   struct pipe_context base;
-};
-
 struct graw_renderer_vertex_element {
    unsigned count;
    struct pipe_vertex_element elements[PIPE_MAX_ATTRIBS];
    GLuint vboids[PIPE_MAX_ATTRIBS];
+};
+
+
+struct graw_renderer_context {
+   struct pipe_context base;
+   GLuint vaoid;
+   
+   int num_vbos;
+   struct pipe_vertex_buffer vbo[PIPE_MAX_ATTRIBS];
 };
 
 boolean tgsi_text_translate(const char *text,
@@ -167,21 +225,39 @@ static void *graw_renderer_create_vertex_elements_state(struct pipe_context *ctx
 static void graw_renderer_bind_vertex_elements_state(struct pipe_context *ctx,
                                                      void *ve)
 {
-   
+   struct graw_renderer_context *grctx = (struct graw_renderer_context *)ctx;
+   struct graw_renderer_vertex_element *v = (struct graw_renderer_vertex_element *)ve;
+   int i;
+
+   if (!grctx->vaoid) {
+      glGenVertexArrays(1, &grctx->vaoid);
+   }
+
+   glBindVertexArray(grctx->vaoid);
+   for (i = 0; i < v->count; i++) {
+//      glVertexAttribPointer(i, 4, GL_FLOAT, GL_FALSE, 4, v->elements[i].src_offset);
+      glEnableVertexAttribArray(i);
+   }
 }
 
 static void graw_renderer_set_vertex_buffers(struct pipe_context *ctx,
                                              unsigned num_buffers,
                                              const struct pipe_vertex_buffer *buffers)
 {
+   struct graw_renderer_context *grctx = (struct graw_renderer_context *)ctx;
    int i;
 
+   if (!grctx->vaoid) {
+      glGenVertexArrays(1, &grctx->vaoid);
+   }
+
+   glBindVertexArray(grctx->vaoid);
    for (i = 0; i < num_buffers; i++) {
       struct graw_renderer_buffer *buf = buffers[i].buffer;
 
       glBindBufferARB(GL_ARRAY_BUFFER_ARB, buf->base.id);
-      glBufferDataARB(GL_ARRAY_BUFFER_ARB, buffers[i].stride, NULL, GL_STATIC_DRAW_ARB);
-
+//      glVertexAttribPointer(i, 4, GL_FLOAT, GL_FALSE, 4, 0);
+//      glEnableVertexAttribArray(i);
    }
 }
 
@@ -194,13 +270,18 @@ static void graw_renderer_transfer_inline_write(struct pipe_context *ctx,
                                                 unsigned stride,
                                                 unsigned layer_stride)
 {
+   struct graw_renderer_resource *grres = (struct graw_renderer_resource *)res;
+   void *ptr;
 
+   glBindBufferARB(GL_ARRAY_BUFFER_ARB, grres->id);
+
+   glBufferData(GL_ARRAY_BUFFER_ARB, box->width, data, GL_STATIC_DRAW);
 }
 
 static void graw_renderer_bind_vs_state(struct pipe_context *ctx,
                                         void *vss)
 {
-
+   hack_shaders();
 }
 
 static void graw_renderer_bind_fs_state(struct pipe_context *ctx,
@@ -214,14 +295,22 @@ static void graw_renderer_clear(struct pipe_context *pipe,
                                 const union pipe_color_union *color,
                                 double depth, unsigned stencil)
 {
+   glUseProgram(0);
    glClearColor(color->f[0], color->f[1], color->f[2], color->f[3]);
    glClear(GL_COLOR_BUFFER_BIT);
+   glUseProgram(ProgramId);
+
 }
 
 static void graw_renderer_draw_vbo(struct pipe_context *ctx,
                                    const struct pipe_draw_info *info)
 {
-
+   if (!info->indexed) {
+      GLenum mode = info->mode;
+      glDrawArrays(mode, info->start, info->count);
+   } else {
+      fprintf(stderr,"indexed\n");
+   }
 }
 
 static void graw_renderer_flush(struct pipe_context *ctx,
@@ -269,7 +358,7 @@ static void graw_renderer_flush_frontbuffer(struct pipe_screen *screen,
 
    tex = (struct graw_renderer_texture *)res;
    glDrawBuffer(GL_NONE);
-
+   glUseProgram(0);
    glBindTexture(tex->base.target, tex->base.id);
    glBindFramebuffer(GL_FRAMEBUFFER_EXT, 0);
    glEnable(tex->base.target);

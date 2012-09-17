@@ -50,7 +50,6 @@ static void set_vertices( void )
    ve[1].src_format = PIPE_FORMAT_R32G32B32A32_FLOAT;
 
    handle = info.ctx->create_vertex_elements_state(info.ctx, 2, ve);
-   info.ctx->bind_vertex_elements_state(info.ctx, handle);
 
 
    vbuf.stride = sizeof( struct vertex );
@@ -62,6 +61,9 @@ static void set_vertices( void )
                                               vertices);
 
    info.ctx->set_vertex_buffers(info.ctx, 1, &vbuf);
+
+   info.ctx->bind_vertex_elements_state(info.ctx, handle);
+
 }
 
 

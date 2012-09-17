@@ -2,7 +2,7 @@ include Makefile.sources
 
 noinst_PROGRAMS=tri
 
-AM_LDFLAGS = $(GLUT_LIBS) $(GLEW_LIBS) $(GL_LIBS)
+AM_LDFLAGS = ../auxiliary/libgallium.a $(GLUT_LIBS) $(GLEW_LIBS) $(GL_LIBS) -lm -ldl
 
 AM_CFLAGS = \
 	-I$(top_srcdir)/src/gallium/include \

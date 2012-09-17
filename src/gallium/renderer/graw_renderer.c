@@ -98,7 +98,8 @@ struct grend_vertex_element {
 struct grend_context {
    struct pipe_context base;
    GLuint vaoid;
-   
+
+   struct grend_vertex_element *ve;
    int num_vbos;
    struct pipe_vertex_buffer vbo[PIPE_MAX_ATTRIBS];
 };
@@ -229,15 +230,7 @@ static void grend_bind_vertex_elements_state(struct pipe_context *ctx,
    struct grend_vertex_element *v = (struct grend_vertex_element *)ve;
    int i;
 
-   if (!grctx->vaoid) {
-      glGenVertexArrays(1, &grctx->vaoid);
-   }
-
-   glBindVertexArray(grctx->vaoid);
-   for (i = 0; i < v->count; i++) {
-//      glVertexAttribPointer(i, 4, GL_FLOAT, GL_FALSE, 4, v->elements[i].src_offset);
-      glEnableVertexAttribArray(i);
-   }
+   grctx->ve = ve;
 }
 
 static void grend_set_vertex_buffers(struct pipe_context *ctx,
@@ -247,15 +240,9 @@ static void grend_set_vertex_buffers(struct pipe_context *ctx,
    struct grend_context *grctx = (struct grend_context *)ctx;
    int i;
 
-   if (!grctx->vaoid) {
-      glGenVertexArrays(1, &grctx->vaoid);
-   }
-
-   glBindVertexArray(grctx->vaoid);
-   for (i = 0; i < num_buffers; i++) {
-      struct grend_buffer *buf = buffers[i].buffer;
-
-   }
+   for (i = 0; i < num_buffers; i++)
+      grctx->vbo[i] = buffers[i];
+   grctx->num_vbos = num_buffers;
 }
 
 static void grend_transfer_inline_write(struct pipe_context *ctx,
@@ -271,7 +258,6 @@ static void grend_transfer_inline_write(struct pipe_context *ctx,
    void *ptr;
 
    glBindBufferARB(GL_ARRAY_BUFFER_ARB, grres->id);
-
    glBufferData(GL_ARRAY_BUFFER_ARB, box->width, data, GL_STATIC_DRAW);
 }
 
@@ -302,12 +288,33 @@ static void grend_clear(struct pipe_context *pipe,
 static void grend_draw_vbo(struct pipe_context *ctx,
                                    const struct pipe_draw_info *info)
 {
+   struct grend_context *grctx = (struct grend_context *)ctx;
+   GLuint vaoid;
+   int i;
+
+   glGenVertexArrays(1, &vaoid);
+
+   glBindVertexArray(vaoid);
+
+   for (i = 0; i < grctx->ve->count; i++) {
+      int vbo_index = grctx->ve->elements[i].vertex_buffer_index;
+      struct grend_buffer *buf;
+      
+      buf = grctx->vbo[vbo_index].buffer;
+      glBindBuffer(GL_ARRAY_BUFFER, buf->base.id);
+      glVertexAttribPointer(i, 4, GL_FLOAT, GL_FALSE, 4, (void *)grctx->ve->elements[i].src_offset);
+      glEnableVertexAttribArray(i);
+   }
+   
+   /* set the vertex state up now on a delay */
    if (!info->indexed) {
       GLenum mode = info->mode;
       glDrawArrays(mode, info->start, info->count);
    } else {
       fprintf(stderr,"indexed\n");
    }
+
+   glBindVertexArray(0);
 }
 
 static void grend_flush(struct pipe_context *ctx,

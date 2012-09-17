@@ -67,35 +67,35 @@ static void hack_shaders(void)
    glLinkProgram(ProgramId);
 }
 
-struct graw_renderer_screen;
+struct grend_screen;
 
-struct graw_renderer_resource {
+struct grend_resource {
    struct pipe_resource base;
    GLuint id;
    GLenum target;
 };
 
-struct graw_renderer_buffer {
-   struct graw_renderer_resource base;
+struct grend_buffer {
+   struct grend_resource base;
 };
 
-struct graw_renderer_texture {
-   struct graw_renderer_resource base;
+struct grend_texture {
+   struct grend_resource base;
 };
 
-struct graw_renderer_surface {
+struct grend_surface {
    struct pipe_surface base;
    GLuint id;
 };
 
-struct graw_renderer_vertex_element {
+struct grend_vertex_element {
    unsigned count;
    struct pipe_vertex_element elements[PIPE_MAX_ATTRIBS];
    GLuint vboids[PIPE_MAX_ATTRIBS];
 };
 
 
-struct graw_renderer_context {
+struct grend_context {
    struct pipe_context base;
    GLuint vaoid;
    
@@ -123,21 +123,21 @@ static void key_esc(unsigned char key, int x, int y)
 
 static struct pipe_screen glutscreen;
 
-static struct pipe_surface *graw_renderer_create_surface(struct pipe_context *ctx,
+static struct pipe_surface *grend_create_surface(struct pipe_context *ctx,
                                                          struct pipe_resource *resource,
                                                          const struct pipe_surface *templat)
 {
-   struct graw_renderer_surface *surf;
-   struct graw_renderer_texture *tex;
+   struct grend_surface *surf;
+   struct grend_texture *tex;
 
-   surf = calloc(1, sizeof(struct graw_renderer_surface));
+   surf = calloc(1, sizeof(struct grend_surface));
 
    surf->base = *templat;
    pipe_resource_reference(&surf->base.texture, resource);
    surf->base.context = ctx;
    glGenFramebuffers(1, &surf->id);
 
-   tex = (struct graw_renderer_texture *)resource;
+   tex = (struct grend_texture *)resource;
 
    glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, surf->id);
    glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
@@ -146,7 +146,7 @@ static struct pipe_surface *graw_renderer_create_surface(struct pipe_context *ct
    return &surf->base;
 }
 
-static void *graw_renderer_create_blend_state(struct pipe_context *ctx,
+static void *grend_create_blend_state(struct pipe_context *ctx,
                                               const struct pipe_blend_state *blend_state)
 {
    struct pipe_blend_state *state = CALLOC_STRUCT(pipe_blend_state);
@@ -156,64 +156,64 @@ static void *graw_renderer_create_blend_state(struct pipe_context *ctx,
 
 }
 
-static void graw_renderer_bind_blend_state(struct pipe_context *ctx,
+static void grend_bind_blend_state(struct pipe_context *ctx,
                                            void *blend_state)
 {
 
 }
 
-static void *graw_renderer_create_depth_stencil_alpha_state(struct pipe_context *ctx,
+static void *grend_create_depth_stencil_alpha_state(struct pipe_context *ctx,
                                                             const struct pipe_depth_stencil_alpha_state *blend_state)
 {
    return NULL;
 
 }
 
-static void graw_renderer_bind_depth_stencil_alpha_state(struct pipe_context *ctx,
+static void grend_bind_depth_stencil_alpha_state(struct pipe_context *ctx,
                                                          void *blend_state)
 {
 
 }
 
-static void *graw_renderer_create_rasterizer_state(struct pipe_context *ctx,
+static void *grend_create_rasterizer_state(struct pipe_context *ctx,
                                                    const struct pipe_rasterizer_state *rs_state)
 {
    return NULL;
 
 }
 
-static void graw_renderer_bind_rasterizer_state(struct pipe_context *ctx,
+static void grend_bind_rasterizer_state(struct pipe_context *ctx,
                                                 void *blend_state)
 {
 
 }
 
-static void graw_renderer_set_framebuffer_state(struct pipe_context *ctx,
+static void grend_set_framebuffer_state(struct pipe_context *ctx,
                                                 const struct pipe_framebuffer_state *state)
 {
-   struct graw_renderer_surface *surf;
+   struct grend_surface *surf;
 
    if (state->nr_cbufs != 1)
       return;
 
-   surf = (struct graw_renderer_surface *)state->cbufs[0];
+   surf = (struct grend_surface *)state->cbufs[0];
    
    glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, surf->id);
    glDrawBuffer(GL_COLOR_ATTACHMENT0);
    glViewport(0, 0, state->width, state->height);
 }
 
-static void graw_renderer_set_viewport_state(struct pipe_context *ctx,
+static void grend_set_viewport_state(struct pipe_context *ctx,
                                              const struct pipe_viewport_state *state)
 {
 
 }
 
-static void *graw_renderer_create_vertex_elements_state(struct pipe_context *ctx,
+static void *grend_create_vertex_elements_state(struct pipe_context *ctx,
                                                         unsigned num_elements,
                                                         const struct pipe_vertex_element *elements)
 {
-   struct graw_renderer_vertex_element *v = CALLOC_STRUCT(graw_renderer_vertex_element);
+   struct grend_vertex_element *v = CALLOC_STRUCT(grend_vertex_element);
    int i;
    int max_vbo_index = 0;
    v->count = num_elements;
@@ -222,11 +222,11 @@ static void *graw_renderer_create_vertex_elements_state(struct pipe_context *ctx
    return v;
 }
 
-static void graw_renderer_bind_vertex_elements_state(struct pipe_context *ctx,
+static void grend_bind_vertex_elements_state(struct pipe_context *ctx,
                                                      void *ve)
 {
-   struct graw_renderer_context *grctx = (struct graw_renderer_context *)ctx;
-   struct graw_renderer_vertex_element *v = (struct graw_renderer_vertex_element *)ve;
+   struct grend_context *grctx = (struct grend_context *)ctx;
+   struct grend_vertex_element *v = (struct grend_vertex_element *)ve;
    int i;
 
    if (!grctx->vaoid) {
@@ -240,11 +240,11 @@ static void graw_renderer_bind_vertex_elements_state(struct pipe_context *ctx,
    }
 }
 
-static void graw_renderer_set_vertex_buffers(struct pipe_context *ctx,
+static void grend_set_vertex_buffers(struct pipe_context *ctx,
                                              unsigned num_buffers,
                                              const struct pipe_vertex_buffer *buffers)
 {
-   struct graw_renderer_context *grctx = (struct graw_renderer_context *)ctx;
+   struct grend_context *grctx = (struct grend_context *)ctx;
    int i;
 
    if (!grctx->vaoid) {
@@ -253,15 +253,12 @@ static void graw_renderer_set_vertex_buffers(struct pipe_context *ctx,
 
    glBindVertexArray(grctx->vaoid);
    for (i = 0; i < num_buffers; i++) {
-      struct graw_renderer_buffer *buf = buffers[i].buffer;
+      struct grend_buffer *buf = buffers[i].buffer;
 
-      glBindBufferARB(GL_ARRAY_BUFFER_ARB, buf->base.id);
-//      glVertexAttribPointer(i, 4, GL_FLOAT, GL_FALSE, 4, 0);
-//      glEnableVertexAttribArray(i);
    }
 }
 
-static void graw_renderer_transfer_inline_write(struct pipe_context *ctx,
+static void grend_transfer_inline_write(struct pipe_context *ctx,
                                                 struct pipe_resource *res,
                                                 unsigned level,
                                                 unsigned usage,
@@ -270,7 +267,7 @@ static void graw_renderer_transfer_inline_write(struct pipe_context *ctx,
                                                 unsigned stride,
                                                 unsigned layer_stride)
 {
-   struct graw_renderer_resource *grres = (struct graw_renderer_resource *)res;
+   struct grend_resource *grres = (struct grend_resource *)res;
    void *ptr;
 
    glBindBufferARB(GL_ARRAY_BUFFER_ARB, grres->id);
@@ -278,19 +275,19 @@ static void graw_renderer_transfer_inline_write(struct pipe_context *ctx,
    glBufferData(GL_ARRAY_BUFFER_ARB, box->width, data, GL_STATIC_DRAW);
 }
 
-static void graw_renderer_bind_vs_state(struct pipe_context *ctx,
+static void grend_bind_vs_state(struct pipe_context *ctx,
                                         void *vss)
 {
    hack_shaders();
 }
 
-static void graw_renderer_bind_fs_state(struct pipe_context *ctx,
+static void grend_bind_fs_state(struct pipe_context *ctx,
                                         void *vss)
 {
 
 }
 
-static void graw_renderer_clear(struct pipe_context *pipe,
+static void grend_clear(struct pipe_context *pipe,
                                 unsigned buffers,
                                 const union pipe_color_union *color,
                                 double depth, unsigned stencil)
@@ -302,7 +299,7 @@ static void graw_renderer_clear(struct pipe_context *pipe,
 
 }
 
-static void graw_renderer_draw_vbo(struct pipe_context *ctx,
+static void grend_draw_vbo(struct pipe_context *ctx,
                                    const struct pipe_draw_info *info)
 {
    if (!info->indexed) {
@@ -313,50 +310,50 @@ static void graw_renderer_draw_vbo(struct pipe_context *ctx,
    }
 }
 
-static void graw_renderer_flush(struct pipe_context *ctx,
+static void grend_flush(struct pipe_context *ctx,
                                 struct pipe_fence_handle **fence)
 {
    glFlush();
 }
 
-static struct pipe_context *graw_renderer_context_create(struct pipe_screen *pscreen,
+static struct pipe_context *grend_context_create(struct pipe_screen *pscreen,
                                                          void *priv)
 {
-   struct graw_renderer_context *gr_ctx;
+   struct grend_context *gr_ctx;
 
-   gr_ctx = CALLOC_STRUCT(graw_renderer_context);
+   gr_ctx = CALLOC_STRUCT(grend_context);
 
 
-   gr_ctx->base.create_surface = graw_renderer_create_surface;
-   gr_ctx->base.set_framebuffer_state = graw_renderer_set_framebuffer_state;
-   gr_ctx->base.create_blend_state = graw_renderer_create_blend_state;
-   gr_ctx->base.bind_blend_state = graw_renderer_bind_blend_state;
-   gr_ctx->base.create_depth_stencil_alpha_state = graw_renderer_create_depth_stencil_alpha_state;
-   gr_ctx->base.bind_depth_stencil_alpha_state = graw_renderer_bind_depth_stencil_alpha_state;
-   gr_ctx->base.create_rasterizer_state = graw_renderer_create_rasterizer_state;
-   gr_ctx->base.bind_rasterizer_state = graw_renderer_bind_rasterizer_state;
-   gr_ctx->base.set_viewport_state = graw_renderer_set_viewport_state;
-   gr_ctx->base.create_vertex_elements_state = graw_renderer_create_vertex_elements_state;
-   gr_ctx->base.bind_vertex_elements_state = graw_renderer_bind_vertex_elements_state;
-   gr_ctx->base.set_vertex_buffers = graw_renderer_set_vertex_buffers;
-   gr_ctx->base.transfer_inline_write = graw_renderer_transfer_inline_write;
-   gr_ctx->base.bind_vs_state = graw_renderer_bind_vs_state;
-   gr_ctx->base.bind_fs_state = graw_renderer_bind_fs_state;
-   gr_ctx->base.clear = graw_renderer_clear;
-   gr_ctx->base.draw_vbo = graw_renderer_draw_vbo;
-   gr_ctx->base.flush = graw_renderer_flush;
+   gr_ctx->base.create_surface = grend_create_surface;
+   gr_ctx->base.set_framebuffer_state = grend_set_framebuffer_state;
+   gr_ctx->base.create_blend_state = grend_create_blend_state;
+   gr_ctx->base.bind_blend_state = grend_bind_blend_state;
+   gr_ctx->base.create_depth_stencil_alpha_state = grend_create_depth_stencil_alpha_state;
+   gr_ctx->base.bind_depth_stencil_alpha_state = grend_bind_depth_stencil_alpha_state;
+   gr_ctx->base.create_rasterizer_state = grend_create_rasterizer_state;
+   gr_ctx->base.bind_rasterizer_state = grend_bind_rasterizer_state;
+   gr_ctx->base.set_viewport_state = grend_set_viewport_state;
+   gr_ctx->base.create_vertex_elements_state = grend_create_vertex_elements_state;
+   gr_ctx->base.bind_vertex_elements_state = grend_bind_vertex_elements_state;
+   gr_ctx->base.set_vertex_buffers = grend_set_vertex_buffers;
+   gr_ctx->base.transfer_inline_write = grend_transfer_inline_write;
+   gr_ctx->base.bind_vs_state = grend_bind_vs_state;
+   gr_ctx->base.bind_fs_state = grend_bind_fs_state;
+   gr_ctx->base.clear = grend_clear;
+   gr_ctx->base.draw_vbo = grend_draw_vbo;
+   gr_ctx->base.flush = grend_flush;
    gr_ctx->base.screen = pscreen;
    return &gr_ctx->base;
 }
 
-static void graw_renderer_flush_frontbuffer(struct pipe_screen *screen,
+static void grend_flush_frontbuffer(struct pipe_screen *screen,
 					    struct pipe_resource *res,
 					    unsigned level, unsigned layer,
 					    void *winsys_drawable_handle)
 {
-   struct graw_renderer_texture *tex;
+   struct grend_texture *tex;
 
-   tex = (struct graw_renderer_texture *)res;
+   tex = (struct grend_texture *)res;
    glDrawBuffer(GL_NONE);
    glUseProgram(0);
    glBindTexture(tex->base.target, tex->base.id);
@@ -396,21 +393,21 @@ static GLenum tgsitargettogltarget(const struct pipe_resource *res)
    }
    return PIPE_BUFFER;
 }
-static struct pipe_resource *graw_renderer_resource_create(struct pipe_screen *pscreen,
+static struct pipe_resource *grend_resource_create(struct pipe_screen *pscreen,
                                                            const struct pipe_resource *template)
 {
-   struct graw_renderer_buffer *buf;
-   struct graw_renderer_texture *tex;
+   struct grend_buffer *buf;
+   struct grend_texture *tex;
    
    if (template->target == PIPE_BUFFER) {
-      buf = CALLOC_STRUCT(graw_renderer_buffer);
+      buf = CALLOC_STRUCT(grend_buffer);
       buf->base.base = *template;
       buf->base.base.screen = pscreen;
       pipe_reference_init(&buf->base.base.reference, 1);
       glGenBuffersARB(1, &buf->base.id);
       return &buf->base.base;
    } else {
-      tex = CALLOC_STRUCT(graw_renderer_texture);
+      tex = CALLOC_STRUCT(grend_texture);
       tex->base.base = *template;
       tex->base.base.screen = pscreen;
       pipe_reference_init(&tex->base.base.reference, 1);
@@ -462,9 +459,9 @@ graw_create_window_and_screen( int x,
    glutReshapeFunc(Reshape);
    glutKeyboardFunc(key_esc);
 
-   glutscreen.context_create = graw_renderer_context_create;
-   glutscreen.resource_create = graw_renderer_resource_create;
-   glutscreen.flush_frontbuffer = graw_renderer_flush_frontbuffer;
+   glutscreen.context_create = grend_context_create;
+   glutscreen.resource_create = grend_resource_create;
+   glutscreen.flush_frontbuffer = grend_flush_frontbuffer;
    return &glutscreen;
 }
 

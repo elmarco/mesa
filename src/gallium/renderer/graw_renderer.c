@@ -16,6 +16,8 @@
 
 #include "state_tracker/graw.h"
 
+#include "graw_shader.h"
+
 const GLchar* VertexShader =
 {
     "#version 130\n"
@@ -104,14 +106,6 @@ struct grend_context {
    struct pipe_vertex_buffer vbo[PIPE_MAX_ATTRIBS];
 };
 
-boolean tgsi_text_translate(const char *text,
-			    struct tgsi_token *tokens,
-                            uint num_tokens)
-{
-   return FALSE;
-}
-
-
 static void Reshape(int width, int height)
 {
 
@@ -134,6 +128,7 @@ static struct pipe_surface *grend_create_surface(struct pipe_context *ctx,
    surf = calloc(1, sizeof(struct grend_surface));
 
    surf->base = *templat;
+   surf->base.texture = NULL;
    pipe_resource_reference(&surf->base.texture, resource);
    surf->base.context = ctx;
    glGenFramebuffers(1, &surf->id);
@@ -261,11 +256,37 @@ static void grend_transfer_inline_write(struct pipe_context *ctx,
    glBufferData(GL_ARRAY_BUFFER_ARB, box->width, data, GL_STATIC_DRAW);
 }
 
+static void *grend_create_vs_state(struct pipe_context *ctx,
+                                   const struct pipe_shader_state *shader)
+{
+   char *glsl_prog;
+
+   glsl_prog = tgsi_convert(shader->tokens, 0);
+   
+   if (glsl_prog) {
+      fprintf(stderr,"FS:\n%s\n", glsl_prog);
+   }
+   return NULL;
+}
+
+static void *grend_create_fs_state(struct pipe_context *ctx,
+                                   const struct pipe_shader_state *shader)
+{
+   char *glsl_prog;
+
+   glsl_prog = tgsi_convert(shader->tokens, 0);
+   if (glsl_prog) {
+      fprintf(stderr,"FS:\n%s\n", glsl_prog);
+   }
+   return NULL;
+}
+
 static void grend_bind_vs_state(struct pipe_context *ctx,
                                         void *vss)
 {
    hack_shaders();
 }
+
 
 static void grend_bind_fs_state(struct pipe_context *ctx,
                                         void *vss)
@@ -344,6 +365,8 @@ static struct pipe_context *grend_context_create(struct pipe_screen *pscreen,
    gr_ctx->base.bind_vertex_elements_state = grend_bind_vertex_elements_state;
    gr_ctx->base.set_vertex_buffers = grend_set_vertex_buffers;
    gr_ctx->base.transfer_inline_write = grend_transfer_inline_write;
+   gr_ctx->base.create_fs_state = grend_create_fs_state;
+   gr_ctx->base.create_vs_state = grend_create_vs_state;
    gr_ctx->base.bind_vs_state = grend_bind_vs_state;
    gr_ctx->base.bind_fs_state = grend_bind_fs_state;
    gr_ctx->base.clear = grend_clear;

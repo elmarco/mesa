@@ -96,6 +96,13 @@ struct grend_vertex_element {
    GLuint vboids[PIPE_MAX_ATTRIBS];
 };
 
+struct 
+grend_shader_state {
+   uint id;
+   unsigned type;
+   char *glsl_prog;
+};
+
 
 struct grend_context {
    struct pipe_context base;
@@ -104,6 +111,9 @@ struct grend_context {
    struct grend_vertex_element *ve;
    int num_vbos;
    struct pipe_vertex_buffer vbo[PIPE_MAX_ATTRIBS];
+
+   struct grend_shader_state *vs;
+   struct grend_shader_state *fs;
 };
 
 static void Reshape(int width, int height)
@@ -259,39 +269,54 @@ static void grend_transfer_inline_write(struct pipe_context *ctx,
 static void *grend_create_vs_state(struct pipe_context *ctx,
                                    const struct pipe_shader_state *shader)
 {
+   struct grend_shader_state *state = CALLOC_STRUCT(grend_shader_state);
    char *glsl_prog;
 
+   state->id = glCreateShader(GL_VERTEX_SHADER);
    glsl_prog = tgsi_convert(shader->tokens, 0);
    
    if (glsl_prog) {
-      fprintf(stderr,"FS:\n%s\n", glsl_prog);
+      glShaderSource(state->id, 1, &glsl_prog, NULL);
+      glCompileShader(state->id);
+      fprintf(stderr,"VS:\n%s\n", glsl_prog);
    }
-   return NULL;
+   return state;
 }
 
 static void *grend_create_fs_state(struct pipe_context *ctx,
                                    const struct pipe_shader_state *shader)
 {
+   struct grend_shader_state *state = CALLOC_STRUCT(grend_shader_state);
    char *glsl_prog;
 
+   state->id = glCreateShader(GL_FRAGMENT_SHADER);
+   
    glsl_prog = tgsi_convert(shader->tokens, 0);
    if (glsl_prog) {
+      glShaderSource(state->id, 1, &glsl_prog, NULL);
+      glCompileShader(state->id);
       fprintf(stderr,"FS:\n%s\n", glsl_prog);
    }
-   return NULL;
+   return state;
 }
 
 static void grend_bind_vs_state(struct pipe_context *ctx,
                                         void *vss)
 {
-   hack_shaders();
+   struct grend_context *grctx = (struct grend_context *)ctx;
+   struct grend_shader_state *state = vss; 
+
+   grctx->vs = state;
 }
 
 
 static void grend_bind_fs_state(struct pipe_context *ctx,
                                         void *vss)
 {
+   struct grend_context *grctx = (struct grend_context *)ctx;
+   struct grend_shader_state *state = vss; 
 
+   grctx->fs = state;
 }
 
 static void grend_clear(struct pipe_context *pipe,
@@ -302,7 +327,6 @@ static void grend_clear(struct pipe_context *pipe,
    glUseProgram(0);
    glClearColor(color->f[0], color->f[1], color->f[2], color->f[3]);
    glClear(GL_COLOR_BUFFER_BIT);
-   glUseProgram(ProgramId);
 
 }
 
@@ -312,7 +336,13 @@ static void grend_draw_vbo(struct pipe_context *ctx,
    struct grend_context *grctx = (struct grend_context *)ctx;
    GLuint vaoid;
    int i;
+   int program_id;
 
+   program_id = glCreateProgram();
+   glAttachShader(program_id, grctx->vs->id);
+   glAttachShader(program_id, grctx->fs->id);
+   glLinkProgram(program_id);
+   glUseProgram(program_id);
    glGenVertexArrays(1, &vaoid);
 
    glBindVertexArray(vaoid);

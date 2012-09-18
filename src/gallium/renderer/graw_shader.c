@@ -64,7 +64,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
       strcat(ctx->glsl_prog, "void main(void)\n{\n");
    for (i = 0; i < inst->Instruction.NumDstRegs; i++) {
       const struct tgsi_full_dst_register *dst = &inst->Dst[i];
-      if (dst->Register.File == TGSI_FILE_OUTPUT) {
+      if (dst->Register.File == TGSI_FILE_OUTPUT) {\
          snprintf(dsts[i], 255, "out_%d", dst->Register.Index);
       }
    }
@@ -73,6 +73,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
       const struct tgsi_full_src_register *src = &inst->Src[i];
 
       if (src->Register.File == TGSI_FILE_INPUT) {
+         
          snprintf(srcs[i], 255, "in_%d", src->Register.Index);
       }
    }

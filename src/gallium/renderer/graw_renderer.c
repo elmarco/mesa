@@ -18,57 +18,6 @@
 
 #include "graw_shader.h"
 
-const GLchar* VertexShader =
-{
-    "#version 130\n"
-    "#extension GL_ARB_explicit_attrib_location: enable\n"
-    "layout(location=0) in vec4 in_Position;\n"
-    "layout(location=1) in vec4 in_Color;\n"
-    "out vec4 ex_Color;\n"
-    "void main(void)\n"
-    "{\n"
-    "   gl_Position = in_Position;\n"
-    "   ex_Color = in_Color;\n"
-    "}\n"
-};
-
-const GLchar* FragmentShader =
-{
-	"#version 130\n"
-	"in vec4 ex_Color;\n"
-	"out vec4 out_Color;\n"
-	"void main(void)\n"
-	"{\n"
-	"	out_Color = ex_Color;\n"
-	"}\n"
-};
-
-GLuint VertexShaderId, FragmentShaderId, ProgramId;
-
-static void hack_shaders(void)
-{
-   static GLuint shaders_hacked;
-
-   if (shaders_hacked) {
-      glUseProgram(ProgramId);
-      return;
-   }
-
-   shaders_hacked = 1;
-   VertexShaderId = glCreateShader(GL_VERTEX_SHADER);
-   glShaderSource(VertexShaderId, 1, &VertexShader, NULL);
-   glCompileShader(VertexShaderId);
-
-   FragmentShaderId = glCreateShader(GL_FRAGMENT_SHADER);
-   glShaderSource(FragmentShaderId, 1, &FragmentShader, NULL);
-   glCompileShader(FragmentShaderId);
-
-   ProgramId = glCreateProgram();
-   glAttachShader(ProgramId, VertexShaderId);
-   glAttachShader(ProgramId, FragmentShaderId);
-   glLinkProgram(ProgramId);
-}
-
 struct grend_screen;
 
 struct grend_resource {
@@ -274,7 +223,6 @@ static void *grend_create_vs_state(struct pipe_context *ctx,
 
    state->id = glCreateShader(GL_VERTEX_SHADER);
    glsl_prog = tgsi_convert(shader->tokens, 0);
-   
    if (glsl_prog) {
       glShaderSource(state->id, 1, &glsl_prog, NULL);
       glCompileShader(state->id);

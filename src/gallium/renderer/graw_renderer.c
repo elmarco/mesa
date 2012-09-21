@@ -155,13 +155,26 @@ static void grend_set_framebuffer_state(struct pipe_context *ctx,
    
    glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, surf->id);
    glDrawBuffer(GL_COLOR_ATTACHMENT0);
-   glViewport(0, 0, state->width, state->height);
 }
 
 static void grend_set_viewport_state(struct pipe_context *ctx,
-                                             const struct pipe_viewport_state *state)
+                                     const struct pipe_viewport_state *state)
 {
+   /* convert back to glViewport */
+   GLint x, y;
+   GLsizei width, height;
+   GLclampd near_val, far_val;
 
+   width = state->scale[0] * 2.0f;
+   height = state->scale[1] * 2.0f;
+   x = state->translate[0] - state->scale[0];
+   y = state->translate[1] - state->scale[1];
+   near_val = state->translate[2] - state->scale[2];
+
+   far_val = near_val + (state->scale[2] * 2.0f);
+
+   glViewport(x, y, width, height);
+   glDepthRange(near_val, far_val);
 }
 
 static void *grend_create_vertex_elements_state(struct pipe_context *ctx,

@@ -18,4 +18,5 @@ tri_SOURCES = \
 	$(C_SOURCES) \
         graw_util.c \
         graw_renderer.c \
-        graw_shader.c
+        graw_shader.c \
+        graw_object.c

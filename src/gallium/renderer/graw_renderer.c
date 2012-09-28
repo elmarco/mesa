@@ -16,6 +16,7 @@
 
 #include "state_tracker/graw.h"
 
+#include "graw_object.h"
 #include "graw_shader.h"
 
 struct grend_screen;
@@ -105,16 +106,39 @@ static void *grend_create_blend_state(struct pipe_context *ctx,
                                               const struct pipe_blend_state *blend_state)
 {
    struct pipe_blend_state *state = CALLOC_STRUCT(pipe_blend_state);
+   uint32_t handle;
 
    *state = *blend_state;
-   return state;
+
+   handle = graw_object_create_handle(state);
+   
+   return (void *)(unsigned long)handle;
 
 }
 
 static void grend_bind_blend_state(struct pipe_context *ctx,
                                            void *blend_state)
 {
+   uint32_t handle = (unsigned long)blend_state;
+   void *state;
 
+   state = graw_object_lookup(handle);
+   if (!state)
+      fprintf(stderr,"illegal blend state\n");
+}
+
+static void grend_delete_blend_state(struct pipe_context *ctx,
+                                     void *blend_state)
+{
+   uint32_t handle = (unsigned long)blend_state;
+   struct pipe_blend_state *state;
+
+   state = graw_object_lookup(handle);
+   if (!state)
+      return;
+
+   graw_object_destroy_handle(handle);
+   free(state);
 }
 
 static void *grend_create_depth_stencil_alpha_state(struct pipe_context *ctx,
@@ -133,14 +157,32 @@ static void grend_bind_depth_stencil_alpha_state(struct pipe_context *ctx,
 static void *grend_create_rasterizer_state(struct pipe_context *ctx,
                                                    const struct pipe_rasterizer_state *rs_state)
 {
-   return NULL;
+   struct pipe_rasterizer_state *myrs_state = CALLOC_STRUCT(pipe_rasterizer_state);
+   uint32_t handle;
+   *myrs_state = *rs_state;
 
+   handle = graw_object_create_handle(myrs_state);
+
+   return (void *)(unsigned long)handle;
 }
 
 static void grend_bind_rasterizer_state(struct pipe_context *ctx,
-                                                void *blend_state)
+                                                void *rs_state)
 {
+   uint32_t handle = (unsigned long)rs_state;
+   struct pipe_rasterizer_state *myrs_state;
 
+   myrs_state = graw_object_lookup(handle);
+   if (!myrs_state){
+      fprintf(stderr,"illegal rs state handle\n");
+      return;
+   }
+
+   if (myrs_state->flatshade)
+      glShadeModel(GL_FLAT);
+   else
+      glShadeModel(GL_SMOOTH);
+       
 }
 
 static void grend_set_framebuffer_state(struct pipe_context *ctx,
@@ -184,20 +226,30 @@ static void *grend_create_vertex_elements_state(struct pipe_context *ctx,
    struct grend_vertex_element *v = CALLOC_STRUCT(grend_vertex_element);
    int i;
    int max_vbo_index = 0;
+   uint32_t handle;
    v->count = num_elements;
    memcpy(v->elements, elements, sizeof(struct pipe_vertex_element) * num_elements);
 
-   return v;
+   handle = graw_object_create_handle(v);
+   
+   return (void*)(unsigned long)handle;
 }
 
 static void grend_bind_vertex_elements_state(struct pipe_context *ctx,
                                                      void *ve)
 {
+   uint32_t handle = (unsigned long)ve;
    struct grend_context *grctx = (struct grend_context *)ctx;
-   struct grend_vertex_element *v = (struct grend_vertex_element *)ve;
+   struct grend_vertex_element *v;
    int i;
 
-   grctx->ve = ve;
+   v = graw_object_lookup(handle);
+   if (!v) {
+      fprintf(stderr, "illegal ve lookup\n");
+      return;
+   }
+      
+   grctx->ve = v;
 }
 
 static void grend_set_vertex_buffers(struct pipe_context *ctx,
@@ -232,6 +284,8 @@ static void *grend_create_vs_state(struct pipe_context *ctx,
                                    const struct pipe_shader_state *shader)
 {
    struct grend_shader_state *state = CALLOC_STRUCT(grend_shader_state);
+   uint32_t handle;
+
    char *glsl_prog;
 
    state->id = glCreateShader(GL_VERTEX_SHADER);
@@ -241,7 +295,10 @@ static void *grend_create_vs_state(struct pipe_context *ctx,
       glCompileShader(state->id);
       fprintf(stderr,"VS:\n%s\n", glsl_prog);
    }
-   return state;
+
+   handle = graw_object_create_handle(state);
+
+   return (void *)(unsigned long)handle;
 }
 
 static void *grend_create_fs_state(struct pipe_context *ctx,
@@ -249,6 +306,7 @@ static void *grend_create_fs_state(struct pipe_context *ctx,
 {
    struct grend_shader_state *state = CALLOC_STRUCT(grend_shader_state);
    char *glsl_prog;
+   uint32_t handle;
 
    state->id = glCreateShader(GL_FRAGMENT_SHADER);
    
@@ -258,14 +316,19 @@ static void *grend_create_fs_state(struct pipe_context *ctx,
       glCompileShader(state->id);
       fprintf(stderr,"FS:\n%s\n", glsl_prog);
    }
-   return state;
+   handle = graw_object_create_handle(state);
+
+   return (void *)(unsigned long)handle;
 }
 
 static void grend_bind_vs_state(struct pipe_context *ctx,
                                         void *vss)
 {
+   uint32_t handle = (unsigned long)vss;
    struct grend_context *grctx = (struct grend_context *)ctx;
-   struct grend_shader_state *state = vss; 
+   struct grend_shader_state *state;
+
+   state = graw_object_lookup(handle);
 
    grctx->vs = state;
 }
@@ -274,8 +337,11 @@ static void grend_bind_vs_state(struct pipe_context *ctx,
 static void grend_bind_fs_state(struct pipe_context *ctx,
                                         void *vss)
 {
+   uint32_t handle = (unsigned long)vss;
    struct grend_context *grctx = (struct grend_context *)ctx;
-   struct grend_shader_state *state = vss; 
+   struct grend_shader_state *state;
+
+   state = graw_object_lookup(handle);
 
    grctx->fs = state;
 }
@@ -347,6 +413,7 @@ static struct pipe_context *grend_context_create(struct pipe_screen *pscreen,
    gr_ctx->base.set_framebuffer_state = grend_set_framebuffer_state;
    gr_ctx->base.create_blend_state = grend_create_blend_state;
    gr_ctx->base.bind_blend_state = grend_bind_blend_state;
+   gr_ctx->base.delete_blend_state = grend_delete_blend_state;
    gr_ctx->base.create_depth_stencil_alpha_state = grend_create_depth_stencil_alpha_state;
    gr_ctx->base.bind_depth_stencil_alpha_state = grend_bind_depth_stencil_alpha_state;
    gr_ctx->base.create_rasterizer_state = grend_create_rasterizer_state;
@@ -459,7 +526,7 @@ graw_create_window_and_screen( int x,
    *handle = 5;
    if (!glut_inited) {
       glut_inited = 1;
-
+      graw_object_init_hash();
       glutInit(&argc, NULL);
    }
    

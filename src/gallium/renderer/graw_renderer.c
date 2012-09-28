@@ -110,7 +110,8 @@ static void *grend_create_blend_state(struct pipe_context *ctx,
 
    *state = *blend_state;
 
-   handle = graw_object_create_handle(state);
+   handle = graw_object_create(state, sizeof(struct pipe_blend_state),
+                               GRAW_OBJECT_BLEND);
    
    return (void *)(unsigned long)handle;
 
@@ -122,7 +123,7 @@ static void grend_bind_blend_state(struct pipe_context *ctx,
    uint32_t handle = (unsigned long)blend_state;
    void *state;
 
-   state = graw_object_lookup(handle);
+   state = graw_object_lookup(handle, GRAW_OBJECT_BLEND);
    if (!state)
       fprintf(stderr,"illegal blend state\n");
 }
@@ -133,11 +134,11 @@ static void grend_delete_blend_state(struct pipe_context *ctx,
    uint32_t handle = (unsigned long)blend_state;
    struct pipe_blend_state *state;
 
-   state = graw_object_lookup(handle);
+   state = graw_object_lookup(handle, GRAW_OBJECT_BLEND);
    if (!state)
       return;
 
-   graw_object_destroy_handle(handle);
+   graw_object_destroy(handle);
    free(state);
 }
 
@@ -161,7 +162,8 @@ static void *grend_create_rasterizer_state(struct pipe_context *ctx,
    uint32_t handle;
    *myrs_state = *rs_state;
 
-   handle = graw_object_create_handle(myrs_state);
+   handle = graw_object_create(myrs_state, sizeof(struct pipe_rasterizer_state),
+                               GRAW_OBJECT_RASTERIZER);
 
    return (void *)(unsigned long)handle;
 }
@@ -172,7 +174,7 @@ static void grend_bind_rasterizer_state(struct pipe_context *ctx,
    uint32_t handle = (unsigned long)rs_state;
    struct pipe_rasterizer_state *myrs_state;
 
-   myrs_state = graw_object_lookup(handle);
+   myrs_state = graw_object_lookup(handle, GRAW_OBJECT_RASTERIZER);
    if (!myrs_state){
       fprintf(stderr,"illegal rs state handle\n");
       return;
@@ -230,7 +232,8 @@ static void *grend_create_vertex_elements_state(struct pipe_context *ctx,
    v->count = num_elements;
    memcpy(v->elements, elements, sizeof(struct pipe_vertex_element) * num_elements);
 
-   handle = graw_object_create_handle(v);
+   handle = graw_object_create(v, sizeof(struct grend_vertex_element),
+                               GRAW_OBJECT_VERTEX_ELEMENTS);
    
    return (void*)(unsigned long)handle;
 }
@@ -243,7 +246,7 @@ static void grend_bind_vertex_elements_state(struct pipe_context *ctx,
    struct grend_vertex_element *v;
    int i;
 
-   v = graw_object_lookup(handle);
+   v = graw_object_lookup(handle, GRAW_OBJECT_VERTEX_ELEMENTS);
    if (!v) {
       fprintf(stderr, "illegal ve lookup\n");
       return;
@@ -296,7 +299,7 @@ static void *grend_create_vs_state(struct pipe_context *ctx,
       fprintf(stderr,"VS:\n%s\n", glsl_prog);
    }
 
-   handle = graw_object_create_handle(state);
+   handle = graw_object_create(state, sizeof(*state), GRAW_OBJECT_VS);
 
    return (void *)(unsigned long)handle;
 }
@@ -316,7 +319,7 @@ static void *grend_create_fs_state(struct pipe_context *ctx,
       glCompileShader(state->id);
       fprintf(stderr,"FS:\n%s\n", glsl_prog);
    }
-   handle = graw_object_create_handle(state);
+   handle = graw_object_create(state, sizeof(*state), GRAW_OBJECT_FS);
 
    return (void *)(unsigned long)handle;
 }
@@ -328,7 +331,7 @@ static void grend_bind_vs_state(struct pipe_context *ctx,
    struct grend_context *grctx = (struct grend_context *)ctx;
    struct grend_shader_state *state;
 
-   state = graw_object_lookup(handle);
+   state = graw_object_lookup(handle, GRAW_OBJECT_VS);
 
    grctx->vs = state;
 }
@@ -341,7 +344,7 @@ static void grend_bind_fs_state(struct pipe_context *ctx,
    struct grend_context *grctx = (struct grend_context *)ctx;
    struct grend_shader_state *state;
 
-   state = graw_object_lookup(handle);
+   state = graw_object_lookup(handle, GRAW_OBJECT_FS);
 
    grctx->fs = state;
 }

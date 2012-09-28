@@ -1,7 +1,9 @@
 #include "util/u_pointer.h"
+#include "util/u_memory.h"
 #include "util/u_hash_table.h"
 
 #include "graw_object.h"
+
 static unsigned
 hash_func(void *key)
 {
@@ -23,6 +25,12 @@ compare(void *key1, void *key2)
 static struct util_hash_table *handle_hash;
 static uint32_t next_handle;
 
+struct graw_object {
+   enum graw_object_type type;
+   uint32_t handle;
+   void *data;
+};
+
 void
 graw_object_init_hash(void)
 {
@@ -31,20 +39,37 @@ graw_object_init_hash(void)
 }
 
 uint32_t
-graw_object_create_handle(void *object)
+graw_object_create(void *data, uint32_t length, enum graw_object_type type)
 {
-   uint32_t h = next_handle++;
-   util_hash_table_set(handle_hash, intptr_to_pointer(h), object);
-   return h;
+   struct graw_object *obj = CALLOC_STRUCT(graw_object);
+
+   if (!obj)
+      return 0;
+   obj->handle = next_handle++;
+   obj->data = data;
+   obj->type = type;
+   util_hash_table_set(handle_hash, intptr_to_pointer(obj->handle), obj);
+   return obj->handle;
 }
 
 void
-graw_object_destroy_handle(uint32_t handle)
+graw_object_destroy(uint32_t handle)
 {
+   struct graw_object *obj = util_hash_table_get(handle_hash, intptr_to_pointer(handle));
+   if (!obj)
+      return;
    util_hash_table_remove(handle_hash, intptr_to_pointer(handle));
+   free(obj);
 }
 
-void *graw_object_lookup(uint32_t handle)
+void *graw_object_lookup(uint32_t handle, enum graw_object_type type)
 {
-   return util_hash_table_get(handle_hash, intptr_to_pointer(handle));
+   struct graw_object *obj = util_hash_table_get(handle_hash, intptr_to_pointer(handle));
+
+   if (!obj)
+      return NULL;
+
+   if (obj->type != type)
+      return NULL;
+   return obj->data;
 }

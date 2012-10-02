@@ -17,6 +17,17 @@ int graw_encode_blend_state(struct graw_encoder_state *enc,
    tmp = blend_state->logicop_fund << 0;
    graw_encode_write_dword(enc, tmp);
 
-   for (i = 0; i < PIPE_MAX_COLOR_BUFS; i++);
+   for (i = 0; i < PIPE_MAX_COLOR_BUFS; i++) {
 
+   }
+}
+
+int graw_encode_vs_state(struct graw_encoder_state *enc,
+			 const struct pipe_shader_state *shader)
+{
+   uint32_t tmp;
+   
+   /* dump shader to tgsi text */
+
+   /* encode text */
 }

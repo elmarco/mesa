@@ -21,4 +21,11 @@ static inline void graw_encoder_write_qword(struct graw_encoder_state *state,
    state->buf_offset += 2;
 }
 
+static inline void graw_encoder_write_block(struct graw_encoder_state *state,
+					    uint8_t *ptr, uint32_t len)
+{
+   memcpy(state->buf + state->buf_offset, ptr, len);
+   state->buf_offset += len;
+}
+
 #endif

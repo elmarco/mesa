@@ -109,7 +109,6 @@ static void draw( void )
    info.ctx->flush(info.ctx, NULL);
 
    graw_save_surface_to_file(info.ctx, info.color_surf[0], NULL);
-
    graw_util_flush_front(&info);
 }
 

@@ -19,4 +19,7 @@ tri_SOURCES = \
         graw_util.c \
         graw_renderer.c \
         graw_shader.c \
-        graw_object.c
+        graw_object.c \
+        graw_encode.c \
+        graw_decode.c \
+        graw_context.c

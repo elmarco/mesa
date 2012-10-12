@@ -1,0 +1,38 @@
+#ifndef GRAW_PROTOCOL_H
+#define GRAW_PROTOCOL_H
+
+enum graw_object_type {
+   GRAW_OBJECT_NULL,
+   GRAW_OBJECT_BLEND,
+   GRAW_OBJECT_RASTERIZER,
+   GRAW_OBJECT_DSA,
+   GRAW_OBJECT_VS,
+   GRAW_OBJECT_FS,
+   GRAW_OBJECT_VERTEX_ELEMENTS,
+   GRAW_RESOURCE,
+   GRAW_SURFACE,
+};
+
+/* context cmds to be encoded in the command stream */
+enum graw_cmd {
+   GRAW_NOP = 0,
+   GRAW_CREATE_OBJECT = 1,
+   GRAW_BIND_OBJECT,
+   GRAW_DESTROY_OBJECT,
+   GRAW_SET_VIEWPORT_STATE,
+   GRAW_SET_FRAMEBUFFER_STATE,
+   GRAW_SET_VERTEX_BUFFERS,
+   GRAW_CLEAR,
+   GRAW_DRAW_VBO,
+   GRAW_FLUSH_FRONTBUFFER,
+};
+
+/* 
+ 8-bit cmd headers
+ 8-bit object type
+ 16-bit length
+*/
+
+#define GRAW_CMD0(cmd, obj, len) ((cmd) | ((obj) << 8) | ((len) << 16))
+
+#endif

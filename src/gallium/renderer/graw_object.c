@@ -52,6 +52,20 @@ graw_object_create(void *data, uint32_t length, enum graw_object_type type)
    return obj->handle;
 }
 
+uint32_t
+graw_object_insert(void *data, uint32_t length, uint32_t handle, enum graw_object_type type)
+{
+   struct graw_object *obj = CALLOC_STRUCT(graw_object);
+
+   if (!obj)
+      return 0;
+   obj->handle = handle;
+   obj->data = data;
+   obj->type = type;
+   util_hash_table_set(handle_hash, intptr_to_pointer(obj->handle), obj);
+   return obj->handle;
+}
+
 void
 graw_object_destroy(uint32_t handle)
 {
@@ -72,4 +86,9 @@ void *graw_object_lookup(uint32_t handle, enum graw_object_type type)
    if (obj->type != type)
       return NULL;
    return obj->data;
+}
+
+uint32_t graw_object_assign_handle(void)
+{
+   return next_handle++;
 }

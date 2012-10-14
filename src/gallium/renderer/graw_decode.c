@@ -83,15 +83,76 @@ static void graw_decode_clear(struct grend_decode_ctx *ctx)
    grend_clear(ctx->grctx, buffers, &color, depth, stencil);
 }
 
+static float fui(unsigned int ui)
+{
+   union { float f; unsigned int ui; } myuif;
+   myuif.ui = ui;
+   return myuif.f;
+}
+
 static void graw_decode_set_viewport_state(struct grend_decode_ctx *ctx)
 {
+   struct pipe_viewport_state vps;
+   int i;
 
+   for (i = 0; i < 4; i++)
+      vps.scale[i] = fui(ctx->ds->buf[ctx->ds->buf_offset + 1 + i]);
+   for (i = 0; i < 4; i++)
+      vps.translate[i] = fui(ctx->ds->buf[ctx->ds->buf_offset + 5 + i]);
+   
+   grend_set_viewport_state(ctx->grctx, &vps);
+}
 
+static void graw_decode_set_vertex_buffers(struct grend_decode_ctx *ctx, uint16_t length)
+{
+   int num_vbo;
+   int i;
+   num_vbo = (length / 3);
+
+   for (i = 0; i < num_vbo; i++) {
+      int element_offset = ctx->ds->buf_offset + 1 + (i * 3);
+      grend_set_single_vbo(ctx->grctx, i,
+                           ctx->ds->buf[element_offset],
+                           ctx->ds->buf[element_offset + 1],
+                           ctx->ds->buf[element_offset + 2]);
+   }
+   grend_set_num_vbo(ctx->grctx, num_vbo);
+
+}
+
+static void graw_decode_resource_inline_write(struct grend_decode_ctx *ctx, uint16_t length)
+{
+   struct pipe_box box;
+   uint32_t res_handle = ctx->ds->buf[ctx->ds->buf_offset + 1];
+   uint32_t level, usage, stride, layer_stride;
+   void *data;
+
+   level = ctx->ds->buf[ctx->ds->buf_offset + 2];
+   usage = ctx->ds->buf[ctx->ds->buf_offset + 3];
+   stride = ctx->ds->buf[ctx->ds->buf_offset + 4];
+   layer_stride = ctx->ds->buf[ctx->ds->buf_offset + 5];
+   box.x = ctx->ds->buf[ctx->ds->buf_offset + 6];
+   box.y = ctx->ds->buf[ctx->ds->buf_offset + 7];
+   box.z = ctx->ds->buf[ctx->ds->buf_offset + 8];
+   box.width = ctx->ds->buf[ctx->ds->buf_offset + 9];
+   box.height = ctx->ds->buf[ctx->ds->buf_offset + 10];
+   box.depth = ctx->ds->buf[ctx->ds->buf_offset + 11];
+
+   data = &ctx->ds->buf[ctx->ds->buf_offset + 12];
+   grend_transfer_inline_write(ctx->grctx, res_handle, level,
+                               usage, &box, data, stride, layer_stride);
+                               
 }
 
 static void graw_decode_draw_vbo(struct grend_decode_ctx *ctx)
 {
+   struct pipe_draw_info info;
 
+   memset(&info, 0, sizeof(struct pipe_draw_info));
+
+   info.start = ctx->ds->buf[ctx->ds->buf_offset + 1];
+   info.count = ctx->ds->buf[ctx->ds->buf_offset + 2];
+   grend_draw_vbo(gdctx->grctx, &info);
 }
 
 static void graw_decode_create_blend(struct grend_decode_ctx *ctx, uint32_t handle, uint16_t length)
@@ -111,6 +172,29 @@ static void graw_decode_create_surface(struct grend_decode_ctx *ctx, uint32_t ha
    grend_create_surface(ctx->grctx, handle, res_handle);
 }
 
+static void graw_decode_create_ve(struct grend_decode_ctx *ctx, uint32_t handle, uint16_t length)
+{
+   struct pipe_vertex_element *ve;
+   int num_elements;
+   int i;
+
+   num_elements = (length - 1) / 4;
+   ve = calloc(num_elements, sizeof(struct pipe_vertex_element));
+   if (!ve)
+      return;
+      
+   for (i = 0; i < num_elements; i++) {
+      uint32_t element_offset = ctx->ds->buf_offset + 2 + (i * 4);
+      ve[i].src_offset = ctx->ds->buf[element_offset];
+      ve[i].instance_divisor = ctx->ds->buf[element_offset + 1];
+      ve[i].vertex_buffer_index = ctx->ds->buf[element_offset + 2];
+      ve[i].src_format = ctx->ds->buf[element_offset + 3];
+   }
+
+   grend_create_vertex_elements_state(ctx->grctx, handle, num_elements,
+                                      ve);
+}
+
 static void graw_decode_create_object(struct grend_decode_ctx *ctx)
 {
    uint32_t header = ctx->ds->buf[ctx->ds->buf_offset];
@@ -127,6 +211,9 @@ static void graw_decode_create_object(struct grend_decode_ctx *ctx)
    case GRAW_OBJECT_VS:
    case GRAW_OBJECT_FS:
       graw_decode_create_shader(ctx, obj_type, handle, length);
+      break;
+   case GRAW_OBJECT_VERTEX_ELEMENTS:
+      graw_decode_create_ve(ctx, handle, length);
       break;
    case GRAW_RESOURCE:
       break;
@@ -154,6 +241,9 @@ static void graw_decode_bind_object(struct grend_decode_ctx *ctx)
       break;
    case GRAW_OBJECT_FS:
       grend_bind_fs(ctx->grctx, handle);
+      break;
+   case GRAW_OBJECT_VERTEX_ELEMENTS:
+      grend_bind_vertex_elements_state(ctx->grctx, handle);
       break;
    }
       
@@ -197,12 +287,20 @@ void graw_decode_block(uint32_t *block, int ndw)
          graw_decode_clear(gdctx);
          break;
       case GRAW_DRAW_VBO:
-         grend_draw_vbo(gdctx->grctx, NULL);
+         graw_decode_draw_vbo(gdctx);
          break;
       case GRAW_SET_FRAMEBUFFER_STATE:
          graw_decode_set_framebuffer_state(gdctx);
          break;
       case GRAW_SET_VERTEX_BUFFERS:
+         graw_decode_set_vertex_buffers(gdctx, header >> 16);
+         break;
+      case GRAW_RESOURCE_INLINE_WRITE:
+         graw_decode_resource_inline_write(gdctx, header >> 16);
+         break;
+      case GRAW_SET_VIEWPORT_STATE:
+         graw_decode_set_viewport_state(gdctx);
+         break;
       case GRAW_FLUSH_FRONTBUFFER:
          break;
       }

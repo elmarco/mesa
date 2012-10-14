@@ -25,6 +25,7 @@ enum graw_cmd {
    GRAW_CLEAR,
    GRAW_DRAW_VBO,
    GRAW_FLUSH_FRONTBUFFER,
+   GRAW_RESOURCE_INLINE_WRITE,
 };
 
 /* 

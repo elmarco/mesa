@@ -84,4 +84,22 @@ int graw_encoder_create_surface(struct graw_encoder_state *enc,
 
 int graw_encoder_flush_frontbuffer(struct graw_encoder_state *enc,
                                    uint32_t res_handle);
+
+int graw_encoder_create_vertex_elements(struct graw_encoder_state *enc,
+                                        uint32_t handle,
+                                        unsigned num_elements,
+                                        const struct pipe_vertex_element *element);
+
+int graw_encoder_set_vertex_buffers(struct graw_encoder_state *enc,
+                                    unsigned num_buffers,
+                                    const struct pipe_vertex_buffer *buffers,
+                                    uint32_t *res_handles);
+
+
+int graw_encoder_inline_write(struct graw_encoder_state *enc,
+                              uint32_t res_handle,
+                              unsigned level, unsigned usage,
+                              const struct pipe_box *box,
+                              void *data, unsigned stride,
+                              unsigned layer_stride);
 #endif

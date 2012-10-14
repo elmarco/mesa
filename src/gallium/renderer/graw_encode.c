@@ -113,10 +113,43 @@ int graw_encoder_set_viewport_state(struct graw_encoder_state *enc,
    return 0;
 }
 
+int graw_encoder_create_vertex_elements(struct graw_encoder_state *enc,
+                                        uint32_t handle,
+                                        unsigned num_elements,
+                                        const struct pipe_vertex_element *element)
+{
+   int i;
+   graw_encoder_write_dword(enc, GRAW_CMD0(GRAW_CREATE_OBJECT, GRAW_OBJECT_VERTEX_ELEMENTS, (4 * num_elements) + 1));
+   graw_encoder_write_dword(enc, handle);
+   for (i = 0; i < num_elements; i++) {
+      graw_encoder_write_dword(enc, element[i].src_offset);
+      graw_encoder_write_dword(enc, element[i].instance_divisor);
+      graw_encoder_write_dword(enc, element[i].vertex_buffer_index);
+      graw_encoder_write_dword(enc, element[i].src_format);
+   }
+   return 0;
+}
+
+int graw_encoder_set_vertex_buffers(struct graw_encoder_state *enc,
+                                    unsigned num_buffers,
+                                    const struct pipe_vertex_buffer *buffers,
+                                    uint32_t *res_handles)
+{
+   int i;
+   graw_encoder_write_dword(enc, GRAW_CMD0(GRAW_SET_VERTEX_BUFFERS, 0, (3 * num_buffers)));
+   for (i = 0; i < num_buffers; i++) {
+      graw_encoder_write_dword(enc, buffers[i].stride);
+      graw_encoder_write_dword(enc, buffers[i].buffer_offset);
+      graw_encoder_write_dword(enc, res_handles[i]);
+   }
+}
 int graw_encoder_draw_vbo(struct graw_encoder_state *enc,
 			  const struct pipe_draw_info *info)
 {
-   graw_encoder_write_dword(enc, GRAW_CMD0(GRAW_DRAW_VBO, 0, 0));
+   graw_encoder_write_dword(enc, GRAW_CMD0(GRAW_DRAW_VBO, 0, 2));
+   graw_encoder_write_dword(enc, info->start);
+   graw_encoder_write_dword(enc, info->count);
+   return 0;
 }
 
 int graw_encoder_create_surface(struct graw_encoder_state *enc,
@@ -131,6 +164,32 @@ int graw_encoder_create_surface(struct graw_encoder_state *enc,
    graw_encoder_write_dword(enc, templat->height);
    graw_encoder_write_dword(enc, templat->usage);
    graw_encoder_write_dword(enc, templat->format);
+   return 0;
+}
+
+int graw_encoder_inline_write(struct graw_encoder_state *enc,
+                              uint32_t res_handle,
+                              unsigned level, unsigned usage,
+                              const struct pipe_box *box,
+                              void *data, unsigned stride,
+                              unsigned layer_stride)
+{
+   uint32_t length = 11 + box->width / 4;
+   graw_encoder_write_dword(enc, GRAW_CMD0(GRAW_RESOURCE_INLINE_WRITE, 0, length));
+   graw_encoder_write_dword(enc, res_handle);
+   graw_encoder_write_dword(enc, level);
+   graw_encoder_write_dword(enc, usage);
+   graw_encoder_write_dword(enc, stride);
+   graw_encoder_write_dword(enc, layer_stride);
+   graw_encoder_write_dword(enc, box->x);
+   graw_encoder_write_dword(enc, box->y);
+   graw_encoder_write_dword(enc, box->z);
+   graw_encoder_write_dword(enc, box->width);
+   graw_encoder_write_dword(enc, box->height);
+   graw_encoder_write_dword(enc, box->depth);
+
+   graw_encoder_write_block(enc, data, box->width);
+
 }
 
 int graw_encoder_flush_frontbuffer(struct graw_encoder_state *enc,
@@ -138,6 +197,7 @@ int graw_encoder_flush_frontbuffer(struct graw_encoder_state *enc,
 {
 //   graw_encoder_write_dword(enc, GRAW_CMD0(GRAW_FLUSH_FRONTUBFFER, 0, 1));
    graw_encoder_write_dword(enc, res_handle);
+   return 0;
 }
 
 #define EQ_BUF_SIZE (16*1024)

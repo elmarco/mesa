@@ -43,4 +43,31 @@ void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target tar
 void grend_create_surface(struct grend_context *ctx,
                           uint32_t handle,
                           uint32_t res_handle);
+
+void grend_create_vertex_elements_state(struct grend_context *ctx,
+                                        uint32_t handle,
+                                        unsigned num_elements,
+                                        const struct pipe_vertex_element *elements);
+void grend_bind_vertex_elements_state(struct grend_context *ctx,
+                                      uint32_t handle);
+
+void grend_set_single_vbo(struct grend_context *ctx,
+                         int index,
+                         uint32_t stride,
+                         uint32_t buffer_offset,
+                         uint32_t res_handle);
+void grend_set_num_vbo(struct grend_context *ctx,
+                      int num_vbo);
+
+void grend_transfer_inline_write(struct grend_context *ctx,
+                                 uint32_t res_handle,
+                                 unsigned level,
+                                 unsigned usage,
+                                 const struct pipe_box *box,
+                                 const void *data,
+                                 unsigned stride,
+                                 unsigned layer_stride);
+
+void grend_set_viewport_state(struct grend_context *ctx,
+                              const struct pipe_viewport_state *state);
 #endif

@@ -119,8 +119,8 @@ void grend_set_framebuffer_state(struct grend_context *ctx,
    glDrawBuffer(GL_COLOR_ATTACHMENT0);
 }
 
-static void grend_set_viewport_state(struct pipe_context *ctx,
-                                     const struct pipe_viewport_state *state)
+void grend_set_viewport_state(struct grend_context *ctx,
+                              const struct pipe_viewport_state *state)
 {
    /* convert back to glViewport */
    GLint x, y;
@@ -139,28 +139,25 @@ static void grend_set_viewport_state(struct pipe_context *ctx,
    glDepthRange(near_val, far_val);
 }
 
-static void *grend_create_vertex_elements_state(struct pipe_context *ctx,
-                                                        unsigned num_elements,
-                                                        const struct pipe_vertex_element *elements)
+void grend_create_vertex_elements_state(struct grend_context *ctx,
+                                        uint32_t handle,
+                                        unsigned num_elements,
+                                        const struct pipe_vertex_element *elements)
 {
    struct grend_vertex_element *v = CALLOC_STRUCT(grend_vertex_element);
    int i;
    int max_vbo_index = 0;
-   uint32_t handle;
+
    v->count = num_elements;
    memcpy(v->elements, elements, sizeof(struct pipe_vertex_element) * num_elements);
 
-   handle = graw_object_create(v, sizeof(struct grend_vertex_element),
-                               GRAW_OBJECT_VERTEX_ELEMENTS);
-   
-   return (void*)(unsigned long)handle;
+   graw_object_insert(v, sizeof(struct grend_vertex_element), handle,
+                      GRAW_OBJECT_VERTEX_ELEMENTS);
 }
 
-static void grend_bind_vertex_elements_state(struct pipe_context *ctx,
-                                                     void *ve)
+void grend_bind_vertex_elements_state(struct grend_context *ctx,
+                                      uint32_t handle)
 {
-   uint32_t handle = (unsigned long)ve;
-   struct grend_context *grctx = (struct grend_context *)ctx;
    struct grend_vertex_element *v;
    int i;
 
@@ -170,34 +167,44 @@ static void grend_bind_vertex_elements_state(struct pipe_context *ctx,
       return;
    }
       
-   grctx->ve = v;
+   ctx->ve = v;
 }
 
-static void grend_set_vertex_buffers(struct pipe_context *ctx,
-                                             unsigned num_buffers,
-                                             const struct pipe_vertex_buffer *buffers)
+void grend_set_single_vbo(struct grend_context *ctx,
+                         int index,
+                         uint32_t stride,
+                         uint32_t buffer_offset,
+                         uint32_t res_handle)
 {
-   struct grend_context *grctx = (struct grend_context *)ctx;
-   int i;
+   struct grend_resource *res;
+   ctx->vbo[index].stride = stride;
+   ctx->vbo[index].buffer_offset = buffer_offset;
 
-   for (i = 0; i < num_buffers; i++)
-      grctx->vbo[i] = buffers[i];
-   grctx->num_vbos = num_buffers;
+   res = graw_object_lookup(res_handle, GRAW_RESOURCE);
+   ctx->vbo[index].buffer = &res->base;
 }
 
-static void grend_transfer_inline_write(struct pipe_context *ctx,
-                                                struct pipe_resource *res,
-                                                unsigned level,
-                                                unsigned usage,
-                                                const struct pipe_box *box,
-                                                const void *data,
-                                                unsigned stride,
-                                                unsigned layer_stride)
+void grend_set_num_vbo(struct grend_context *ctx,
+                      int num_vbo)
 {
-   struct grend_resource *grres = (struct grend_resource *)res;
+   ctx->num_vbos = num_vbo;
+}
+
+void grend_transfer_inline_write(struct grend_context *ctx,
+                                 uint32_t res_handle,
+                                 unsigned level,
+                                 unsigned usage,
+                                 const struct pipe_box *box,
+                                 const void *data,
+                                 unsigned stride,
+                                 unsigned layer_stride)
+{
+   struct grend_resource *res;
    void *ptr;
 
-   glBindBufferARB(GL_ARRAY_BUFFER_ARB, grres->id);
+   res = graw_object_lookup(res_handle, GRAW_RESOURCE);
+   glBindBufferARB(GL_ARRAY_BUFFER_ARB, res->id);
+
    glBufferData(GL_ARRAY_BUFFER_ARB, box->width, data, GL_STATIC_DRAW);
 }
 
@@ -278,7 +285,7 @@ void grend_draw_vbo(struct grend_context *ctx,
    GLuint vaoid;
    int i;
    int program_id;
-#if 0
+#if 1
    program_id = glCreateProgram();
    glAttachShader(program_id, ctx->vs->id);
    glAttachShader(program_id, ctx->fs->id);
@@ -447,6 +454,8 @@ void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target tar
 {
    struct grend_resource *gr = CALLOC_STRUCT(grend_resource);
 
+   gr->base.width0 = width;
+   gr->base.height0 = height;
    if (target == PIPE_BUFFER) {
       glGenBuffersARB(1, &gr->id);
    } else {

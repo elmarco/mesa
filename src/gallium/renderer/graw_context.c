@@ -166,17 +166,6 @@ static void graw_set_framebuffer_state(struct pipe_context *ctx,
 {
    struct graw_context *grctx = (struct graw_context *)ctx;
    graw_encoder_set_framebuffer_state(grctx->eq, state);
-#if 0
-   struct graw_surface *surf;
-
-   if (state->nr_cbufs != 1)
-      return;
-
-   surf = (struct graw_surface *)state->cbufs[0];
-   
-   glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, surf->id);
-   glDrawBuffer(GL_COLOR_ATTACHMENT0);
-#endif
 }
 
 static void graw_set_viewport_state(struct pipe_context *ctx,
@@ -190,53 +179,36 @@ static void *graw_create_vertex_elements_state(struct pipe_context *ctx,
                                                         unsigned num_elements,
                                                         const struct pipe_vertex_element *elements)
 {
-#if 0
-   struct graw_vertex_element *v = CALLOC_STRUCT(graw_vertex_element);
-   int i;
-   int max_vbo_index = 0;
-   uint32_t handle;
-   v->count = num_elements;
-   memcpy(v->elements, elements, sizeof(struct pipe_vertex_element) * num_elements);
-
-   handle = graw_object_create(v, sizeof(struct graw_vertex_element),
-                               GRAW_OBJECT_VERTEX_ELEMENTS);
-   
+   struct graw_context *grctx = (struct graw_context *)ctx;
+   uint32_t handle = graw_object_assign_handle();
+   graw_encoder_create_vertex_elements(grctx->eq, handle,
+                                       num_elements, elements);
    return (void*)(unsigned long)handle;
-#endif
-   return NULL;
+
 }
 
 static void graw_bind_vertex_elements_state(struct pipe_context *ctx,
                                                      void *ve)
 {
-#if 0
-   uint32_t handle = (unsigned long)ve;
    struct graw_context *grctx = (struct graw_context *)ctx;
-   struct graw_vertex_element *v;
-   int i;
-
-   v = graw_object_lookup(handle, GRAW_OBJECT_VERTEX_ELEMENTS);
-   if (!v) {
-      fprintf(stderr, "illegal ve lookup\n");
-      return;
-   }
-      
-   grctx->ve = v;
-#endif
+   uint32_t handle = (unsigned long)ve;
+   graw_encode_bind_object(grctx->eq, handle, GRAW_OBJECT_VERTEX_ELEMENTS);
 }
 
 static void graw_set_vertex_buffers(struct pipe_context *ctx,
                                              unsigned num_buffers,
                                              const struct pipe_vertex_buffer *buffers)
 {
-#if 0
    struct graw_context *grctx = (struct graw_context *)ctx;
+   uint32_t res_handles[PIPE_MAX_ATTRIBS];
+   struct graw_resource *res;
    int i;
 
-   for (i = 0; i < num_buffers; i++)
-      grctx->vbo[i] = buffers[i];
-   grctx->num_vbos = num_buffers;
-#endif
+   for (i = 0; i < num_buffers; i++) {
+      res = (struct graw_resource *)buffers[i].buffer;
+      res_handles[i] = res->res_handle;
+   }
+   graw_encoder_set_vertex_buffers(grctx->eq, num_buffers, buffers, res_handles);
 }
 
 static void graw_transfer_inline_write(struct pipe_context *ctx,
@@ -248,11 +220,12 @@ static void graw_transfer_inline_write(struct pipe_context *ctx,
                                                 unsigned stride,
                                                 unsigned layer_stride)
 {
+   struct graw_context *grctx = (struct graw_context *)ctx;
    struct graw_resource *grres = (struct graw_resource *)res;
    void *ptr;
 
-//   glBindBufferARB(GL_ARRAY_BUFFER_ARB, grres->id);
-//   glBufferData(GL_ARRAY_BUFFER_ARB, box->width, data, GL_STATIC_DRAW);
+   graw_encoder_inline_write(grctx->eq, grres->res_handle, level, usage,
+                             box, data, stride, layer_stride);
 }
 
 static void *graw_create_vs_state(struct pipe_context *ctx,

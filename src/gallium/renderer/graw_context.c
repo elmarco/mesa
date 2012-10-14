@@ -392,6 +392,9 @@ static void graw_flush_frontbuffer(struct pipe_screen *screen,
                                        unsigned level, unsigned layer,
                                        void *winsys_drawable_handle)
 {
+   struct graw_resource *gres = res;
+
+   grend_flush_frontbuffer(gres->res_handle);
 #if 0
    struct graw_texture *tex;
 

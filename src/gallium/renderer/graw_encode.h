@@ -2,6 +2,7 @@
 #ifndef GRAW_ENCODER_H
 #define GRAW_ENCODER_H
 
+#include <stdio.h>
 struct graw_surface {
    struct pipe_surface base;
    uint32_t handle;
@@ -35,7 +36,15 @@ static inline void graw_encoder_write_qword(struct graw_encoder_state *state,
 static inline void graw_encoder_write_block(struct graw_encoder_state *state,
 					    uint8_t *ptr, uint32_t len)
 {
+   int x;
    memcpy(state->buf + state->buf_offset, ptr, len);
+   x = (len % 4);
+   printf("len is %d x is %d\n", len, x);
+   if (x) {
+      uint8_t *mp = state->buf + state->buf_offset;
+      mp += len;
+      memset(mp, 0, x);
+   }
    state->buf_offset += (len + 3) / 4;
 }
 
@@ -73,5 +82,6 @@ int graw_encoder_create_surface(struct graw_encoder_state *enc,
 				uint32_t res_handle,
 				const struct pipe_surface *templat);
 
-
+int graw_encoder_flush_frontbuffer(struct graw_encoder_state *enc,
+                                   uint32_t res_handle);
 #endif

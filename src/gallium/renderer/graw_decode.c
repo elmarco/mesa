@@ -123,9 +123,10 @@ static void graw_decode_create_object(struct grend_decode_ctx *ctx)
    switch (obj_type){
    case GRAW_OBJECT_BLEND:
       graw_decode_create_blend(ctx, handle, length);
+      break;
    case GRAW_OBJECT_VS:
    case GRAW_OBJECT_FS:
-      graw_decode_create_shader(ctx, handle, obj_type, length);
+      graw_decode_create_shader(ctx, obj_type, handle, length);
       break;
    case GRAW_RESOURCE:
       break;
@@ -180,7 +181,7 @@ void graw_decode_block(uint32_t *block, int ndw)
    while (gdctx->ds->buf_offset < gdctx->ds->buf_total) {
       uint32_t header = gdctx->ds->buf[gdctx->ds->buf_offset];
 
-      fprintf(stderr,"cmd is %d len %d\n", header & 0xff, (header >> 16));
+      fprintf(stderr,"cmd is %d (obj %d) len %d\n", header & 0xff, (header >> 8 & 0xff), (header >> 16));
       
       switch (header & 0xff) {
       case GRAW_CREATE_OBJECT:

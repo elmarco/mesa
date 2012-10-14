@@ -35,10 +35,7 @@ void grend_flush(struct grend_context *ctx);
 
 void graw_renderer_init(int x, int y, int width, int height);
 
-void grend_flush_frontbuffer(struct pipe_screen *screen,
-                             struct pipe_resource *res,
-                             unsigned level, unsigned layer,
-                             void *winsys_drawable_handle);
+void grend_flush_frontbuffer(uint32_t res_handle);
 struct grend_context *grend_create_context(void);
 
 void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target target, uint32_t width, uint32_t height);

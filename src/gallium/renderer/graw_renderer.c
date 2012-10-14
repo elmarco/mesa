@@ -206,7 +206,7 @@ void grend_create_vs(struct grend_context *ctx,
                      uint32_t handle,
                      const struct pipe_shader_state *vs)
 {
-   struct grend_shader_state *state;
+   struct grend_shader_state *state = CALLOC_STRUCT(grend_shader_state);
    GLchar *glsl_prog;
 
    state->id = glCreateShader(GL_VERTEX_SHADER);
@@ -225,7 +225,7 @@ void grend_create_fs(struct grend_context *ctx,
                      uint32_t handle,
                      const struct pipe_shader_state *fs)
 {
-   struct grend_shader_state *state;
+   struct grend_shader_state *state = CALLOC_STRUCT(grend_shader_state);
    GLchar *glsl_prog;
 
    state->id = glCreateShader(GL_FRAGMENT_SHADER);
@@ -278,7 +278,7 @@ void grend_draw_vbo(struct grend_context *ctx,
    GLuint vaoid;
    int i;
    int program_id;
-
+#if 0
    program_id = glCreateProgram();
    glAttachShader(program_id, ctx->vs->id);
    glAttachShader(program_id, ctx->fs->id);
@@ -307,6 +307,7 @@ void grend_draw_vbo(struct grend_context *ctx,
    }
 
    glBindVertexArray(0);
+#endif
 }
 
 
@@ -315,27 +316,25 @@ void grend_flush(struct grend_context *ctx)
    glFlush();
 }
 
-void grend_flush_frontbuffer(struct pipe_screen *screen,
-                             struct pipe_resource *res,
-                             unsigned level, unsigned layer,
-                             void *winsys_drawable_handle)
+void grend_flush_frontbuffer(uint32_t res_handle)
 {
-   struct grend_texture *tex;
+   struct grend_resource *res;
 
-   tex = (struct grend_texture *)res;
+   res = graw_object_lookup(res_handle, GRAW_RESOURCE);
+
    glDrawBuffer(GL_NONE);
    glUseProgram(0);
-   glBindTexture(tex->base.target, tex->base.id);
+   glBindTexture(res->target, res->id);
    glBindFramebuffer(GL_FRAMEBUFFER_EXT, 0);
-   glEnable(tex->base.target);
+   glEnable(res->target);
    glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
-   glTexParameteri(tex->base.target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-   glTexParameteri(tex->base.target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+   glTexParameteri(res->target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+   glTexParameteri(res->target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-   glTexParameteri(tex->base.target, GL_TEXTURE_BASE_LEVEL, 0);
-   glTexParameteri(tex->base.target, GL_TEXTURE_MAX_LEVEL, 0);
+   glTexParameteri(res->target, GL_TEXTURE_BASE_LEVEL, 0);
+   glTexParameteri(res->target, GL_TEXTURE_MAX_LEVEL, 0);
    glBegin(GL_QUADS);
-#define VAL res->width0
+#define VAL 300//res->width0
    glTexCoord2f(0, 0);
    glVertex2f(0, 0);
    glTexCoord2f(1, 0);

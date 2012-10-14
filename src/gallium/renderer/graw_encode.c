@@ -64,10 +64,12 @@ int graw_encode_shader_state(struct graw_encoder_state *enc,
    uint32_t tmp;
    static char str[8192];
    uint32_t len;
+
+   memset(str, 0, 8192);
    tgsi_dump_str(shader->tokens, 0, str, sizeof(str));
 
-   len = strlen(str);
-   graw_encoder_write_dword(enc, GRAW_CMD0(GRAW_CREATE_OBJECT, type, (len / 4) + 1));
+   len = strlen(str) + 1;
+   graw_encoder_write_dword(enc, GRAW_CMD0(GRAW_CREATE_OBJECT, type, ((len + 3)/ 4) + 1));
    graw_encoder_write_dword(enc, handle);
    graw_encoder_write_block(enc, str, len);
    return 0;
@@ -129,6 +131,13 @@ int graw_encoder_create_surface(struct graw_encoder_state *enc,
    graw_encoder_write_dword(enc, templat->height);
    graw_encoder_write_dword(enc, templat->usage);
    graw_encoder_write_dword(enc, templat->format);
+}
+
+int graw_encoder_flush_frontbuffer(struct graw_encoder_state *enc,
+                                   uint32_t res_handle)
+{
+//   graw_encoder_write_dword(enc, GRAW_CMD0(GRAW_FLUSH_FRONTUBFFER, 0, 1));
+   graw_encoder_write_dword(enc, res_handle);
 }
 
 #define EQ_BUF_SIZE (16*1024)

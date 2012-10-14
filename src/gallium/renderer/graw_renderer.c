@@ -98,16 +98,6 @@ void grend_create_surface(struct grend_context *ctx,
    graw_object_insert(surf, sizeof(*surf), handle, GRAW_SURFACE);
 }
 
-#if 0
-
-   if (myrs_state->flatshade)
-      glShadeModel(GL_FLAT);
-   else
-      glShadeModel(GL_SMOOTH);
-       
-#endif
-
-
 void grend_set_framebuffer_state(struct grend_context *ctx,
                                  uint32_t nr_cbufs, uint32_t surf_handle)
 {
@@ -341,7 +331,7 @@ void grend_flush_frontbuffer(uint32_t res_handle)
    glTexParameteri(res->target, GL_TEXTURE_BASE_LEVEL, 0);
    glTexParameteri(res->target, GL_TEXTURE_MAX_LEVEL, 0);
    glBegin(GL_QUADS);
-#define VAL 300//res->width0
+#define VAL res->base.width0
    glTexCoord2f(0, 0);
    glVertex2f(0, 0);
    glTexCoord2f(1, 0);
@@ -368,35 +358,6 @@ static GLenum tgsitargettogltarget(const enum pipe_texture_target target)
    }
    return PIPE_BUFFER;
 }
-
-static struct pipe_resource *grend_resource_create(struct pipe_screen *pscreen,
-                                                           const struct pipe_resource *template)
-{
-   struct grend_buffer *buf;
-   struct grend_texture *tex;
-   
-   if (template->target == PIPE_BUFFER) {
-      buf = CALLOC_STRUCT(grend_buffer);
-      buf->base.base = *template;
-      buf->base.base.screen = pscreen;
-      pipe_reference_init(&buf->base.base.reference, 1);
-      glGenBuffersARB(1, &buf->base.id);
-      return &buf->base.base;
-   } else {
-      tex = CALLOC_STRUCT(grend_texture);
-      tex->base.base = *template;
-      tex->base.base.screen = pscreen;
-      pipe_reference_init(&tex->base.base.reference, 1);
-      glGenTextures(1, &tex->base.id);
-//      tex->base.target = tgsitargettogltarget(template);
-      glBindTexture(tex->base.target, tex->base.id);
-
-      glTexImage2D(tex->base.target, 0, GL_RGBA, template->width0,
-                   template->height0, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-      return &tex->base.base;
-   }
-}
-
 
 void
 graw_renderer_init(int x, int y, int width, int height)

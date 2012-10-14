@@ -318,7 +318,6 @@ static void graw_flush(struct pipe_context *ctx,
    graw_flush_eq(grctx->eq, grctx);
 }
 
-
 static struct pipe_context *graw_context_create(struct pipe_screen *pscreen,
                                                          void *priv)
 {
@@ -368,34 +367,6 @@ static void graw_flush_frontbuffer(struct pipe_screen *screen,
    struct graw_resource *gres = res;
 
    grend_flush_frontbuffer(gres->res_handle);
-#if 0
-   struct graw_texture *tex;
-
-   tex = (struct graw_texture *)res;
-   glDrawBuffer(GL_NONE);
-   glUseProgram(0);
-   glBindTexture(tex->base.target, tex->base.id);
-   glBindFramebuffer(GL_FRAMEBUFFER_EXT, 0);
-   glEnable(tex->base.target);
-   glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
-   glTexParameteri(tex->base.target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-   glTexParameteri(tex->base.target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-   glTexParameteri(tex->base.target, GL_TEXTURE_BASE_LEVEL, 0);
-   glTexParameteri(tex->base.target, GL_TEXTURE_MAX_LEVEL, 0);
-   glBegin(GL_QUADS);
-#define VAL res->width0
-   glTexCoord2f(0, 0);
-   glVertex2f(0, 0);
-   glTexCoord2f(1, 0);
-   glVertex2f(VAL, 0);
-   glTexCoord2f(1, 1);
-   glVertex2f(VAL, VAL);
-   glTexCoord2f(0, 1);
-   glVertex2f(0, VAL);
-   glEnd();
-   glutSwapBuffers();
-#endif
 }
 
 static struct pipe_resource *graw_resource_create(struct pipe_screen *pscreen,

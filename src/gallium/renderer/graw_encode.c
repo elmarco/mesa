@@ -146,9 +146,10 @@ int graw_encoder_set_vertex_buffers(struct graw_encoder_state *enc,
 int graw_encoder_draw_vbo(struct graw_encoder_state *enc,
 			  const struct pipe_draw_info *info)
 {
-   graw_encoder_write_dword(enc, GRAW_CMD0(GRAW_DRAW_VBO, 0, 2));
+   graw_encoder_write_dword(enc, GRAW_CMD0(GRAW_DRAW_VBO, 0, 3));
    graw_encoder_write_dword(enc, info->start);
    graw_encoder_write_dword(enc, info->count);
+   graw_encoder_write_dword(enc, info->mode);
    return 0;
 }
 

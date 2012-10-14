@@ -152,6 +152,7 @@ static void graw_decode_draw_vbo(struct grend_decode_ctx *ctx)
 
    info.start = ctx->ds->buf[ctx->ds->buf_offset + 1];
    info.count = ctx->ds->buf[ctx->ds->buf_offset + 2];
+   info.mode = ctx->ds->buf[ctx->ds->buf_offset + 3];
    grend_draw_vbo(gdctx->grctx, &info);
 }
 

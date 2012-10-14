@@ -141,16 +141,6 @@ static void *graw_create_rasterizer_state(struct pipe_context *ctx,
    handle = graw_object_assign_handle();
    return (void *)(unsigned long)handle;
 }
-#if 0
-   struct pipe_rasterizer_state *myrs_state = CALLOC_STRUCT(pipe_rasterizer_state);
-   uint32_t handle;
-   *myrs_state = *rs_state;
-
-   handle = graw_object_create(myrs_state, sizeof(struct pipe_rasterizer_state),
-                               GRAW_OBJECT_RASTERIZER);
-
-   return (void *)(unsigned long)handle;
-#endif
 
 static void graw_bind_rasterizer_state(struct pipe_context *ctx,
                                                 void *rs_state)

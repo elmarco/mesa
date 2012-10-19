@@ -308,6 +308,45 @@ static void graw_flush(struct pipe_context *ctx,
    graw_flush_eq(grctx->eq, grctx);
 }
 
+static struct pipe_sampler_view *graw_create_sampler_view(struct pipe_context *ctx,
+                                      struct pipe_resource *texture,
+                                      const struct pipe_sampler_view *state)
+{
+   struct graw_context *grctx = (struct graw_context *)ctx;
+   uint32_t handle;
+   int ret;
+   struct graw_resource *res;
+   res = (struct graw_resource *)state->texture;
+   handle = graw_object_assign_handle();
+   graw_encode_sampler_view(grctx->eq, handle, res->res_handle, state);
+   return (void *)(unsigned long)handle;
+}
+
+static void graw_set_fragment_sampler_views(struct pipe_context *ctx,	
+					unsigned num_views,
+					struct pipe_sampler_view **views)
+{
+
+}
+
+static void *graw_create_sampler_state(struct pipe_context *ctx,
+					const struct pipe_sampler_state *state)
+{
+   struct graw_context *grctx = (struct graw_context *)ctx;
+   uint32_t handle;
+   int ret;
+   handle = graw_object_assign_handle();
+
+   graw_encode_sampler_state(grctx->eq, handle, state);
+   return (void *)(unsigned long)handle;
+}
+
+static void graw_bind_fragment_sampler_states(struct pipe_context *ctx,
+						unsigned num_samplers,
+						void **samplers)
+{
+}
+
 static struct pipe_context *graw_context_create(struct pipe_screen *pscreen,
                                                          void *priv)
 {
@@ -346,6 +385,10 @@ static struct pipe_context *graw_context_create(struct pipe_screen *pscreen,
    gr_ctx->base.draw_vbo = graw_draw_vbo;
    gr_ctx->base.flush = graw_flush;
    gr_ctx->base.screen = pscreen;
+   gr_ctx->base.create_sampler_view = graw_create_sampler_view;
+   gr_ctx->base.set_fragment_sampler_views = graw_set_fragment_sampler_views;
+   gr_ctx->base.create_sampler_state = graw_create_sampler_state;
+   gr_ctx->base.bind_fragment_sampler_states = graw_bind_fragment_sampler_states;
    return &gr_ctx->base;
 }
 
@@ -354,7 +397,7 @@ static void graw_flush_frontbuffer(struct pipe_screen *screen,
                                        unsigned level, unsigned layer,
                                        void *winsys_drawable_handle)
 {
-   struct graw_resource *gres = res;
+   struct graw_resource *gres = (struct graw_resource *)res;
 
    grend_flush_frontbuffer(gres->res_handle);
 }

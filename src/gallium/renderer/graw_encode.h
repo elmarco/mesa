@@ -102,4 +102,11 @@ int graw_encoder_inline_write(struct graw_encoder_state *enc,
                               const struct pipe_box *box,
                               void *data, unsigned stride,
                               unsigned layer_stride);
+int graw_encode_sampler_state(struct graw_encoder_state *enc,
+                              uint32_t handle,
+                              const struct pipe_sampler_state *state);
+int graw_encode_sampler_view(struct graw_encoder_state *enc,
+                             uint32_t handle,
+                             uint32_t res_handle,
+                             const struct pipe_sampler_view *state);
 #endif

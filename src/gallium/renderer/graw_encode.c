@@ -201,6 +201,25 @@ int graw_encoder_flush_frontbuffer(struct graw_encoder_state *enc,
    return 0;
 }
 
+int graw_encode_sampler_state(struct graw_encoder_state *enc,
+                              uint32_t handle,
+                              const struct pipe_sampler_state *state)
+{
+   graw_encoder_write_dword(enc, GRAW_CMD0(GRAW_CREATE_OBJECT, GRAW_OBJECT_SAMPLER_STATE ,1));
+   graw_encoder_write_dword(enc, handle);
+}
+
+
+int graw_encode_sampler_view(struct graw_encoder_state *enc,
+                             uint32_t handle,
+                             uint32_t res_handle,
+                             const struct pipe_sampler_view *state)
+{
+   graw_encoder_write_dword(enc, GRAW_CMD0(GRAW_CREATE_OBJECT, GRAW_OBJECT_SAMPLER_VIEW ,2));
+   graw_encoder_write_dword(enc, handle);
+   graw_encoder_write_dword(enc, res_handle);
+}
+
 #define EQ_BUF_SIZE (16*1024)
 
 struct graw_encoder_state *graw_encoder_init_queue(void)

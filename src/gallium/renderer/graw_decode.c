@@ -221,6 +221,10 @@ static void graw_decode_create_object(struct grend_decode_ctx *ctx)
    case GRAW_SURFACE:
       graw_decode_create_surface(ctx, handle);
       break;
+   case GRAW_OBJECT_SAMPLER_VIEW:
+      break;
+   case GRAW_OBJECT_SAMPLER_STATE:
+      break;
    }
 }
 

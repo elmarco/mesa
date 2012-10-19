@@ -31,6 +31,8 @@ struct dump_ctx {
    int num_outputs;
    struct graw_shader_io outputs[32];
 
+   int num_temps;
+   int num_samps;
    unsigned fragcoord_input;
 };
 
@@ -94,9 +96,13 @@ iter_declaration(struct tgsi_iterate_context *iter,
          snprintf(ctx->outputs[i].glsl_name, 64, "%s_%d", name_prefix, ctx->outputs[i].first + color_offset);
 
       break;
-   case TGSI_FILE_CONSTANT:
    case TGSI_FILE_TEMPORARY:
+      ctx->num_temps++;
+      break;
    case TGSI_FILE_SAMPLER:
+      ctx->num_samps++;
+      break;
+   case TGSI_FILE_CONSTANT:
    case TGSI_FILE_ADDRESS:
    case TGSI_FILE_SYSTEM_VALUE:
    default:
@@ -144,6 +150,8 @@ iter_instruction(struct tgsi_iterate_context *iter,
                break;
             }
       }
+      else if (dst->Register.File == TGSI_FILE_TEMPORARY)
+          snprintf(dsts[i], 255, "temp%d", dst->Register.Index);
    }
       
    for (i = 0; i < inst->Instruction.NumSrcRegs; i++) {
@@ -156,11 +164,20 @@ iter_instruction(struct tgsi_iterate_context *iter,
                break;
             }
       }
+      else if (src->Register.File == TGSI_FILE_TEMPORARY)
+          snprintf(srcs[i], 255, "temp%d", src->Register.Index);
+      else if (src->Register.File == TGSI_FILE_SAMPLER)
+          snprintf(srcs[i], 255, "temp%d", src->Register.Index);
    }
    switch (inst->Instruction.Opcode) {
 
    case TGSI_OPCODE_MOV:
       snprintf(buf, 255, "%s = %s;\n", dsts[0], srcs[0]);
+      strcat(ctx->glsl_main, buf);
+      break;
+   case TGSI_OPCODE_TEX:
+   case TGSI_OPCODE_TXP:
+      snprintf(buf, 255, "%s = texture(tex, %s);\n", dsts[0], srcs[0]);
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_END:
@@ -203,6 +220,14 @@ static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
          snprintf(buf, 255, "out vec4 %s;\n", ctx->outputs[i].glsl_name);
          strcat(glsl_final, buf);
       }
+   }
+   for (i = 0; i < ctx->num_temps; i++) {
+      snprintf(buf, 255, "vec4 temp%d;\n", i);
+      strcat(glsl_final, buf);
+   }
+   for (i = 0; i < ctx->num_samps; i++) {
+      snprintf(buf, 255, "uniform sampler2D samp%d;\n", i);
+      strcat(glsl_final, buf);
    }
 }
 

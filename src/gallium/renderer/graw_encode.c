@@ -220,6 +220,18 @@ int graw_encode_sampler_view(struct graw_encoder_state *enc,
    graw_encoder_write_dword(enc, res_handle);
 }
 
+int graw_encode_set_fragment_sampler_views(struct graw_encoder_state *enc,
+                                           uint32_t num_handles,
+                                           uint32_t *handles)
+{
+   int i;
+   graw_encoder_write_dword(enc, GRAW_CMD0(GRAW_SET_FRAGMENT_SAMPLER_VIEWS, 0, num_handles + 1));
+   graw_encoder_write_dword(enc, num_handles);
+   for (i = 0; i < num_handles; i++)
+      graw_encoder_write_dword(enc, handles[i]);
+   return 0;
+}
+
 #define EQ_BUF_SIZE (16*1024)
 
 struct graw_encoder_state *graw_encoder_init_queue(void)

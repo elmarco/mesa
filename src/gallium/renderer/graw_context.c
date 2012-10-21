@@ -51,7 +51,11 @@ struct graw_shader_state {
    char *glsl_prog;
 };
 
-
+struct graw_sampler_view {
+   struct pipe_sampler_view base;
+   uint32_t handle;
+};
+   
 struct graw_context {
    struct pipe_context base;
    GLuint vaoid;
@@ -313,20 +317,38 @@ static struct pipe_sampler_view *graw_create_sampler_view(struct pipe_context *c
                                       const struct pipe_sampler_view *state)
 {
    struct graw_context *grctx = (struct graw_context *)ctx;
+   struct graw_sampler_view *grview = CALLOC_STRUCT(graw_sampler_view);
    uint32_t handle;
    int ret;
    struct graw_resource *res;
-   res = (struct graw_resource *)state->texture;
+
+   if (state == NULL)
+      return NULL;
+
+   res = (struct graw_resource *)texture;
    handle = graw_object_assign_handle();
    graw_encode_sampler_view(grctx->eq, handle, res->res_handle, state);
-   return (void *)(unsigned long)handle;
+
+   grview->base = *state;
+   grview->base.texture = NULL;
+   pipe_reference(NULL, &texture->reference);
+   grview->base.texture = texture;
+   grview->handle = handle;
+   return &grview->base;
 }
 
 static void graw_set_fragment_sampler_views(struct pipe_context *ctx,	
 					unsigned num_views,
 					struct pipe_sampler_view **views)
 {
-
+   struct graw_context *grctx = (struct graw_context *)ctx;
+   uint32_t handles[32];
+   int i;
+   for (i = 0; i < num_views; i++) {
+      struct graw_sampler_view *grview = views[i];
+      handles[i] = grview->handle;
+   }
+   graw_encode_set_fragment_sampler_views(grctx->eq, num_views, handles);
 }
 
 static void *graw_create_sampler_state(struct pipe_context *ctx,

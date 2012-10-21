@@ -308,6 +308,8 @@ void graw_decode_block(uint32_t *block, int ndw)
          break;
       case GRAW_FLUSH_FRONTBUFFER:
          break;
+      case GRAW_SET_FRAGMENT_SAMPLER_VIEWS:
+         break;
       }
       gdctx->ds->buf_offset += (header >> 16) + 1;
       

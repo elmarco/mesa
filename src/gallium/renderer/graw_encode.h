@@ -109,4 +109,8 @@ int graw_encode_sampler_view(struct graw_encoder_state *enc,
                              uint32_t handle,
                              uint32_t res_handle,
                              const struct pipe_sampler_view *state);
+
+int graw_encode_set_fragment_sampler_views(struct graw_encoder_state *enc,
+                                           uint32_t num_handles,
+                                           uint32_t *handles);
 #endif

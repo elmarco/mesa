@@ -49,6 +49,14 @@ struct grend_surface {
    GLuint res_handle;
 };
 
+struct grend_sampler {
+
+};
+
+struct grend_sampler_view {
+
+};
+
 struct grend_vertex_element {
    unsigned count;
    struct pipe_vertex_element elements[PIPE_MAX_ATTRIBS];

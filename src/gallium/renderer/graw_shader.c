@@ -19,6 +19,10 @@ struct graw_shader_io {
    char glsl_name[64];
 };
 
+struct graw_shader_sampler {
+   int tgsi_sampler_type;
+};
+
 struct dump_ctx {
    struct tgsi_iterate_context iter;
    int prog_type;
@@ -32,6 +36,7 @@ struct dump_ctx {
    struct graw_shader_io outputs[32];
 
    int num_temps;
+   struct graw_shader_sampler samplers[32];
    int num_samps;
    unsigned fragcoord_input;
 };
@@ -79,8 +84,9 @@ iter_declaration(struct tgsi_iterate_context *iter,
          }
          break;
       case TGSI_SEMANTIC_COLOR:
+      case TGSI_SEMANTIC_GENERIC:
          if (iter->processor.Processor == TGSI_PROCESSOR_VERTEX)
-            if (ctx->outputs[i].name == TGSI_SEMANTIC_COLOR)
+            if (ctx->outputs[i].name == TGSI_SEMANTIC_COLOR || ctx->outputs[i].name == TGSI_SEMANTIC_GENERIC)
                color_offset = -1;
       default:
          if (iter->processor.Processor == TGSI_PROCESSOR_VERTEX)
@@ -139,6 +145,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
    uint instno = ctx->instno++;
    int i;
    int j;
+   int sreg_index;
    if (instno == 0)
       strcat(ctx->glsl_main, "void main(void)\n{\n");
    for (i = 0; i < inst->Instruction.NumDstRegs; i++) {
@@ -166,8 +173,10 @@ iter_instruction(struct tgsi_iterate_context *iter,
       }
       else if (src->Register.File == TGSI_FILE_TEMPORARY)
           snprintf(srcs[i], 255, "temp%d", src->Register.Index);
-      else if (src->Register.File == TGSI_FILE_SAMPLER)
-          snprintf(srcs[i], 255, "temp%d", src->Register.Index);
+      else if (src->Register.File == TGSI_FILE_SAMPLER) {
+          snprintf(srcs[i], 255, "samp%d", src->Register.Index);
+	  sreg_index = src->Register.Index;
+      }
    }
    switch (inst->Instruction.Opcode) {
 
@@ -177,7 +186,8 @@ iter_instruction(struct tgsi_iterate_context *iter,
       break;
    case TGSI_OPCODE_TEX:
    case TGSI_OPCODE_TXP:
-      snprintf(buf, 255, "%s = texture(tex, %s);\n", dsts[0], srcs[0]);
+      ctx->samplers[sreg_index].tgsi_sampler_type = inst->Texture.Texture;
+      snprintf(buf, 255, "%s = texture(%s, %s);\n", dsts[0], srcs[1], srcs[0]);
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_END:
@@ -200,6 +210,16 @@ static void emit_header(struct dump_ctx *ctx, char *glsl_final)
    if (ctx->prog_type == TGSI_PROCESSOR_VERTEX)
       strcat(glsl_final, "#extension GL_ARB_explicit_attrib_location : enable\n");
 
+}
+
+static const char *samplertypeconv(int sampler_type)
+{
+	switch (sampler_type) {
+	case TGSI_TEXTURE_1D: return "1D";
+	case TGSI_TEXTURE_2D: return "2D";
+	case TGSI_TEXTURE_3D: return "3D";
+	default: return "UNK";
+        }
 }
 
 static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
@@ -226,7 +246,7 @@ static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
       strcat(glsl_final, buf);
    }
    for (i = 0; i < ctx->num_samps; i++) {
-      snprintf(buf, 255, "uniform sampler2D samp%d;\n", i);
+      snprintf(buf, 255, "uniform sampler%s samp%d;\n", samplertypeconv(ctx->samplers[i].tgsi_sampler_type), i);
       strcat(glsl_final, buf);
    }
 }

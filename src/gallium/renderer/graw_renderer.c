@@ -341,6 +341,7 @@ void grend_flush_frontbuffer(uint32_t res_handle)
    glTexCoord2f(0, 1);
    glVertex2f(0, VAL);
    glEnd();
+   glDisable(res->target);
    glutSwapBuffers();
 }
 

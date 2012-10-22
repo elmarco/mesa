@@ -33,7 +33,6 @@ void grend_set_framebuffer_state(struct grend_context *ctx,
 
 void grend_flush(struct grend_context *ctx);
 
-void graw_renderer_init(int x, int y, int width, int height);
 
 void grend_flush_frontbuffer(uint32_t res_handle);
 struct grend_context *grend_create_context(void);

@@ -26,10 +26,19 @@ enum graw_cmd {
    GRAW_SET_VERTEX_BUFFERS,
    GRAW_CLEAR,
    GRAW_DRAW_VBO,
-   GRAW_FLUSH_FRONTBUFFER,
    GRAW_RESOURCE_INLINE_WRITE,
    GRAW_SET_FRAGMENT_SAMPLER_VIEWS,
    GRAW_SET_INDEX_BUFFER,
+};
+
+enum graw_scrn_cmd {
+   GRAW_CREATE_RENDERER = 1,
+   GRAW_CREATE_CONTEXT = 2,
+   GRAW_CREATE_RESOURCE = 3,
+   GRAW_FLUSH_FRONTBUFFER = 4,
+   GRAW_SUBMIT_CMD = 5,
+   GRAW_DESTROY_CONTEXT = 6,
+   GRAW_DESTROY_RENDERER = 7,
 };
 
 /* 
@@ -40,4 +49,8 @@ enum graw_cmd {
 
 #define GRAW_CMD0(cmd, obj, len) ((cmd) | ((obj) << 8) | ((len) << 16))
 
+void graw_renderer_init(int x, int y, int width, int height);
+void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target target, uint32_t bind, uint32_t width, uint32_t height);
+void grend_flush_frontbuffer(uint32_t res_handle);
+void graw_decode_block(uint32_t *block, int ndw);
 #endif

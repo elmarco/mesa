@@ -373,8 +373,6 @@ void graw_decode_block(uint32_t *block, int ndw)
       case GRAW_SET_VIEWPORT_STATE:
          graw_decode_set_viewport_state(gdctx);
          break;
-      case GRAW_FLUSH_FRONTBUFFER:
-         break;
       case GRAW_SET_FRAGMENT_SAMPLER_VIEWS:
          graw_decode_set_fragment_sampler_views(gdctx, header >> 16);
          break;

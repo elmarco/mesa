@@ -1,6 +1,6 @@
 include Makefile.sources
 
-noinst_PROGRAMS=tri quad-tex tri-instanced
+noinst_PROGRAMS=tri quad-tex tri-instanced graw-renderer graw-pipe-winsys
 
 AM_LDFLAGS = ../auxiliary/libgallium.a $(GLUT_LIBS) $(GLEW_LIBS) $(GL_LIBS) -lm -ldl
 
@@ -23,6 +23,7 @@ tri_instanced_SOURCES = \
         graw_encode.c \
         graw_decode.c \
         graw_context.c
+
 quad_tex_SOURCES = \
 	quad-tex.c \
         graw_util.c \
@@ -42,3 +43,17 @@ tri_SOURCES = \
         graw_encode.c \
         graw_decode.c \
         graw_context.c
+
+graw_renderer_SOURCES = \
+        graw_pipe_renderer.c \
+        graw_renderer.c \
+        graw_shader.c \
+        graw_object.c \
+        graw_decode.c
+
+graw_pipe_winsys_SOURCES = \
+        tri.c\
+        graw_context.c \
+        graw_encode.c \
+        graw_util.c \
+        graw_pipe_winsys.c

@@ -12,7 +12,7 @@
 static INLINE struct pipe_screen *
 sw_screen_wrap(struct pipe_screen *screen)
 {
-#if defined(GALLIUM_SOFTPIPE) || defined(GALLIUM_LLVMPIPE)
+#if defined(GALLIUM_SOFTPIPE) || defined(GALLIUM_LLVMPIPE) || defined(GALLIUM_REMPIPE)
    struct sw_winsys *sws;
    struct pipe_screen *sw_screen = NULL;
    const char *driver;

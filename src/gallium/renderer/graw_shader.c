@@ -133,6 +133,7 @@ iter_immediate(
    struct tgsi_full_immediate *imm )
 {
    struct dump_ctx *ctx = (struct dump_ctx *) iter;
+   return TRUE;
 }
 
 static boolean
@@ -209,7 +210,7 @@ static boolean
 prolog(struct tgsi_iterate_context *iter)
 {
    struct dump_ctx *ctx = (struct dump_ctx *)iter;
-
+   return TRUE;
 }
 
 static void emit_header(struct dump_ctx *ctx, char *glsl_final)

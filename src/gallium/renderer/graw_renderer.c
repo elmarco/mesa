@@ -12,6 +12,7 @@
 #include "util/u_inlines.h"
 #include "util/u_memory.h"
 #include "util/u_transfer.h"
+#include "util/u_format.h"
 #include "tgsi/tgsi_text.h"
 
 #include "state_tracker/graw.h"
@@ -295,11 +296,17 @@ void grend_draw_vbo(struct grend_context *ctx,
 
    for (i = 0; i < ctx->ve->count; i++) {
       int vbo_index = ctx->ve->elements[i].vertex_buffer_index;
+      const struct util_format_description *desc = util_format_description(ctx->ve->elements[i].src_format);
       struct grend_buffer *buf;
-      
+      GLenum type;
+      int sz;
+      if (desc->channel[0].type == UTIL_FORMAT_TYPE_FLOAT)
+         type = GL_FLOAT;
+      sz = desc->nr_channels;
+
       buf = ctx->vbo[vbo_index].buffer;
       glBindBuffer(GL_ARRAY_BUFFER, buf->base.id);
-      glVertexAttribPointer(i, 4, GL_FLOAT, GL_FALSE, 4, (void *)ctx->ve->elements[i].src_offset);
+      glVertexAttribPointer(i, sz, type, GL_FALSE, ctx->vbo[vbo_index].stride, (void *)ctx->ve->elements[i].src_offset);
       glEnableVertexAttribArray(i);
    }
    
@@ -427,6 +434,7 @@ void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target tar
    gr->base.width0 = width;
    gr->base.height0 = height;
    if (target == PIPE_BUFFER) {
+      gr->target = GL_ARRAY_BUFFER_ARB;
       glGenBuffersARB(1, &gr->id);
    } else {
       gr->target = tgsitargettogltarget(target);

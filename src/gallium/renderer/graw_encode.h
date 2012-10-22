@@ -53,6 +53,10 @@ extern struct graw_encoder_state *graw_encoder_init_queue(void);
 extern int graw_encode_blend_state(struct graw_encoder_state *enc,
                                    uint32_t handle,
                                    struct pipe_blend_state *blend_state);
+extern int graw_encode_rasterizer_state(struct graw_encoder_state *enc,
+                                         uint32_t handle,
+                                         struct pipe_rasterizer_state *state);
+
 extern int graw_encode_shader_state(struct graw_encoder_state *enc,
                                     uint32_t handle,
                                     uint32_t type,
@@ -113,4 +117,8 @@ int graw_encode_sampler_view(struct graw_encoder_state *enc,
 int graw_encode_set_fragment_sampler_views(struct graw_encoder_state *enc,
                                            uint32_t num_handles,
                                            uint32_t *handles);
+int graw_encode_bind_fragment_sampler_states(struct graw_encoder_state *enc,
+                                             uint32_t num_handles,
+                                             uint32_t *handles);
+
 #endif

@@ -55,7 +55,7 @@ struct grend_sampler {
 };
 
 struct grend_sampler_view {
-
+   struct grend_resource *texture;
 };
 
 struct grend_vertex_element {
@@ -74,6 +74,13 @@ struct grend_context {
 
    struct grend_shader_state *vs;
    struct grend_shader_state *fs;
+
+   int num_fs_views;
+   /* frag samplers */
+   struct grend_sampler_view fs_views[PIPE_MAX_SHADER_SAMPLER_VIEWS];
+
+   struct pipe_rasterizer_state *rs_state;
+   
 };
 
 static void Reshape(int width, int height)
@@ -189,6 +196,22 @@ void grend_set_num_vbo(struct grend_context *ctx,
    ctx->num_vbos = num_vbo;
 }
 
+void grend_set_single_fs_sampler_view(struct grend_context *ctx,
+                                      int index,
+                                      uint32_t res_handle)
+{
+   struct grend_resource *res;
+
+   res = graw_object_lookup(res_handle, GRAW_RESOURCE);
+   ctx->fs_views[index].texture = &res->base;
+}
+
+void grend_set_num_fs_sampler_views(struct grend_context *ctx,
+                                    int num_fs_sampler_views)
+{
+   ctx->num_fs_views = num_fs_sampler_views;
+}
+
 void grend_transfer_inline_write(struct grend_context *ctx,
                                  uint32_t res_handle,
                                  unsigned level,
@@ -202,9 +225,17 @@ void grend_transfer_inline_write(struct grend_context *ctx,
    void *ptr;
 
    res = graw_object_lookup(res_handle, GRAW_RESOURCE);
-   glBindBufferARB(GL_ARRAY_BUFFER_ARB, res->id);
+   if (res->target == GL_ARRAY_BUFFER_ARB) {
+      glBindBufferARB(GL_ARRAY_BUFFER_ARB, res->id);
+      glBufferData(GL_ARRAY_BUFFER_ARB, box->width, data, GL_STATIC_DRAW);
+   } else {
+      glBindTexture(res->target, res->id);
+      glEnable(res->target);
+      glTexSubImage2D(res->target, level, box->x, box->y, box->width, box->height,
+                      GL_RGBA, GL_UNSIGNED_BYTE, data);
+      glDisable(res->target);
 
-   glBufferData(GL_ARRAY_BUFFER_ARB, box->width, data, GL_STATIC_DRAW);
+   }
 }
 
 
@@ -294,6 +325,14 @@ void grend_draw_vbo(struct grend_context *ctx,
 
    glBindVertexArray(vaoid);
 
+   for (i = 0; i < ctx->num_fs_views; i++) {
+      glActiveTexture(GL_TEXTURE0 + i);
+      glBindTexture(ctx->fs_views[i].texture->target, ctx->fs_views[i].texture->id);
+      glEnable(ctx->fs_views[i].texture->target);
+   } 
+   glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+   glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+
    for (i = 0; i < ctx->ve->count; i++) {
       int vbo_index = ctx->ve->elements[i].vertex_buffer_index;
       const struct util_format_description *desc = util_format_description(ctx->ve->elements[i].src_format);
@@ -318,10 +357,48 @@ void grend_draw_vbo(struct grend_context *ctx,
       fprintf(stderr,"indexed\n");
    }
 
+   glActiveTexture(GL_TEXTURE0);
+   glDisable(GL_TEXTURE_2D);
    glBindVertexArray(0);
 #endif
 }
+   
+void grend_object_bind_rasterizer(struct grend_context *ctx,
+                                  uint32_t handle)
+{
+   struct pipe_rasterizer_state *state;
 
+   state = graw_object_lookup(handle, GRAW_OBJECT_RASTERIZER);
+   
+#if 0
+   if (state->depth_clip) {
+      glEnable(GL_DEPTH_CLAMP);
+   } else {
+      glDisable(GL_DEPTH_CLAMP);
+   }
+#endif
+   if (state->flatshade) {
+      glShadeModel(GL_FLAT);
+   } else {
+      glShadeModel(GL_SMOOTH);
+   }
+   ctx->rs_state = state;
+}
+
+void grend_object_bind_sampler_states(struct grend_context *ctx,
+                                      uint32_t num_states,
+                                      uint32_t *handles)
+{
+   int i;
+   struct pipe_sampler_state *state;
+   for (i = 0; i < num_states; i++) {
+      state = graw_object_lookup(handles[0], GRAW_OBJECT_SAMPLER_STATE);
+
+      glEnable(GL_TEXTURE_2D);
+      glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+      glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+   }
+}
 
 void grend_flush(struct grend_context *ctx)
 {
@@ -336,6 +413,12 @@ void grend_flush_frontbuffer(uint32_t res_handle)
 
    glDrawBuffer(GL_NONE);
    glUseProgram(0);
+   glMatrixMode(GL_PROJECTION);
+   glLoadIdentity();
+   glOrtho(0, res->base.width0, 0, res->base.height0, -1, 1);
+   glMatrixMode(GL_MODELVIEW);
+   glLoadIdentity();
+
    glBindTexture(res->target, res->id);
    glBindFramebuffer(GL_FRAMEBUFFER_EXT, 0);
    glEnable(res->target);
@@ -351,9 +434,9 @@ void grend_flush_frontbuffer(uint32_t res_handle)
    glVertex2f(0, 0);
    glTexCoord2f(1, 0);
    glVertex2f(VAL, 0);
-   glTexCoord2f(1, 1);
+   glTexCoord2f(1, -1);
    glVertex2f(VAL, VAL);
-   glTexCoord2f(0, 1);
+   glTexCoord2f(0, -1);
    glVertex2f(0, VAL);
    glEnd();
    glDisable(res->target);
@@ -396,15 +479,8 @@ graw_renderer_init(int x, int y, int width, int height)
 
    glewInit();
       
-   glMatrixMode(GL_PROJECTION);
-   glLoadIdentity();
-   glOrtho(0, width, 0, height, -1, 1);
-   glMatrixMode(GL_MODELVIEW);
-   glLoadIdentity();
-
    glutReshapeFunc(Reshape);
    glutKeyboardFunc(key_esc);
-   return 0;
 }
 
 

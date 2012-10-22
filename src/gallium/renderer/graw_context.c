@@ -143,6 +143,8 @@ static void *graw_create_rasterizer_state(struct pipe_context *ctx,
    struct graw_context *grctx = (struct graw_context *)ctx;
    uint32_t handle;
    handle = graw_object_assign_handle();
+
+   graw_encode_rasterizer_state(grctx->eq, handle, rs_state);
    return (void *)(unsigned long)handle;
 }
 
@@ -326,14 +328,14 @@ static struct pipe_sampler_view *graw_create_sampler_view(struct pipe_context *c
       return NULL;
 
    res = (struct graw_resource *)texture;
-   handle = graw_object_assign_handle();
-   graw_encode_sampler_view(grctx->eq, handle, res->res_handle, state);
+//   handle = graw_object_assign_handle();
+//  graw_encode_sampler_view(grctx->eq, handle, res->res_handle, state);
 
    grview->base = *state;
    grview->base.texture = NULL;
    pipe_reference(NULL, &texture->reference);
    grview->base.texture = texture;
-   grview->handle = handle;
+//   grview->handle = handle;
    return &grview->base;
 }
 
@@ -345,8 +347,9 @@ static void graw_set_fragment_sampler_views(struct pipe_context *ctx,
    uint32_t handles[32];
    int i;
    for (i = 0; i < num_views; i++) {
-      struct graw_sampler_view *grview = views[i];
-      handles[i] = grview->handle;
+      struct graw_sampler_view *grview = (struct graw_sampler_view *)views[i];
+      struct graw_resource *grres = (struct graw_resource *)grview->base.texture;
+      handles[i] = grres->res_handle;
    }
    graw_encode_set_fragment_sampler_views(grctx->eq, num_views, handles);
 }
@@ -367,6 +370,13 @@ static void graw_bind_fragment_sampler_states(struct pipe_context *ctx,
 						unsigned num_samplers,
 						void **samplers)
 {
+   struct graw_context *grctx = (struct graw_context *)ctx;
+   uint32_t handles[32];
+   int i;
+   for (i = 0; i < num_samplers; i++) {
+      handles[i] = (unsigned long)(samplers[i]);
+   }
+   graw_encode_bind_fragment_sampler_states(grctx->eq, num_samplers, handles);
 }
 
 static struct pipe_context *graw_context_create(struct pipe_screen *pscreen,

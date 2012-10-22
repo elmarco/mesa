@@ -120,6 +120,19 @@ static void graw_decode_set_vertex_buffers(struct grend_decode_ctx *ctx, uint16_
 
 }
 
+static void graw_decode_set_fragment_sampler_views(struct grend_decode_ctx *ctx, uint16_t length)
+{
+   int num_samps;
+   int i;
+   num_samps = length;
+   for (i = 0; i < num_samps; i++) {
+      uint32_t handle = ctx->ds->buf[ctx->ds->buf_offset + 1 + i];
+      grend_set_single_fs_sampler_view(ctx->grctx, i, handle);
+   }
+   grend_set_num_fs_sampler_views(ctx->grctx, num_samps);
+
+}
+
 static void graw_decode_resource_inline_write(struct grend_decode_ctx *ctx, uint16_t length)
 {
    struct pipe_box box;
@@ -164,6 +177,19 @@ static void graw_decode_create_blend(struct grend_decode_ctx *ctx, uint32_t hand
                       GRAW_OBJECT_BLEND);
 }
 
+static void graw_decode_create_rasterizer(struct grend_decode_ctx *ctx, uint32_t handle, uint16_t length)
+{
+   struct pipe_rasterizer_state *rasterizer_state = CALLOC_STRUCT(pipe_rasterizer_state);
+   uint32_t tmp;
+
+   tmp = ctx->ds->buf[ctx->ds->buf_offset + 2];
+   rasterizer_state->flatshade = tmp & (1 << 0);
+   rasterizer_state->depth_clip = tmp & (1 << 1);
+   rasterizer_state->gl_rasterization_rules = tmp & (1 << 2);
+   graw_object_insert(rasterizer_state, sizeof(struct pipe_rasterizer_state), handle,
+                      GRAW_OBJECT_RASTERIZER);
+}
+
 static void graw_decode_create_surface(struct grend_decode_ctx *ctx, uint32_t handle)
 {
    uint32_t res_handle;
@@ -171,6 +197,23 @@ static void graw_decode_create_surface(struct grend_decode_ctx *ctx, uint32_t ha
    res_handle = ctx->ds->buf[ctx->ds->buf_offset + 2];
 
    grend_create_surface(ctx->grctx, handle, res_handle);
+}
+
+static void graw_decode_create_sampler_state(struct grend_decode_ctx *ctx, uint32_t handle, uint16_t length)
+{
+   struct pipe_sampler_state *state = CALLOC_STRUCT(pipe_sampler_state);
+
+   uint32_t tmp;
+
+   tmp = ctx->ds->buf[ctx->ds->buf_offset + 2];
+   state->wrap_s = tmp & 0x7;
+   state->wrap_t = (tmp >> 3) & 0x7;
+   state->wrap_r = (tmp >> 6) & 0x7;
+   state->min_img_filter = (tmp >> 9) & 0x3;
+   state->min_mip_filter = (tmp >> 11) & 0x3;
+   state->mag_img_filter = (tmp >> 13) & 0x3;
+   graw_object_insert(state, sizeof(struct pipe_sampler_state), handle,
+                      GRAW_OBJECT_SAMPLER_STATE);
 }
 
 static void graw_decode_create_ve(struct grend_decode_ctx *ctx, uint32_t handle, uint16_t length)
@@ -209,6 +252,9 @@ static void graw_decode_create_object(struct grend_decode_ctx *ctx)
    case GRAW_OBJECT_BLEND:
       graw_decode_create_blend(ctx, handle, length);
       break;
+   case GRAW_OBJECT_RASTERIZER:
+      graw_decode_create_rasterizer(ctx, handle, length);
+      break;
    case GRAW_OBJECT_VS:
    case GRAW_OBJECT_FS:
       graw_decode_create_shader(ctx, obj_type, handle, length);
@@ -224,9 +270,13 @@ static void graw_decode_create_object(struct grend_decode_ctx *ctx)
    case GRAW_OBJECT_SAMPLER_VIEW:
       break;
    case GRAW_OBJECT_SAMPLER_STATE:
+      graw_decode_create_sampler_state(ctx, handle, length);
       break;
    }
 }
+
+
+
 
 static void graw_decode_bind_object(struct grend_decode_ctx *ctx)
 {
@@ -239,7 +289,10 @@ static void graw_decode_bind_object(struct grend_decode_ctx *ctx)
 
    switch (obj_type) {
    case GRAW_OBJECT_BLEND:
-      //   graw_object_bind_blend(ctx, handle);
+      //graw_object_bind_blend(ctx, handle);
+      break;
+   case GRAW_OBJECT_RASTERIZER:
+      grend_object_bind_rasterizer(ctx->grctx, handle);
       break;
    case GRAW_OBJECT_VS:
       grend_bind_vs(ctx->grctx, handle);
@@ -249,6 +302,11 @@ static void graw_decode_bind_object(struct grend_decode_ctx *ctx)
       break;
    case GRAW_OBJECT_VERTEX_ELEMENTS:
       grend_bind_vertex_elements_state(ctx->grctx, handle);
+      break;
+   case GRAW_OBJECT_SAMPLER_STATE: {
+      grend_object_bind_sampler_states(ctx->grctx, length, &ctx->ds->buf[ctx->ds->buf_offset + 1]);
+
+   }
       break;
    }
       
@@ -309,6 +367,7 @@ void graw_decode_block(uint32_t *block, int ndw)
       case GRAW_FLUSH_FRONTBUFFER:
          break;
       case GRAW_SET_FRAGMENT_SAMPLER_VIEWS:
+         graw_decode_set_fragment_sampler_views(gdctx, header >> 16);
          break;
       }
       gdctx->ds->buf_offset += (header >> 16) + 1;

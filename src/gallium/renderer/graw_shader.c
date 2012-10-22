@@ -185,9 +185,14 @@ iter_instruction(struct tgsi_iterate_context *iter,
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_TEX:
+      ctx->samplers[sreg_index].tgsi_sampler_type = inst->Texture.Texture;
+      snprintf(buf, 255, "%s = texture(%s, %s.xy);\n", dsts[0], srcs[1], srcs[0]);
+      strcat(ctx->glsl_main, buf);
+      break;
    case TGSI_OPCODE_TXP:
       ctx->samplers[sreg_index].tgsi_sampler_type = inst->Texture.Texture;
-      snprintf(buf, 255, "%s = texture(%s, %s);\n", dsts[0], srcs[1], srcs[0]);
+      snprintf(buf, 255, "%s = textureProj(%s, %s);\n", dsts[0], srcs[1], srcs[0]);
+
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_END:

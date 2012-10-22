@@ -56,6 +56,22 @@ int graw_encode_blend_state(struct graw_encoder_state *enc,
    return 0;
 }
 
+int graw_encode_rasterizer_state(struct graw_encoder_state *enc,
+                                  uint32_t handle,
+                                  struct pipe_rasterizer_state *state)
+{
+   uint32_t tmp;
+
+   graw_encoder_write_dword(enc, GRAW_CMD0(GRAW_CREATE_OBJECT, GRAW_OBJECT_RASTERIZER, 2 + 1));
+   graw_encoder_write_dword(enc, handle);
+
+   tmp = (state->flatshade << 0) |
+      (state->depth_clip << 1) |
+      (state->gl_rasterization_rules << 2);
+   graw_encoder_write_dword(enc, tmp);
+   graw_encoder_write_dword(enc, 0);
+}
+
 int graw_encode_shader_state(struct graw_encoder_state *enc,
                              uint32_t handle,
 			     uint32_t type,
@@ -175,7 +191,8 @@ int graw_encoder_inline_write(struct graw_encoder_state *enc,
                               void *data, unsigned stride,
                               unsigned layer_stride)
 {
-   uint32_t length = 11 + box->width / 4;
+   uint32_t size = (stride ? stride : box->width) * box->height;
+   uint32_t length = 11 + size / 4;
    graw_encoder_write_dword(enc, GRAW_CMD0(GRAW_RESOURCE_INLINE_WRITE, 0, length));
    graw_encoder_write_dword(enc, res_handle);
    graw_encoder_write_dword(enc, level);
@@ -189,7 +206,7 @@ int graw_encoder_inline_write(struct graw_encoder_state *enc,
    graw_encoder_write_dword(enc, box->height);
    graw_encoder_write_dword(enc, box->depth);
 
-   graw_encoder_write_block(enc, data, box->width);
+   graw_encoder_write_block(enc, data, size);
 
 }
 
@@ -205,8 +222,19 @@ int graw_encode_sampler_state(struct graw_encoder_state *enc,
                               uint32_t handle,
                               const struct pipe_sampler_state *state)
 {
-   graw_encoder_write_dword(enc, GRAW_CMD0(GRAW_CREATE_OBJECT, GRAW_OBJECT_SAMPLER_STATE ,1));
+   uint32_t tmp;
+
+   graw_encoder_write_dword(enc, GRAW_CMD0(GRAW_CREATE_OBJECT, GRAW_OBJECT_SAMPLER_STATE , 2));
    graw_encoder_write_dword(enc, handle);
+
+   tmp = state->wrap_s |
+      state->wrap_t << 3 |
+      state->wrap_r << 6 |
+      state->min_img_filter << 9 |
+      state->min_mip_filter << 11 |
+      state->mag_img_filter << 13;
+
+   graw_encoder_write_dword(enc, tmp);
 }
 
 
@@ -225,12 +253,24 @@ int graw_encode_set_fragment_sampler_views(struct graw_encoder_state *enc,
                                            uint32_t *handles)
 {
    int i;
-   graw_encoder_write_dword(enc, GRAW_CMD0(GRAW_SET_FRAGMENT_SAMPLER_VIEWS, 0, num_handles + 1));
-   graw_encoder_write_dword(enc, num_handles);
+   graw_encoder_write_dword(enc, GRAW_CMD0(GRAW_SET_FRAGMENT_SAMPLER_VIEWS, 0, num_handles));
    for (i = 0; i < num_handles; i++)
       graw_encoder_write_dword(enc, handles[i]);
    return 0;
 }
+
+
+int graw_encode_bind_fragment_sampler_states(struct graw_encoder_state *enc,
+                                             uint32_t num_handles,
+                                             uint32_t *handles)
+{
+   int i;
+   graw_encoder_write_dword(enc, GRAW_CMD0(GRAW_BIND_OBJECT, GRAW_OBJECT_SAMPLER_STATE, num_handles));
+   for (i = 0; i < num_handles; i++)
+      graw_encoder_write_dword(enc, handles[i]);
+   return 0;
+}
+
 
 #define EQ_BUF_SIZE (16*1024)
 

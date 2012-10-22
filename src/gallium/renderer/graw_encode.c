@@ -159,13 +159,26 @@ int graw_encoder_set_vertex_buffers(struct graw_encoder_state *enc,
       graw_encoder_write_dword(enc, res_handles[i]);
    }
 }
+
+int graw_encoder_set_index_buffer(struct graw_encoder_state *enc,
+                                  const struct pipe_index_buffer *ib,
+                                  uint32_t res_handle)
+{
+   graw_encoder_write_dword(enc, GRAW_CMD0(GRAW_SET_INDEX_BUFFER, 0, 3));
+   graw_encoder_write_dword(enc, res_handle);
+   graw_encoder_write_dword(enc, ib->index_size);
+   graw_encoder_write_dword(enc, ib->offset);
+}
+
 int graw_encoder_draw_vbo(struct graw_encoder_state *enc,
 			  const struct pipe_draw_info *info)
 {
-   graw_encoder_write_dword(enc, GRAW_CMD0(GRAW_DRAW_VBO, 0, 3));
+   graw_encoder_write_dword(enc, GRAW_CMD0(GRAW_DRAW_VBO, 0, 5));
    graw_encoder_write_dword(enc, info->start);
    graw_encoder_write_dword(enc, info->count);
    graw_encoder_write_dword(enc, info->mode);
+   graw_encoder_write_dword(enc, info->indexed);
+   graw_encoder_write_dword(enc, info->instance_count);
    return 0;
 }
 

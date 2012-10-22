@@ -80,6 +80,8 @@ struct grend_context {
    struct grend_sampler_view fs_views[PIPE_MAX_SHADER_SAMPLER_VIEWS];
 
    struct pipe_rasterizer_state *rs_state;
+
+   struct pipe_index_buffer ib;
    
 };
 
@@ -176,6 +178,19 @@ void grend_bind_vertex_elements_state(struct grend_context *ctx,
    ctx->ve = v;
 }
 
+void grend_set_index_buffer(struct grend_context *ctx,
+                            uint32_t res_handle,
+                            uint32_t index_size,
+                            uint32_t offset)
+{
+   struct grend_resource *res;
+
+   ctx->ib.index_size = index_size;
+   ctx->ib.offset = offset;
+   res = graw_object_lookup(res_handle, GRAW_RESOURCE);
+   ctx->ib.buffer = &res->base;
+}
+
 void grend_set_single_vbo(struct grend_context *ctx,
                          int index,
                          uint32_t stride,
@@ -225,7 +240,10 @@ void grend_transfer_inline_write(struct grend_context *ctx,
    void *ptr;
 
    res = graw_object_lookup(res_handle, GRAW_RESOURCE);
-   if (res->target == GL_ARRAY_BUFFER_ARB) {
+   if (res->target == GL_ELEMENT_ARRAY_BUFFER_ARB) {
+      glBindBufferARB(GL_ELEMENT_ARRAY_BUFFER_ARB, res->id);
+      glBufferData(GL_ELEMENT_ARRAY_BUFFER_ARB, box->width, data, GL_STATIC_DRAW);
+   } else if (res->target == GL_ARRAY_BUFFER_ARB) {
       glBindBufferARB(GL_ARRAY_BUFFER_ARB, res->id);
       glBufferData(GL_ARRAY_BUFFER_ARB, box->width, data, GL_STATIC_DRAW);
    } else {
@@ -346,15 +364,42 @@ void grend_draw_vbo(struct grend_context *ctx,
       buf = ctx->vbo[vbo_index].buffer;
       glBindBuffer(GL_ARRAY_BUFFER, buf->base.id);
       glVertexAttribPointer(i, sz, type, GL_FALSE, ctx->vbo[vbo_index].stride, (void *)ctx->ve->elements[i].src_offset);
+      if (ctx->ve->elements[i].instance_divisor)
+         glVertexAttribDivisorARB(i, ctx->ve->elements[i].instance_divisor);
       glEnableVertexAttribArray(i);
+   }
+
+   if (info->indexed) {
+      struct grend_resource *res = (struct grend_resource *)ctx->ib.buffer;
+      glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, res->id);
    }
    
    /* set the vertex state up now on a delay */
    if (!info->indexed) {
       GLenum mode = info->mode;
-      glDrawArrays(mode, info->start, info->count);
+      if (info->instance_count == 0)
+         glDrawArrays(mode, info->start, info->count);
+      else
+         glDrawArraysInstancedARB(mode, info->start, info->count, info->instance_count);
    } else {
-      fprintf(stderr,"indexed\n");
+      GLenum elsz;
+      GLenum mode = info->mode;
+      switch (ctx->ib.index_size) {
+      case 1:
+         elsz = GL_UNSIGNED_BYTE;
+         break;
+      case 2: 
+         elsz = GL_UNSIGNED_SHORT;
+         break;
+      case 4: 
+         elsz = GL_UNSIGNED_INT;
+         break;
+      }
+
+      if (info->instance_count == 0)        
+         glDrawElements(mode, info->count, elsz, 0);
+      else
+         glDrawElementsInstancedARB(mode, info->count, elsz, 0, info->instance_count);
    }
 
    glActiveTexture(GL_TEXTURE0);
@@ -503,13 +548,16 @@ struct grend_context *grend_create_context(void)
    return CALLOC_STRUCT(grend_context);
 }
 
-void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target target, uint32_t width, uint32_t height)
+void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target target, uint32_t bind, uint32_t width, uint32_t height)
 {
    struct grend_resource *gr = CALLOC_STRUCT(grend_resource);
 
    gr->base.width0 = width;
    gr->base.height0 = height;
-   if (target == PIPE_BUFFER) {
+   if (bind == PIPE_BIND_INDEX_BUFFER) {
+      gr->target = GL_ELEMENT_ARRAY_BUFFER_ARB;
+      glGenBuffersARB(1, &gr->id);
+   } else if (target == PIPE_BUFFER) {
       gr->target = GL_ARRAY_BUFFER_ARB;
       glGenBuffersARB(1, &gr->id);
    } else {

@@ -207,6 +207,16 @@ static void graw_set_vertex_buffers(struct pipe_context *ctx,
    graw_encoder_set_vertex_buffers(grctx->eq, num_buffers, buffers, res_handles);
 }
 
+static void graw_set_index_buffer(struct pipe_context *ctx,
+                                  const struct pipe_index_buffer *buf)
+{
+   struct graw_context *grctx = (struct graw_context *)ctx;
+   struct graw_resource *res;
+
+   res = (struct graw_resource *)buf->buffer;
+   graw_encoder_set_index_buffer(grctx->eq, buf, res->res_handle);
+}
+
 static void graw_transfer_inline_write(struct pipe_context *ctx,
                                                 struct pipe_resource *res,
                                                 unsigned level,
@@ -408,6 +418,7 @@ static struct pipe_context *graw_context_create(struct pipe_screen *pscreen,
    gr_ctx->base.create_vertex_elements_state = graw_create_vertex_elements_state;
    gr_ctx->base.bind_vertex_elements_state = graw_bind_vertex_elements_state;
    gr_ctx->base.set_vertex_buffers = graw_set_vertex_buffers;
+   gr_ctx->base.set_index_buffer = graw_set_index_buffer;
    gr_ctx->base.transfer_inline_write = graw_transfer_inline_write;
    gr_ctx->base.create_fs_state = graw_create_fs_state;
    gr_ctx->base.create_vs_state = graw_create_vs_state;
@@ -447,7 +458,7 @@ static struct pipe_resource *graw_resource_create(struct pipe_screen *pscreen,
       buf->base.base = *template;
       buf->base.base.screen = pscreen;
       pipe_reference_init(&buf->base.base.reference, 1);
-      graw_renderer_resource_create(handle, template->target, 0, 0);
+      graw_renderer_resource_create(handle, template->target, template->bind, 0, 0);
       buf->base.res_handle = handle;
       return &buf->base.base;
    } else {
@@ -455,7 +466,7 @@ static struct pipe_resource *graw_resource_create(struct pipe_screen *pscreen,
       tex->base.base = *template;
       tex->base.base.screen = pscreen;
       pipe_reference_init(&tex->base.base.reference, 1);
-      graw_renderer_resource_create(handle, template->target, template->width0, template->height0);
+      graw_renderer_resource_create(handle, template->target, template->bind, template->width0, template->height0);
       tex->base.res_handle = handle;
       return &tex->base.base;
    }

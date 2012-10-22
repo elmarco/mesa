@@ -103,6 +103,14 @@ static void graw_decode_set_viewport_state(struct grend_decode_ctx *ctx)
    grend_set_viewport_state(ctx->grctx, &vps);
 }
 
+static void graw_decode_set_index_buffer(struct grend_decode_ctx *ctx)
+{
+   int offset = ctx->ds->buf_offset;
+   grend_set_index_buffer(ctx->grctx, ctx->ds->buf[offset + 1],
+                          ctx->ds->buf[offset + 2],
+                          ctx->ds->buf[offset + 3]);
+}
+
 static void graw_decode_set_vertex_buffers(struct grend_decode_ctx *ctx, uint16_t length)
 {
    int num_vbo;
@@ -117,7 +125,6 @@ static void graw_decode_set_vertex_buffers(struct grend_decode_ctx *ctx, uint16_
                            ctx->ds->buf[element_offset + 2]);
    }
    grend_set_num_vbo(ctx->grctx, num_vbo);
-
 }
 
 static void graw_decode_set_fragment_sampler_views(struct grend_decode_ctx *ctx, uint16_t length)
@@ -166,6 +173,8 @@ static void graw_decode_draw_vbo(struct grend_decode_ctx *ctx)
    info.start = ctx->ds->buf[ctx->ds->buf_offset + 1];
    info.count = ctx->ds->buf[ctx->ds->buf_offset + 2];
    info.mode = ctx->ds->buf[ctx->ds->buf_offset + 3];
+   info.indexed = ctx->ds->buf[ctx->ds->buf_offset + 4];
+   info.instance_count = ctx->ds->buf[ctx->ds->buf_offset + 5];
    grend_draw_vbo(gdctx->grctx, &info);
 }
 
@@ -368,6 +377,9 @@ void graw_decode_block(uint32_t *block, int ndw)
          break;
       case GRAW_SET_FRAGMENT_SAMPLER_VIEWS:
          graw_decode_set_fragment_sampler_views(gdctx, header >> 16);
+         break;
+      case GRAW_SET_INDEX_BUFFER:
+         graw_decode_set_index_buffer(gdctx);
          break;
       }
       gdctx->ds->buf_offset += (header >> 16) + 1;

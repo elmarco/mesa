@@ -124,8 +124,7 @@ static boolean
 iter_property(struct tgsi_iterate_context *iter,
               struct tgsi_full_property *prop)
 {
-   return FALSE;
-
+   return TRUE;
 }
 
 static boolean

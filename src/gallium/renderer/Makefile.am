@@ -1,10 +1,11 @@
 include Makefile.sources
 
-noinst_PROGRAMS=tri quad-tex tri-instanced graw-renderer graw-pipe-winsys
+noinst_PROGRAMS=tri quad-tex tri-instanced graw-renderer 
 
 AM_LDFLAGS = ../auxiliary/libgallium.a $(GLUT_LIBS) $(GLEW_LIBS) $(GL_LIBS) -lm -ldl
 
 AM_CFLAGS = \
+        -I$(top_srcdir)/src/gallium/drivers/rempipe \
 	-I$(top_srcdir)/src/gallium/include \
 	-I$(top_srcdir)/src/gallium/auxiliary \
 	-I$(top_srcdir)/src/gallium/drivers \
@@ -18,6 +19,7 @@ tri_instanced_SOURCES = \
 	tri-instanced.c \
         graw_util.c \
         graw_renderer.c \
+        graw_renderer_glut.c \
         graw_shader.c \
         graw_object.c \
         graw_encode.c \
@@ -28,6 +30,7 @@ quad_tex_SOURCES = \
 	quad-tex.c \
         graw_util.c \
         graw_renderer.c \
+        graw_renderer_glut.c \
         graw_shader.c \
         graw_object.c \
         graw_encode.c \
@@ -38,6 +41,7 @@ tri_SOURCES = \
 	$(C_SOURCES) \
         graw_util.c \
         graw_renderer.c \
+        graw_renderer_glut.c \
         graw_shader.c \
         graw_object.c \
         graw_encode.c \
@@ -49,11 +53,6 @@ graw_renderer_SOURCES = \
         graw_renderer.c \
         graw_shader.c \
         graw_object.c \
-        graw_decode.c
+        graw_decode.c \
+        graw_renderer_glut.c
 
-graw_pipe_winsys_SOURCES = \
-        tri.c\
-        graw_context.c \
-        graw_encode.c \
-        graw_util.c \
-        graw_pipe_winsys.c

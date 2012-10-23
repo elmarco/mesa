@@ -10,4 +10,5 @@ struct graw_decoder_state {
 
 void graw_decode_block(uint32_t *block, int ndw);
 
+void graw_decode_transfer(uint32_t *data, uint32_t ndw);
 #endif

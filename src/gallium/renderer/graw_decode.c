@@ -38,7 +38,8 @@ static int graw_decode_create_shader(struct grend_decode_ctx *ctx, uint32_t type
       free(state);
       return -1;
    }
-   
+
+   fprintf(stderr,"shader\n%s\n", &ctx->ds->buf[ctx->ds->buf_offset + 2]);
    if (!tgsi_text_translate(&ctx->ds->buf[ctx->ds->buf_offset + 2], tokens, DECODE_MAX_TOKENS)) {
       fprintf(stderr,"failed to translate\n");
       free(tokens);
@@ -109,6 +110,15 @@ static void graw_decode_set_index_buffer(struct grend_decode_ctx *ctx)
    grend_set_index_buffer(ctx->grctx, ctx->ds->buf[offset + 1],
                           ctx->ds->buf[offset + 2],
                           ctx->ds->buf[offset + 3]);
+}
+
+static void graw_decode_set_constant_buffer(struct grend_decode_ctx *ctx, uint16_t length)
+{
+   int offset = ctx->ds->buf_offset;
+   uint32_t shader = ctx->ds->buf[offset + 1];
+   uint32_t index = ctx->ds->buf[offset + 2];
+   int nc = (length - 2);
+   grend_set_constants(ctx->grctx, shader, index, nc, &ctx->ds->buf[offset + 3]);
 }
 
 static void graw_decode_set_vertex_buffers(struct grend_decode_ctx *ctx, uint16_t length)
@@ -379,6 +389,9 @@ void graw_decode_block(uint32_t *block, int ndw)
       case GRAW_SET_INDEX_BUFFER:
          graw_decode_set_index_buffer(gdctx);
          break;
+      case GRAW_SET_CONSTANT_BUFFER:
+         graw_decode_set_constant_buffer(gdctx, header >> 16);
+         break;
       }
       gdctx->ds->buf_offset += (header >> 16) + 1;
       
@@ -386,3 +399,17 @@ void graw_decode_block(uint32_t *block, int ndw)
 
 }
 
+void graw_decode_transfer(uint32_t *data, uint32_t ndw)
+{
+   uint32_t handle = data[0];
+   struct pipe_box box;
+
+   box.x = data[1];
+   box.y = data[2];
+   box.z = data[3];
+   box.width = data[4];
+   box.height = data[5];
+   box.depth = data[6];
+
+   graw_renderer_transfer_write(handle, &box, data+7);
+}

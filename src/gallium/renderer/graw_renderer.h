@@ -85,4 +85,13 @@ void grend_set_index_buffer(struct grend_context *ctx,
                             uint32_t res_handle,
                             uint32_t index_size,
                             uint32_t offset);
+
+void graw_renderer_transfer_write(uint32_t handle, struct pipe_box *box,
+                                  void *data);
+
+void grend_set_constants(struct grend_context *ctx,
+                         uint32_t shader,
+                         uint32_t index,
+                         uint32_t num_constant,
+                         float *data);
 #endif

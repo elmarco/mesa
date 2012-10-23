@@ -29,6 +29,7 @@ enum graw_cmd {
    GRAW_RESOURCE_INLINE_WRITE,
    GRAW_SET_FRAGMENT_SAMPLER_VIEWS,
    GRAW_SET_INDEX_BUFFER,
+   GRAW_SET_CONSTANT_BUFFER,
 };
 
 enum graw_scrn_cmd {
@@ -39,6 +40,8 @@ enum graw_scrn_cmd {
    GRAW_SUBMIT_CMD = 5,
    GRAW_DESTROY_CONTEXT = 6,
    GRAW_DESTROY_RENDERER = 7,
+   GRAW_TRANSFER_GET = 8,
+   GRAW_TRANSFER_PUT = 9,
 };
 
 /* 
@@ -53,4 +56,5 @@ void graw_renderer_init(int x, int y, int width, int height);
 void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target target, uint32_t bind, uint32_t width, uint32_t height);
 void grend_flush_frontbuffer(uint32_t res_handle);
 void graw_decode_block(uint32_t *block, int ndw);
+
 #endif

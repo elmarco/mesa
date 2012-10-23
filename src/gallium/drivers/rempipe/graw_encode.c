@@ -286,6 +286,19 @@ int graw_encode_bind_fragment_sampler_states(struct graw_encoder_state *enc,
    return 0;
 }
 
+int graw_encoder_write_constant_buffer(struct graw_encoder_state *enc,
+                                       uint32_t shader,
+                                       uint32_t index,
+                                       uint32_t size,
+                                       void *data)
+{
+   graw_encoder_write_dword(enc, GRAW_CMD0(GRAW_SET_CONSTANT_BUFFER, 0, size + 2));
+   graw_encoder_write_dword(enc, shader);
+   graw_encoder_write_dword(enc, index);
+   if (data)
+      graw_encoder_write_block(enc, data, size * 4);
+
+}
 
 #define EQ_BUF_SIZE (16*1024)
 

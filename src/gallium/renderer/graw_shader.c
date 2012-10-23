@@ -38,6 +38,7 @@ struct dump_ctx {
    int num_temps;
    struct graw_shader_sampler samplers[32];
    int num_samps;
+   int num_consts;
    unsigned fragcoord_input;
 };
 
@@ -109,6 +110,8 @@ iter_declaration(struct tgsi_iterate_context *iter,
       ctx->num_samps++;
       break;
    case TGSI_FILE_CONSTANT:
+      ctx->num_consts+=decl->Range.Last + 1;
+      break;
    case TGSI_FILE_ADDRESS:
    case TGSI_FILE_SYSTEM_VALUE:
    default:
@@ -134,6 +137,16 @@ iter_immediate(
 {
    struct dump_ctx *ctx = (struct dump_ctx *) iter;
    return TRUE;
+}
+
+static char get_swiz_char(int swiz)
+{
+   switch(swiz){
+   case TGSI_SWIZZLE_X: return 'x';
+   case TGSI_SWIZZLE_Y: return 'y';
+   case TGSI_SWIZZLE_Z: return 'z';
+   case TGSI_SWIZZLE_W: return 'w';
+   }
 }
 
 static boolean
@@ -163,18 +176,31 @@ iter_instruction(struct tgsi_iterate_context *iter,
       
    for (i = 0; i < inst->Instruction.NumSrcRegs; i++) {
       const struct tgsi_full_src_register *src = &inst->Src[i];
-
+      char swizzle[6] = {0};
+      
+      if (src->Register.SwizzleX != TGSI_SWIZZLE_X ||
+          src->Register.SwizzleY != TGSI_SWIZZLE_Y ||
+          src->Register.SwizzleZ != TGSI_SWIZZLE_Z ||
+          src->Register.SwizzleW != TGSI_SWIZZLE_W) {
+         swizzle[0] = '.';
+         swizzle[1] = get_swiz_char(src->Register.SwizzleX);
+         swizzle[2] = get_swiz_char(src->Register.SwizzleY);
+         swizzle[3] = get_swiz_char(src->Register.SwizzleZ);
+         swizzle[4] = get_swiz_char(src->Register.SwizzleW);
+      }
       if (src->Register.File == TGSI_FILE_INPUT) {
          for (j = 0; j < ctx->num_inputs; j++)
             if (ctx->inputs[j].first == src->Register.Index) {
-               snprintf(srcs[i], 255, "%s", ctx->inputs[j].glsl_name);
+               snprintf(srcs[i], 255, "%s%s", ctx->inputs[j].glsl_name, swizzle);
                break;
             }
       }
       else if (src->Register.File == TGSI_FILE_TEMPORARY)
-          snprintf(srcs[i], 255, "temp%d", src->Register.Index);
+          snprintf(srcs[i], 255, "temp%d%s", src->Register.Index, swizzle);
+      else if (src->Register.File == TGSI_FILE_CONSTANT)
+          snprintf(srcs[i], 255, "const%d%s", src->Register.Index, swizzle);
       else if (src->Register.File == TGSI_FILE_SAMPLER) {
-          snprintf(srcs[i], 255, "samp%d", src->Register.Index);
+          snprintf(srcs[i], 255, "samp%d%s", src->Register.Index, swizzle);
 	  sreg_index = src->Register.Index;
       }
    }
@@ -186,6 +212,14 @@ iter_instruction(struct tgsi_iterate_context *iter,
       break;
    case TGSI_OPCODE_ADD:
       snprintf(buf, 255, "%s = %s + %s;\n", dsts[0], srcs[0], srcs[1]);
+      strcat(ctx->glsl_main, buf);
+      break;
+   case TGSI_OPCODE_MUL:
+      snprintf(buf, 255, "%s = %s * %s;\n", dsts[0], srcs[0], srcs[1]);
+      strcat(ctx->glsl_main, buf);
+      break;
+   case TGSI_OPCODE_MAD:
+      snprintf(buf, 255, "%s = %s * %s + %s;\n", dsts[0], srcs[0], srcs[1], srcs[2]);
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_TEX:
@@ -252,6 +286,10 @@ static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
    }
    for (i = 0; i < ctx->num_temps; i++) {
       snprintf(buf, 255, "vec4 temp%d;\n", i);
+      strcat(glsl_final, buf);
+   }
+   for (i = 0; i < ctx->num_consts; i++) {
+      snprintf(buf, 255, "uniform vec4 const%d;\n", i);
       strcat(glsl_final, buf);
    }
    for (i = 0; i < ctx->num_samps; i++) {

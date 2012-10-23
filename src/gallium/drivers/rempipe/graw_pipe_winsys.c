@@ -5,6 +5,7 @@
 #include "pipe/p_state.h"
 #include "graw_protocol.h"
 #include "graw_pipe_winsys.h"
+#include "graw_context.h"
 
 int graw_fd;
 uint32_t buf[255];
@@ -45,6 +46,8 @@ void grend_flush_frontbuffer(uint32_t res_handle)
    buf[0] = GRAW_CMD0(GRAW_FLUSH_FRONTBUFFER, 0, 1);
    buf[1] = res_handle;
    write(graw_fd, buf, 2 * sizeof(uint32_t));
+
+   /* we need to block to get back the contents of the front buffer? */
 }
 
 void graw_decode_block(uint32_t *block, int ndw)
@@ -55,17 +58,18 @@ void graw_decode_block(uint32_t *block, int ndw)
    write(graw_fd, block, ndw * sizeof(uint32_t));
 }
 
-#if 0
-void (*mydraw)(void);
-
-void 
-graw_set_display_func( void (*draw)( void ) )
+void graw_transfer_block(uint32_t res_handle, const struct pipe_box *box,
+                         void *data, int ndw)
 {
-   mydraw = draw;
+   buf[0] = GRAW_CMD0(GRAW_TRANSFER_PUT, 0, ndw + 7);
+   buf[1] = res_handle;
+   buf[2] = box->x;
+   buf[3] = box->y;
+   buf[4] = box->z;
+   buf[5] = box->width;
+   buf[6] = box->height;
+   buf[7] = box->depth;
+   write(graw_fd, buf, 8 * sizeof(uint32_t));
+   write(graw_fd, data, ndw * sizeof(uint32_t));
+   
 }
-void
-graw_main_loop( void )
-{
-   (*mydraw)();
-}
-#endif

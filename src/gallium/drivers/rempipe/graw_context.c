@@ -11,6 +11,7 @@
 #include "pipe/p_state.h"
 #include "util/u_inlines.h"
 #include "util/u_memory.h"
+#include "util/u_format.h"
 #include "util/u_transfer.h"
 #include "tgsi/tgsi_text.h"
 
@@ -66,6 +67,12 @@ struct graw_context {
    struct graw_shader_state *fs;
 
    struct graw_encoder_state *eq;
+};
+
+struct graw_transfer {
+   struct pipe_transfer base;
+   void *localmem;
+   uint32_t lmsize;
 };
 
 static struct pipe_screen encscreen;
@@ -238,7 +245,17 @@ static void graw_set_constant_buffer(struct pipe_context *ctx,
                                      uint shader, uint index,
                                      struct pipe_constant_buffer *buf)
 {
+   struct graw_context *grctx = (struct graw_context *)ctx;
 
+   if (buf) {
+      if (!buf->user_buffer){
+         fprintf(stderr,"CONST BUFFER FAIL\n");
+         return;
+      }
+      
+      graw_encoder_write_constant_buffer(grctx->eq, shader, index, buf->buffer_size / 4, buf->user_buffer);
+   } else
+      graw_encoder_write_constant_buffer(grctx->eq, shader, index, 0, NULL);
 }
 
 static void graw_transfer_inline_write(struct pipe_context *ctx,
@@ -431,6 +448,73 @@ static void graw_set_sample_mask(struct pipe_context *ctx,
 
 }
 
+static struct pipe_transfer *graw_get_transfer(struct pipe_context *ctx,
+                                               struct pipe_resource *resource,
+                                               unsigned level,
+                                               unsigned usage,  /* a combination of PIPE_TRANSFER_x */
+                                               const struct pipe_box *box)
+{
+   struct graw_context *grctx = (struct graw_context *)ctx;
+
+   struct graw_transfer *trans;
+
+   trans = CALLOC_STRUCT(graw_transfer);
+   if (trans == NULL)
+      return NULL;
+
+   trans->lmsize = box->width * box->height * box->depth * util_format_get_blocksize(resource->format);
+   trans->localmem = malloc(trans->lmsize);
+   if (usage & PIPE_TRANSFER_READ) {
+      fprintf(stderr, "TODO READ\n");
+      memset(trans->localmem, 0, trans->lmsize);
+   }
+
+   trans->base.resource = resource;
+   trans->base.level = level;
+   trans->base.usage = usage;
+   trans->base.box = *box;
+   trans->base.stride = 0;
+   trans->base.layer_stride = 0;
+   trans->base.data = NULL;
+
+   return &trans->base;
+}
+
+static void graw_transfer_destroy(struct pipe_context *ctx,
+                                  struct pipe_transfer *transfer)
+{
+   struct graw_transfer *trans = (struct graw_transfer *)transfer;
+   FREE(trans->localmem);
+   FREE(trans);
+}
+
+static void *graw_transfer_map(struct pipe_context *ctx,
+                               struct pipe_transfer *transfer)
+{
+   struct graw_transfer *trans = (struct graw_transfer *)transfer;
+   return trans->localmem;
+}
+
+static void graw_transfer_unmap(struct pipe_context *ctx,
+                                 struct pipe_transfer *transfer)
+{
+
+}
+
+static void graw_transfer_flush_region(struct pipe_context *ctx,
+                                       struct pipe_transfer *transfer,
+                                       const struct pipe_box *box)
+{
+   struct graw_context *grctx = (struct graw_context *)ctx;
+   struct graw_resource *grres = (struct graw_resource *)transfer->resource;
+   struct graw_transfer *trans = (struct graw_transfer *)transfer;
+   uint32_t offset;
+   uint32_t size;
+
+   graw_transfer_block(grres->res_handle, box, trans->localmem, box->width);
+   
+}
+                                       
 static void
 graw_context_destroy( struct pipe_context *ctx )
 {
@@ -488,6 +572,13 @@ struct pipe_context *graw_context_create(struct pipe_screen *pscreen,
    gr_ctx->base.set_polygon_stipple = graw_set_polygon_stipple;
    gr_ctx->base.set_scissor_state = graw_set_scissor_state;
    gr_ctx->base.set_sample_mask = graw_set_sample_mask;
+
+   gr_ctx->base.get_transfer = graw_get_transfer;
+   gr_ctx->base.transfer_destroy = graw_transfer_destroy;
+   gr_ctx->base.transfer_map = graw_transfer_map;
+   gr_ctx->base.transfer_unmap = graw_transfer_unmap;
+   gr_ctx->base.transfer_flush_region = graw_transfer_flush_region;
+
    return &gr_ctx->base;
 }
 
@@ -514,7 +605,7 @@ struct pipe_resource *graw_resource_create(struct pipe_screen *pscreen,
       buf->base.base = *template;
       buf->base.base.screen = pscreen;
       pipe_reference_init(&buf->base.base.reference, 1);
-      graw_renderer_resource_create(handle, template->target, template->bind, 0, 0);
+      graw_renderer_resource_create(handle, template->target, template->bind, template->width0, 1);
       buf->base.res_handle = handle;
       return &buf->base.base;
    } else {

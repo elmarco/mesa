@@ -1,6 +1,7 @@
 #ifndef GRAW_CONTEXT_H
 #define GRAW_CONTEXT_H
 
+#include "pipe/p_state.h"
 #include "graw_protocol.h"
 struct pipe_context *graw_context_create(struct pipe_screen *pscreen,
                                          void *priv);
@@ -16,4 +17,7 @@ void graw_flush_frontbuffer(struct pipe_screen *screen,
                             struct pipe_resource *res,
                             unsigned level, unsigned layer,
                             void *winsys_drawable_handle);
+
+void graw_transfer_block(uint32_t res_handle, const struct pipe_box *box,
+                         void *data, int ndw);
 #endif

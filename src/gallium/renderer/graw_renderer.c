@@ -64,6 +64,11 @@ struct grend_vertex_element {
    GLuint vboids[PIPE_MAX_ATTRIBS];
 };
 
+struct grend_constants {
+   float consts[128];
+   uint32_t num_consts;
+};
+
 struct grend_context {
    struct pipe_context base;
    GLuint vaoid;
@@ -82,18 +87,11 @@ struct grend_context {
    struct pipe_rasterizer_state *rs_state;
 
    struct pipe_index_buffer ib;
-   
+
+   struct grend_constants vs_consts;
+   struct grend_constants fs_consts;
 };
 
-static void Reshape(int width, int height)
-{
-
-}
-
-static void key_esc(unsigned char key, int x, int y)
-{
-   if (key == 27) exit(0);
-}
 
 void grend_create_surface(struct grend_context *ctx,
                           uint32_t handle,
@@ -136,9 +134,9 @@ void grend_set_viewport_state(struct grend_context *ctx,
    GLclampd near_val, far_val;
 
    width = state->scale[0] * 2.0f;
-   height = state->scale[1] * 2.0f;
+   height = abs(state->scale[1]) * 2.0f;
    x = state->translate[0] - state->scale[0];
-   y = state->translate[1] - state->scale[1];
+   y = state->translate[1] - abs(state->scale[1]);
    near_val = state->translate[2] - state->scale[2];
 
    far_val = near_val + (state->scale[2] * 2.0f);
@@ -176,6 +174,23 @@ void grend_bind_vertex_elements_state(struct grend_context *ctx,
    }
       
    ctx->ve = v;
+}
+
+void grend_set_constants(struct grend_context *ctx,
+                         uint32_t shader,
+                         uint32_t index,
+                         uint32_t num_constant,
+                         float *data)
+{
+   struct grend_constants *consts;
+   int i;
+   if (shader == 0)
+      consts = &ctx->vs_consts;
+   else
+      consts = &ctx->fs_consts;
+   consts->num_consts = num_constant;
+   for (i = 0; i < num_constant; i++)
+      consts->consts[i] = data[i];
 }
 
 void grend_set_index_buffer(struct grend_context *ctx,
@@ -343,6 +358,17 @@ void grend_draw_vbo(struct grend_context *ctx,
 
    glBindVertexArray(vaoid);
 
+   for (i = 0; i < ctx->vs_consts.num_consts / 4; i++) {
+      GLint loc;
+      char name[10];
+      snprintf(name, 10, "const%d", i);
+      loc = glGetUniformLocation(program_id, name);
+      if (loc == -1)
+         fprintf(stderr,"unknown constant\n");
+      glUniform4fv(loc, 1, &ctx->vs_consts.consts[i * 4]);
+   }
+
+
    for (i = 0; i < ctx->num_fs_views; i++) {
       glActiveTexture(GL_TEXTURE0 + i);
       glBindTexture(ctx->fs_views[i].texture->target, ctx->fs_views[i].texture->id);
@@ -506,41 +532,14 @@ static GLenum tgsitargettogltarget(const enum pipe_texture_target target)
 void
 graw_renderer_init(int x, int y, int width, int height)
 {
-   int argc = 0;
+   static int inited;
 
-   static int glut_inited;
-
-   if (!glut_inited) {
-      glut_inited = 1;
+   if (!inited) {
+      inited = 1;
       graw_object_init_hash();
-      glutInit(&argc, NULL);
    }
    
-   glutInitWindowSize(width, height);
- 
-   glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE);
-
-   glutCreateWindow("test");
-
    glewInit();
-      
-   glutReshapeFunc(Reshape);
-   glutKeyboardFunc(key_esc);
-}
-
-
-
-void 
-graw_set_display_func( void (*draw)( void ) )
-{
-   glutDisplayFunc(draw);
-}
-
-
-void
-graw_main_loop( void )
-{
-   glutMainLoop();
 }
 
 struct grend_context *grend_create_context(void)
@@ -557,9 +556,13 @@ void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target tar
    if (bind == PIPE_BIND_INDEX_BUFFER) {
       gr->target = GL_ELEMENT_ARRAY_BUFFER_ARB;
       glGenBuffersARB(1, &gr->id);
+      glBindBufferARB(gr->target, gr->id);
+      glBufferData(gr->target, width, NULL, GL_STATIC_DRAW);
    } else if (target == PIPE_BUFFER) {
       gr->target = GL_ARRAY_BUFFER_ARB;
       glGenBuffersARB(1, &gr->id);
+      glBindBufferARB(gr->target, gr->id);
+      glBufferData(gr->target, width, NULL, GL_STATIC_DRAW);
    } else {
       gr->target = tgsitargettogltarget(target);
       glGenTextures(1, &gr->id);
@@ -570,5 +573,24 @@ void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target tar
    }
 
    graw_object_insert(gr, sizeof(*gr), handle, GRAW_RESOURCE);
+}
+
+void graw_renderer_transfer_write(uint32_t res_handle, struct pipe_box *box,
+                                  void *data)
+{
+   struct grend_resource *res;
+   void *ptr;
+
+   res = graw_object_lookup(res_handle, GRAW_RESOURCE);
+   if (res->target == GL_ELEMENT_ARRAY_BUFFER_ARB) {
+      fprintf(stderr,"TRANSFER FOR IB\n");
+   } else if (res->target == GL_ARRAY_BUFFER_ARB) {
+      glBindBufferARB(GL_ARRAY_BUFFER_ARB, res->id);
+      glBufferSubData(GL_ARRAY_BUFFER_ARB, box->x, box->width, data);
+   } else {
+      fprintf(stderr,"TRANSFER FOR TEXTURE\n");
+   }
+   
+
 }
 

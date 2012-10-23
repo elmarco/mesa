@@ -22,6 +22,7 @@
 #include "graw_object.h"
 
 #include "graw_renderer.h"
+#include "graw_renderer_glut.h"
 #include "graw_decode.h"
 struct graw_screen;
 
@@ -482,8 +483,9 @@ graw_create_window_and_screen( int x,
 {
 
    *handle = 5;
-
+   graw_renderer_glut_init(x, y, width, height);
    graw_renderer_init(x, y, width, height);
+
    encscreen.context_create = graw_context_create;
    encscreen.resource_create = graw_resource_create;
    encscreen.flush_frontbuffer = graw_flush_frontbuffer;

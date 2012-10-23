@@ -8,6 +8,8 @@
 #include "graw_protocol.h"
 #include "graw_pipe_winsys.h"
 
+#include "graw_renderer_glut.h"
+#include "graw_decode.h"
 int graw_fd;
 
 uint32_t cmdbuf[65536];
@@ -23,8 +25,9 @@ static void process_cmd(void)
    switch (cmd & 0xff) {
    case GRAW_CREATE_RENDERER:
       ret = read(graw_fd, &decbuf, 4 * sizeof(uint32_t));
-
+      graw_renderer_glut_init(decbuf[0], decbuf[1], decbuf[2], decbuf[3]);
       graw_renderer_init(decbuf[0], decbuf[1], decbuf[2], decbuf[3]);
+
       break;
    case GRAW_CREATE_RESOURCE:
       ret = read(graw_fd, &decbuf, 5 * sizeof(uint32_t));
@@ -39,6 +42,11 @@ static void process_cmd(void)
       ndw = cmd >> 16;
       ret = read(graw_fd, &cmdbuf, ndw * sizeof(uint32_t));
       graw_decode_block(cmdbuf, ndw);
+      break;
+   case GRAW_TRANSFER_PUT:
+      ndw = cmd >> 16;
+      ret = read(graw_fd, &cmdbuf, ndw * sizeof(uint32_t));
+      graw_decode_transfer(cmdbuf, ndw);
       break;
    default:
       fprintf(stderr,"read unknown cmd %d\n", cmd);

@@ -125,4 +125,10 @@ int graw_encoder_set_index_buffer(struct graw_encoder_state *enc,
                                   const struct pipe_index_buffer *ib,
                                   uint32_t res_handle);
 uint32_t graw_object_assign_handle(void);
+
+int graw_encoder_write_constant_buffer(struct graw_encoder_state *enc,
+                                       uint32_t shader,
+                                       uint32_t index,
+                                       uint32_t size,
+                                       void *data);
 #endif

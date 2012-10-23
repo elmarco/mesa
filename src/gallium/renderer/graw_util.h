@@ -14,6 +14,7 @@
 #include "util/u_inlines.h"
 #include "util/u_memory.h"
 
+#include "graw_renderer_glut.h"
 
 struct graw_info
 {

@@ -11,6 +11,25 @@ int graw_fd;
 int graw_cli_fd;
 uint32_t buf[255];
 
+static int do_blocked_read(int fd, void *data, uint32_t bytes)
+{
+   int left = bytes;
+   int sofar = 0;
+
+   do {
+      int ret;
+
+      ret = read(fd, data + sofar, left);
+      if (ret > 0) {
+         sofar += ret;
+         left -= ret;
+      }
+      if (ret < 0)
+         return ret;
+   } while (left > 0);
+   return sofar;
+}
+
 void graw_renderer_init(int x, int y, int width, int height)
 {
    graw_fd = open(GRAW_PIPENAME, O_RDWR);
@@ -80,8 +99,8 @@ void graw_transfer_block(uint32_t res_handle, const struct pipe_box *box,
 void graw_transfer_get_block(uint32_t res_handle, const struct pipe_box *box,
                              void *data, int ndw)
 {
-   int left = ndw * 4;
-   int sofar = 0;
+   int ret;
+
    buf[0] = GRAW_CMD0(GRAW_TRANSFER_GET, 0, 7);
    buf[1] = res_handle;
    buf[2] = box->x;
@@ -92,17 +111,6 @@ void graw_transfer_get_block(uint32_t res_handle, const struct pipe_box *box,
    buf[7] = box->depth;
    write(graw_fd, buf, 8 * sizeof(uint32_t));
 
-   fprintf(stderr,"left is %d\n", left);
-   /* blocking read time */
-   do {
-      int ret;
-
-      ret = read(graw_cli_fd, data + sofar, left);
-      if (ret > 0) {
-         sofar += ret;
-         left -= ret;
-      }
-   } while (left > 0);
-   
+   ret = do_blocked_read(graw_cli_fd, data, ndw * 4);
 }
 

@@ -271,6 +271,20 @@ rempipe_is_format_supported( struct pipe_screen *screen,
    return TRUE;
 }
 
+static void rempipe_flush_frontbuffer(struct pipe_screen *screen,
+                                      struct pipe_resource *res,
+                                      unsigned level, unsigned layer,
+                                      void *winsys_drawable_handle)
+{
+   struct sw_winsys *winsys = rempipe_screen(screen)->winsys;
+   struct graw_resource *gres = (struct graw_resource *)res;
+   void *map;
+
+   //   map = winsys->displaytarget_map(winsys, spr->dt, transfer->usage);
+   graw_flush_frontbuffer(screen, res, level, layer, winsys_drawable_handle);
+   //grend_flush_frontbuffer(gres->res_handle);
+}
+
 static void
 rp_destroy_screen(struct pipe_screen *screen)
 {
@@ -304,6 +318,6 @@ rempipe_create_screen(struct sw_winsys *winsys)
    screen->base.context_create = graw_context_create;
    screen->base.resource_create = graw_resource_create;
    screen->base.resource_destroy = graw_resource_destroy;
-   screen->base.flush_frontbuffer = graw_flush_frontbuffer;
+   screen->base.flush_frontbuffer = rempipe_flush_frontbuffer;
    return &screen->base;
 }

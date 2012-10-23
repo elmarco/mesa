@@ -22,11 +22,15 @@
 #include "graw_encode.h"
 
 #include "graw_context.h"
+
+#include "rempipe.h"
+#include "state_tracker/sw_winsys.h"
 struct graw_screen;
 
 struct graw_resource {
    struct pipe_resource base;
    uint32_t res_handle;
+
 };
 
 struct graw_buffer {
@@ -35,6 +39,10 @@ struct graw_buffer {
 
 struct graw_texture {
    struct graw_resource base;
+
+   struct sw_displaytarget *dt; 
+   uint32_t stride;
+
 };
 
 
@@ -594,9 +602,22 @@ void graw_flush_frontbuffer(struct pipe_screen *screen,
                             unsigned level, unsigned layer,
                             void *winsys_drawable_handle)
 {
-   struct graw_resource *gres = (struct graw_resource *)res;
+   struct sw_winsys *winsys = rempipe_screen(screen)->winsys;
+   struct graw_texture *gres = (struct graw_texture *)res;
+   void *map;
+   struct pipe_box box;
+   int size = res->width0 * res->height0 * util_format_get_blocksize(res->format);
+   grend_flush_frontbuffer(gres->base.res_handle);
+   map = winsys->displaytarget_map(winsys, gres->dt, 0);
 
-   grend_flush_frontbuffer(gres->res_handle);
+   box.x = box.y = box.z = 0;
+   box.width = res->width0;
+   box.height = res->height0;
+   box.depth = 1;
+   graw_transfer_get_block(gres->base.res_handle, &box, map, size / 4);
+   winsys->displaytarget_unmap(winsys, gres->dt);
+
+   winsys->displaytarget_display(winsys, gres->dt, winsys_drawable_handle);
 }
 
 struct pipe_resource *graw_resource_create(struct pipe_screen *pscreen,
@@ -622,6 +643,22 @@ struct pipe_resource *graw_resource_create(struct pipe_screen *pscreen,
       pipe_reference_init(&tex->base.base.reference, 1);
       graw_renderer_resource_create(handle, template->target, template->format, template->bind, template->width0, template->height0);
       tex->base.res_handle = handle;
+
+      if (template->bind & (PIPE_BIND_DISPLAY_TARGET |
+                            PIPE_BIND_SCANOUT |
+                            PIPE_BIND_SHARED))
+      {
+         struct sw_winsys *winsys = rempipe_screen(pscreen)->winsys;
+         tex->dt = winsys->displaytarget_create(winsys,
+                                                tex->base.base.bind,
+                                                tex->base.base.format,
+                                                tex->base.base.width0, 
+                                                tex->base.base.height0,
+                                                16,
+                                                &tex->stride );
+      }
+      
+
       return &tex->base.base;
    }
 }

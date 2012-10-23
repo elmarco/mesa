@@ -68,8 +68,6 @@ void grend_flush_frontbuffer(uint32_t res_handle)
    buf[0] = GRAW_CMD0(GRAW_FLUSH_FRONTBUFFER, 0, 1);
    buf[1] = res_handle;
    write(graw_fd, buf, 2 * sizeof(uint32_t));
-
-   /* we need to block to get back the contents of the front buffer? */
 }
 
 void graw_decode_block(uint32_t *block, int ndw)

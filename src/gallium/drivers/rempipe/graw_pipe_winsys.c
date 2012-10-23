@@ -8,11 +8,13 @@
 #include "graw_context.h"
 
 int graw_fd;
+int graw_cli_fd;
 uint32_t buf[255];
 
 void graw_renderer_init(int x, int y, int width, int height)
 {
    graw_fd = open(GRAW_PIPENAME, O_RDWR);
+   graw_cli_fd = open(GRAW_CLI_PIPENAME, O_RDWR);
 
    buf[0] = GRAW_CMD0(GRAW_CREATE_RENDERER, 0, 4);
    buf[1] = x;
@@ -30,15 +32,16 @@ uint32_t graw_object_assign_handle(void)
    return next_handle++;
 }
 
-void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target target, uint32_t bind, uint32_t width, uint32_t height)
+void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target target, uint32_t format, uint32_t bind, uint32_t width, uint32_t height)
 {
-   buf[0] = GRAW_CMD0(GRAW_CREATE_RESOURCE, 0, 5);
+   buf[0] = GRAW_CMD0(GRAW_CREATE_RESOURCE, 0, 6);
    buf[1] = handle;
    buf[2] = target;
-   buf[3] = bind;
-   buf[4] = width;
-   buf[5] = height;
-   write(graw_fd, buf, 6 * sizeof(uint32_t));
+   buf[3] = format;
+   buf[4] = bind;
+   buf[5] = width;
+   buf[6] = height;
+   write(graw_fd, buf, 7 * sizeof(uint32_t));
 }
 
 void grend_flush_frontbuffer(uint32_t res_handle)
@@ -73,3 +76,33 @@ void graw_transfer_block(uint32_t res_handle, const struct pipe_box *box,
    write(graw_fd, data, ndw * sizeof(uint32_t));
    
 }
+
+void graw_transfer_get_block(uint32_t res_handle, const struct pipe_box *box,
+                             void *data, int ndw)
+{
+   int left = ndw * 4;
+   int sofar = 0;
+   buf[0] = GRAW_CMD0(GRAW_TRANSFER_GET, 0, 7);
+   buf[1] = res_handle;
+   buf[2] = box->x;
+   buf[3] = box->y;
+   buf[4] = box->z;
+   buf[5] = box->width;
+   buf[6] = box->height;
+   buf[7] = box->depth;
+   write(graw_fd, buf, 8 * sizeof(uint32_t));
+
+   fprintf(stderr,"left is %d\n", left);
+   /* blocking read time */
+   do {
+      int ret;
+
+      ret = read(graw_cli_fd, data + sofar, left);
+      if (ret > 0) {
+         sofar += ret;
+         left -= ret;
+      }
+   } while (left > 0);
+   
+}
+

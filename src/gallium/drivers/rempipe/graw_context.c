@@ -67,6 +67,9 @@ struct graw_context {
    struct graw_shader_state *fs;
 
    struct graw_encoder_state *eq;
+
+   struct graw_sampler_view fs_views[16];
+   struct graw_sampler_view vs_views[16];
 };
 
 struct graw_transfer {
@@ -383,9 +386,10 @@ static struct pipe_sampler_view *graw_create_sampler_view(struct pipe_context *c
 //  graw_encode_sampler_view(grctx->eq, handle, res->res_handle, state);
 
    grview->base = *state;
+   grview->base.reference.count = 1;
+
    grview->base.texture = NULL;
-   pipe_reference(NULL, &texture->reference);
-   grview->base.texture = texture;
+   pipe_resource_reference(&grview->base.texture, texture);
 //   grview->handle = handle;
    return &grview->base;
 }
@@ -401,6 +405,7 @@ static void graw_set_fragment_sampler_views(struct pipe_context *ctx,
       struct graw_sampler_view *grview = (struct graw_sampler_view *)views[i];
       struct graw_resource *grres = (struct graw_resource *)grview->base.texture;
       handles[i] = grres->res_handle;
+      pipe_sampler_view_reference((struct pipe_sampler_view **)&grctx->fs_views[i], views[i]);
    }
    graw_encode_set_fragment_sampler_views(grctx->eq, num_views, handles);
 }
@@ -465,8 +470,10 @@ static struct pipe_transfer *graw_get_transfer(struct pipe_context *ctx,
    trans->lmsize = box->width * box->height * box->depth * util_format_get_blocksize(resource->format);
    trans->localmem = malloc(trans->lmsize);
    if (usage & PIPE_TRANSFER_READ) {
+      struct graw_resource *grres = (struct graw_resource *)resource;
       fprintf(stderr, "TODO READ\n");
-      memset(trans->localmem, 0, trans->lmsize);
+      graw_flush(ctx, NULL);
+      graw_transfer_get_block(grres->res_handle, box, trans->localmem, trans->lmsize / 4);
    }
 
    trans->base.resource = resource;
@@ -605,7 +612,7 @@ struct pipe_resource *graw_resource_create(struct pipe_screen *pscreen,
       buf->base.base = *template;
       buf->base.base.screen = pscreen;
       pipe_reference_init(&buf->base.base.reference, 1);
-      graw_renderer_resource_create(handle, template->target, template->bind, template->width0, 1);
+      graw_renderer_resource_create(handle, template->target, template->format, template->bind, template->width0, 1);
       buf->base.res_handle = handle;
       return &buf->base.base;
    } else {
@@ -613,7 +620,7 @@ struct pipe_resource *graw_resource_create(struct pipe_screen *pscreen,
       tex->base.base = *template;
       tex->base.base.screen = pscreen;
       pipe_reference_init(&tex->base.base.reference, 1);
-      graw_renderer_resource_create(handle, template->target, template->bind, template->width0, template->height0);
+      graw_renderer_resource_create(handle, template->target, template->format, template->bind, template->width0, template->height0);
       tex->base.res_handle = handle;
       return &tex->base.base;
    }

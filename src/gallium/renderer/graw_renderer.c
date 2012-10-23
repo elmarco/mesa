@@ -547,12 +547,14 @@ struct grend_context *grend_create_context(void)
    return CALLOC_STRUCT(grend_context);
 }
 
-void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target target, uint32_t bind, uint32_t width, uint32_t height)
+void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target target, uint32_t format, uint32_t bind, uint32_t width, uint32_t height)
 {
    struct grend_resource *gr = CALLOC_STRUCT(grend_resource);
 
    gr->base.width0 = width;
    gr->base.height0 = height;
+   gr->base.format = format;
+   gr->base.target = target;
    if (bind == PIPE_BIND_INDEX_BUFFER) {
       gr->target = GL_ELEMENT_ARRAY_BUFFER_ARB;
       glGenBuffersARB(1, &gr->id);
@@ -594,3 +596,28 @@ void graw_renderer_transfer_write(uint32_t res_handle, struct pipe_box *box,
 
 }
 
+void graw_renderer_transfer_send(uint32_t res_handle, struct pipe_box *box)
+{
+   struct grend_resource *res;
+
+   res = graw_object_lookup(res_handle, GRAW_RESOURCE);
+
+   if (res->target == GL_ELEMENT_ARRAY_BUFFER_ARB) {
+   } else if (res->target == GL_ARRAY_BUFFER_ARB) {
+
+   } else {
+      fprintf(stderr,"TEXTURE TRANSFER %d %d\n", box->width, box->height);
+      void *data;
+      uint32_t alloc_size = res->base.width0 * res->base.height0 * util_format_get_blocksize(res->base.format);
+      uint32_t send_size = box->width * box->height * util_format_get_blocksize(res->base.format);
+      data = malloc(alloc_size);
+
+      if (!data)
+         fprintf(stderr,"malloc failed %d\n", send_size);
+
+      fprintf(stderr,"writing %d %d\n", alloc_size, send_size);
+      glBindTexture(res->target, res->id);
+      glGetTexImage(res->target, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+      graw_transfer_write_return(data, send_size);
+   }
+}

@@ -9,8 +9,9 @@
 #include "graw_pipe_winsys.h"
 
 #include "graw_renderer_glut.h"
+#include "graw_renderer.h"
 #include "graw_decode.h"
-int graw_fd;
+int graw_fd, graw_cli_fd;
 
 uint32_t cmdbuf[65536];
 uint32_t decbuf[255];
@@ -20,8 +21,11 @@ static void process_cmd(void)
    int cmd;
    int ret;
    uint32_t ndw;
+
+ retry:
    ret = read(graw_fd, &cmd, 4);
 
+   fprintf(stderr,"cmd is %d %d\n", cmd &0xff, ret);
    switch (cmd & 0xff) {
    case GRAW_CREATE_RENDERER:
       ret = read(graw_fd, &decbuf, 4 * sizeof(uint32_t));
@@ -30,9 +34,9 @@ static void process_cmd(void)
 
       break;
    case GRAW_CREATE_RESOURCE:
-      ret = read(graw_fd, &decbuf, 5 * sizeof(uint32_t));
+      ret = read(graw_fd, &decbuf, 6 * sizeof(uint32_t));
 
-      graw_renderer_resource_create(decbuf[0], decbuf[1], decbuf[2], decbuf[3], decbuf[4]);
+      graw_renderer_resource_create(decbuf[0], decbuf[1], decbuf[2], decbuf[3], decbuf[4], decbuf[5]);
       break;
    case GRAW_FLUSH_FRONTBUFFER:
       ret = read(graw_fd, &decbuf, 1 * sizeof(uint32_t));
@@ -48,11 +52,16 @@ static void process_cmd(void)
       ret = read(graw_fd, &cmdbuf, ndw * sizeof(uint32_t));
       graw_decode_transfer(cmdbuf, ndw);
       break;
+   case GRAW_TRANSFER_GET:
+      ndw = cmd >> 16;
+      ret = read(graw_fd, &decbuf, 7 * sizeof(uint32_t));
+      graw_decode_get_transfer(decbuf, ndw);
+      break;
    default:
       fprintf(stderr,"read unknown cmd %d\n", cmd);
       break;
    }
-      
+   goto retry;
 }
 
 int main(void)
@@ -62,6 +71,10 @@ int main(void)
 
    graw_fd = open(GRAW_PIPENAME, O_RDWR);
    if (graw_fd < 0)
+      return -1;
+
+   graw_cli_fd = open(GRAW_CLI_PIPENAME, O_RDWR);
+   if (graw_cli_fd < 0)
       return -1;
    
    while (ret >= 0) { 
@@ -75,3 +88,7 @@ int main(void)
    }
 }
   
+void graw_transfer_write_return(void *data, uint32_t ndw)
+{
+   write(graw_cli_fd, data, ndw);
+}

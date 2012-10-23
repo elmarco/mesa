@@ -459,7 +459,7 @@ static struct pipe_resource *graw_resource_create(struct pipe_screen *pscreen,
       buf->base.base = *template;
       buf->base.base.screen = pscreen;
       pipe_reference_init(&buf->base.base.reference, 1);
-      graw_renderer_resource_create(handle, template->target, template->bind, 0, 0);
+      graw_renderer_resource_create(handle, template->target, template->format, template->bind, 0, 0);
       buf->base.res_handle = handle;
       return &buf->base.base;
    } else {
@@ -467,7 +467,7 @@ static struct pipe_resource *graw_resource_create(struct pipe_screen *pscreen,
       tex->base.base = *template;
       tex->base.base.screen = pscreen;
       pipe_reference_init(&tex->base.base.reference, 1);
-      graw_renderer_resource_create(handle, template->target, template->bind, template->width0, template->height0);
+      graw_renderer_resource_create(handle, template->target, template->format, template->bind, template->width0, template->height0);
       tex->base.res_handle = handle;
       return &tex->base.base;
    }
@@ -490,4 +490,9 @@ graw_create_window_and_screen( int x,
    encscreen.resource_create = graw_resource_create;
    encscreen.flush_frontbuffer = graw_flush_frontbuffer;
    return &encscreen;
+}
+
+void graw_transfer_write_return(void *data, uint32_t ndw)
+{
+
 }

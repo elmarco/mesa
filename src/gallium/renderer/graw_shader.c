@@ -206,6 +206,12 @@ iter_instruction(struct tgsi_iterate_context *iter,
    }
    switch (inst->Instruction.Opcode) {
 
+   case TGSI_OPCODE_DP3:
+      snprintf(buf, 255, "%s.x = dot(%s, %s);\n", dsts[0], srcs[0], srcs[1]);
+      strcat(ctx->glsl_main, buf);
+      break;
+   case TGSI_OPCODE_LIT:
+      break;
    case TGSI_OPCODE_MOV:
       snprintf(buf, 255, "%s = %s;\n", dsts[0], srcs[0]);
       strcat(ctx->glsl_main, buf);

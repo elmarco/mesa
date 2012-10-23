@@ -413,3 +413,19 @@ void graw_decode_transfer(uint32_t *data, uint32_t ndw)
 
    graw_renderer_transfer_write(handle, &box, data+7);
 }
+
+void graw_decode_get_transfer(uint32_t *data, uint32_t ndw)
+{
+   uint32_t handle = data[0];
+   struct pipe_box box;
+
+
+   box.x = data[1];
+   box.y = data[2];
+   box.z = data[3];
+   box.width = data[4];
+   box.height = data[5];
+   box.depth = data[6];
+
+   graw_renderer_transfer_send(handle, &box);
+}

@@ -20,4 +20,6 @@ void graw_flush_frontbuffer(struct pipe_screen *screen,
 
 void graw_transfer_block(uint32_t res_handle, const struct pipe_box *box,
                          void *data, int ndw);
+void graw_transfer_get_block(uint32_t res_handle, const struct pipe_box *box,
+                             void *data, int ndw);
 #endif

@@ -159,19 +159,37 @@ iter_instruction(struct tgsi_iterate_context *iter,
    int i;
    int j;
    int sreg_index;
+   char dstconv[6] = {0};
    if (instno == 0)
       strcat(ctx->glsl_main, "void main(void)\n{\n");
    for (i = 0; i < inst->Instruction.NumDstRegs; i++) {
       const struct tgsi_full_dst_register *dst = &inst->Dst[i];
+      char writemask[6] = {0};
+      if (dst->Register.WriteMask != TGSI_WRITEMASK_XYZW) {
+         int wm_idx = 0;
+         writemask[wm_idx++] = '.';
+         if (dst->Register.WriteMask & 0x1)
+            writemask[wm_idx++] = 'x';
+         if (dst->Register.WriteMask & 0x2)
+            writemask[wm_idx++] = 'y';
+         if (dst->Register.WriteMask & 0x4)
+            writemask[wm_idx++] = 'z';
+         if (dst->Register.WriteMask & 0x8)
+            writemask[wm_idx++] = 'w';
+         if (wm_idx == 2)
+            snprintf(dstconv, 6, "float");
+         else
+            snprintf(dstconv, 6, "vec%d", wm_idx-1);
+      }
       if (dst->Register.File == TGSI_FILE_OUTPUT) {
          for (j = 0; j < ctx->num_outputs; j++)
             if (ctx->outputs[j].first == dst->Register.Index) {
-               snprintf(dsts[i], 255, "%s", ctx->outputs[j].glsl_name);
+               snprintf(dsts[i], 255, "%s%s", ctx->outputs[j].glsl_name, writemask);
                break;
             }
       }
       else if (dst->Register.File == TGSI_FILE_TEMPORARY)
-          snprintf(dsts[i], 255, "temp%d", dst->Register.Index);
+          snprintf(dsts[i], 255, "temp%d%s", dst->Register.Index, writemask);
    }
       
    for (i = 0; i < inst->Instruction.NumSrcRegs; i++) {
@@ -213,29 +231,29 @@ iter_instruction(struct tgsi_iterate_context *iter,
    case TGSI_OPCODE_LIT:
       break;
    case TGSI_OPCODE_MOV:
-      snprintf(buf, 255, "%s = %s;\n", dsts[0], srcs[0]);
+      snprintf(buf, 255, "%s = %s(%s);\n", dsts[0], dstconv, srcs[0]);
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_ADD:
-      snprintf(buf, 255, "%s = %s + %s;\n", dsts[0], srcs[0], srcs[1]);
+      snprintf(buf, 255, "%s = %s(%s + %s);\n", dsts[0], dstconv, srcs[0], srcs[1]);
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_MUL:
-      snprintf(buf, 255, "%s = %s * %s;\n", dsts[0], srcs[0], srcs[1]);
+      snprintf(buf, 255, "%s = %s(%s * %s);\n", dsts[0], dstconv, srcs[0], srcs[1]);
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_MAD:
-      snprintf(buf, 255, "%s = %s * %s + %s;\n", dsts[0], srcs[0], srcs[1], srcs[2]);
+      snprintf(buf, 255, "%s = %s(%s * %s + %s);\n", dsts[0], dstconv, srcs[0], srcs[1], srcs[2]);
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_TEX:
       ctx->samplers[sreg_index].tgsi_sampler_type = inst->Texture.Texture;
-      snprintf(buf, 255, "%s = texture(%s, %s.xy);\n", dsts[0], srcs[1], srcs[0]);
+      snprintf(buf, 255, "%s = %s(texture(%s, %s.xy));\n", dsts[0], dstconv, srcs[1], srcs[0]);
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_TXP:
       ctx->samplers[sreg_index].tgsi_sampler_type = inst->Texture.Texture;
-      snprintf(buf, 255, "%s = textureProj(%s, %s);\n", dsts[0], srcs[1], srcs[0]);
+      snprintf(buf, 255, "%s = %s(textureProj(%s, %s));\n", dsts[0], dstconv, srcs[1], srcs[0]);
 
       strcat(ctx->glsl_main, buf);
       break;

@@ -81,6 +81,8 @@ struct grend_context {
    struct grend_shader_state *vs;
    struct grend_shader_state *fs;
 
+   bool shader_dirty;
+   int program_id;
    int num_fs_views;
    /* frag samplers */
    struct grend_sampler_view fs_views[PIPE_MAX_SHADER_SAMPLER_VIEWS];
@@ -335,6 +337,8 @@ void grend_bind_vs(struct grend_context *ctx,
 
    state = graw_object_lookup(handle, GRAW_OBJECT_VS);
 
+   if (ctx->vs != state)
+      ctx->shader_dirty = true;
    ctx->vs = state;
 }
 
@@ -346,6 +350,8 @@ void grend_bind_fs(struct grend_context *ctx,
 
    state = graw_object_lookup(handle, GRAW_OBJECT_FS);
 
+   if (ctx->fs != state)
+      ctx->shader_dirty = true;
    ctx->fs = state;
 }
 
@@ -365,13 +371,17 @@ void grend_draw_vbo(struct grend_context *ctx,
 {
    GLuint vaoid;
    int i;
-   int program_id;
 #if 1
-   program_id = glCreateProgram();
-   glAttachShader(program_id, ctx->vs->id);
-   glAttachShader(program_id, ctx->fs->id);
-   glLinkProgram(program_id);
-   glUseProgram(program_id);
+   if (ctx->shader_dirty) {
+      if (ctx->program_id)
+         glDeleteProgram(ctx->program_id);
+
+      ctx->program_id = glCreateProgram();
+      glAttachShader(ctx->program_id, ctx->vs->id);
+      glAttachShader(ctx->program_id, ctx->fs->id);
+      glLinkProgram(ctx->program_id);
+   }
+   glUseProgram(ctx->program_id);
    glGenVertexArrays(1, &vaoid);
 
    glBindVertexArray(vaoid);
@@ -380,7 +390,7 @@ void grend_draw_vbo(struct grend_context *ctx,
       GLint loc;
       char name[10];
       snprintf(name, 10, "const%d", i);
-      loc = glGetUniformLocation(program_id, name);
+      loc = glGetUniformLocation(ctx->program_id, name);
       if (loc == -1)
          fprintf(stderr,"unknown constant %s\n", name);
       else

@@ -104,7 +104,11 @@ iter_declaration(struct tgsi_iterate_context *iter,
 
       break;
    case TGSI_FILE_TEMPORARY:
-      ctx->num_temps++;
+      if (decl->Range.Last)
+         ctx->num_temps+=decl->Range.Last + 1;
+      else
+         ctx->num_temps++;
+
       break;
    case TGSI_FILE_SAMPLER:
       ctx->num_samps++;
@@ -225,10 +229,22 @@ iter_instruction(struct tgsi_iterate_context *iter,
    switch (inst->Instruction.Opcode) {
 
    case TGSI_OPCODE_DP3:
-      snprintf(buf, 255, "%s.x = dot(%s, %s);\n", dsts[0], srcs[0], srcs[1]);
+      snprintf(buf, 255, "%s = %s(dot(%s.xyzw, %s.xyzw));\n", dsts[0], dstconv, srcs[0], srcs[1]);
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_LIT:
+      snprintf(buf, 255, "%s.x = 1.0;\n", dsts[0]);
+      strcat(ctx->glsl_main, buf);
+      snprintf(buf, 255, "%s.y = max(%s.x, 0.0);\n", dsts[0], srcs[0]);
+      strcat(ctx->glsl_main, buf);
+      snprintf(buf, 255, "%s.z = pow(max(0.0, %s.y) * step(0.0, %s.x), clamp(%s.w, -128.0, 128.0));\n", dsts[0], srcs[0], srcs[0], srcs[0]);
+      strcat(ctx->glsl_main, buf);
+      snprintf(buf, 255, "%s.w = 1.0;\n", dsts[0]);
+      strcat(ctx->glsl_main, buf);
+      break;
+   case TGSI_OPCODE_RSQ:
+      snprintf(buf, 255, "%s = %s(inversesqrt(%s.x));\n", dsts[0], dstconv, srcs[0]);
+      strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_MOV:
       snprintf(buf, 255, "%s = %s(%s);\n", dsts[0], dstconv, srcs[0]);
@@ -259,6 +275,9 @@ iter_instruction(struct tgsi_iterate_context *iter,
       break;
    case TGSI_OPCODE_END:
       strcat(ctx->glsl_main, "}\n");
+      break;
+   default:
+      assert(0);
       break;
    }
    

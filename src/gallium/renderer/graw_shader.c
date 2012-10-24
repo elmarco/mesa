@@ -278,9 +278,10 @@ iter_instruction(struct tgsi_iterate_context *iter,
       break;
    default:
       assert(0);
+      return FALSE;
       break;
    }
-   
+   return TRUE;
 }
 
 static boolean

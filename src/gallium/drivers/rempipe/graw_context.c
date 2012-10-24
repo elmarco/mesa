@@ -244,6 +244,12 @@ static void graw_set_vertex_buffers(struct pipe_context *ctx,
    graw_encoder_set_vertex_buffers(grctx->eq, num_buffers, buffers, res_handles);
 }
 
+static void graw_set_stencil_ref(struct pipe_context *ctx,
+                                 const struct pipe_stencil_ref *ref)
+{
+
+}
+
 static void graw_set_index_buffer(struct pipe_context *ctx,
                                   const struct pipe_index_buffer *buf)
 {
@@ -602,6 +608,7 @@ struct pipe_context *graw_context_create(struct pipe_screen *pscreen,
    gr_ctx->base.set_polygon_stipple = graw_set_polygon_stipple;
    gr_ctx->base.set_scissor_state = graw_set_scissor_state;
    gr_ctx->base.set_sample_mask = graw_set_sample_mask;
+   gr_ctx->base.set_stencil_ref = graw_set_stencil_ref;
 
    gr_ctx->base.get_transfer = graw_get_transfer;
    gr_ctx->base.transfer_destroy = graw_transfer_destroy;

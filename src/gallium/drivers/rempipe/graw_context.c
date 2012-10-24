@@ -174,6 +174,14 @@ static void graw_bind_depth_stencil_alpha_state(struct pipe_context *ctx,
    graw_encode_bind_object(grctx->eq, handle, GRAW_OBJECT_DSA);
 }
 
+static void graw_delete_depth_stencil_alpha_state(struct pipe_context *ctx,
+                                                  void *dsa_state)
+{
+   struct graw_context *grctx = (struct graw_context *)ctx;
+   uint32_t handle = (unsigned long)dsa_state;
+   graw_encode_delete_object(grctx->eq, handle, GRAW_OBJECT_DSA);
+}
+
 static void *graw_create_rasterizer_state(struct pipe_context *ctx,
                                                    const struct pipe_rasterizer_state *rs_state)
 {
@@ -192,6 +200,14 @@ static void graw_bind_rasterizer_state(struct pipe_context *ctx,
    uint32_t handle = (unsigned long)rs_state;
 
    graw_encode_bind_object(grctx->eq, handle, GRAW_OBJECT_RASTERIZER);
+}
+
+static void graw_delete_rasterizer_state(struct pipe_context *ctx,
+                                         void *rs_state)
+{
+   struct graw_context *grctx = (struct graw_context *)ctx;
+   uint32_t handle = (unsigned long)rs_state;
+   graw_encode_delete_object(grctx->eq, handle, GRAW_OBJECT_RASTERIZER);
 }
 
 static void graw_set_framebuffer_state(struct pipe_context *ctx,
@@ -584,8 +600,11 @@ struct pipe_context *graw_context_create(struct pipe_screen *pscreen,
    gr_ctx->base.delete_blend_state = graw_delete_blend_state;
    gr_ctx->base.create_depth_stencil_alpha_state = graw_create_depth_stencil_alpha_state;
    gr_ctx->base.bind_depth_stencil_alpha_state = graw_bind_depth_stencil_alpha_state;
+   gr_ctx->base.delete_depth_stencil_alpha_state = graw_delete_depth_stencil_alpha_state;
    gr_ctx->base.create_rasterizer_state = graw_create_rasterizer_state;
    gr_ctx->base.bind_rasterizer_state = graw_bind_rasterizer_state;
+   gr_ctx->base.delete_rasterizer_state = graw_delete_rasterizer_state;
+
    gr_ctx->base.set_viewport_state = graw_set_viewport_state;
    gr_ctx->base.create_vertex_elements_state = graw_create_vertex_elements_state;
    gr_ctx->base.bind_vertex_elements_state = graw_bind_vertex_elements_state;

@@ -387,13 +387,12 @@ static void graw_decode_bind_object(struct grend_decode_ctx *ctx)
    }
       break;
    }
-      
-
 }
 
 static void graw_decode_destroy_object(struct grend_decode_ctx *ctx)
 {
-
+   uint32_t handle = ctx->ds->buf[ctx->ds->buf_offset+1];
+   graw_object_destroy(handle);
 }
 
 void graw_decode_block(uint32_t *block, int ndw)

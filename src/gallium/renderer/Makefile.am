@@ -54,5 +54,8 @@ graw_renderer_SOURCES = \
         graw_shader.c \
         graw_object.c \
         graw_decode.c \
-        graw_renderer_glut.c
+        graw_renderer_glut.c \
+        graw_renderer_glx.c
 
+
+graw_renderer_LDADD = -lX11

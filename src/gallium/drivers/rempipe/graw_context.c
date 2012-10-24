@@ -84,6 +84,7 @@ struct graw_transfer {
    struct pipe_transfer base;
    void *localmem;
    uint32_t lmsize;
+   uint32_t offset;
 };
 
 static struct pipe_screen encscreen;
@@ -155,18 +156,22 @@ static void graw_delete_blend_state(struct pipe_context *ctx,
 }
 
 static void *graw_create_depth_stencil_alpha_state(struct pipe_context *ctx,
-                                                            const struct pipe_depth_stencil_alpha_state *blend_state)
+                                                   const struct pipe_depth_stencil_alpha_state *blend_state)
 {
    struct graw_context *grctx = (struct graw_context *)ctx;
    uint32_t handle; 
    handle = graw_object_assign_handle();
+
+   graw_encode_dsa_state(grctx->eq, handle, blend_state);
    return (void *)(unsigned long)handle;
 }
 
 static void graw_bind_depth_stencil_alpha_state(struct pipe_context *ctx,
-                                                         void *blend_state)
+                                                void *blend_state)
 {
-
+   struct graw_context *grctx = (struct graw_context *)ctx;
+   uint32_t handle = (unsigned long)blend_state;
+   graw_encode_bind_object(grctx->eq, handle, GRAW_OBJECT_DSA);
 }
 
 static void *graw_create_rasterizer_state(struct pipe_context *ctx,
@@ -468,7 +473,7 @@ static struct pipe_transfer *graw_get_transfer(struct pipe_context *ctx,
                                                const struct pipe_box *box)
 {
    struct graw_context *grctx = (struct graw_context *)ctx;
-
+   enum pipe_format format = resource->format;
    struct graw_transfer *trans;
 
    trans = CALLOC_STRUCT(graw_transfer);
@@ -491,6 +496,9 @@ static struct pipe_transfer *graw_get_transfer(struct pipe_context *ctx,
    trans->base.stride = 0;
    trans->base.layer_stride = 0;
    trans->base.data = NULL;
+
+//   trans->offset = box->y / util_format_get_blockheight(format) * trans->base.stride +
+//      box->x / util_format_get_blockwidth(format) * util_format_get_blocksize(format);
 
    return &trans->base;
 }
@@ -526,7 +534,7 @@ static void graw_transfer_flush_region(struct pipe_context *ctx,
    uint32_t offset;
    uint32_t size;
 
-   graw_transfer_block(grres->res_handle, box, trans->localmem, box->width);
+   graw_transfer_block(grres->res_handle, &transfer->box, box, trans->localmem + trans->offset, box->width);
    
 }
                                        
@@ -607,17 +615,32 @@ void graw_flush_frontbuffer(struct pipe_screen *screen,
    void *map;
    struct pipe_box box;
    int size = res->width0 * res->height0 * util_format_get_blocksize(res->format);
+   void *alloced = malloc(size);
+   int i;
+
    grend_flush_frontbuffer(gres->base.res_handle);
+   if (!alloced) {
+      fprintf(stderr,"Failed to malloc\n");
+
+   }
    map = winsys->displaytarget_map(winsys, gres->dt, 0);
 
    box.x = box.y = box.z = 0;
    box.width = res->width0;
    box.height = res->height0;
    box.depth = 1;
-   graw_transfer_get_block(gres->base.res_handle, &box, map, size / 4);
+   graw_transfer_get_block(gres->base.res_handle, &box, alloced, size / 4);
+
+   for (i = 0; i < res->height0; i++) {
+      int offsrc = res->width0 * util_format_get_blocksize(res->format) * (res->height0 - i - 1);
+      int offdst = gres->stride * i;
+      memcpy(map + offdst, alloced + offsrc, res->width0 * util_format_get_blocksize(res->format));
+   }
+   free(alloced);
    winsys->displaytarget_unmap(winsys, gres->dt);
 
    winsys->displaytarget_display(winsys, gres->dt, winsys_drawable_handle);
+
 }
 
 struct pipe_resource *graw_resource_create(struct pipe_screen *pscreen,
@@ -669,22 +692,4 @@ graw_resource_destroy(struct pipe_screen *pscreen,
 {
 
 
-}
-
-struct pipe_screen *
-graw_create_window_and_screen( int x,
-                               int y,
-                               unsigned width,
-                               unsigned height,
-                               enum pipe_format format,
-                               void **handle)
-{
-
-   *handle = 5;
-
-   graw_renderer_init(x, y, width, height);
-   encscreen.context_create = graw_context_create;
-   encscreen.resource_create = graw_resource_create;
-   encscreen.flush_frontbuffer = graw_flush_frontbuffer;
-   return &encscreen;
 }

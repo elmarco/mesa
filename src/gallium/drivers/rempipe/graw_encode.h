@@ -131,4 +131,7 @@ int graw_encoder_write_constant_buffer(struct graw_encoder_state *enc,
                                        uint32_t index,
                                        uint32_t size,
                                        void *data);
+int graw_encode_dsa_state(struct graw_encoder_state *enc,
+                          uint32_t handle,
+                          struct pipe_depth_stencil_alpha_state *dsa_state);
 #endif

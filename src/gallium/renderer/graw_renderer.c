@@ -22,6 +22,7 @@
 #include "graw_shader.h"
 
 #include "graw_renderer.h"
+#include "graw_renderer_glx.h"
 #include "graw_decode.h"
 
 struct grend_screen;
@@ -90,6 +91,8 @@ struct grend_context {
 
    struct grend_constants vs_consts;
    struct grend_constants fs_consts;
+
+   int fb_id;
 };
 
 
@@ -103,25 +106,40 @@ void grend_create_surface(struct grend_context *ctx,
 
    surf = CALLOC_STRUCT(grend_surface);
 
-   glGenFramebuffers(1, &surf->id);
+//   glGenFramebuffers(1, &surf->id);
 
-   tex = graw_object_lookup(res_handle, GRAW_RESOURCE);
+   surf->res_handle = res_handle;
+//   tex = graw_object_lookup(res_handle, GRAW_RESOURCE);
 
-   glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, surf->id);
-   glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
-                             tex->target, tex->id, 0);
-   glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
+//   glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, surf->id);
+//   glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
    graw_object_insert(surf, sizeof(*surf), handle, GRAW_SURFACE);
 }
 
 void grend_set_framebuffer_state(struct grend_context *ctx,
-                                 uint32_t nr_cbufs, uint32_t surf_handle)
+                                    uint32_t nr_cbufs, uint32_t surf_handle,
+                                    uint32_t zsurf_handle)
 {
-   struct grend_surface *surf;
+   struct grend_surface *surf, *zsurf;
+   struct grend_resource *tex;
 
+   if (!ctx->fb_id)
+      glGenFramebuffers(1, &ctx->fb_id);
+
+   glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, ctx->fb_id);
+
+   if (zsurf_handle) {
+      zsurf = graw_object_lookup(zsurf_handle, GRAW_SURFACE);
+
+      tex = graw_object_lookup(zsurf->res_handle, GRAW_RESOURCE);
+      glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_STENCIL_ATTACHMENT,
+                                tex->target, tex->id, 0);
+   }
    surf = graw_object_lookup(surf_handle, GRAW_SURFACE);
+   tex = graw_object_lookup(surf->res_handle, GRAW_RESOURCE);
+   glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
+                             tex->target, tex->id, 0);
 
-   glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, surf->id);
    glDrawBuffer(GL_COLOR_ATTACHMENT0);
 }
 
@@ -364,8 +382,9 @@ void grend_draw_vbo(struct grend_context *ctx,
       snprintf(name, 10, "const%d", i);
       loc = glGetUniformLocation(program_id, name);
       if (loc == -1)
-         fprintf(stderr,"unknown constant\n");
-      glUniform4fv(loc, 1, &ctx->vs_consts.consts[i * 4]);
+         fprintf(stderr,"unknown constant %s\n", name);
+      else
+         glUniform4fv(loc, 1, &ctx->vs_consts.consts[i * 4]);
    }
 
 
@@ -389,7 +408,7 @@ void grend_draw_vbo(struct grend_context *ctx,
 
       buf = ctx->vbo[vbo_index].buffer;
       glBindBuffer(GL_ARRAY_BUFFER, buf->base.id);
-      glVertexAttribPointer(i, sz, type, GL_FALSE, ctx->vbo[vbo_index].stride, (void *)ctx->ve->elements[i].src_offset);
+      glVertexAttribPointer(i, sz, type, GL_FALSE, ctx->vbo[vbo_index].stride, (void *)(ctx->ve->elements[i].src_offset + ctx->vbo[vbo_index].buffer_offset));
       if (ctx->ve->elements[i].instance_divisor)
          glVertexAttribDivisorARB(i, ctx->ve->elements[i].instance_divisor);
       glEnableVertexAttribArray(i);
@@ -403,7 +422,7 @@ void grend_draw_vbo(struct grend_context *ctx,
    /* set the vertex state up now on a delay */
    if (!info->indexed) {
       GLenum mode = info->mode;
-      if (info->instance_count == 0)
+      if (info->instance_count <= 1)
          glDrawArrays(mode, info->start, info->count);
       else
          glDrawArraysInstancedARB(mode, info->start, info->count, info->instance_count);
@@ -433,7 +452,133 @@ void grend_draw_vbo(struct grend_context *ctx,
    glBindVertexArray(0);
 #endif
 }
-   
+
+static GLenum translate_blend_func(uint32_t pipe_blend)
+{
+   switch(pipe_blend){
+   case PIPE_BLEND_ADD: return GL_FUNC_ADD;
+   case PIPE_BLEND_SUBTRACT: return GL_FUNC_SUBTRACT;
+   case PIPE_BLEND_REVERSE_SUBTRACT: return GL_FUNC_REVERSE_SUBTRACT;
+   case PIPE_BLEND_MIN: return GL_MIN;
+   case PIPE_BLEND_MAX: return GL_MAX;
+   default:
+      assert("invalid blend token()" == NULL);
+      return 0;
+   }
+}
+
+static GLenum translate_blend_factor(uint32_t pipe_factor)
+{
+   switch (pipe_factor) {
+   case PIPE_BLENDFACTOR_ONE: return GL_ONE;
+   case PIPE_BLENDFACTOR_SRC_COLOR: return GL_SRC_COLOR;
+   case PIPE_BLENDFACTOR_SRC_ALPHA: return GL_SRC_ALPHA;
+
+   case PIPE_BLENDFACTOR_DST_COLOR: return GL_DST_COLOR;
+   case PIPE_BLENDFACTOR_DST_ALPHA: return GL_DST_ALPHA;
+
+   case PIPE_BLENDFACTOR_CONST_COLOR: return GL_CONSTANT_COLOR;
+   case PIPE_BLENDFACTOR_CONST_ALPHA: return GL_CONSTANT_ALPHA;
+
+   case PIPE_BLENDFACTOR_SRC1_COLOR: return GL_SRC1_COLOR;
+   case PIPE_BLENDFACTOR_SRC1_ALPHA: return GL_SRC1_ALPHA;
+   case PIPE_BLENDFACTOR_SRC_ALPHA_SATURATE: return GL_SRC_ALPHA_SATURATE;
+   case PIPE_BLENDFACTOR_ZERO: return GL_ZERO;
+
+
+   case PIPE_BLENDFACTOR_INV_SRC_COLOR: return GL_ONE_MINUS_SRC_COLOR;
+   case PIPE_BLENDFACTOR_INV_SRC_ALPHA: return GL_ONE_MINUS_SRC_ALPHA;
+
+   case PIPE_BLENDFACTOR_INV_DST_COLOR: return GL_ONE_MINUS_DST_COLOR;
+   case PIPE_BLENDFACTOR_INV_DST_ALPHA: return GL_ONE_MINUS_DST_ALPHA;
+
+   case PIPE_BLENDFACTOR_INV_CONST_COLOR: return GL_ONE_MINUS_CONSTANT_COLOR;
+   case PIPE_BLENDFACTOR_INV_CONST_ALPHA: return GL_ONE_MINUS_CONSTANT_ALPHA;
+
+   case PIPE_BLENDFACTOR_INV_SRC1_COLOR: return GL_ONE_MINUS_SRC1_COLOR;
+   case PIPE_BLENDFACTOR_INV_SRC1_ALPHA: return GL_ONE_MINUS_SRC1_ALPHA;
+
+   default:
+      assert("invalid blend token()" == NULL);
+      return 0;
+   }
+}
+
+static GLenum
+translate_logicop(GLuint pipe_logicop)
+{
+   switch (pipe_logicop) {
+#define CASE(x) case PIPE_LOGICOP_##x: return GL_##x
+      CASE(CLEAR);
+      CASE(NOR);
+      CASE(AND_INVERTED);
+      CASE(COPY_INVERTED);
+      CASE(AND_REVERSE);
+      CASE(INVERT);
+      CASE(XOR);
+      CASE(NAND);
+      CASE(AND);
+      CASE(EQUIV);
+      CASE(NOOP);
+      CASE(OR_INVERTED);
+      CASE(COPY);
+      CASE(OR_REVERSE);
+      CASE(OR);
+      CASE(SET);
+   default:
+      assert("invalid logicop token()" == NULL);
+      return 0;
+   }
+}
+
+void grend_object_bind_blend(struct grend_context *ctx,
+                             uint32_t handle)
+{
+   struct pipe_blend_state *state;
+   int i;
+   state = graw_object_lookup(handle, GRAW_OBJECT_BLEND);
+
+   if (state->logicop_enable) {
+      glEnable(GL_COLOR_LOGIC_OP);
+      glLogicOp(translate_logicop(state->logicop_func));
+   } else
+      glDisable(GL_COLOR_LOGIC_OP);
+
+   if (state->independent_blend_enable) {
+      
+   } else {
+      if (state->rt[0].blend_enable) {
+         glBlendFunc(translate_blend_factor(state->rt[0].rgb_src_factor),
+                     translate_blend_factor(state->rt[0].rgb_dst_factor));
+         glBlendEquation(translate_blend_func(state->rt[0].rgb_func));
+         glEnable(GL_BLEND);
+      } 
+      else
+         glDisable(GL_BLEND);
+   }
+}
+
+void grend_object_bind_dsa(struct grend_context *ctx,
+                           uint32_t handle)
+{
+   struct pipe_depth_stencil_alpha_state *state;
+
+   state = graw_object_lookup(handle, GRAW_OBJECT_DSA);
+
+   if (state->depth.enabled) {
+      glEnable(GL_DEPTH_TEST);
+      glDepthFunc(GL_NEVER + state->depth.func);
+   } else
+      glDisable(GL_DEPTH_TEST);
+ 
+   if (state->alpha.enabled) {
+      glEnable(GL_ALPHA_TEST);
+      glAlphaFunc(GL_NEVER + state->alpha.func, state->alpha.ref_value);
+   } else
+      glDisable(GL_ALPHA_TEST);
+
+   glDisable(GL_STENCIL_TEST);
+}                            
 void grend_object_bind_rasterizer(struct grend_context *ctx,
                                   uint32_t handle)
 {
@@ -480,6 +625,7 @@ void grend_flush_frontbuffer(uint32_t res_handle)
 {
    struct grend_resource *res;
 
+#if 0
    res = graw_object_lookup(res_handle, GRAW_RESOURCE);
 
    glDrawBuffer(GL_NONE);
@@ -512,6 +658,7 @@ void grend_flush_frontbuffer(uint32_t res_handle)
    glEnd();
    glDisable(res->target);
    glutSwapBuffers();
+#endif
 }
 
 static GLenum tgsitargettogltarget(const enum pipe_texture_target target)
@@ -530,7 +677,7 @@ static GLenum tgsitargettogltarget(const enum pipe_texture_target target)
 }
 
 void
-graw_renderer_init(int x, int y, int width, int height)
+graw_renderer_init(void)
 {
    static int inited;
 
@@ -541,6 +688,7 @@ graw_renderer_init(int x, int y, int width, int height)
    
    glewInit();
 }
+
 
 struct grend_context *grend_create_context(void)
 {
@@ -566,18 +714,36 @@ void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target tar
       glBindBufferARB(gr->target, gr->id);
       glBufferData(gr->target, width, NULL, GL_STATIC_DRAW);
    } else {
+      GLenum internalformat, glformat, gltype;
       gr->target = tgsitargettogltarget(target);
       glGenTextures(1, &gr->id);
       glBindTexture(gr->target, gr->id);
 
-      glTexImage2D(gr->target, 0, GL_RGBA, width, height, 0, GL_RGBA,
-                   GL_UNSIGNED_BYTE, NULL);
+      fprintf(stderr,"format is %d\n", format);
+      switch (format) {
+      case PIPE_FORMAT_B8G8R8X8_UNORM:
+      default:
+         internalformat = GL_RGBA;
+         glformat = GL_RGBA;
+         gltype = GL_UNSIGNED_BYTE;
+         break;
+      case PIPE_FORMAT_Z24_UNORM_S8_UINT:
+         internalformat = GL_DEPTH24_STENCIL8_EXT;
+         glformat = GL_DEPTH_STENCIL;
+         gltype = GL_UNSIGNED_INT_24_8;
+         break;
+      }
+
+      glTexImage2D(gr->target, 0, internalformat, width, height, 0, glformat,
+                   gltype, NULL);
    }
 
    graw_object_insert(gr, sizeof(*gr), handle, GRAW_RESOURCE);
 }
 
-void graw_renderer_transfer_write(uint32_t res_handle, struct pipe_box *box,
+void graw_renderer_transfer_write(uint32_t res_handle,
+                                  struct pipe_box *transfer_box,
+                                  struct pipe_box *box,
                                   void *data)
 {
    struct grend_resource *res;
@@ -588,12 +754,10 @@ void graw_renderer_transfer_write(uint32_t res_handle, struct pipe_box *box,
       fprintf(stderr,"TRANSFER FOR IB\n");
    } else if (res->target == GL_ARRAY_BUFFER_ARB) {
       glBindBufferARB(GL_ARRAY_BUFFER_ARB, res->id);
-      glBufferSubData(GL_ARRAY_BUFFER_ARB, box->x, box->width, data);
+      glBufferSubData(GL_ARRAY_BUFFER_ARB, transfer_box->x + box->x, box->width, data);
    } else {
       fprintf(stderr,"TRANSFER FOR TEXTURE\n");
    }
-   
-
 }
 
 void graw_renderer_transfer_send(uint32_t res_handle, struct pipe_box *box)
@@ -610,6 +774,7 @@ void graw_renderer_transfer_send(uint32_t res_handle, struct pipe_box *box)
       void *data;
       uint32_t alloc_size = res->base.width0 * res->base.height0 * util_format_get_blocksize(res->base.format);
       uint32_t send_size = box->width * box->height * util_format_get_blocksize(res->base.format);
+      GLenum format, type;
       data = malloc(alloc_size);
 
       if (!data)
@@ -617,7 +782,15 @@ void graw_renderer_transfer_send(uint32_t res_handle, struct pipe_box *box)
 
       fprintf(stderr,"writing %d %d\n", alloc_size, send_size);
       glBindTexture(res->target, res->id);
-      glGetTexImage(res->target, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+
+      switch (res->base.format) {
+      case PIPE_FORMAT_B8G8R8A8_UNORM:
+      default:
+         format = GL_BGRA;
+         type = GL_UNSIGNED_BYTE;
+         break;
+      }
+      glGetTexImage(res->target, 0, format, type, data);
       graw_transfer_write_return(data, send_size);
    }
 }

@@ -313,7 +313,7 @@ rempipe_create_screen(struct sw_winsys *winsys)
    screen->base.is_format_supported = rempipe_is_format_supported;
    screen->base.destroy = rp_destroy_screen;
 
-   graw_renderer_init(0, 0, 300, 300);
+   graw_renderer_init();
    
    screen->base.context_create = graw_context_create;
    screen->base.resource_create = graw_resource_create;

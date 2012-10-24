@@ -35,14 +35,14 @@ int graw_encode_blend_state(struct graw_encoder_state *enc,
    uint32_t tmp;
    int i;
 
-   graw_encoder_write_dword(enc, GRAW_CMD0(GRAW_CREATE_OBJECT, GRAW_OBJECT_BLEND, 2 + 1));
+   graw_encoder_write_dword(enc, GRAW_CMD0(GRAW_CREATE_OBJECT, GRAW_OBJECT_BLEND, 2 + 1 + PIPE_MAX_COLOR_BUFS));
    graw_encoder_write_dword(enc, handle);
 
    tmp = (blend_state->independent_blend_enable << 0) |
       (blend_state->logicop_enable << 1) |
-      (blend_state->dither << 3) |
-      (blend_state->alpha_to_coverage << 4) |
-      (blend_state->alpha_to_one << 5);
+      (blend_state->dither << 2) |
+      (blend_state->alpha_to_coverage << 3) |
+      (blend_state->alpha_to_one << 4);
 
    graw_encoder_write_dword(enc, tmp);
 
@@ -50,11 +50,49 @@ int graw_encode_blend_state(struct graw_encoder_state *enc,
    graw_encoder_write_dword(enc, tmp);
 
    for (i = 0; i < PIPE_MAX_COLOR_BUFS; i++) {
-
+      tmp = ((blend_state->rt[i].blend_enable << 0) |
+             (blend_state->rt[i].rgb_func << 1) |
+             (blend_state->rt[i].rgb_src_factor << 4) |
+             (blend_state->rt[i].rgb_dst_factor << 9) |
+             (blend_state->rt[i].alpha_func << 14) |
+             (blend_state->rt[i].alpha_src_factor << 17) |
+             (blend_state->rt[i].alpha_dst_factor << 22) |
+             (blend_state->rt[i].colormask << 27));
+      graw_encoder_write_dword(enc, tmp);
    }
    return 0;
 }
 
+int graw_encode_dsa_state(struct graw_encoder_state *enc,
+                          uint32_t handle,
+                          struct pipe_depth_stencil_alpha_state *dsa_state)
+{
+   uint32_t tmp;
+   int i;
+   graw_encoder_write_dword(enc, GRAW_CMD0(GRAW_CREATE_OBJECT, GRAW_OBJECT_DSA, 1 + 4));
+   graw_encoder_write_dword(enc, handle);
+
+   tmp = dsa_state->depth.enabled |
+      dsa_state->depth.writemask << 1 |
+      dsa_state->depth.func << 2 |
+      dsa_state->alpha.enabled << 8 |
+      dsa_state->alpha.func << 9;
+   graw_encoder_write_dword(enc, tmp);
+
+   for (i = 0; i < 2; i++) {
+      tmp = dsa_state->stencil[i].enabled |
+         dsa_state->stencil[i].func << 1 |
+         dsa_state->stencil[i].fail_op << 4 |
+         dsa_state->stencil[i].zpass_op << 7 |
+         dsa_state->stencil[i].zfail_op << 10 |
+         dsa_state->stencil[i].valuemask << 13 |
+         dsa_state->stencil[i].writemask << 21;
+      graw_encoder_write_dword(enc, tmp);
+   }
+      
+   graw_encoder_write_dword(enc, uif(dsa_state->alpha.ref_value));
+   return 0;
+}
 int graw_encode_rasterizer_state(struct graw_encoder_state *enc,
                                   uint32_t handle,
                                   struct pipe_rasterizer_state *state)
@@ -110,9 +148,12 @@ int graw_encoder_set_framebuffer_state(struct graw_encoder_state *enc,
 				       const struct pipe_framebuffer_state *state)
 {
    struct graw_surface *surf = state->cbufs[0];
-   graw_encoder_write_dword(enc, GRAW_CMD0(GRAW_SET_FRAMEBUFFER_STATE, 0, 2));
+   struct graw_surface *zsurf = state->zsbuf;
+
+   graw_encoder_write_dword(enc, GRAW_CMD0(GRAW_SET_FRAMEBUFFER_STATE, 0, 3));
    graw_encoder_write_dword(enc, state->nr_cbufs);
    graw_encoder_write_dword(enc, surf->handle);
+   graw_encoder_write_dword(enc, zsurf ? zsurf->handle : 0);
    return 0;
 }
 

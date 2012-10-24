@@ -30,18 +30,13 @@ static int do_blocked_read(int fd, void *data, uint32_t bytes)
    return sofar;
 }
 
-void graw_renderer_init(int x, int y, int width, int height)
+void graw_renderer_init()
 {
    graw_fd = open(GRAW_PIPENAME, O_RDWR);
    graw_cli_fd = open(GRAW_CLI_PIPENAME, O_RDWR);
 
-   buf[0] = GRAW_CMD0(GRAW_CREATE_RENDERER, 0, 4);
-   buf[1] = x;
-   buf[2] = y;
-   buf[3] = width;
-   buf[4] = height;
-   
-   write(graw_fd, buf, 5 * sizeof(uint32_t));
+   buf[0] = GRAW_CMD0(GRAW_CREATE_RENDERER, 0, 0);
+   write(graw_fd, buf, 1 * sizeof(uint32_t));
 
 }  
 
@@ -78,10 +73,11 @@ void graw_decode_block(uint32_t *block, int ndw)
    write(graw_fd, block, ndw * sizeof(uint32_t));
 }
 
-void graw_transfer_block(uint32_t res_handle, const struct pipe_box *box,
+void graw_transfer_block(uint32_t res_handle, const struct pipe_box *transfer_box,
+                         const struct pipe_box *box,
                          void *data, int ndw)
 {
-   buf[0] = GRAW_CMD0(GRAW_TRANSFER_PUT, 0, ndw + 7);
+   buf[0] = GRAW_CMD0(GRAW_TRANSFER_PUT, 0, ndw + 13);
    buf[1] = res_handle;
    buf[2] = box->x;
    buf[3] = box->y;
@@ -89,7 +85,13 @@ void graw_transfer_block(uint32_t res_handle, const struct pipe_box *box,
    buf[5] = box->width;
    buf[6] = box->height;
    buf[7] = box->depth;
-   write(graw_fd, buf, 8 * sizeof(uint32_t));
+   buf[8] = transfer_box->x;
+   buf[9] = transfer_box->y;
+   buf[10] = transfer_box->z;
+   buf[11] = transfer_box->width;
+   buf[12] = transfer_box->height;
+   buf[13] = transfer_box->depth;
+   write(graw_fd, buf, 14 * sizeof(uint32_t));
    write(graw_fd, data, ndw * sizeof(uint32_t));
    
 }

@@ -9,6 +9,7 @@
 #include "graw_pipe_winsys.h"
 
 #include "graw_renderer_glut.h"
+#include "graw_renderer_glx.h"
 #include "graw_renderer.h"
 #include "graw_decode.h"
 int graw_fd, graw_cli_fd;
@@ -28,9 +29,9 @@ static void process_cmd(void)
    fprintf(stderr,"cmd is %d %d\n", cmd &0xff, ret);
    switch (cmd & 0xff) {
    case GRAW_CREATE_RENDERER:
-      ret = read(graw_fd, &decbuf, 4 * sizeof(uint32_t));
-      graw_renderer_glut_init(decbuf[0], decbuf[1], decbuf[2], decbuf[3]);
-      graw_renderer_init(decbuf[0], decbuf[1], decbuf[2], decbuf[3]);
+      graw_renderer_init_glx();
+//      graw_renderer_glut_init(decbuf[0], decbuf[1], decbuf[2], decbuf[3]);
+      graw_renderer_init();
 
       break;
    case GRAW_CREATE_RESOURCE:

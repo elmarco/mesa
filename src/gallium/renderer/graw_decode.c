@@ -63,7 +63,8 @@ static void graw_decode_set_framebuffer_state(struct grend_decode_ctx *ctx)
 {
    uint32_t nr_cbufs = ctx->ds->buf[ctx->ds->buf_offset + 1];
    uint32_t surf_handle = ctx->ds->buf[ctx->ds->buf_offset + 2];
-   grend_set_framebuffer_state(ctx->grctx, nr_cbufs, surf_handle);
+   uint32_t zsurf_handle = ctx->ds->buf[ctx->ds->buf_offset + 3];
+   grend_set_framebuffer_state(ctx->grctx, nr_cbufs, surf_handle, zsurf_handle);
 }
 
 static void graw_decode_clear(struct grend_decode_ctx *ctx)
@@ -191,9 +192,64 @@ static void graw_decode_draw_vbo(struct grend_decode_ctx *ctx)
 static void graw_decode_create_blend(struct grend_decode_ctx *ctx, uint32_t handle, uint16_t length)
 {
    struct pipe_blend_state *blend_state = CALLOC_STRUCT(pipe_blend_state);
-   
+   uint32_t tmp;
+   int i;
+   tmp = ctx->ds->buf[ctx->ds->buf_offset + 2];
+   blend_state->independent_blend_enable = (tmp & 1);
+   blend_state->logicop_enable = (tmp >> 1) & 0x1;
+   blend_state->dither = (tmp >> 2) & 0x1;
+   blend_state->alpha_to_coverage = (tmp >> 3) & 0x1;
+   blend_state->alpha_to_one = (tmp >> 4) & 0x1;
+
+   tmp = ctx->ds->buf[ctx->ds->buf_offset + 3];
+   blend_state->logicop_func = tmp & 0xf;
+
+   for (i = 0; i < PIPE_MAX_COLOR_BUFS; i++) {
+      tmp = ctx->ds->buf[ctx->ds->buf_offset + 4 + i];
+      blend_state->rt[i].blend_enable = tmp & 0x1;
+      blend_state->rt[i].rgb_func = (tmp >> 1) & 0x7;
+      blend_state->rt[i].rgb_src_factor = (tmp >> 4) & 0x1f;
+      blend_state->rt[i].rgb_dst_factor = (tmp >> 9) & 0x1f;
+      blend_state->rt[i].alpha_func = (tmp >> 14) & 0x7;
+      blend_state->rt[i].alpha_src_factor = (tmp >> 17) & 0x1f;
+      blend_state->rt[i].alpha_dst_factor = (tmp >> 22) & 0x1f;
+      blend_state->rt[i].colormask = (tmp >> 27) & 0xf;
+   }
+
    graw_object_insert(blend_state, sizeof(struct pipe_blend_state), handle,
                       GRAW_OBJECT_BLEND);
+}
+
+static void graw_decode_create_dsa(struct grend_decode_ctx *ctx, uint32_t handle, uint16_t length)
+{
+   int i;
+   struct pipe_depth_stencil_alpha_state *dsa_state = CALLOC_STRUCT(pipe_depth_stencil_alpha_state);
+   uint32_t tmp;
+   
+   tmp = ctx->ds->buf[ctx->ds->buf_offset + 2];
+   dsa_state->depth.enabled = tmp & 0x1;
+   dsa_state->depth.writemask = (tmp >> 1) & 0x1;
+   dsa_state->depth.func = (tmp >> 2) & 0x7;
+
+   dsa_state->alpha.enabled = (tmp >> 8) & 0x1;
+   dsa_state->alpha.func = (tmp >> 9) & 0x7;
+
+   for (i = 0; i < 2; i++) {
+      tmp = ctx->ds->buf[ctx->ds->buf_offset + 3 + i];
+      dsa_state->stencil[i].enabled = tmp & 0x1;
+      dsa_state->stencil[i].func = (tmp >> 1) & 0x7;
+      dsa_state->stencil[i].fail_op = (tmp >> 4) & 0x7;
+      dsa_state->stencil[i].zpass_op = (tmp >> 7) & 0x7;
+      dsa_state->stencil[i].zfail_op = (tmp >> 10) & 0x7;
+      dsa_state->stencil[i].valuemask = (tmp >> 13) & 0xff;
+      dsa_state->stencil[i].writemask = (tmp >> 21) & 0xff;
+   }
+
+   tmp = ctx->ds->buf[ctx->ds->buf_offset + 5];
+   dsa_state->alpha.ref_value = fui(tmp);
+
+   graw_object_insert(dsa_state, sizeof(struct pipe_depth_stencil_alpha_state), handle,
+                      GRAW_OBJECT_DSA);
 }
 
 static void graw_decode_create_rasterizer(struct grend_decode_ctx *ctx, uint32_t handle, uint16_t length)
@@ -271,6 +327,9 @@ static void graw_decode_create_object(struct grend_decode_ctx *ctx)
    case GRAW_OBJECT_BLEND:
       graw_decode_create_blend(ctx, handle, length);
       break;
+   case GRAW_OBJECT_DSA:
+      graw_decode_create_dsa(ctx, handle, length);
+      break;
    case GRAW_OBJECT_RASTERIZER:
       graw_decode_create_rasterizer(ctx, handle, length);
       break;
@@ -294,9 +353,6 @@ static void graw_decode_create_object(struct grend_decode_ctx *ctx)
    }
 }
 
-
-
-
 static void graw_decode_bind_object(struct grend_decode_ctx *ctx)
 {
    uint32_t header = ctx->ds->buf[ctx->ds->buf_offset];
@@ -308,7 +364,10 @@ static void graw_decode_bind_object(struct grend_decode_ctx *ctx)
 
    switch (obj_type) {
    case GRAW_OBJECT_BLEND:
-      //graw_object_bind_blend(ctx, handle);
+      grend_object_bind_blend(ctx, handle);
+      break;
+   case GRAW_OBJECT_DSA:
+      grend_object_bind_dsa(ctx, handle);
       break;
    case GRAW_OBJECT_RASTERIZER:
       grend_object_bind_rasterizer(ctx->grctx, handle);
@@ -402,7 +461,7 @@ void graw_decode_block(uint32_t *block, int ndw)
 void graw_decode_transfer(uint32_t *data, uint32_t ndw)
 {
    uint32_t handle = data[0];
-   struct pipe_box box;
+   struct pipe_box box, transfer_box;
 
    box.x = data[1];
    box.y = data[2];
@@ -411,7 +470,14 @@ void graw_decode_transfer(uint32_t *data, uint32_t ndw)
    box.height = data[5];
    box.depth = data[6];
 
-   graw_renderer_transfer_write(handle, &box, data+7);
+   transfer_box.x = data[7];
+   transfer_box.y = data[8];
+   transfer_box.z = data[9];
+   transfer_box.width = data[10];
+   transfer_box.height = data[11];
+   transfer_box.depth = data[12];
+
+   graw_renderer_transfer_write(handle, &transfer_box, &box, data+13);
 }
 
 void graw_decode_get_transfer(uint32_t *data, uint32_t ndw)

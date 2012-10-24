@@ -29,7 +29,8 @@ void grend_draw_vbo(struct grend_context *ctx,
                     const struct pipe_draw_info *info);
 
 void grend_set_framebuffer_state(struct grend_context *ctx,
-                                 uint32_t nr_cbufs, uint32_t surf_handle);
+                                 uint32_t nr_cbufs, uint32_t surf_handle,
+   uint32_t zsurf_handle);
 
 void grend_flush(struct grend_context *ctx);
 
@@ -75,6 +76,10 @@ void grend_set_single_fs_sampler_view(struct grend_context *ctx,
                                       int index,
                                       uint32_t res_handle);
 
+void grend_object_bind_blend(struct grend_context *ctx,
+                             uint32_t handle);
+void grend_object_bind_dsa(struct grend_context *ctx,
+                             uint32_t handle);
 void grend_object_bind_rasterizer(struct grend_context *ctx,
                                   uint32_t handle);
 
@@ -86,7 +91,8 @@ void grend_set_index_buffer(struct grend_context *ctx,
                             uint32_t index_size,
                             uint32_t offset);
 
-void graw_renderer_transfer_write(uint32_t handle, struct pipe_box *box,
+void graw_renderer_transfer_write(uint32_t handle, struct pipe_box *transfer_box,
+                                  struct pipe_box *box,
                                   void *data);
 
 void graw_renderer_transfer_send(uint32_t handle, struct pipe_box *box);

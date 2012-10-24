@@ -185,10 +185,13 @@ void grend_bind_vertex_elements_state(struct grend_context *ctx,
    struct grend_vertex_element *v;
    int i;
 
+   if (!handle) {
+      ctx->ve = NULL;
+      return;
+   }
    v = graw_object_lookup(handle, GRAW_OBJECT_VERTEX_ELEMENTS);
    if (!v) {
       fprintf(stderr, "illegal ve lookup\n");
-      return;
    }
       
    ctx->ve = v;
@@ -402,13 +405,22 @@ void grend_draw_vbo(struct grend_context *ctx,
       struct grend_buffer *buf;
       GLenum type;
       int sz;
+      GLboolean norm = GL_FALSE;
       if (desc->channel[0].type == UTIL_FORMAT_TYPE_FLOAT)
          type = GL_FLOAT;
+      else if (desc->channel[0].type == UTIL_FORMAT_TYPE_UNSIGNED &&
+         desc->channel[0].size == 8) 
+         type = GL_UNSIGNED_BYTE;
+      else if (desc->channel[0].type == UTIL_FORMAT_TYPE_UNSIGNED &&
+         desc->channel[0].size == 32) 
+         type = GL_UNSIGNED_INT;
+      if (desc->channel[0].normalized)
+         norm = GL_TRUE;
       sz = desc->nr_channels;
 
       buf = ctx->vbo[vbo_index].buffer;
       glBindBuffer(GL_ARRAY_BUFFER, buf->base.id);
-      glVertexAttribPointer(i, sz, type, GL_FALSE, ctx->vbo[vbo_index].stride, (void *)(ctx->ve->elements[i].src_offset + ctx->vbo[vbo_index].buffer_offset));
+      glVertexAttribPointer(i, sz, type, norm, ctx->vbo[vbo_index].stride, (void *)(ctx->ve->elements[i].src_offset + ctx->vbo[vbo_index].buffer_offset));
       if (ctx->ve->elements[i].instance_divisor)
          glVertexAttribDivisorARB(i, ctx->ve->elements[i].instance_divisor);
       glEnableVertexAttribArray(i);

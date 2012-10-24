@@ -53,7 +53,7 @@ enum graw_scrn_cmd {
 #define GRAW_CMD0(cmd, obj, len) ((cmd) | ((obj) << 8) | ((len) << 16))
 
 void graw_renderer_init(void);
-void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target target, uint32_t format, uint32_t bind, uint32_t width, uint32_t height);
+void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target target, uint32_t format, uint32_t bind, uint32_t width, uint32_t height, uint32_t depth);
 void graw_decode_block(uint32_t *block, int ndw);
 
 #endif

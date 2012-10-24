@@ -493,7 +493,7 @@ static struct pipe_transfer *graw_get_transfer(struct pipe_context *ctx,
    trans->base.level = level;
    trans->base.usage = usage;
    trans->base.box = *box;
-   trans->base.stride = 0;
+   trans->base.stride = box->width * util_format_get_blocksize(resource->format);
    trans->base.layer_stride = 0;
    trans->base.data = NULL;
 
@@ -507,6 +507,13 @@ static void graw_transfer_destroy(struct pipe_context *ctx,
                                   struct pipe_transfer *transfer)
 {
    struct graw_transfer *trans = (struct graw_transfer *)transfer;
+   struct graw_resource *grres = (struct graw_resource *)transfer->resource;
+
+   if (trans->base.usage & PIPE_TRANSFER_WRITE) {
+      graw_transfer_block(grres->res_handle, &transfer->box, &transfer->box, trans->localmem + trans->offset, trans->lmsize / 4);
+      
+   }
+
    FREE(trans->localmem);
    FREE(trans);
 }
@@ -656,7 +663,7 @@ struct pipe_resource *graw_resource_create(struct pipe_screen *pscreen,
       buf->base.base = *template;
       buf->base.base.screen = pscreen;
       pipe_reference_init(&buf->base.base.reference, 1);
-      graw_renderer_resource_create(handle, template->target, template->format, template->bind, template->width0, 1);
+      graw_renderer_resource_create(handle, template->target, template->format, template->bind, template->width0, 1, 1);
       buf->base.res_handle = handle;
       return &buf->base.base;
    } else {
@@ -664,7 +671,7 @@ struct pipe_resource *graw_resource_create(struct pipe_screen *pscreen,
       tex->base.base = *template;
       tex->base.base.screen = pscreen;
       pipe_reference_init(&tex->base.base.reference, 1);
-      graw_renderer_resource_create(handle, template->target, template->format, template->bind, template->width0, template->height0);
+      graw_renderer_resource_create(handle, template->target, template->format, template->bind, template->width0, template->height0, template->depth0);
       tex->base.res_handle = handle;
 
       if (template->bind & (PIPE_BIND_DISPLAY_TARGET |

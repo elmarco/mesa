@@ -35,9 +35,9 @@ static void process_cmd(void)
 
       break;
    case GRAW_CREATE_RESOURCE:
-      ret = read(graw_fd, &decbuf, 6 * sizeof(uint32_t));
+      ret = read(graw_fd, &decbuf, 7 * sizeof(uint32_t));
 
-      graw_renderer_resource_create(decbuf[0], decbuf[1], decbuf[2], decbuf[3], decbuf[4], decbuf[5]);
+graw_renderer_resource_create(decbuf[0], decbuf[1], decbuf[2], decbuf[3], decbuf[4], decbuf[5], decbuf[6]);
       break;
    case GRAW_FLUSH_FRONTBUFFER:
       ret = read(graw_fd, &decbuf, 1 * sizeof(uint32_t));

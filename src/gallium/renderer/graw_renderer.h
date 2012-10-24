@@ -38,7 +38,7 @@ void grend_flush(struct grend_context *ctx);
 void grend_flush_frontbuffer(uint32_t res_handle);
 struct grend_context *grend_create_context(void);
 
-void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target target, uint32_t format, uint32_t bind, uint32_t width, uint32_t height);
+void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target target, uint32_t format, uint32_t bind, uint32_t width, uint32_t height, uint32_t depth);
 
 void grend_create_surface(struct grend_context *ctx,
                           uint32_t handle,

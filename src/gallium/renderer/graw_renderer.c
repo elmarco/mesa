@@ -284,11 +284,8 @@ void grend_transfer_inline_write(struct grend_context *ctx,
       glBufferData(GL_ARRAY_BUFFER_ARB, box->width, data, GL_STATIC_DRAW);
    } else {
       glBindTexture(res->target, res->id);
-      glEnable(res->target);
       glTexSubImage2D(res->target, level, box->x, box->y, box->width, box->height,
                       GL_RGBA, GL_UNSIGNED_BYTE, data);
-      glDisable(res->target);
-
    }
 }
 
@@ -622,9 +619,10 @@ void grend_object_bind_sampler_states(struct grend_context *ctx,
    for (i = 0; i < num_states; i++) {
       state = graw_object_lookup(handles[0], GRAW_OBJECT_SAMPLER_STATE);
 
-      glEnable(GL_TEXTURE_2D);
       glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
       glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+      glTexParameterf(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+      glTexParameterf(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
    }
 }
 
@@ -707,7 +705,7 @@ struct grend_context *grend_create_context(void)
    return CALLOC_STRUCT(grend_context);
 }
 
-void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target target, uint32_t format, uint32_t bind, uint32_t width, uint32_t height)
+void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target target, uint32_t format, uint32_t bind, uint32_t width, uint32_t height, uint32_t depth)
 {
    struct grend_resource *gr = CALLOC_STRUCT(grend_resource);
 
@@ -747,8 +745,14 @@ void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target tar
          break;
       }
 
-      glTexImage2D(gr->target, 0, internalformat, width, height, 0, glformat,
-                   gltype, NULL);
+      if (gr->target == GL_TEXTURE_3D) {
+         glTexImage3D(gr->target, 0, internalformat, width, height, depth, 0,
+                      glformat,
+                      gltype, NULL);
+      } else {
+         glTexImage2D(gr->target, 0, internalformat, width, height, 0, glformat,
+                      gltype, NULL);
+      }
    }
 
    graw_object_insert(gr, sizeof(*gr), handle, GRAW_RESOURCE);
@@ -769,10 +773,19 @@ void graw_renderer_transfer_write(uint32_t res_handle,
       glBindBufferARB(GL_ARRAY_BUFFER_ARB, res->id);
       glBufferSubData(GL_ARRAY_BUFFER_ARB, transfer_box->x + box->x, box->width, data);
    } else {
+
       glBindTexture(res->target, res->id);
-      glTexSubImage2D(res->target, 0, transfer_box->x + box->x,
-                      transfer_box->y + box->y, box->width, box->height,
-                      GL_BGRA, GL_UNSIGNED_BYTE, data);
+      if (res->target == GL_TEXTURE_3D) {
+         glTexSubImage3D(res->target, 0, transfer_box->x + box->x,
+                         transfer_box->y + box->y, 
+                         box->z,
+                         box->width, box->height, box->depth,
+                         GL_BGRA, GL_UNSIGNED_BYTE, data);
+      } else {
+         glTexSubImage2D(res->target, 0, transfer_box->x + box->x,
+                         transfer_box->y + box->y, box->width, box->height,
+                         GL_BGRA, GL_UNSIGNED_BYTE, data);
+      }
       fprintf(stderr,"TRANSFER FOR TEXTURE\n");
    }
 }

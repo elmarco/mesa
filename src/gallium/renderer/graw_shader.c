@@ -245,6 +245,14 @@ iter_instruction(struct tgsi_iterate_context *iter,
       snprintf(buf, 255, "%s = %s(dot(%s.xyzw, %s.xyzw));\n", dsts[0], dstconv, srcs[0], srcs[1]);
       strcat(ctx->glsl_main, buf);
       break;
+   case TGSI_OPCODE_MAX:
+      snprintf(buf, 255, "%s = %s(max(%s));\n", dsts[0], dstconv, srcs[0]);
+      strcat(ctx->glsl_main, buf);
+      break;
+   case TGSI_OPCODE_MIN:
+      snprintf(buf, 255, "%s = %s(min(%s));\n", dsts[0], dstconv, srcs[0]);
+      strcat(ctx->glsl_main, buf);
+      break;
    case TGSI_OPCODE_LIT:
       snprintf(buf, 255, "%s.x = 1.0;\n", dsts[0]);
       strcat(ctx->glsl_main, buf);

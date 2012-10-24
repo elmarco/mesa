@@ -39,6 +39,9 @@ struct dump_ctx {
    struct graw_shader_sampler samplers[32];
    int num_samps;
    int num_consts;
+
+   int num_flt_imm;
+   float flt_imm[32];
    unsigned fragcoord_input;
 };
 
@@ -140,6 +143,14 @@ iter_immediate(
    struct tgsi_full_immediate *imm )
 {
    struct dump_ctx *ctx = (struct dump_ctx *) iter;
+   int i;
+   
+   if (imm->Immediate.DataType == TGSI_IMM_FLOAT32) {
+      int first = ctx->num_flt_imm;
+      for (i = 0; i < 4; i++)
+         ctx->flt_imm[first + i] = imm->u[i].Float;
+      ctx->num_flt_imm += 4;
+   }
    return TRUE;
 }
 
@@ -224,6 +235,8 @@ iter_instruction(struct tgsi_iterate_context *iter,
       else if (src->Register.File == TGSI_FILE_SAMPLER) {
           snprintf(srcs[i], 255, "samp%d%s", src->Register.Index, swizzle);
 	  sreg_index = src->Register.Index;
+      } else if (src->Register.File == TGSI_FILE_IMMEDIATE) {
+         snprintf(srcs[i], 255, "%.4f", ctx->flt_imm[(src->Register.Index)]);
       }
    }
    switch (inst->Instruction.Opcode) {

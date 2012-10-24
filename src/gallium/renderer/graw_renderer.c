@@ -734,6 +734,7 @@ void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target tar
       fprintf(stderr,"format is %d\n", format);
       switch (format) {
       case PIPE_FORMAT_B8G8R8X8_UNORM:
+      case PIPE_FORMAT_B8G8R8A8_UNORM:
       default:
          internalformat = GL_RGBA;
          glformat = GL_RGBA;
@@ -768,6 +769,10 @@ void graw_renderer_transfer_write(uint32_t res_handle,
       glBindBufferARB(GL_ARRAY_BUFFER_ARB, res->id);
       glBufferSubData(GL_ARRAY_BUFFER_ARB, transfer_box->x + box->x, box->width, data);
    } else {
+      glBindTexture(res->target, res->id);
+      glTexSubImage2D(res->target, 0, transfer_box->x + box->x,
+                      transfer_box->y + box->y, box->width, box->height,
+                      GL_BGRA, GL_UNSIGNED_BYTE, data);
       fprintf(stderr,"TRANSFER FOR TEXTURE\n");
    }
 }

@@ -195,7 +195,8 @@ iter_instruction(struct tgsi_iterate_context *iter,
             snprintf(dstconv, 6, "float");
          else
             snprintf(dstconv, 6, "vec%d", wm_idx-1);
-      }
+      } else
+         snprintf(dstconv, 6, "vec4");
       if (dst->Register.File == TGSI_FILE_OUTPUT) {
          for (j = 0; j < ctx->num_outputs; j++)
             if (ctx->outputs[j].first == dst->Register.Index) {
@@ -242,7 +243,15 @@ iter_instruction(struct tgsi_iterate_context *iter,
    switch (inst->Instruction.Opcode) {
 
    case TGSI_OPCODE_DP3:
-      snprintf(buf, 255, "%s = %s(dot(%s.xyzw, %s.xyzw));\n", dsts[0], dstconv, srcs[0], srcs[1]);
+      snprintf(buf, 255, "%s = %s(dot(vec3(%s), vec3(%s)));\n", dsts[0], dstconv, srcs[0], srcs[1]);
+      strcat(ctx->glsl_main, buf);
+      break;
+   case TGSI_OPCODE_DP4:
+      snprintf(buf, 255, "%s = %s(dot(vec4(%s), vec4(%s)));\n", dsts[0], dstconv, srcs[0], srcs[1]);
+      strcat(ctx->glsl_main, buf);
+      break;
+   case TGSI_OPCODE_DPH:
+      snprintf(buf, 255, "%s = %s(dot(vec4(%s), vec4(vec3(%s), 1.0)));\n", dsts[0], dstconv, srcs[0], srcs[1]);
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_MAX:
@@ -251,6 +260,10 @@ iter_instruction(struct tgsi_iterate_context *iter,
       break;
    case TGSI_OPCODE_MIN:
       snprintf(buf, 255, "%s = %s(min(%s));\n", dsts[0], dstconv, srcs[0]);
+      strcat(ctx->glsl_main, buf);
+      break;
+   case TGSI_OPCODE_ABS:
+      snprintf(buf, 255, "%s = %s(abs(%s));\n", dsts[0], dstconv, srcs[0]);
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_LIT:
@@ -263,6 +276,10 @@ iter_instruction(struct tgsi_iterate_context *iter,
       snprintf(buf, 255, "%s.w = 1.0;\n", dsts[0]);
       strcat(ctx->glsl_main, buf);
       break;
+   case TGSI_OPCODE_RCP:
+      snprintf(buf, 255, "%s = %s(1.0/(%s));\n", dsts[0], dstconv, srcs[0]);
+      strcat(ctx->glsl_main, buf);
+      break;
    case TGSI_OPCODE_RSQ:
       snprintf(buf, 255, "%s = %s(inversesqrt(%s.x));\n", dsts[0], dstconv, srcs[0]);
       strcat(ctx->glsl_main, buf);
@@ -273,6 +290,10 @@ iter_instruction(struct tgsi_iterate_context *iter,
       break;
    case TGSI_OPCODE_ADD:
       snprintf(buf, 255, "%s = %s(%s + %s);\n", dsts[0], dstconv, srcs[0], srcs[1]);
+      strcat(ctx->glsl_main, buf);
+      break;
+   case TGSI_OPCODE_SUB:
+      snprintf(buf, 255, "%s = %s(%s - %s);\n", dsts[0], dstconv, srcs[0], srcs[1]);
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_MUL:

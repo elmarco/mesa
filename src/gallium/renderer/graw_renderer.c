@@ -783,6 +783,10 @@ void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target tar
          glTexImage3D(gr->target, 0, internalformat, width, height, depth, 0,
                       glformat,
                       gltype, NULL);
+      } else if (gr->target == GL_TEXTURE_1D) {
+         glTexImage1D(gr->target, 0, internalformat, width, 0,
+                      glformat,
+                      gltype, NULL);
       } else {
          glTexImage2D(gr->target, 0, internalformat, width, height, 0, glformat,
                       gltype, NULL);
@@ -814,6 +818,10 @@ void graw_renderer_transfer_write(uint32_t res_handle,
                          transfer_box->y + box->y, 
                          box->z,
                          box->width, box->height, box->depth,
+                         GL_BGRA, GL_UNSIGNED_BYTE, data);
+      } else if (res->target == GL_TEXTURE_1D) {
+         glTexSubImage1D(res->target, 0, transfer_box->x + box->x,
+                         box->width,
                          GL_BGRA, GL_UNSIGNED_BYTE, data);
       } else {
          glTexSubImage2D(res->target, 0, transfer_box->x + box->x,

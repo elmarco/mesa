@@ -27,7 +27,7 @@ static inline void graw_encoder_write_dword(struct graw_encoder_state *state,
 }
 
 static inline void graw_encoder_write_qword(struct graw_encoder_state *state,
-                                            uint32_t qword)
+                                            uint64_t qword)
 {
    memcpy(state->buf + state->buf_offset, &qword, sizeof(uint64_t));
    state->buf_offset += 2;

@@ -348,6 +348,21 @@ static void *graw_create_fs_state(struct pipe_context *ctx,
    return (void *)(unsigned long)handle;
 }
 
+static void
+graw_delete_fs_state(struct pipe_context *ctx,
+                     void *fs)
+{
+
+
+}
+
+static void
+graw_delete_vs_state(struct pipe_context *ctx,
+                     void *vs)
+{
+
+}
+
 static void graw_bind_vs_state(struct pipe_context *ctx,
                                         void *vss)
 {
@@ -616,6 +631,9 @@ struct pipe_context *graw_context_create(struct pipe_screen *pscreen,
    gr_ctx->base.create_vs_state = graw_create_vs_state;
    gr_ctx->base.bind_vs_state = graw_bind_vs_state;
    gr_ctx->base.bind_fs_state = graw_bind_fs_state;
+   gr_ctx->base.delete_vs_state = graw_delete_vs_state;
+   gr_ctx->base.delete_fs_state = graw_delete_fs_state;
+   
    gr_ctx->base.clear = graw_clear;
    gr_ctx->base.draw_vbo = graw_draw_vbo;
    gr_ctx->base.flush = graw_flush;

@@ -126,10 +126,16 @@ void grend_set_framebuffer_state(struct grend_context *ctx,
    glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, ctx->fb_id);
 
    if (zsurf_handle) {
+      GLuint attachment;
       zsurf = graw_object_lookup(zsurf_handle, GRAW_SURFACE);
 
       tex = graw_object_lookup(zsurf->res_handle, GRAW_RESOURCE);
-      glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_STENCIL_ATTACHMENT,
+      
+      if (tex->base.format == PIPE_FORMAT_Z24X8_UNORM)
+         attachment = GL_DEPTH_ATTACHMENT;
+      else
+         attachment = GL_DEPTH_STENCIL_ATTACHMENT;
+      glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, attachment,
                                 tex->target, tex->id, 0);
    }
    surf = graw_object_lookup(surf_handle, GRAW_SURFACE);
@@ -355,9 +361,18 @@ void grend_clear(struct grend_context *ctx,
                  const union pipe_color_union *color,
                  double depth, unsigned stencil)
 {
+   GLbitfield bits = 0;
    glUseProgram(0);
    glClearColor(color->f[0], color->f[1], color->f[2], color->f[3]);
-   glClear(GL_COLOR_BUFFER_BIT);
+
+   glClearDepth(depth);
+   if (buffers & PIPE_CLEAR_COLOR)
+      bits |= GL_COLOR_BUFFER_BIT;
+   if (buffers & PIPE_CLEAR_DEPTH)
+      bits |= GL_DEPTH_BUFFER_BIT;
+   if (buffers & PIPE_CLEAR_STENCIL)
+      bits |= GL_STENCIL_BUFFER_BIT;
+   glClear(bits);
 
 }
 
@@ -756,6 +771,11 @@ void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target tar
          internalformat = GL_DEPTH24_STENCIL8_EXT;
          glformat = GL_DEPTH_STENCIL;
          gltype = GL_UNSIGNED_INT_24_8;
+         break;
+      case PIPE_FORMAT_Z24X8_UNORM:
+         internalformat = GL_DEPTH_COMPONENT24;
+         glformat = GL_DEPTH_COMPONENT;
+         gltype = GL_UNSIGNED_INT;
          break;
       }
 

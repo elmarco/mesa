@@ -38,6 +38,13 @@ graw_object_init_hash(void)
       handle_hash = util_hash_table_create(hash_func, compare);
 }
 
+void graw_object_fini_hash(void)
+{
+   if (handle_hash)
+      util_hash_table_destroy(handle_hash);
+   handle_hash = NULL;
+}
+
 uint32_t
 graw_object_create(void *data, uint32_t length, enum graw_object_type type)
 {

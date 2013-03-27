@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <signal.h>
 #include "pipe/p_state.h"
 #include "graw_protocol.h"
 #include "graw_pipe_winsys.h"
@@ -12,12 +13,16 @@
 #include "graw_renderer_glx.h"
 #include "graw_renderer.h"
 #include "graw_decode.h"
-int graw_fd, graw_cli_fd;
+
+#include <sys/socket.h>
+#include <sys/un.h>
+
+int graw_fd;
 
 uint32_t cmdbuf[65536];
 uint32_t decbuf[255];
 
-static void process_cmd(void)
+static int process_cmd(void)
 {
    int cmd;
    int ret;
@@ -25,6 +30,8 @@ static void process_cmd(void)
 
  retry:
    ret = read(graw_fd, &cmd, 4);
+   if (ret == 0)
+       return -1;
 
    fprintf(stderr,"cmd is %d %d\n", cmd &0xff, ret);
    switch (cmd & 0xff) {
@@ -37,6 +44,7 @@ static void process_cmd(void)
    case GRAW_CREATE_RESOURCE:
       ret = read(graw_fd, &decbuf, 7 * sizeof(uint32_t));
 
+	fprintf(stderr,"resource create\n");
 graw_renderer_resource_create(decbuf[0], decbuf[1], decbuf[2], decbuf[3], decbuf[4], decbuf[5], decbuf[6]);
       break;
    case GRAW_FLUSH_FRONTBUFFER:
@@ -45,7 +53,9 @@ graw_renderer_resource_create(decbuf[0], decbuf[1], decbuf[2], decbuf[3], decbuf
       break;
    case GRAW_SUBMIT_CMD:
       ndw = cmd >> 16;
+      fprintf(stderr,"submit cmd pre %d %d\n", ndw, ret);
       ret = read(graw_fd, &cmdbuf, ndw * sizeof(uint32_t));
+      fprintf(stderr,"submit cmd %d %d\n", ndw, ret);
       graw_decode_block(cmdbuf, ndw);
       break;
    case GRAW_TRANSFER_PUT:
@@ -65,31 +75,84 @@ graw_renderer_resource_create(decbuf[0], decbuf[1], decbuf[2], decbuf[3], decbuf
    goto retry;
 }
 
-int main(void)
+static void pipehandler(void)
 {
-   fd_set rset, errset;
-   int ret = 0;
-
-   graw_fd = open(GRAW_PIPENAME, O_RDWR);
-   if (graw_fd < 0)
-      return -1;
-
-   graw_cli_fd = open(GRAW_CLI_PIPENAME, O_RDWR);
-   if (graw_cli_fd < 0)
-      return -1;
-   
-   while (ret >= 0) { 
-      FD_ZERO(&rset);
-      FD_SET(graw_fd, &rset);
-      
-      ret = select(graw_fd+1, &rset, NULL, NULL, NULL);
-      
-      if (FD_ISSET(graw_fd, &rset))
-	 process_cmd();
-   }
+  fprintf(stderr,"got sigpipe\n");
+  graw_renderer_fini_glx();
 }
-  
+
+static int socket_main(void)
+{
+    struct sockaddr_un address;
+    int socket_fd;
+    socklen_t address_length = 0;
+    int ret = 0;
+    fd_set rset, errset;
+    struct sigaction newact; 
+
+    socket_fd = socket(PF_UNIX, SOCK_STREAM, 0);
+    if(socket_fd < 0) {
+        printf("socket() failed\n");
+        return 1;
+    }
+
+    unlink("/tmp/.demo_socket");
+
+    /* start with a clean address structure */
+    memset(&address, 0, sizeof(struct sockaddr_un));
+
+    address.sun_family = AF_UNIX;
+    snprintf(address.sun_path, PATH_MAX, "/tmp/.demo_socket");
+
+    if(bind(socket_fd, 
+            (struct sockaddr *) &address, 
+            sizeof(struct sockaddr_un)) != 0)
+    {
+        printf("bind() failed\n");
+        return 1;
+    }
+
+    if(listen(socket_fd, 5) != 0)
+    {
+        printf("listen() failed\n");
+        return 1;
+    }
+ relisten:
+    graw_fd = accept(socket_fd, 
+           (struct sockaddr *) &address,
+           &address_length);
+
+    memset(&newact, 0, sizeof(struct sigaction));
+    newact.sa_handler = SIG_IGN;
+    sigaction(SIGPIPE, &newact, NULL);
+    while (ret >= 0) { 
+        FD_ZERO(&rset);
+        FD_SET(graw_fd, &rset);
+      
+        ret = select(graw_fd+1, &rset, NULL, NULL, NULL);
+      
+        if (FD_ISSET(graw_fd, &rset)) {
+            ret = process_cmd();
+            if (ret == -1) {
+                close(graw_fd);
+                graw_fd = 0;
+                graw_reset_decode();
+                graw_renderer_fini();
+                graw_renderer_fini_glx();
+                ret = 0;
+                goto relisten;
+            }
+        }
+    }
+    return 0;
+}
+
+int main(int argc, char **argv)
+{
+   socket_main();
+}
+
 void graw_transfer_write_return(void *data, uint32_t ndw)
 {
-   write(graw_cli_fd, data, ndw);
+   write(graw_fd, data, ndw);
 }

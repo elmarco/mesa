@@ -7,13 +7,24 @@
 #include <stdio.h>
 #include "graw_renderer_glx.h"
 
+Display *graw_dpy;
+Window graw_win;
+GLXContext graw_ctx;
+
+int inited;
+void graw_renderer_fini_glx(void)
+{
+   glXMakeCurrent(graw_dpy, None, NULL);
+   glXDestroyContext(graw_dpy, graw_ctx);
+   XDestroyWindow(graw_dpy, graw_win);
+   XCloseDisplay(graw_dpy);
+   inited = 0;
+}
+
 void graw_renderer_init_glx(void)
 {
-   Display *dpy;
    int scrnum;
    Window root;
-   Window win;
-   GLXContext ctx;
    XVisualInfo *visinfo;
    int attribs[64];
    int i = 0;
@@ -21,9 +32,11 @@ void graw_renderer_init_glx(void)
    XSetWindowAttributes attr;
    unsigned long mask;
 
-   dpy = XOpenDisplay(displayName);
+   if (inited)
+      return;
+   graw_dpy = XOpenDisplay(displayName);
 
-   root = RootWindow(dpy, scrnum);
+   root = RootWindow(graw_dpy, scrnum);
 
    attribs[i++] = GLX_RGBA;
    attribs[i++] = GLX_DOUBLEBUFFER;
@@ -37,27 +50,28 @@ void graw_renderer_init_glx(void)
    attribs[i++] = 1;
    attribs[i++] = None;
 
-   visinfo = glXChooseVisual(dpy, scrnum, attribs);
+   visinfo = glXChooseVisual(graw_dpy, scrnum, attribs);
    if (!visinfo) {
       fprintf(stderr,"no suitable visual\n");
       return;
    }
       
-   ctx = glXCreateContext( dpy, visinfo, NULL, True );
-   if (!ctx) {
+   graw_ctx = glXCreateContext( graw_dpy, visinfo, NULL, True );
+   if (!graw_ctx) {
       fprintf(stderr,"Error: glXCreateContext failed\n");
       return;
    }
 
    attr.background_pixel = 0;
    attr.border_pixel = 0;
-   attr.colormap = XCreateColormap(dpy, root, visinfo->visual, AllocNone);
+   attr.colormap = XCreateColormap(graw_dpy, root, visinfo->visual, AllocNone);
    attr.event_mask = StructureNotifyMask | ExposureMask;
    mask = CWBackPixel | CWBorderPixel | CWColormap | CWEventMask;
-   win = XCreateWindow(dpy, root, 0, 0, 1, 1, 
+   graw_win = XCreateWindow(graw_dpy, root, 0, 0, 1, 1, 
 		       0, visinfo->depth, InputOutput,
 		       visinfo->visual, mask, &attr);
 
-   glXMakeCurrent(dpy, win, ctx);
+   glXMakeCurrent(graw_dpy, graw_win, graw_ctx);
+   inited = 1;
 }
 

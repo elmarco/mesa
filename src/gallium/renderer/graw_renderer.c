@@ -108,13 +108,8 @@ void grend_create_surface(struct grend_context *ctx,
 
    surf = CALLOC_STRUCT(grend_surface);
 
-//   glGenFramebuffers(1, &surf->id);
-
    surf->res_handle = res_handle;
-//   tex = graw_object_lookup(res_handle, GRAW_RESOURCE);
 
-//   glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, surf->id);
-//   glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
    graw_object_insert(surf, sizeof(*surf), handle, GRAW_SURFACE);
 }
 
@@ -371,7 +366,7 @@ void grend_draw_vbo(struct grend_context *ctx,
 {
    GLuint vaoid;
    int i;
-#if 1
+
    if (ctx->shader_dirty) {
       if (ctx->program_id)
          glDeleteProgram(ctx->program_id);
@@ -469,7 +464,6 @@ void grend_draw_vbo(struct grend_context *ctx,
    glActiveTexture(GL_TEXTURE0);
    glDisable(GL_TEXTURE_2D);
    glBindVertexArray(0);
-#endif
 }
 
 static GLenum translate_blend_func(uint32_t pipe_blend)
@@ -696,17 +690,27 @@ static GLenum tgsitargettogltarget(const enum pipe_texture_target target)
    return PIPE_BUFFER;
 }
 
+static int inited;
+
 void
 graw_renderer_init(void)
 {
-   static int inited;
-
    if (!inited) {
       inited = 1;
       graw_object_init_hash();
    }
    
    glewInit();
+}
+
+void
+graw_renderer_fini(void)
+{
+   if (!inited)
+      return;
+
+   graw_object_fini_hash();
+   inited = 0;
 }
 
 

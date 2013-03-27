@@ -395,6 +395,13 @@ static void graw_decode_destroy_object(struct grend_decode_ctx *ctx)
    graw_object_destroy(handle);
 }
 
+void graw_reset_decode(void)
+{
+   free(gdctx->grctx);
+   gdctx->grctx = NULL;
+   gdctx->ds = NULL;
+}
+
 void graw_decode_block(uint32_t *block, int ndw)
 {
    struct graw_decoder_state ds;

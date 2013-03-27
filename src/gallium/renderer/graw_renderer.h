@@ -105,4 +105,7 @@ void grend_set_constants(struct grend_context *ctx,
                          float *data);
 
 void graw_transfer_write_return(void *data, uint32_t ndw);
+
+void graw_renderer_fini(void);
+void graw_reset_decode(void);
 #endif

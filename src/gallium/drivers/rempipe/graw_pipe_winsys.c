@@ -2,13 +2,15 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <fcntl.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <signal.h>
 #include "pipe/p_state.h"
 #include "graw_protocol.h"
 #include "graw_pipe_winsys.h"
 #include "graw_context.h"
 
 int graw_fd;
-int graw_cli_fd;
 uint32_t buf[255];
 
 static int do_blocked_read(int fd, void *data, uint32_t bytes)
@@ -32,13 +34,42 @@ static int do_blocked_read(int fd, void *data, uint32_t bytes)
 
 void graw_renderer_init()
 {
-   graw_fd = open(GRAW_PIPENAME, O_RDWR);
-   graw_cli_fd = open(GRAW_CLI_PIPENAME, O_RDWR);
+   struct sockaddr_un address;
+   int  socket_fd, nbytes;
+   char buffer[256];
+   int ret;
+    struct sigaction newact; 
+
+    memset(&newact, 0, sizeof(struct sigaction));
+    newact.sa_handler = SIG_IGN;
+   sigaction(SIGPIPE, &newact, NULL);
+
+   socket_fd = socket(PF_UNIX, SOCK_STREAM, 0);
+   if(socket_fd < 0)
+   {
+      printf("socket() failed\n");
+      return 1;
+   }
+
+   /* start with a clean address structure */
+   memset(&address, 0, sizeof(struct sockaddr_un));
+   
+   address.sun_family = AF_UNIX;
+   snprintf(address.sun_path, PATH_MAX, "/tmp/.demo_socket");
+
+   if(connect(socket_fd, 
+              (struct sockaddr *) &address, 
+              sizeof(struct sockaddr_un)) != 0)
+   {
+      printf("connect() failed\n");
+      return 1;
+   }
+   graw_fd = socket_fd;
 
    buf[0] = GRAW_CMD0(GRAW_CREATE_RENDERER, 0, 0);
-   write(graw_fd, buf, 1 * sizeof(uint32_t));
+   ret = write(graw_fd, buf, 1 * sizeof(uint32_t));
 
-}  
+}
 
 static uint32_t next_handle;
 uint32_t graw_object_assign_handle(void)
@@ -112,6 +143,6 @@ void graw_transfer_get_block(uint32_t res_handle, const struct pipe_box *box,
    buf[7] = box->depth;
    write(graw_fd, buf, 8 * sizeof(uint32_t));
 
-   ret = do_blocked_read(graw_cli_fd, data, ndw * 4);
+   ret = do_blocked_read(graw_fd, data, ndw * 4);
 }
 

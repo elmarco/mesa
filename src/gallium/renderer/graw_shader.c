@@ -311,7 +311,10 @@ iter_instruction(struct tgsi_iterate_context *iter,
       break;
    case TGSI_OPCODE_TXP:
       ctx->samplers[sreg_index].tgsi_sampler_type = inst->Texture.Texture;
-      snprintf(buf, 255, "%s = %s(textureProj(%s, %s));\n", dsts[0], dstconv, srcs[1], srcs[0]);
+      if (inst->Texture.Texture == TGSI_TEXTURE_RECT)
+         snprintf(buf, 255, "%s = %s(texture2DRectProj(%s, %s));\n", dsts[0], dstconv, srcs[1], srcs[0]);
+      else
+         snprintf(buf, 255, "%s = %s(textureProj(%s, %s));\n", dsts[0], dstconv, srcs[1], srcs[0]);
 
       strcat(ctx->glsl_main, buf);
       break;
@@ -338,6 +341,7 @@ static void emit_header(struct dump_ctx *ctx, char *glsl_final)
    strcat(glsl_final, "#version 130\n");
    if (ctx->prog_type == TGSI_PROCESSOR_VERTEX)
       strcat(glsl_final, "#extension GL_ARB_explicit_attrib_location : enable\n");
+   strcat(glsl_final, "#extension GL_ARB_texture_rectangle : require\n");
 
 }
 
@@ -347,6 +351,7 @@ static const char *samplertypeconv(int sampler_type)
 	case TGSI_TEXTURE_1D: return "1D";
 	case TGSI_TEXTURE_2D: return "2D";
 	case TGSI_TEXTURE_3D: return "3D";
+	case TGSI_TEXTURE_RECT: return "2DRect";
 	default: return "UNK";
         }
 }

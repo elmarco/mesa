@@ -29,7 +29,7 @@ void grend_draw_vbo(struct grend_context *ctx,
                     const struct pipe_draw_info *info);
 
 void grend_set_framebuffer_state(struct grend_context *ctx,
-                                 uint32_t nr_cbufs, uint32_t surf_handle,
+                                 uint32_t nr_cbufs, uint32_t surf_handle[8],
    uint32_t zsurf_handle);
 
 void grend_flush(struct grend_context *ctx);

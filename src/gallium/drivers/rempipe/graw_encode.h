@@ -23,6 +23,7 @@ struct graw_encoder_state {
 static inline void graw_encoder_write_dword(struct graw_encoder_state *state,
                                             uint32_t dword)
 {
+   fprintf(stderr,"writing 0x%x to %d\n", dword, state->buf_offset);
    state->buf[state->buf_offset++] = dword;
 }
 

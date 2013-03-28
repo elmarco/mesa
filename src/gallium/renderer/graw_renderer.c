@@ -114,11 +114,22 @@ void grend_create_surface(struct grend_context *ctx,
 }
 
 void grend_set_framebuffer_state(struct grend_context *ctx,
-                                    uint32_t nr_cbufs, uint32_t surf_handle,
+                                    uint32_t nr_cbufs, uint32_t surf_handle[8],
                                     uint32_t zsurf_handle)
 {
    struct grend_surface *surf, *zsurf;
    struct grend_resource *tex;
+   int i;
+   static const GLenum buffers[8] = {
+      GL_COLOR_ATTACHMENT0_EXT,
+      GL_COLOR_ATTACHMENT1_EXT,
+      GL_COLOR_ATTACHMENT2_EXT,
+      GL_COLOR_ATTACHMENT3_EXT,
+      GL_COLOR_ATTACHMENT4_EXT,
+      GL_COLOR_ATTACHMENT5_EXT,
+      GL_COLOR_ATTACHMENT6_EXT,
+      GL_COLOR_ATTACHMENT7_EXT,
+   };
 
    if (!ctx->fb_id)
       glGenFramebuffers(1, &ctx->fb_id);
@@ -138,12 +149,15 @@ void grend_set_framebuffer_state(struct grend_context *ctx,
       glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, attachment,
                                 tex->target, tex->id, 0);
    }
-   surf = graw_object_lookup(surf_handle, GRAW_SURFACE);
-   tex = graw_object_lookup(surf->res_handle, GRAW_RESOURCE);
-   glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
-                             tex->target, tex->id, 0);
 
-   glDrawBuffer(GL_COLOR_ATTACHMENT0);
+   for (i = 0; i < nr_cbufs; i++) {
+      surf = graw_object_lookup(surf_handle[i], GRAW_SURFACE);
+      tex = graw_object_lookup(surf->res_handle, GRAW_RESOURCE);
+      glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, buffers[i],
+                                tex->target, tex->id, 0);
+   }
+
+   glDrawBuffers(nr_cbufs, buffers);
 }
 
 void grend_set_viewport_state(struct grend_context *ctx,
@@ -629,6 +643,19 @@ void grend_object_bind_rasterizer(struct grend_context *ctx,
    ctx->rs_state = state;
 }
 
+static GLuint convert_wrap(int wrap)
+{
+   switch(wrap){
+   case PIPE_TEX_WRAP_REPEAT: return GL_REPEAT;
+   case PIPE_TEX_WRAP_CLAMP: return GL_CLAMP;
+
+   case PIPE_TEX_WRAP_CLAMP_TO_EDGE: return GL_CLAMP_TO_EDGE;
+   case PIPE_TEX_WRAP_CLAMP_TO_BORDER: return GL_CLAMP_TO_BORDER;
+
+   case PIPE_TEX_WRAP_MIRROR_REPEAT: return GL_MIRRORED_REPEAT;
+   }
+} 
+
 void grend_object_bind_sampler_states(struct grend_context *ctx,
                                       uint32_t num_states,
                                       uint32_t *handles)
@@ -636,12 +663,16 @@ void grend_object_bind_sampler_states(struct grend_context *ctx,
    int i;
    struct pipe_sampler_state *state;
    for (i = 0; i < num_states; i++) {
-      state = graw_object_lookup(handles[0], GRAW_OBJECT_SAMPLER_STATE);
+      state = graw_object_lookup(handles[i], GRAW_OBJECT_SAMPLER_STATE);
 
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, convert_wrap(state->wrap_s));
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, convert_wrap(state->wrap_t));
       glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
       glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
       glTexParameterf(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
       glTexParameterf(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+      glTexParameterf(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+      glTexParameterf(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
    }
 }
 
@@ -825,7 +856,7 @@ void graw_renderer_transfer_write(uint32_t res_handle,
                          GL_BGRA, GL_UNSIGNED_BYTE, data);
       } else {
          glTexSubImage2D(res->target, 0, transfer_box->x + box->x,
-                         transfer_box->y + box->y, box->width, box->height,
+                         transfer_box->y + box->y, transfer_box->width, transfer_box->height,
                          GL_BGRA, GL_UNSIGNED_BYTE, data);
       }
       fprintf(stderr,"TRANSFER FOR TEXTURE\n");

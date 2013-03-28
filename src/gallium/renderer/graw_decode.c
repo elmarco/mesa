@@ -62,8 +62,12 @@ static int graw_decode_create_shader(struct grend_decode_ctx *ctx, uint32_t type
 static void graw_decode_set_framebuffer_state(struct grend_decode_ctx *ctx)
 {
    uint32_t nr_cbufs = ctx->ds->buf[ctx->ds->buf_offset + 1];
-   uint32_t surf_handle = ctx->ds->buf[ctx->ds->buf_offset + 2];
-   uint32_t zsurf_handle = ctx->ds->buf[ctx->ds->buf_offset + 3];
+   uint32_t zsurf_handle = ctx->ds->buf[ctx->ds->buf_offset + 2];
+   uint32_t surf_handle[8];
+   int i;
+
+   for (i = 0; i < nr_cbufs; i++)
+      surf_handle[i] = ctx->ds->buf[ctx->ds->buf_offset + 3 + i];
    grend_set_framebuffer_state(ctx->grctx, nr_cbufs, surf_handle, zsurf_handle);
 }
 

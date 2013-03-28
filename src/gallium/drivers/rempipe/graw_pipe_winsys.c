@@ -109,22 +109,63 @@ void graw_transfer_block(uint32_t res_handle, const struct pipe_box *transfer_bo
                          const struct pipe_box *box,
                          void *data, int ndw)
 {
-   buf[0] = GRAW_CMD0(GRAW_TRANSFER_PUT, 0, ndw + 13);
-   buf[1] = res_handle;
-   buf[2] = box->x;
-   buf[3] = box->y;
-   buf[4] = box->z;
-   buf[5] = box->width;
-   buf[6] = box->height;
-   buf[7] = box->depth;
-   buf[8] = transfer_box->x;
-   buf[9] = transfer_box->y;
-   buf[10] = transfer_box->z;
-   buf[11] = transfer_box->width;
-   buf[12] = transfer_box->height;
-   buf[13] = transfer_box->depth;
-   write(graw_fd, buf, 14 * sizeof(uint32_t));
-   write(graw_fd, data, ndw * sizeof(uint32_t));
+
+   if (ndw > 65536-14) {
+      struct pipe_box ntb;
+      int h;
+      int mdw;
+      void *mdata;
+      /* need to split */
+      if (transfer_box->depth > 1) {
+         fprintf(stderr,"gotta handle depth\n");
+         exit(-1);
+      }
+      ntb = *transfer_box;
+      mdw = ntb.width;
+      ntb.y = 0;
+      ntb.height = 1;
+      mdata = data;
+      for (h = 0; h < transfer_box->height; h++) {
+         buf[0] = GRAW_CMD0(GRAW_TRANSFER_PUT, 0, mdw + 13);
+         buf[1] = res_handle;
+         buf[2] = box->x;
+         buf[3] = box->y;
+         buf[4] = box->z;
+         buf[5] = box->width;
+         buf[6] = box->height;
+         buf[7] = box->depth;
+         buf[8] = ntb.x;
+         buf[9] = ntb.y;
+         buf[10] = ntb.z;
+         buf[11] = ntb.width;
+         buf[12] = ntb.height;
+         buf[13] = ntb.depth;
+         write(graw_fd, buf, 14 * sizeof(uint32_t));
+         write(graw_fd, mdata, mdw * sizeof(uint32_t));      
+         mdata += mdw;
+         ntb.y++;
+
+      }
+
+   } else {
+      
+      buf[0] = GRAW_CMD0(GRAW_TRANSFER_PUT, 0, ndw + 13);
+      buf[1] = res_handle;
+      buf[2] = box->x;
+      buf[3] = box->y;
+      buf[4] = box->z;
+      buf[5] = box->width;
+      buf[6] = box->height;
+      buf[7] = box->depth;
+      buf[8] = transfer_box->x;
+      buf[9] = transfer_box->y;
+      buf[10] = transfer_box->z;
+      buf[11] = transfer_box->width;
+      buf[12] = transfer_box->height;
+      buf[13] = transfer_box->depth;
+      write(graw_fd, buf, 14 * sizeof(uint32_t));
+      write(graw_fd, data, ndw * sizeof(uint32_t));
+   }
    
 }
 

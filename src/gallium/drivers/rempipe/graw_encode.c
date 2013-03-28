@@ -147,13 +147,16 @@ int graw_encode_clear(struct graw_encoder_state *enc,
 int graw_encoder_set_framebuffer_state(struct graw_encoder_state *enc,
 				       const struct pipe_framebuffer_state *state)
 {
-   struct graw_surface *surf = state->cbufs[0];
    struct graw_surface *zsurf = state->zsbuf;
+   int i;
 
-   graw_encoder_write_dword(enc, GRAW_CMD0(GRAW_SET_FRAMEBUFFER_STATE, 0, 3));
+   graw_encoder_write_dword(enc, GRAW_CMD0(GRAW_SET_FRAMEBUFFER_STATE, 0, 2 + state->nr_cbufs));
    graw_encoder_write_dword(enc, state->nr_cbufs);
-   graw_encoder_write_dword(enc, surf->handle);
    graw_encoder_write_dword(enc, zsurf ? zsurf->handle : 0);
+   for (i = 0; i < state->nr_cbufs; i++) {
+      struct graw_surface *surf = state->cbufs[i];
+      graw_encoder_write_dword(enc, surf->handle);
+   }
    return 0;
 }
 

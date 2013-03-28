@@ -519,7 +519,7 @@ static struct pipe_transfer *graw_get_transfer(struct pipe_context *ctx,
 
    trans->lmsize = box->width * box->height * box->depth * util_format_get_blocksize(resource->format);
    trans->localmem = malloc(trans->lmsize);
-   if (usage & PIPE_TRANSFER_READ) {
+   if (1) {//usage & PIPE_TRANSFER_READ) {
       struct graw_resource *grres = (struct graw_resource *)resource;
       fprintf(stderr, "TODO READ\n");
       graw_flush(ctx, NULL);

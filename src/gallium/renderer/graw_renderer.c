@@ -87,6 +87,10 @@ struct grend_context {
    /* frag samplers */
    struct grend_sampler_view fs_views[PIPE_MAX_SHADER_SAMPLER_VIEWS];
 
+   int num_vs_views;
+   /* frag samplers */
+   struct grend_sampler_view vs_views[PIPE_MAX_SHADER_SAMPLER_VIEWS];
+
    struct pipe_rasterizer_state *rs_state;
 
    struct pipe_index_buffer ib;
@@ -280,6 +284,22 @@ void grend_set_num_fs_sampler_views(struct grend_context *ctx,
    ctx->num_fs_views = num_fs_sampler_views;
 }
 
+void grend_set_single_vs_sampler_view(struct grend_context *ctx,
+                                      int index,
+                                      uint32_t res_handle)
+{
+   struct grend_resource *res;
+
+   res = graw_object_lookup(res_handle, GRAW_RESOURCE);
+   ctx->vs_views[index].texture = &res->base;
+}
+
+void grend_set_num_vs_sampler_views(struct grend_context *ctx,
+                                    int num_vs_sampler_views)
+{
+   ctx->num_vs_views = num_vs_sampler_views;
+}
+
 void grend_transfer_inline_write(struct grend_context *ctx,
                                  uint32_t res_handle,
                                  unsigned level,
@@ -421,7 +441,11 @@ void grend_draw_vbo(struct grend_context *ctx,
          glUniform4fv(loc, 1, &ctx->vs_consts.consts[i * 4]);
    }
 
-
+   for (i = 0; i < ctx->num_vs_views; i++) {
+      glActiveTexture(GL_TEXTURE0 + i);
+      glBindTexture(ctx->vs_views[i].texture->target, ctx->vs_views[i].texture->id);
+      glEnable(ctx->vs_views[i].texture->target);
+   } 
    for (i = 0; i < ctx->num_fs_views; i++) {
       glActiveTexture(GL_TEXTURE0 + i);
       glBindTexture(ctx->fs_views[i].texture->target, ctx->fs_views[i].texture->id);
@@ -665,6 +689,7 @@ void grend_object_bind_sampler_states(struct grend_context *ctx,
    for (i = 0; i < num_states; i++) {
       state = graw_object_lookup(handles[i], GRAW_OBJECT_SAMPLER_STATE);
 
+      glActiveTexture(GL_TEXTURE0 + i);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, convert_wrap(state->wrap_s));
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, convert_wrap(state->wrap_t));
       glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -828,6 +853,7 @@ void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target tar
 }
 
 void graw_renderer_transfer_write(uint32_t res_handle,
+                                  int level,
                                   struct pipe_box *transfer_box,
                                   struct pipe_box *box,
                                   void *data)
@@ -845,17 +871,17 @@ void graw_renderer_transfer_write(uint32_t res_handle,
 
       glBindTexture(res->target, res->id);
       if (res->target == GL_TEXTURE_3D) {
-         glTexSubImage3D(res->target, 0, transfer_box->x + box->x,
+         glTexSubImage3D(res->target, level, transfer_box->x + box->x,
                          transfer_box->y + box->y, 
                          box->z,
                          box->width, box->height, box->depth,
                          GL_BGRA, GL_UNSIGNED_BYTE, data);
       } else if (res->target == GL_TEXTURE_1D) {
-         glTexSubImage1D(res->target, 0, transfer_box->x + box->x,
+         glTexSubImage1D(res->target, level, transfer_box->x + box->x,
                          box->width,
                          GL_BGRA, GL_UNSIGNED_BYTE, data);
       } else {
-         glTexSubImage2D(res->target, 0, transfer_box->x + box->x,
+         glTexSubImage2D(res->target, level, transfer_box->x + box->x,
                          transfer_box->y + box->y, transfer_box->width, transfer_box->height,
                          GL_BGRA, GL_UNSIGNED_BYTE, data);
       }

@@ -152,7 +152,18 @@ static void graw_decode_set_fragment_sampler_views(struct grend_decode_ctx *ctx,
       grend_set_single_fs_sampler_view(ctx->grctx, i, handle);
    }
    grend_set_num_fs_sampler_views(ctx->grctx, num_samps);
+}
 
+static void graw_decode_set_vertex_sampler_views(struct grend_decode_ctx *ctx, uint16_t length)
+{
+   int num_samps;
+   int i;
+   num_samps = length;
+   for (i = 0; i < num_samps; i++) {
+      uint32_t handle = ctx->ds->buf[ctx->ds->buf_offset + 1 + i];
+      grend_set_single_vs_sampler_view(ctx->grctx, i, handle);
+   }
+   grend_set_num_vs_sampler_views(ctx->grctx, num_samps);
 }
 
 static void graw_decode_resource_inline_write(struct grend_decode_ctx *ctx, uint16_t length)
@@ -461,6 +472,9 @@ void graw_decode_block(uint32_t *block, int ndw)
       case GRAW_SET_CONSTANT_BUFFER:
          graw_decode_set_constant_buffer(gdctx, header >> 16);
          break;
+      case GRAW_SET_VERTEX_SAMPLER_VIEWS:
+         graw_decode_set_vertex_sampler_views(gdctx, header >> 16);
+         break;
       }
       gdctx->ds->buf_offset += (header >> 16) + 1;
       
@@ -472,7 +486,7 @@ void graw_decode_transfer(uint32_t *data, uint32_t ndw)
 {
    uint32_t handle = data[0];
    struct pipe_box box, transfer_box;
-
+   int level;
    box.x = data[1];
    box.y = data[2];
    box.z = data[3];
@@ -486,8 +500,9 @@ void graw_decode_transfer(uint32_t *data, uint32_t ndw)
    transfer_box.width = data[10];
    transfer_box.height = data[11];
    transfer_box.depth = data[12];
+   level = data[13];
 
-   graw_renderer_transfer_write(handle, &transfer_box, &box, data+13);
+   graw_renderer_transfer_write(handle, level, &transfer_box, &box, data+14);
 }
 
 void graw_decode_get_transfer(uint32_t *data, uint32_t ndw)

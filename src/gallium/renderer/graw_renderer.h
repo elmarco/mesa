@@ -75,6 +75,11 @@ void grend_set_num_fs_sampler_views(struct grend_context *ctx,
 void grend_set_single_fs_sampler_view(struct grend_context *ctx,
                                       int index,
                                       uint32_t res_handle);
+void grend_set_num_vs_sampler_views(struct grend_context *ctx,
+                                    int num_fs_sampler_views);
+void grend_set_single_vs_sampler_view(struct grend_context *ctx,
+                                      int index,
+                                      uint32_t res_handle);
 
 void grend_object_bind_blend(struct grend_context *ctx,
                              uint32_t handle);
@@ -91,7 +96,8 @@ void grend_set_index_buffer(struct grend_context *ctx,
                             uint32_t index_size,
                             uint32_t offset);
 
-void graw_renderer_transfer_write(uint32_t handle, struct pipe_box *transfer_box,
+void graw_renderer_transfer_write(uint32_t handle, int level,
+                                  struct pipe_box *transfer_box,
                                   struct pipe_box *box,
                                   void *data);
 

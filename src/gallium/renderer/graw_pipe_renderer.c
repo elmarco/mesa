@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <signal.h>
+#include <assert.h>
 #include "pipe/p_state.h"
 #include "graw_protocol.h"
 #include "graw_pipe_winsys.h"
@@ -70,6 +71,7 @@ graw_renderer_resource_create(decbuf[0], decbuf[1], decbuf[2], decbuf[3], decbuf
       break;
    default:
       fprintf(stderr,"read unknown cmd %d\n", cmd);
+      assert(0);
       break;
    }
    goto retry;

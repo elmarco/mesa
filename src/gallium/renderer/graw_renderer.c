@@ -840,7 +840,13 @@ void graw_renderer_transfer_send(uint32_t res_handle, struct pipe_box *box)
 
    if (res->target == GL_ELEMENT_ARRAY_BUFFER_ARB) {
    } else if (res->target == GL_ARRAY_BUFFER_ARB) {
-
+      uint32_t alloc_size = res->base.width0 * util_format_get_blocksize(res->base.format);
+      uint32_t send_size = box->width * util_format_get_blocksize(res->base.format);      
+      void *data;
+      glBindBufferARB(GL_ARRAY_BUFFER_ARB, res->id);
+      data = glMapBuffer(GL_ARRAY_BUFFER_ARB, GL_READ_ONLY);
+      graw_transfer_write_return(data, send_size);
+      glUnmapBuffer(GL_ARRAY_BUFFER_ARB);
    } else {
       fprintf(stderr,"TEXTURE TRANSFER %d %d\n", box->width, box->height);
       void *data;

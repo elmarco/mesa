@@ -5,6 +5,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <signal.h>
+#include <termios.h>
 #include "pipe/p_state.h"
 #include "graw_protocol.h"
 #include "graw_pipe_winsys.h"
@@ -32,6 +33,26 @@ static int do_blocked_read(int fd, void *data, uint32_t bytes)
    return sofar;
 }
 
+static int do_blocked_write(int fd, void *data, uint32_t bytes)
+{
+   int left = bytes;
+   int sofar = 0;
+
+   do {
+      int ret;
+      ret = write(fd, data + sofar, left);
+      if (ret > 0){
+         sofar += ret;
+         left -= ret;
+      }
+      if (ret < 0)
+         return ret;
+   } while (left > 0);
+   return sofar;
+}
+
+#define USE_SERIAL 1
+
 void graw_renderer_init()
 {
    struct sockaddr_un address;
@@ -44,6 +65,7 @@ void graw_renderer_init()
     newact.sa_handler = SIG_IGN;
    sigaction(SIGPIPE, &newact, NULL);
 
+#ifndef USE_SERIAL
    socket_fd = socket(PF_UNIX, SOCK_STREAM, 0);
    if(socket_fd < 0)
    {
@@ -65,10 +87,23 @@ void graw_renderer_init()
       return 1;
    }
    graw_fd = socket_fd;
+#else
+   {
+      struct termios options;
+      graw_fd = open("/dev/virtio-ports/com.redhat.3d.0", O_RDWR);
+#if 0
+      /* get the current options */
+      tcgetattr(graw_fd, &options);
+      options.c_lflag     &= ~(ICANON | ECHO | ECHOE | ISIG);
+      options.c_iflag &= ~(ICRNL | IXON | IXOFF | IXANY);
+      options.c_oflag &= ~OPOST;
 
+      tcsetattr(graw_fd, TCSANOW, &options);
+#endif
+   }
    buf[0] = GRAW_CMD0(GRAW_CREATE_RENDERER, 0, 0);
    ret = write(graw_fd, buf, 1 * sizeof(uint32_t));
-
+#endif
 }
 
 static uint32_t next_handle;
@@ -102,7 +137,7 @@ void graw_decode_block(uint32_t *block, int ndw)
    fprintf(stderr,"sending ndw %d\n", ndw);
    buf[0] = GRAW_CMD0(GRAW_SUBMIT_CMD, 0, ndw);
    write(graw_fd, buf, 1 * sizeof(uint32_t));
-   write(graw_fd, block, ndw * sizeof(uint32_t));
+   do_blocked_write(graw_fd, block, ndw * sizeof(uint32_t));
 }
 
 void graw_transfer_block(uint32_t res_handle, int level,
@@ -143,7 +178,7 @@ void graw_transfer_block(uint32_t res_handle, int level,
          buf[13] = ntb.depth;
          buf[14] = level;
          write(graw_fd, buf, 15 * sizeof(uint32_t));
-         write(graw_fd, mdata, mdw * sizeof(uint32_t));      
+         do_blocked_write(graw_fd, mdata, mdw * sizeof(uint32_t));      
          mdata += mdw;
          ntb.y++;
 
@@ -167,7 +202,7 @@ void graw_transfer_block(uint32_t res_handle, int level,
       buf[13] = transfer_box->depth;
       buf[14] = level;
       write(graw_fd, buf, 15 * sizeof(uint32_t));
-      write(graw_fd, data, ndw * sizeof(uint32_t));
+      do_blocked_write(graw_fd, data, ndw * sizeof(uint32_t));
    }
    
 }

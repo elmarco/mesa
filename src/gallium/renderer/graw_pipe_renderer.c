@@ -23,6 +23,25 @@ int graw_fd;
 uint32_t cmdbuf[65536];
 uint32_t decbuf[255];
 
+static int do_blocked_read(int fd, void *data, uint32_t bytes)
+{
+   int left = bytes;
+   int sofar = 0;
+
+   do {
+      int ret;
+
+      ret = read(fd, data + sofar, left);
+      if (ret > 0) {
+         sofar += ret;
+         left -= ret;
+      }
+      if (ret < 0)
+         return ret;
+   } while (left > 0);
+   return sofar;
+}
+
 static int process_cmd(void)
 {
    int cmd;
@@ -30,11 +49,11 @@ static int process_cmd(void)
    uint32_t ndw;
 
  retry:
-   ret = read(graw_fd, &cmd, 4);
+   ret = do_blocked_read(graw_fd, &cmd, 4);
    if (ret == 0)
        return -1;
 
-   fprintf(stderr,"cmd is %d %d\n", cmd &0xff, ret);
+   fprintf(stderr,"cmd is %d %d %d\n", cmd, cmd &0xff, ret);
    switch (cmd & 0xff) {
    case GRAW_CREATE_RENDERER:
       graw_renderer_init_glx();
@@ -43,30 +62,30 @@ static int process_cmd(void)
 
       break;
    case GRAW_CREATE_RESOURCE:
-      ret = read(graw_fd, &decbuf, 7 * sizeof(uint32_t));
+      ret = do_blocked_read(graw_fd, &decbuf, 7 * sizeof(uint32_t));
 
 	fprintf(stderr,"resource create\n");
 graw_renderer_resource_create(decbuf[0], decbuf[1], decbuf[2], decbuf[3], decbuf[4], decbuf[5], decbuf[6]);
       break;
    case GRAW_FLUSH_FRONTBUFFER:
-      ret = read(graw_fd, &decbuf, 1 * sizeof(uint32_t));
+      ret = do_blocked_read(graw_fd, &decbuf, 1 * sizeof(uint32_t));
       grend_flush_frontbuffer(decbuf[0]);
       break;
    case GRAW_SUBMIT_CMD:
       ndw = cmd >> 16;
       fprintf(stderr,"submit cmd pre %d %d\n", ndw, ret);
-      ret = read(graw_fd, &cmdbuf, ndw * sizeof(uint32_t));
+      ret = do_blocked_read(graw_fd, &cmdbuf, ndw * sizeof(uint32_t));
       fprintf(stderr,"submit cmd %d %d\n", ndw, ret);
       graw_decode_block(cmdbuf, ndw);
       break;
    case GRAW_TRANSFER_PUT:
       ndw = cmd >> 16;
-      ret = read(graw_fd, &cmdbuf, ndw * sizeof(uint32_t));
+      ret = do_blocked_read(graw_fd, &cmdbuf, ndw * sizeof(uint32_t));
       graw_decode_transfer(cmdbuf, ndw);
       break;
    case GRAW_TRANSFER_GET:
       ndw = cmd >> 16;
-      ret = read(graw_fd, &decbuf, 7 * sizeof(uint32_t));
+      ret = do_blocked_read(graw_fd, &decbuf, 7 * sizeof(uint32_t));
       graw_decode_get_transfer(decbuf, ndw);
       break;
    default:

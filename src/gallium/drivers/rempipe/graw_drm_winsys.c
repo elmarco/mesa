@@ -152,6 +152,13 @@ static int qxl_3d_wait(int fd, int handle)
   return ret;
 }
 
+static void gem_close(int fd, uint32_t handle)
+{
+	struct drm_gem_close close_bo;
+
+	close_bo.handle = handle;
+	drmIoctl(fd, DRM_IOCTL_GEM_CLOSE, &close_bo);
+}
 
 void graw_transfer_block(uint32_t res_handle, int level,
                          const struct pipe_box *transfer_box,
@@ -181,7 +188,8 @@ void graw_transfer_block(uint32_t res_handle, int level,
    ret = qxl_3d_transfer_put(fd, res_handle, bo_handle, box,
                              transfer_box, level);
 
-
+   munmap(ptr, size);
+   gem_close(fd, bo_handle);
 }
 
 
@@ -209,6 +217,9 @@ void graw_transfer_get_block(uint32_t res_handle, const struct pipe_box *box,
    ptr = gem_mmap(fd, bo_handle, size, PROT_READ|PROT_WRITE);
 
    memcpy(data, ptr, ndw*4);
+
+   munmap(ptr, size);
+   gem_close(fd, bo_handle);
 }
 
 

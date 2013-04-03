@@ -818,7 +818,8 @@ void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target tar
       switch (format) {
       case PIPE_FORMAT_B8G8R8X8_UNORM:
       case PIPE_FORMAT_B8G8R8A8_UNORM:
-      default:
+      case PIPE_FORMAT_R8G8B8X8_UNORM:
+      case PIPE_FORMAT_R8G8B8A8_UNORM:
          internalformat = GL_RGBA;
          glformat = GL_RGBA;
          gltype = GL_UNSIGNED_BYTE;
@@ -837,6 +838,17 @@ void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target tar
          internalformat = GL_DEPTH_COMPONENT32;
          glformat = GL_DEPTH_COMPONENT;
          gltype = GL_UNSIGNED_INT;
+         break;
+      case PIPE_FORMAT_I8_UNORM:
+         internalformat = GL_INTENSITY8;
+         glformat = GL_RGB;
+         gltype = GL_UNSIGNED_BYTE;
+         break;
+      default:
+         fprintf(stderr,"unknown format is %d\n", format);
+         internalformat = GL_RGBA;
+         glformat = GL_RGBA;
+         gltype = GL_UNSIGNED_BYTE;
          break;
       }
 

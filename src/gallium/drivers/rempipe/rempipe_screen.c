@@ -160,6 +160,8 @@ rempipe_get_shader_param(struct pipe_screen *screen, unsigned shader, enum pipe_
       switch (param) {
       case PIPE_SHADER_CAP_MAX_TEXTURE_SAMPLERS:
             return PIPE_MAX_SAMPLERS;
+      case PIPE_SHADER_CAP_MAX_CONSTS:
+         return 4096;
       default:
          return 0;
 #if 0

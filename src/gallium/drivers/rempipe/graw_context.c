@@ -13,6 +13,7 @@
 #include "util/u_memory.h"
 #include "util/u_format.h"
 #include "util/u_transfer.h"
+#include "util/u_slab.h"
 #include "tgsi/tgsi_text.h"
 
 #include "state_tracker/graw.h"
@@ -80,6 +81,8 @@ struct graw_context {
    struct graw_sampler_view vs_views[16];
 
    struct pipe_framebuffer_state framebuffer;
+
+   struct util_slab_mempool texture_transfer_pool;
 };
 
 struct graw_transfer {
@@ -571,7 +574,7 @@ static void *graw_transfer_map(struct pipe_context *ctx,
    enum pipe_format format = resource->format;
    struct graw_transfer *trans;
 
-   trans = CALLOC_STRUCT(graw_transfer);
+   trans = util_slab_alloc(&grctx->texture_transfer_pool);
    if (trans == NULL)
       return NULL;
 
@@ -602,6 +605,7 @@ static void *graw_transfer_map(struct pipe_context *ctx,
 static void graw_transfer_unmap(struct pipe_context *ctx,
                                  struct pipe_transfer *transfer)
 {
+   struct graw_context *grctx = (struct graw_context *)ctx;
    struct graw_transfer *trans = (struct graw_transfer *)transfer;
    struct graw_resource *grres = (struct graw_resource *)transfer->resource;
    if (trans->base.usage & PIPE_TRANSFER_WRITE) {
@@ -610,7 +614,8 @@ static void graw_transfer_unmap(struct pipe_context *ctx,
    }
 
    FREE(trans->localmem);
-   FREE(transfer);
+
+   util_slab_free(&grctx->texture_transfer_pool, trans);
 }
 
 static void graw_transfer_flush_region(struct pipe_context *ctx,
@@ -701,6 +706,9 @@ struct pipe_context *graw_context_create(struct pipe_screen *pscreen,
    gr_ctx->base.transfer_unmap = graw_transfer_unmap;
    gr_ctx->base.transfer_flush_region = graw_transfer_flush_region;
 
+
+   util_slab_create(&gr_ctx->texture_transfer_pool, sizeof(struct graw_transfer),
+                    16, UTIL_SLAB_SINGLETHREADED);
    return &gr_ctx->base;
 }
 

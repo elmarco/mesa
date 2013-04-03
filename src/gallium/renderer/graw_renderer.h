@@ -114,4 +114,7 @@ void graw_transfer_write_return(void *data, uint32_t ndw, void *ptr);
 
 void graw_renderer_fini(void);
 void graw_reset_decode(void);
+
+void graw_decode_block(uint32_t *block, int ndw);
+
 #endif

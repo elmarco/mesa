@@ -1,6 +1,6 @@
 include Makefile.sources
 
-noinst_PROGRAMS=tri quad-tex tri-instanced graw-renderer 
+noinst_PROGRAMS=tri quad-tex tri-instanced graw-renderer graw-shm-renderer
 
 AM_LDFLAGS = ../auxiliary/libgallium.a $(GLUT_LIBS) $(GLEW_LIBS) $(GL_LIBS) -lm -ldl
 
@@ -57,5 +57,14 @@ graw_renderer_SOURCES = \
         graw_renderer_glut.c \
         graw_renderer_glx.c
 
+graw_shm_renderer_SOURCES = \
+        graw_shm_renderer.c \
+        graw_renderer.c \
+        graw_shader.c \
+        graw_object.c \
+        graw_decode.c \
+        graw_renderer_glut.c \
+        graw_renderer_glx.c
 
 graw_renderer_LDADD = -lX11
+graw_shm_renderer_LDADD = -lrt -lX11

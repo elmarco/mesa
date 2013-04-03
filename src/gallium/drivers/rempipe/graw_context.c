@@ -446,6 +446,26 @@ static struct pipe_sampler_view *graw_create_sampler_view(struct pipe_context *c
    return &grview->base;
 }
 
+static void graw_set_vertex_sampler_views(struct pipe_context *ctx,	
+					unsigned num_views,
+					struct pipe_sampler_view **views)
+{
+   struct graw_context *grctx = (struct graw_context *)ctx;
+   uint32_t handles[32] = {0};
+   int i;
+
+   for (i = 0; i < num_views; i++) {
+      struct graw_sampler_view *grview = (struct graw_sampler_view *)views[i];
+
+      if (views[i]) {
+         struct graw_resource *grres = (struct graw_resource *)grview->base.texture;
+         handles[i] = grres->res_handle;
+      }
+      pipe_sampler_view_reference((struct pipe_sampler_view **)&grctx->fs_views[i], views[i]);
+   }
+   graw_encode_set_vertex_sampler_views(grctx->eq, num_views, handles);
+}
+
 static void graw_set_fragment_sampler_views(struct pipe_context *ctx,	
 					unsigned num_views,
 					struct pipe_sampler_view **views)
@@ -486,6 +506,19 @@ static void *graw_create_sampler_state(struct pipe_context *ctx,
 }
 
 static void graw_bind_fragment_sampler_states(struct pipe_context *ctx,
+						unsigned num_samplers,
+						void **samplers)
+{
+   struct graw_context *grctx = (struct graw_context *)ctx;
+   uint32_t handles[32];
+   int i;
+   for (i = 0; i < num_samplers; i++) {
+      handles[i] = (unsigned long)(samplers[i]);
+   }
+   graw_encode_bind_fragment_sampler_states(grctx->eq, num_samplers, handles);
+}
+
+static void graw_bind_vertex_sampler_states(struct pipe_context *ctx,
 						unsigned num_samplers,
 						void **samplers)
 {
@@ -654,8 +687,11 @@ struct pipe_context *graw_context_create(struct pipe_screen *pscreen,
    gr_ctx->base.create_sampler_view = graw_create_sampler_view;
    gr_ctx->base.sampler_view_destroy = graw_destroy_sampler_view;
    gr_ctx->base.set_fragment_sampler_views = graw_set_fragment_sampler_views;
+   gr_ctx->base.set_vertex_sampler_views = graw_set_vertex_sampler_views;
+
    gr_ctx->base.create_sampler_state = graw_create_sampler_state;
    gr_ctx->base.bind_fragment_sampler_states = graw_bind_fragment_sampler_states;
+   gr_ctx->base.bind_vertex_sampler_states = graw_bind_vertex_sampler_states;
 
    gr_ctx->base.set_polygon_stipple = graw_set_polygon_stipple;
    gr_ctx->base.set_scissor_state = graw_set_scissor_state;

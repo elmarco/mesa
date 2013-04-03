@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <time.h>
 
 #include <sys/mman.h>
 #include <fcntl.h>
@@ -35,7 +36,8 @@ int main(int argc, char **argv)
       int notify;
    restart:
       while (SPICE_RING_IS_EMPTY(&ramp->cmd_3d_ring)) {
-         sleep(1);
+         struct timespec req = {0, 50000000};
+         nanosleep(&req, NULL);
       }
       
       cmd = SPICE_RING_CONS_ITEM(&ramp->cmd_3d_ring);

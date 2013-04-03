@@ -27,7 +27,10 @@ AM_CPPFLAGS = \
 	-I$(top_srcdir)/include \
 	$(GALLIUM_CFLAGS) \
 	$(LIBDRM_CFLAGS)
+
 noinst_LTLIBRARIES = librempipe.la
+
+librempipe_la_SOURCES = \
 	rempipe_screen.c \
 	graw_context.c \
 	graw_encode.c \

@@ -63,6 +63,9 @@ void graw_decode_block(uint32_t *block, int ndw)
    struct drm_qxl_command cmd;
    int ret;
 
+   if (ndw == 0)
+      return;
+
    cmd.command = (unsigned long)(void*)block;
    cmd.command_size = ndw * 4;
    cmd.relocs_num = 0;

@@ -51,7 +51,7 @@ static int do_blocked_write(int fd, void *data, uint32_t bytes)
    return sofar;
 }
 
-#define USE_SERIAL 1
+//#define USE_SERIAL 1
 
 void graw_renderer_init()
 {
@@ -87,6 +87,8 @@ void graw_renderer_init()
       return 1;
    }
    graw_fd = socket_fd;
+   buf[0] = GRAW_CMD0(GRAW_CREATE_RENDERER, 0, 0);
+   ret = write(graw_fd, buf, 1 * sizeof(uint32_t));
 #else
    {
       struct termios options;

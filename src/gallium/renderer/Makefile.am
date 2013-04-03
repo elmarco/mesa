@@ -1,7 +1,7 @@
 
 noinst_PROGRAMS=graw-renderer graw-shm-renderer
 
-AM_LDFLAGS = ../auxiliary/libgallium.a $(GLEW_LIBS) $(GL_LIBS) -lm -ldl
+AM_LDFLAGS = ../auxiliary/libgallium.la $(GLEW_LIBS) $(GL_LIBS) -lm -ldl
 
 AM_CFLAGS = \
         -I$(top_srcdir)/src/gallium/drivers/rempipe \

@@ -146,7 +146,7 @@ void grend_set_framebuffer_state(struct grend_context *ctx,
 
       tex = graw_object_lookup(zsurf->res_handle, GRAW_RESOURCE);
       
-      if (tex->base.format == PIPE_FORMAT_Z24X8_UNORM)
+      if (tex->base.format == PIPE_FORMAT_Z24X8_UNORM || tex->base.format == PIPE_FORMAT_Z32_UNORM)
          attachment = GL_DEPTH_ATTACHMENT;
       else
          attachment = GL_DEPTH_STENCIL_ATTACHMENT;
@@ -830,6 +830,11 @@ void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target tar
          break;
       case PIPE_FORMAT_Z24X8_UNORM:
          internalformat = GL_DEPTH_COMPONENT24;
+         glformat = GL_DEPTH_COMPONENT;
+         gltype = GL_UNSIGNED_INT;
+         break;
+      case PIPE_FORMAT_Z32_UNORM:
+         internalformat = GL_DEPTH_COMPONENT32;
          glformat = GL_DEPTH_COMPONENT;
          gltype = GL_UNSIGNED_INT;
          break;

@@ -78,6 +78,8 @@ struct graw_context {
 
    struct graw_sampler_view fs_views[16];
    struct graw_sampler_view vs_views[16];
+
+   struct pipe_framebuffer_state framebuffer;
 };
 
 struct graw_transfer {
@@ -213,6 +215,8 @@ static void graw_set_framebuffer_state(struct pipe_context *ctx,
                                                 const struct pipe_framebuffer_state *state)
 {
    struct graw_context *grctx = (struct graw_context *)ctx;
+
+   grctx->framebuffer = *state;
    graw_encoder_set_framebuffer_state(grctx->eq, state);
 }
 
@@ -244,8 +248,9 @@ static void graw_bind_vertex_elements_state(struct pipe_context *ctx,
 }
 
 static void graw_set_vertex_buffers(struct pipe_context *ctx,
-                                             unsigned num_buffers,
-                                             const struct pipe_vertex_buffer *buffers)
+                                    unsigned start_slot,
+                                    unsigned num_buffers,
+                                    const struct pipe_vertex_buffer *buffers)
 {
    struct graw_context *grctx = (struct graw_context *)ctx;
    uint32_t res_handles[PIPE_MAX_ATTRIBS];
@@ -411,11 +416,18 @@ static void graw_flush_eq(struct graw_encoder_state *eq, void *closure)
 }
 
 static void graw_flush(struct pipe_context *ctx,
-                                struct pipe_fence_handle **fence)
+                       struct pipe_fence_handle **fence,
+                       enum pipe_flush_flags flags)
 {
    struct graw_context *grctx = (struct graw_context *)ctx;
 
    graw_flush_eq(grctx->eq, grctx);
+
+   if (flags == PIPE_FLUSH_END_OF_FRAME) {
+      graw_flush_frontbuffer(ctx->screen,
+                             grctx->framebuffer.cbufs[0]->texture,
+                             0, 0, NULL);
+   }
 }
 
 static struct pipe_sampler_view *graw_create_sampler_view(struct pipe_context *ctx,
@@ -548,11 +560,12 @@ static void graw_set_sample_mask(struct pipe_context *ctx,
 
 }
 
-static struct pipe_transfer *graw_get_transfer(struct pipe_context *ctx,
-                                               struct pipe_resource *resource,
-                                               unsigned level,
-                                               unsigned usage,  /* a combination of PIPE_TRANSFER_x */
-                                               const struct pipe_box *box)
+static void *graw_transfer_map(struct pipe_context *ctx,
+                               struct pipe_resource *resource,
+                               unsigned level,
+                               unsigned usage,
+                               const struct pipe_box *box,
+                               struct pipe_transfer **transfer)
 {
    struct graw_context *grctx = (struct graw_context *)ctx;
    enum pipe_format format = resource->format;
@@ -567,7 +580,7 @@ static struct pipe_transfer *graw_get_transfer(struct pipe_context *ctx,
    if (1) {//usage & PIPE_TRANSFER_READ) {
       struct graw_resource *grres = (struct graw_resource *)resource;
       fprintf(stderr, "TODO READ\n");
-      graw_flush(ctx, NULL);
+      graw_flush(ctx, NULL, 0);
       graw_transfer_get_block(grres->res_handle, box, trans->localmem, trans->lmsize / 4);
    }
 
@@ -581,35 +594,23 @@ static struct pipe_transfer *graw_get_transfer(struct pipe_context *ctx,
 //   trans->offset = box->y / util_format_get_blockheight(format) * trans->base.stride +
 //      box->x / util_format_get_blockwidth(format) * util_format_get_blocksize(format);
 
-   return &trans->base;
-}
+   *transfer = &trans->base;
 
-static void graw_transfer_destroy(struct pipe_context *ctx,
-                                  struct pipe_transfer *transfer)
-{
-   struct graw_transfer *trans = (struct graw_transfer *)transfer;
-   struct graw_resource *grres = (struct graw_resource *)transfer->resource;
-
-   if (trans->base.usage & PIPE_TRANSFER_WRITE) {
-      graw_transfer_block(grres->res_handle, transfer->level, &transfer->box, &transfer->box, trans->localmem + trans->offset, trans->lmsize / 4);
-      
-   }
-
-   FREE(trans->localmem);
-   FREE(trans);
-}
-
-static void *graw_transfer_map(struct pipe_context *ctx,
-                               struct pipe_transfer *transfer)
-{
-   struct graw_transfer *trans = (struct graw_transfer *)transfer;
    return trans->localmem;
 }
 
 static void graw_transfer_unmap(struct pipe_context *ctx,
                                  struct pipe_transfer *transfer)
 {
+   struct graw_transfer *trans = (struct graw_transfer *)transfer;
+   struct graw_resource *grres = (struct graw_resource *)transfer->resource;
+   if (trans->base.usage & PIPE_TRANSFER_WRITE) {
+      graw_transfer_block(grres->res_handle, transfer->level, &transfer->box, &transfer->box, trans->localmem + trans->offset, trans->lmsize / 4);
+      
+   }
 
+   FREE(trans->localmem);
+   FREE(transfer);
 }
 
 static void graw_transfer_flush_region(struct pipe_context *ctx,
@@ -737,7 +738,7 @@ void graw_flush_frontbuffer(struct pipe_screen *screen,
    free(alloced);
    winsys->displaytarget_unmap(winsys, gres->dt);
 
-   winsys->displaytarget_display(winsys, gres->dt, winsys_drawable_handle);
+//   winsys->displaytarget_display(winsys, gres->dt, winsys_drawable_handle);
 
 }
 

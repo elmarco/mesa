@@ -593,7 +593,7 @@ static void graw_transfer_destroy(struct pipe_context *ctx,
    struct graw_resource *grres = (struct graw_resource *)transfer->resource;
 
    if (trans->base.usage & PIPE_TRANSFER_WRITE) {
-      graw_transfer_block(grres->res_handle, &transfer->box, &transfer->box, trans->localmem + trans->offset, trans->lmsize / 4);
+      graw_transfer_block(grres->res_handle, transfer->level, &transfer->box, &transfer->box, trans->localmem + trans->offset, trans->lmsize / 4);
       
    }
 
@@ -624,7 +624,7 @@ static void graw_transfer_flush_region(struct pipe_context *ctx,
    uint32_t offset;
    uint32_t size;
 
-   graw_transfer_block(grres->res_handle, &transfer->box, box, trans->localmem + trans->offset, box->width);
+   graw_transfer_block(grres->res_handle, transfer->level, &transfer->box, box, trans->localmem + trans->offset, box->width);
    
 }
                                        

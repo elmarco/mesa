@@ -105,12 +105,13 @@ void graw_decode_block(uint32_t *block, int ndw)
    write(graw_fd, block, ndw * sizeof(uint32_t));
 }
 
-void graw_transfer_block(uint32_t res_handle, const struct pipe_box *transfer_box,
+void graw_transfer_block(uint32_t res_handle, int level,
+                         const struct pipe_box *transfer_box,
                          const struct pipe_box *box,
                          void *data, int ndw)
 {
 
-   if (ndw > 65536-14) {
+   if (ndw > 65536-15) {
       struct pipe_box ntb;
       int h;
       int mdw;
@@ -126,7 +127,7 @@ void graw_transfer_block(uint32_t res_handle, const struct pipe_box *transfer_bo
       ntb.height = 1;
       mdata = data;
       for (h = 0; h < transfer_box->height; h++) {
-         buf[0] = GRAW_CMD0(GRAW_TRANSFER_PUT, 0, mdw + 13);
+         buf[0] = GRAW_CMD0(GRAW_TRANSFER_PUT, 0, mdw + 14);
          buf[1] = res_handle;
          buf[2] = box->x;
          buf[3] = box->y;
@@ -140,7 +141,8 @@ void graw_transfer_block(uint32_t res_handle, const struct pipe_box *transfer_bo
          buf[11] = ntb.width;
          buf[12] = ntb.height;
          buf[13] = ntb.depth;
-         write(graw_fd, buf, 14 * sizeof(uint32_t));
+         buf[14] = level;
+         write(graw_fd, buf, 15 * sizeof(uint32_t));
          write(graw_fd, mdata, mdw * sizeof(uint32_t));      
          mdata += mdw;
          ntb.y++;
@@ -149,7 +151,7 @@ void graw_transfer_block(uint32_t res_handle, const struct pipe_box *transfer_bo
 
    } else {
       
-      buf[0] = GRAW_CMD0(GRAW_TRANSFER_PUT, 0, ndw + 13);
+      buf[0] = GRAW_CMD0(GRAW_TRANSFER_PUT, 0, ndw + 14);
       buf[1] = res_handle;
       buf[2] = box->x;
       buf[3] = box->y;
@@ -163,7 +165,8 @@ void graw_transfer_block(uint32_t res_handle, const struct pipe_box *transfer_bo
       buf[11] = transfer_box->width;
       buf[12] = transfer_box->height;
       buf[13] = transfer_box->depth;
-      write(graw_fd, buf, 14 * sizeof(uint32_t));
+      buf[14] = level;
+      write(graw_fd, buf, 15 * sizeof(uint32_t));
       write(graw_fd, data, ndw * sizeof(uint32_t));
    }
    

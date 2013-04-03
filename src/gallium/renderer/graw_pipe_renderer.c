@@ -173,7 +173,13 @@ int main(int argc, char **argv)
    socket_main();
 }
 
-void graw_transfer_write_return(void *data, uint32_t ndw)
+void graw_transfer_write_return(void *data, uint32_t ndw, void *dummy)
 {
-   write(graw_fd, data, ndw);
+   uint32_t count = ndw;
+   while (count) {
+      int amt = count < 4096 ? count : 4096;
+
+      write(graw_fd, data + (ndw - count), amt);
+      count -= amt;
+   }
 }

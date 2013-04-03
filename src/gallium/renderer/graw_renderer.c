@@ -889,7 +889,7 @@ void graw_renderer_transfer_write(uint32_t res_handle,
    }
 }
 
-void graw_renderer_transfer_send(uint32_t res_handle, struct pipe_box *box)
+void graw_renderer_transfer_send(uint32_t res_handle, struct pipe_box *box, void *myptr)
 {
    struct grend_resource *res;
 
@@ -902,7 +902,7 @@ void graw_renderer_transfer_send(uint32_t res_handle, struct pipe_box *box)
       void *data;
       glBindBufferARB(GL_ARRAY_BUFFER_ARB, res->id);
       data = glMapBuffer(GL_ARRAY_BUFFER_ARB, GL_READ_ONLY);
-      graw_transfer_write_return(data, send_size);
+      graw_transfer_write_return(data, send_size, myptr);
       glUnmapBuffer(GL_ARRAY_BUFFER_ARB);
    } else {
       fprintf(stderr,"TEXTURE TRANSFER %d %d\n", box->width, box->height);
@@ -926,6 +926,6 @@ void graw_renderer_transfer_send(uint32_t res_handle, struct pipe_box *box)
          break;
       }
       glGetTexImage(res->target, 0, format, type, data);
-      graw_transfer_write_return(data, send_size);
+      graw_transfer_write_return(data, send_size, myptr);
    }
 }

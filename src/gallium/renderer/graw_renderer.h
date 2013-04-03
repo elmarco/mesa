@@ -101,7 +101,7 @@ void graw_renderer_transfer_write(uint32_t handle, int level,
                                   struct pipe_box *box,
                                   void *data);
 
-void graw_renderer_transfer_send(uint32_t handle, struct pipe_box *box);
+void graw_renderer_transfer_send(uint32_t handle, struct pipe_box *box, void *ptr);
 
 
 void grend_set_constants(struct grend_context *ctx,
@@ -110,7 +110,7 @@ void grend_set_constants(struct grend_context *ctx,
                          uint32_t num_constant,
                          float *data);
 
-void graw_transfer_write_return(void *data, uint32_t ndw);
+void graw_transfer_write_return(void *data, uint32_t ndw, void *ptr);
 
 void graw_renderer_fini(void);
 void graw_reset_decode(void);

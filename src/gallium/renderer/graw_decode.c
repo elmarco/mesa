@@ -518,5 +518,5 @@ void graw_decode_get_transfer(uint32_t *data, uint32_t ndw)
    box.height = data[5];
    box.depth = data[6];
 
-   graw_renderer_transfer_send(handle, &box);
+   graw_renderer_transfer_send(handle, &box, NULL);
 }

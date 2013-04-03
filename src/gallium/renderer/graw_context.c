@@ -492,7 +492,7 @@ graw_create_window_and_screen( int x,
    return &encscreen;
 }
 
-void graw_transfer_write_return(void *data, uint32_t ndw)
+void graw_transfer_write_return(void *data, uint32_t ndw, void *dummy)
 {
 
 }

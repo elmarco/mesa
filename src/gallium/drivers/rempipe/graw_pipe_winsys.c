@@ -112,8 +112,11 @@ uint32_t graw_object_assign_handle(void)
    return next_handle++;
 }
 
-void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target target, uint32_t format, uint32_t bind, uint32_t width, uint32_t height, uint32_t depth)
+uint32_t graw_renderer_resource_create(enum pipe_texture_target target, uint32_t format, uint32_t bind, uint32_t width, uint32_t height, uint32_t depth)
 {
+   uint32_t handle;
+   handle = graw_object_assign_handle();
+
    buf[0] = GRAW_CMD0(GRAW_CREATE_RESOURCE, 0, 7);
    buf[1] = handle;
    buf[2] = target;
@@ -123,6 +126,7 @@ void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target tar
    buf[6] = height;
    buf[7] = depth;
    write(graw_fd, buf, 8 * sizeof(uint32_t));
+   return handle;
 }
 
 void grend_flush_frontbuffer(uint32_t res_handle)

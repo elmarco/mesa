@@ -751,14 +751,13 @@ struct pipe_resource *graw_resource_create(struct pipe_screen *pscreen,
    struct graw_buffer *buf;
    struct graw_texture *tex;
    uint32_t handle;
-   handle = graw_object_assign_handle();
 
    if (template->target == PIPE_BUFFER) {
       buf = CALLOC_STRUCT(graw_buffer);
       buf->base.base = *template;
       buf->base.base.screen = pscreen;
       pipe_reference_init(&buf->base.base.reference, 1);
-      graw_renderer_resource_create(handle, template->target, template->format, template->bind, template->width0, 1, 1);
+      handle = graw_renderer_resource_create(template->target, template->format, template->bind, template->width0, 1, 1);
       buf->base.res_handle = handle;
       return &buf->base.base;
    } else {
@@ -766,7 +765,7 @@ struct pipe_resource *graw_resource_create(struct pipe_screen *pscreen,
       tex->base.base = *template;
       tex->base.base.screen = pscreen;
       pipe_reference_init(&tex->base.base.reference, 1);
-      graw_renderer_resource_create(handle, template->target, template->format, template->bind, template->width0, template->height0, template->depth0);
+      handle = graw_renderer_resource_create(template->target, template->format, template->bind, template->width0, template->height0, template->depth0);
       tex->base.res_handle = handle;
 
       if (template->bind & (PIPE_BIND_DISPLAY_TARGET |

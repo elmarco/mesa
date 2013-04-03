@@ -407,7 +407,7 @@ static void graw_decode_bind_object(struct grend_decode_ctx *ctx)
 static void graw_decode_destroy_object(struct grend_decode_ctx *ctx)
 {
    uint32_t handle = ctx->ds->buf[ctx->ds->buf_offset+1];
-   graw_object_destroy(handle);
+   graw_object_destroy(handle, 0);
 }
 
 void graw_reset_decode(void)

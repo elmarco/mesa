@@ -22,7 +22,7 @@ compare(void *key1, void *key2)
       return 0;
 }
 
-static struct util_hash_table *handle_hash;
+static struct util_hash_table *handle_hash, *res_hash;
 static uint32_t next_handle;
 
 struct graw_object {
@@ -36,6 +36,9 @@ graw_object_init_hash(void)
 {
    if (!handle_hash)
       handle_hash = util_hash_table_create(hash_func, compare);
+
+   if (!res_hash)
+      res_hash = util_hash_table_create(hash_func, compare);
 }
 
 void graw_object_fini_hash(void)
@@ -43,6 +46,9 @@ void graw_object_fini_hash(void)
    if (handle_hash)
       util_hash_table_destroy(handle_hash);
    handle_hash = NULL;
+   if (res_hash)
+      util_hash_table_destroy(res_hash);
+   res_hash = NULL;
 }
 
 uint32_t
@@ -69,24 +75,41 @@ graw_object_insert(void *data, uint32_t length, uint32_t handle, enum graw_objec
    obj->handle = handle;
    obj->data = data;
    obj->type = type;
-   util_hash_table_set(handle_hash, intptr_to_pointer(obj->handle), obj);
+   if (type == GRAW_RESOURCE)
+      util_hash_table_set(res_hash, intptr_to_pointer(obj->handle), obj);
+   else
+      util_hash_table_set(handle_hash, intptr_to_pointer(obj->handle), obj);
    return obj->handle;
 }
 
 void
-graw_object_destroy(uint32_t handle)
+graw_object_destroy(uint32_t handle, enum graw_object_type type)
 {
-   struct graw_object *obj = util_hash_table_get(handle_hash, intptr_to_pointer(handle));
-   if (!obj)
-      return;
-   util_hash_table_remove(handle_hash, intptr_to_pointer(handle));
+   struct graw_object *obj;
+
+   if (type == GRAW_RESOURCE) {
+      obj = util_hash_table_get(res_hash, intptr_to_pointer(handle));
+      if (!obj)
+         return;
+      util_hash_table_remove(res_hash, intptr_to_pointer(handle));
+   } else {
+      obj = util_hash_table_get(handle_hash, intptr_to_pointer(handle));
+      if (!obj)
+         return;
+      util_hash_table_remove(handle_hash, intptr_to_pointer(handle));
+   }
    free(obj);
+      
 }
 
 void *graw_object_lookup(uint32_t handle, enum graw_object_type type)
 {
-   struct graw_object *obj = util_hash_table_get(handle_hash, intptr_to_pointer(handle));
+   struct graw_object *obj;
 
+   if (type == GRAW_RESOURCE)
+      obj = util_hash_table_get(res_hash, intptr_to_pointer(handle));
+   else
+      obj = util_hash_table_get(handle_hash, intptr_to_pointer(handle));
    if (!obj)
       return NULL;
 

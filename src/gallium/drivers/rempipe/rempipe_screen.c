@@ -314,6 +314,7 @@ rempipe_create_screen(struct sw_winsys *winsys)
    screen->base.get_paramf = rempipe_get_paramf;
    screen->base.is_format_supported = rempipe_is_format_supported;
    screen->base.destroy = rp_destroy_screen;
+   screen->base.resource_from_handle = rempipe_resource_from_handle;
 
    graw_renderer_init();
    

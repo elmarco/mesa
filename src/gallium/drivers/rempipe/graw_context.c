@@ -787,6 +787,26 @@ struct pipe_resource *graw_resource_create(struct pipe_screen *pscreen,
    }
 }
 
+
+struct pipe_resource *
+rempipe_resource_from_handle(struct pipe_screen *screen,
+                             const struct pipe_resource *templat,
+                             struct winsys_handle *whandle)
+{
+   struct sw_winsys *winsys = rempipe_screen(screen)->winsys;
+   struct graw_texture *rpr = CALLOC_STRUCT(graw_texture);
+
+   rpr->base.base = *templat;
+   pipe_reference_init(&rpr->base.base.reference, 1);
+   rpr->base.base.screen = screen;      
+
+   rpr->dt = winsys->displaytarget_from_handle(winsys,
+                                               templat,
+                                               whandle,
+                                               &rpr->stride);
+   return &rpr->base.base;
+}   
+
 void
 graw_resource_destroy(struct pipe_screen *pscreen,
                       struct pipe_resource *pt)

@@ -106,7 +106,6 @@ static struct pipe_surface *graw_create_surface(struct pipe_context *ctx,
    handle = graw_object_assign_handle();
    pipe_reference_init(&surf->base.reference, 1);
    surf->base.format = templ->format;
-   surf->base.usage = templ->usage;
    surf->base.u = templ->u;
    surf->base.texture = NULL;
    pipe_resource_reference(&surf->base.texture, resource);
@@ -578,7 +577,6 @@ static struct pipe_transfer *graw_get_transfer(struct pipe_context *ctx,
    trans->base.box = *box;
    trans->base.stride = box->width * util_format_get_blocksize(resource->format);
    trans->base.layer_stride = 0;
-   trans->base.data = NULL;
 
 //   trans->offset = box->y / util_format_get_blockheight(format) * trans->base.stride +
 //      box->x / util_format_get_blockwidth(format) * util_format_get_blocksize(format);
@@ -698,8 +696,6 @@ struct pipe_context *graw_context_create(struct pipe_screen *pscreen,
    gr_ctx->base.set_sample_mask = graw_set_sample_mask;
    gr_ctx->base.set_stencil_ref = graw_set_stencil_ref;
 
-   gr_ctx->base.get_transfer = graw_get_transfer;
-   gr_ctx->base.transfer_destroy = graw_transfer_destroy;
    gr_ctx->base.transfer_map = graw_transfer_map;
    gr_ctx->base.transfer_unmap = graw_transfer_unmap;
    gr_ctx->base.transfer_flush_region = graw_transfer_flush_region;
@@ -790,18 +786,21 @@ struct pipe_resource *graw_resource_create(struct pipe_screen *pscreen,
 
 struct pipe_resource *
 rempipe_resource_from_handle(struct pipe_screen *screen,
-                             const struct pipe_resource *templat,
+                             const struct pipe_resource *template,
                              struct winsys_handle *whandle)
 {
    struct sw_winsys *winsys = rempipe_screen(screen)->winsys;
    struct graw_texture *rpr = CALLOC_STRUCT(graw_texture);
+   uint32_t handle;
 
-   rpr->base.base = *templat;
+   rpr->base.base = *template;
    pipe_reference_init(&rpr->base.base.reference, 1);
    rpr->base.base.screen = screen;      
 
+   handle = graw_renderer_resource_create(template->target, template->format, template->bind, template->width0, template->height0, template->depth0);
+   rpr->base.res_handle = handle;
    rpr->dt = winsys->displaytarget_from_handle(winsys,
-                                               templat,
+                                               template,
                                                whandle,
                                                &rpr->stride);
    return &rpr->base.base;

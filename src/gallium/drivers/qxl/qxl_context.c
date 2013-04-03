@@ -32,7 +32,6 @@ qxl_create_context(struct pipe_screen *screen, void *priv)
 
   qxl->base.destroy = qxl_destroy;
   qxl->base.flush = qxl_flush;
-  qxl->base.get_transfer = u_get_transfer_vtbl;
   qxl->base.transfer_map = u_transfer_map_vtbl;
   qxl->base.transfer_flush_region = u_transfer_flush_region_vtbl;
   qxl->base.transfer_unmap = u_transfer_unmap_vtbl;

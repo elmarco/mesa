@@ -73,8 +73,6 @@ struct u_resource_vtbl qxl_texture_vtbl =
 {
    NULL,
    qxl_texture_destroy,
-   qxl_texture_get_transfer,
-   qxl_transfer_destroy,
    qxl_texture_transfer_map,
    u_default_transfer_flush_region,
    qxl_texture_transfer_unmap,

@@ -36,6 +36,7 @@ void graw_renderer_init_glx(void)
       return;
    graw_dpy = XOpenDisplay(displayName);
 
+   scrnum = DefaultScreen(graw_dpy);
    root = RootWindow(graw_dpy, scrnum);
 
    attribs[i++] = GLX_RGBA;

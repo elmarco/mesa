@@ -30,7 +30,7 @@ int graw_encode_delete_object(struct graw_encoder_state *enc,
 
 int graw_encode_blend_state(struct graw_encoder_state *enc,
                             uint32_t handle,
-                            struct pipe_blend_state *blend_state)
+                            const struct pipe_blend_state *blend_state)
 {
    uint32_t tmp;
    int i;
@@ -65,7 +65,7 @@ int graw_encode_blend_state(struct graw_encoder_state *enc,
 
 int graw_encode_dsa_state(struct graw_encoder_state *enc,
                           uint32_t handle,
-                          struct pipe_depth_stencil_alpha_state *dsa_state)
+                          const struct pipe_depth_stencil_alpha_state *dsa_state)
 {
    uint32_t tmp;
    int i;
@@ -95,7 +95,7 @@ int graw_encode_dsa_state(struct graw_encoder_state *enc,
 }
 int graw_encode_rasterizer_state(struct graw_encoder_state *enc,
                                   uint32_t handle,
-                                  struct pipe_rasterizer_state *state)
+                                  const struct pipe_rasterizer_state *state)
 {
    uint32_t tmp;
 
@@ -238,7 +238,7 @@ int graw_encoder_create_surface(struct graw_encoder_state *enc,
    graw_encoder_write_dword(enc, res_handle);
    graw_encoder_write_dword(enc, templat->width);
    graw_encoder_write_dword(enc, templat->height);
-   graw_encoder_write_dword(enc, templat->usage);
+   graw_encoder_write_dword(enc, 0);
    graw_encoder_write_dword(enc, templat->format);
    return 0;
 }

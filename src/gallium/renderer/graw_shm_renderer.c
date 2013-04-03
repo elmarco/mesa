@@ -10,6 +10,7 @@
 #define MAPPING_SIZE (64*1024*1024)
 int fd;
 void *mapping;
+int inited;
 
 struct qxl_3d_ram *ramp;
 
@@ -81,9 +82,15 @@ int main(int argc, char **argv)
          ramp->last_fence = cmd->u.fence_id;
          break;
       case 0xdeadbeef:
+         if (inited) {
+            graw_renderer_fini();
+            graw_renderer_fini_glx();
+
+         }
          ramp->last_fence = 0;
          graw_renderer_init_glx();
          graw_renderer_init();
+         inited = 1;
          break;
       }
       SPICE_RING_POP(&ramp->cmd_3d_ring, notify);

@@ -49,6 +49,8 @@ struct grend_texture {
 struct grend_surface {
    GLuint id;
    GLuint res_handle;
+   GLuint format;
+   GLuint val0, val1;
 };
 
 struct grend_sampler {
@@ -114,7 +116,8 @@ void grend_update_stencil_state(struct grend_context *ctx);
 
 void grend_create_surface(struct grend_context *ctx,
                           uint32_t handle,
-                          uint32_t res_handle)
+                          uint32_t res_handle, uint32_t format,
+                          uint32_t val0, uint32_t val1)
    
 {
    struct grend_surface *surf;
@@ -123,6 +126,9 @@ void grend_create_surface(struct grend_context *ctx,
    surf = CALLOC_STRUCT(grend_surface);
 
    surf->res_handle = res_handle;
+   surf->format = format;
+   surf->val0 = val0;
+   surf->val1 = val1;
 
    graw_object_insert(surf, sizeof(*surf), handle, GRAW_SURFACE);
 }
@@ -161,14 +167,14 @@ void grend_set_framebuffer_state(struct grend_context *ctx,
       else
          attachment = GL_DEPTH_STENCIL_ATTACHMENT;
       glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, attachment,
-                                tex->target, tex->id, 0);
+                                tex->target, tex->id, zsurf->val0);
    }
 
    for (i = 0; i < nr_cbufs; i++) {
       surf = graw_object_lookup(surf_handle[i], GRAW_SURFACE);
       tex = graw_object_lookup(surf->res_handle, GRAW_RESOURCE);
       glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, buffers[i],
-                                tex->target, tex->id, 0);
+                                tex->target, tex->id, surf->val0);
    }
 
    glDrawBuffers(nr_cbufs, buffers);
@@ -777,6 +783,9 @@ static GLuint convert_wrap(int wrap)
    case PIPE_TEX_WRAP_CLAMP_TO_BORDER: return GL_CLAMP_TO_BORDER;
 
    case PIPE_TEX_WRAP_MIRROR_REPEAT: return GL_MIRRORED_REPEAT;
+   default:
+      assert(0);
+      return;
    }
 } 
 
@@ -890,6 +899,8 @@ static GLenum tgsitargettogltarget(const enum pipe_texture_target target)
       return GL_TEXTURE_3D;
    case PIPE_TEXTURE_RECT:
       return GL_TEXTURE_RECTANGLE_NV;
+//   case PIPE_TEXTURE_CUBE:
+//      return GL_TEXTURE_CUBE;
    }
    return PIPE_BUFFER;
 }
@@ -984,6 +995,7 @@ void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target tar
          break;
       default:
          fprintf(stderr,"unknown format is %d\n", format);
+         assert(0);
          internalformat = GL_RGBA;
          glformat = GL_RGBA;
          gltype = GL_UNSIGNED_BYTE;

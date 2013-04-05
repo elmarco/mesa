@@ -42,7 +42,8 @@ void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target tar
 
 void grend_create_surface(struct grend_context *ctx,
                           uint32_t handle,
-                          uint32_t res_handle);
+                          uint32_t res_handle, uint32_t format,
+                          uint32_t val0, uint32_t val1);
 
 void grend_create_vertex_elements_state(struct grend_context *ctx,
                                         uint32_t handle,

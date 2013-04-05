@@ -282,11 +282,12 @@ static void graw_decode_create_rasterizer(struct grend_decode_ctx *ctx, uint32_t
 
 static void graw_decode_create_surface(struct grend_decode_ctx *ctx, uint32_t handle)
 {
-   uint32_t res_handle;
-
+   uint32_t res_handle, format, val0, val1;
    res_handle = ctx->ds->buf[ctx->ds->buf_offset + 2];
-
-   grend_create_surface(ctx->grctx, handle, res_handle);
+   format = ctx->ds->buf[ctx->ds->buf_offset + 3];
+   val0 = ctx->ds->buf[ctx->ds->buf_offset + 4];
+   val1 = ctx->ds->buf[ctx->ds->buf_offset + 5];
+   grend_create_surface(ctx->grctx, handle, res_handle, format, val0, val1);
 }
 
 static void graw_decode_create_sampler_state(struct grend_decode_ctx *ctx, uint32_t handle, uint16_t length)

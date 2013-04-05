@@ -244,13 +244,18 @@ int graw_encoder_create_surface(struct graw_encoder_state *enc,
 				uint32_t res_handle,
 				const struct pipe_surface *templat)
 {
-   graw_encoder_write_cmd_dword(enc, GRAW_CMD0(GRAW_CREATE_OBJECT, GRAW_SURFACE, 6));
+   graw_encoder_write_cmd_dword(enc, GRAW_CMD0(GRAW_CREATE_OBJECT, GRAW_SURFACE, 5));
    graw_encoder_write_dword(enc, handle);
    graw_encoder_write_dword(enc, res_handle);
-   graw_encoder_write_dword(enc, templat->width);
-   graw_encoder_write_dword(enc, templat->height);
-   graw_encoder_write_dword(enc, 0);
    graw_encoder_write_dword(enc, templat->format);
+   if (templat->texture->target == PIPE_BUFFER) {
+      graw_encoder_write_dword(enc, templat->u.buf.first_element);
+      graw_encoder_write_dword(enc, templat->u.buf.last_element);
+
+   } else {
+      graw_encoder_write_dword(enc, templat->u.tex.level);
+      graw_encoder_write_dword(enc, templat->u.tex.first_layer | (templat->u.tex.last_layer << 16));
+   }
    return 0;
 }
 

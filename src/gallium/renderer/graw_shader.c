@@ -314,13 +314,18 @@ iter_instruction(struct tgsi_iterate_context *iter,
       break;
    case TGSI_OPCODE_TEX:
       ctx->samplers[sreg_index].tgsi_sampler_type = inst->Texture.Texture;
-      snprintf(buf, 255, "%s = %s(texture(%s, %s.xy));\n", dsts[0], dstconv, srcs[1], srcs[0]);
+      if (inst->Texture.Texture == TGSI_TEXTURE_CUBE)
+         snprintf(buf, 255, "%s = %s(texture(%s, %s.xyz));\n", dsts[0], dstconv, srcs[1], srcs[0]);
+      else
+         snprintf(buf, 255, "%s = %s(texture(%s, %s.xy));\n", dsts[0], dstconv, srcs[1], srcs[0]);
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_TXP:
       ctx->samplers[sreg_index].tgsi_sampler_type = inst->Texture.Texture;
       if (inst->Texture.Texture == TGSI_TEXTURE_RECT)
          snprintf(buf, 255, "%s = %s(texture2DRectProj(%s, %s));\n", dsts[0], dstconv, srcs[1], srcs[0]);
+      else if (inst->Texture.Texture == TGSI_TEXTURE_CUBE)
+         snprintf(buf, 255, "%s = %s(textureProj(%s, %s.xyz));\n", dsts[0], dstconv, srcs[1], srcs[0]);
       else
          snprintf(buf, 255, "%s = %s(textureProj(%s, %s));\n", dsts[0], dstconv, srcs[1], srcs[0]);
 
@@ -359,6 +364,7 @@ static const char *samplertypeconv(int sampler_type)
 	case TGSI_TEXTURE_1D: return "1D";
 	case TGSI_TEXTURE_2D: return "2D";
 	case TGSI_TEXTURE_3D: return "3D";
+	case TGSI_TEXTURE_CUBE: return "Cube";
 	case TGSI_TEXTURE_RECT: return "2DRect";
 	default: return "UNK";
         }

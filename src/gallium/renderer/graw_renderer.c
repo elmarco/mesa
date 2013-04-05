@@ -173,8 +173,13 @@ void grend_set_framebuffer_state(struct grend_context *ctx,
    for (i = 0; i < nr_cbufs; i++) {
       surf = graw_object_lookup(surf_handle[i], GRAW_SURFACE);
       tex = graw_object_lookup(surf->res_handle, GRAW_RESOURCE);
-      glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, buffers[i],
-                                tex->target, tex->id, surf->val0);
+
+      if (tex->target == GL_TEXTURE_CUBE_MAP) {
+         glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, buffers[i],
+                                   GL_TEXTURE_CUBE_MAP_POSITIVE_X + surf->val0 - 1, tex->id, 0);
+      } else
+         glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, buffers[i],
+                                   tex->target, tex->id, surf->val0);
    }
 
    glDrawBuffers(nr_cbufs, buffers);
@@ -667,6 +672,11 @@ void grend_object_bind_blend(struct grend_context *ctx,
                              uint32_t handle)
 {
    struct pipe_blend_state *state;
+
+   if (handle == 0) {
+      glDisable(GL_BLEND);
+      return;
+   }
    state = graw_object_lookup(handle, GRAW_OBJECT_BLEND);
 
    if (state->logicop_enable) {
@@ -694,6 +704,14 @@ void grend_object_bind_dsa(struct grend_context *ctx,
 {
    struct pipe_depth_stencil_alpha_state *state;
    int i;
+
+   if (handle == 0) {
+      glDisable(GL_DEPTH_TEST);
+      glDisable(GL_ALPHA_TEST);
+      glDisable(GL_STENCIL_TEST);
+      ctx->dsa = NULL;
+      return;
+   }
 
    state = graw_object_lookup(handle, GRAW_OBJECT_DSA);
 
@@ -756,6 +774,8 @@ void grend_object_bind_rasterizer(struct grend_context *ctx,
 {
    struct pipe_rasterizer_state *state;
 
+   if (handle == 0)
+      return;
    state = graw_object_lookup(handle, GRAW_OBJECT_RASTERIZER);
    
 #if 0
@@ -838,9 +858,12 @@ static void grend_apply_sampler_state(struct grend_context *ctx, int id,
 
    glTexParameteri(target, GL_TEXTURE_WRAP_S, convert_wrap(state->wrap_s));
    glTexParameteri(target, GL_TEXTURE_WRAP_T, convert_wrap(state->wrap_t));
+   glTexParameteri(target, GL_TEXTURE_WRAP_R, convert_wrap(state->wrap_r));
    glTexParameterf(target, GL_TEXTURE_MIN_FILTER, convert_min_filter(state->min_img_filter, state->min_mip_filter));
    glTexParameterf(target, GL_TEXTURE_MAG_FILTER, convert_mag_filter(state->mag_img_filter));
-
+   glTexParameterf(target, GL_TEXTURE_MIN_LOD, state->min_lod);
+   glTexParameterf(target, GL_TEXTURE_MAX_LOD, state->max_lod);
+   glTexParameterf(target, GL_TEXTURE_LOD_BIAS, state->lod_bias);
 }
 
 void grend_flush(struct grend_context *ctx)
@@ -899,8 +922,8 @@ static GLenum tgsitargettogltarget(const enum pipe_texture_target target)
       return GL_TEXTURE_3D;
    case PIPE_TEXTURE_RECT:
       return GL_TEXTURE_RECTANGLE_NV;
-//   case PIPE_TEXTURE_CUBE:
-//      return GL_TEXTURE_CUBE;
+   case PIPE_TEXTURE_CUBE:
+      return GL_TEXTURE_CUBE_MAP;
    }
    return PIPE_BUFFER;
 }
@@ -1002,7 +1025,14 @@ void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target tar
          break;
       }
 
-      if (gr->target == GL_TEXTURE_3D) {
+      if (gr->target == GL_TEXTURE_CUBE_MAP) {
+         int i;
+         for (i = 0; i < 6; i++) {
+            GLenum ctarget = GL_TEXTURE_CUBE_MAP_POSITIVE_X + i;
+            glTexImage2D(ctarget, 0, internalformat, width, height, 0, glformat,
+                         gltype, NULL);
+         }
+      } else if (gr->target == GL_TEXTURE_3D) {
          glTexImage3D(gr->target, 0, internalformat, width, height, depth, 0,
                       glformat,
                       gltype, NULL);
@@ -1036,28 +1066,33 @@ void graw_renderer_transfer_write(uint32_t res_handle,
    if (res->target == GL_ELEMENT_ARRAY_BUFFER_ARB) {
       glBindBufferARB(GL_ELEMENT_ARRAY_BUFFER_ARB, res->id);
       glBufferSubData(GL_ELEMENT_ARRAY_BUFFER_ARB, transfer_box->x + box->x, box->width, data);
-      fprintf(stderr,"TRANSFER FOR IB\n");
    } else if (res->target == GL_ARRAY_BUFFER_ARB) {
       glBindBufferARB(GL_ARRAY_BUFFER_ARB, res->id);
       glBufferSubData(GL_ARRAY_BUFFER_ARB, transfer_box->x + box->x, box->width, data);
    } else {
-
+      GLenum glformat  = GL_BGRA;
       glBindTexture(res->target, res->id);
-      if (res->target == GL_TEXTURE_3D) {
+
+      if (res->base.format == PIPE_FORMAT_R8G8B8A8_UNORM)
+         glformat = GL_RGBA;
+
+      if (res->target == GL_TEXTURE_CUBE_MAP) {
+         GLenum ctarget = GL_TEXTURE_CUBE_MAP_POSITIVE_X + box->z;
+
+         glTexSubImage2D(ctarget, level, transfer_box->x + box->x,
+                         transfer_box->y + box->y, transfer_box->width, transfer_box->height,
+                         glformat, GL_UNSIGNED_BYTE, data);
+      } else if (res->target == GL_TEXTURE_3D) {
          glTexSubImage3D(res->target, level, transfer_box->x + box->x,
                          transfer_box->y + box->y, 
                          box->z,
                          box->width, box->height, box->depth,
-                         GL_BGRA, GL_UNSIGNED_BYTE, data);
+                         glformat, GL_UNSIGNED_BYTE, data);
       } else if (res->target == GL_TEXTURE_1D) {
          glTexSubImage1D(res->target, level, transfer_box->x + box->x,
                          box->width,
-                         GL_BGRA, GL_UNSIGNED_BYTE, data);
+                         glformat, GL_UNSIGNED_BYTE, data);
       } else {
-         GLenum glformat  = GL_BGRA;
-
-         if (res->base.format == PIPE_FORMAT_R8G8B8A8_UNORM)
-            glformat = GL_RGBA;
          glTexSubImage2D(res->target, level, transfer_box->x + box->x,
                          transfer_box->y + box->y, transfer_box->width, transfer_box->height,
                          glformat, GL_UNSIGNED_BYTE, data);

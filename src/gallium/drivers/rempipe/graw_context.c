@@ -47,17 +47,23 @@ static struct pipe_surface *graw_create_surface(struct pipe_context *ctx,
 
    handle = graw_object_assign_handle();
    pipe_reference_init(&surf->base.reference, 1);
-   surf->base.format = templ->format;
-   surf->base.u = templ->u;
-   surf->base.texture = NULL;
    pipe_resource_reference(&surf->base.texture, resource);
    surf->base.context = ctx;
-   
-   graw_encoder_create_surface(grctx->eq, handle, res->res_handle, templ);
+   surf->base.format = templ->format;
+   if (resource->target != PIPE_BUFFER) {
+      surf->base.width = u_minify(resource->width0, templ->u.tex.level);
+      surf->base.height = u_minify(resource->height0, templ->u.tex.level);
+      surf->base.u.tex.level = templ->u.tex.level;
+      surf->base.u.tex.first_layer = templ->u.tex.first_layer;
+      surf->base.u.tex.last_layer = templ->u.tex.last_layer;
+   } else {
+      surf->base.width = templ->u.buf.last_element - templ->u.buf.first_element + 1;
+      surf->base.height = resource->height0;
+      surf->base.u.buf.first_element = templ->u.buf.first_element;
+      surf->base.u.buf.last_element = templ->u.buf.last_element;
+   }
+   graw_encoder_create_surface(grctx->eq, handle, res->res_handle, &surf->base);
    surf->handle = handle;
-   surf->base.width = surf->base.texture->width0;
-   surf->base.height = surf->base.texture->height0;
-
    return &surf->base;
 }
 

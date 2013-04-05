@@ -299,7 +299,7 @@ int graw_encode_sampler_state(struct graw_encoder_state *enc,
 {
    uint32_t tmp;
 
-   graw_encoder_write_cmd_dword(enc, GRAW_CMD0(GRAW_CREATE_OBJECT, GRAW_OBJECT_SAMPLER_STATE , 2));
+   graw_encoder_write_cmd_dword(enc, GRAW_CMD0(GRAW_CREATE_OBJECT, GRAW_OBJECT_SAMPLER_STATE , 5));
    graw_encoder_write_dword(enc, handle);
 
    tmp = state->wrap_s |
@@ -307,9 +307,14 @@ int graw_encode_sampler_state(struct graw_encoder_state *enc,
       state->wrap_r << 6 |
       state->min_img_filter << 9 |
       state->min_mip_filter << 11 |
-      state->mag_img_filter << 13;
+      state->mag_img_filter << 13 |
+      state->compare_mode << 15 |
+      state->compare_func << 16;
 
    graw_encoder_write_dword(enc, tmp);
+   graw_encoder_write_dword(enc, uif(state->lod_bias));
+   graw_encoder_write_dword(enc, uif(state->min_lod));
+   graw_encoder_write_dword(enc, uif(state->max_lod));
 }
 
 

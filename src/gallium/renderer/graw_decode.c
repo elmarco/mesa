@@ -303,6 +303,12 @@ static void graw_decode_create_sampler_state(struct grend_decode_ctx *ctx, uint3
    state->min_img_filter = (tmp >> 9) & 0x3;
    state->min_mip_filter = (tmp >> 11) & 0x3;
    state->mag_img_filter = (tmp >> 13) & 0x3;
+   state->compare_mode = (tmp >> 15) & 0x1;
+   state->compare_func = (tmp >> 16) & 0x7;
+
+   state->lod_bias = fui(ctx->ds->buf[ctx->ds->buf_offset + 3]);
+   state->min_lod = fui(ctx->ds->buf[ctx->ds->buf_offset + 4]);
+   state->max_lod = fui(ctx->ds->buf[ctx->ds->buf_offset + 5]);
    graw_object_insert(state, sizeof(struct pipe_sampler_state), handle,
                       GRAW_OBJECT_SAMPLER_STATE);
 }

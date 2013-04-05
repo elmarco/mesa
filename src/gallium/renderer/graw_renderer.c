@@ -161,8 +161,10 @@ void grend_set_framebuffer_state(struct grend_context *ctx,
       zsurf = graw_object_lookup(zsurf_handle, GRAW_SURFACE);
 
       tex = graw_object_lookup(zsurf->res_handle, GRAW_RESOURCE);
-      
-      if (tex->base.format == PIPE_FORMAT_Z24X8_UNORM || tex->base.format == PIPE_FORMAT_Z32_UNORM)
+  
+      if (tex->base.format == PIPE_FORMAT_S8_UINT)
+         attachment = GL_STENCIL_ATTACHMENT;
+      else if (tex->base.format == PIPE_FORMAT_Z24X8_UNORM || tex->base.format == PIPE_FORMAT_Z32_UNORM)
          attachment = GL_DEPTH_ATTACHMENT;
       else
          attachment = GL_DEPTH_STENCIL_ATTACHMENT;
@@ -176,7 +178,7 @@ void grend_set_framebuffer_state(struct grend_context *ctx,
 
       if (tex->target == GL_TEXTURE_CUBE_MAP) {
          glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, buffers[i],
-                                   GL_TEXTURE_CUBE_MAP_POSITIVE_X + surf->val0 - 1, tex->id, 0);
+                                   GL_TEXTURE_CUBE_MAP_POSITIVE_X + (surf->val1 & 0xffff), tex->id, surf->val0);
       } else
          glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, buffers[i],
                                    tex->target, tex->id, surf->val0);
@@ -996,6 +998,11 @@ void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target tar
          glformat = GL_BGRA;
          gltype = GL_UNSIGNED_BYTE;
          break;
+      case PIPE_FORMAT_S8_UINT:
+         internalformat = GL_DEPTH24_STENCIL8_EXT;
+         glformat = GL_DEPTH_STENCIL;
+         gltype = GL_UNSIGNED_BYTE;
+         break;
       case PIPE_FORMAT_Z24_UNORM_S8_UINT:
          internalformat = GL_DEPTH24_STENCIL8_EXT;
          glformat = GL_DEPTH_STENCIL;
@@ -1010,6 +1017,11 @@ void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target tar
          internalformat = GL_DEPTH_COMPONENT32;
          glformat = GL_DEPTH_COMPONENT;
          gltype = GL_UNSIGNED_INT;
+         break;
+      case PIPE_FORMAT_A8_UNORM:
+         internalformat = GL_ALPHA;
+         glformat = GL_ALPHA;
+         gltype = GL_UNSIGNED_BYTE;
          break;
       case PIPE_FORMAT_I8_UNORM:
          internalformat = GL_INTENSITY8;
@@ -1029,8 +1041,12 @@ void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target tar
          int i;
          for (i = 0; i < 6; i++) {
             GLenum ctarget = GL_TEXTURE_CUBE_MAP_POSITIVE_X + i;
-            glTexImage2D(ctarget, 0, internalformat, width, height, 0, glformat,
-                         gltype, NULL);
+            for (level = 0; level <= last_level; level++) {
+               unsigned mwidth = u_minify(width, level);
+               unsigned mheight = u_minify(height, level);
+               glTexImage2D(ctarget, level, internalformat, mwidth, mheight, 0, glformat,
+                            gltype, NULL);
+            }
          }
       } else if (gr->target == GL_TEXTURE_3D) {
          glTexImage3D(gr->target, 0, internalformat, width, height, depth, 0,

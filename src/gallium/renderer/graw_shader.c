@@ -162,6 +162,7 @@ static char get_swiz_char(int swiz)
    case TGSI_SWIZZLE_Z: return 'z';
    case TGSI_SWIZZLE_W: return 'w';
    }
+   return 0;
 }
 
 static boolean
@@ -241,7 +242,18 @@ iter_instruction(struct tgsi_iterate_context *iter,
       }
    }
    switch (inst->Instruction.Opcode) {
-
+   case TGSI_OPCODE_SQRT:
+      snprintf(buf, 255, "%s = %s(sqrt(vec4(%s)));\n", dsts[0], dstconv, srcs[0]);
+      strcat(ctx->glsl_main, buf);
+      break;
+   case TGSI_OPCODE_LRP:
+      snprintf(buf, 255, "%s = %s(mix(vec4(%s), vec4(%s), vec4(%s)));\n", dsts[0], dstconv, srcs[0], srcs[1], srcs[2]);
+      strcat(ctx->glsl_main, buf);
+      break;
+   case TGSI_OPCODE_DP2:
+      snprintf(buf, 255, "%s = %s(dot(vec2(%s), vec2(%s)));\n", dsts[0], dstconv, srcs[0], srcs[1]);
+      strcat(ctx->glsl_main, buf);
+      break;
    case TGSI_OPCODE_DP3:
       snprintf(buf, 255, "%s = %s(dot(vec3(%s), vec3(%s)));\n", dsts[0], dstconv, srcs[0], srcs[1]);
       strcat(ctx->glsl_main, buf);
@@ -325,7 +337,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
       if (inst->Texture.Texture == TGSI_TEXTURE_RECT)
          snprintf(buf, 255, "%s = %s(texture2DRectProj(%s, %s));\n", dsts[0], dstconv, srcs[1], srcs[0]);
       else if (inst->Texture.Texture == TGSI_TEXTURE_CUBE)
-         snprintf(buf, 255, "%s = %s(textureProj(%s, %s.xyz));\n", dsts[0], dstconv, srcs[1], srcs[0]);
+         snprintf(buf, 255, "%s = %s(texture(%s, %s.xyz));\n", dsts[0], dstconv, srcs[1], srcs[0]);
       else
          snprintf(buf, 255, "%s = %s(textureProj(%s, %s));\n", dsts[0], dstconv, srcs[1], srcs[0]);
 

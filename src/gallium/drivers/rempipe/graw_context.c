@@ -13,7 +13,10 @@
 #include "util/u_memory.h"
 #include "util/u_format.h"
 #include "util/u_transfer.h"
+#include "util/u_helpers.h"
 #include "util/u_slab.h"
+#include "util/u_upload_mgr.h"
+#include "util/u_blitter.h"
 #include "tgsi/tgsi_text.h"
 
 #include "state_tracker/graw.h"
@@ -26,73 +29,7 @@
 
 #include "rempipe.h"
 #include "state_tracker/sw_winsys.h"
-struct graw_screen;
-
-struct graw_resource {
-   struct pipe_resource base;
-   uint32_t res_handle;
-
-};
-
-struct graw_buffer {
-   struct graw_resource base;
-};
-
-struct graw_texture {
-   struct graw_resource base;
-
-   struct sw_displaytarget *dt; 
-   uint32_t stride;
-
-};
-
-
-struct graw_vertex_element {
-   unsigned count;
-   struct pipe_vertex_element elements[PIPE_MAX_ATTRIBS];
-   GLuint vboids[PIPE_MAX_ATTRIBS];
-};
-
-struct graw_shader_state {
-   uint id;
-   unsigned type;
-   char *glsl_prog;
-};
-
-struct graw_sampler_view {
-   struct pipe_sampler_view base;
-   uint32_t handle;
-};
-   
-struct graw_context {
-   struct pipe_context base;
-   GLuint vaoid;
-
-   struct graw_vertex_element *ve;
-   int num_vbos;
-   struct pipe_vertex_buffer vbo[PIPE_MAX_ATTRIBS];
-
-   struct graw_shader_state *vs;
-   struct graw_shader_state *fs;
-
-   struct graw_encoder_state *eq;
-
-   struct graw_sampler_view fs_views[16];
-   struct graw_sampler_view vs_views[16];
-
-   struct pipe_framebuffer_state framebuffer;
-
-   struct util_slab_mempool texture_transfer_pool;
-};
-
-struct graw_transfer {
-   struct pipe_transfer base;
-   void *localmem;
-   uint32_t lmsize;
-   uint32_t offset;
-};
-
-static struct pipe_screen encscreen;
+ struct pipe_screen encscreen;
 
 static struct pipe_surface *graw_create_surface(struct pipe_context *ctx,
                                                 struct pipe_resource *resource,
@@ -242,6 +179,12 @@ static void *graw_create_vertex_elements_state(struct pipe_context *ctx,
 
 }
 
+static void graw_delete_vertex_elements_state(struct pipe_context *ctx,
+                                              const struct pipe_vertex_element *elements)
+{
+
+}
+
 static void graw_bind_vertex_elements_state(struct pipe_context *ctx,
                                                      void *ve)
 {
@@ -256,37 +199,76 @@ static void graw_set_vertex_buffers(struct pipe_context *ctx,
                                     const struct pipe_vertex_buffer *buffers)
 {
    struct graw_context *grctx = (struct graw_context *)ctx;
-   uint32_t res_handles[PIPE_MAX_ATTRIBS];
-   struct graw_resource *res;
+
    int i;
 
-   for (i = 0; i < num_buffers; i++) {
-      res = (struct graw_resource *)buffers[i].buffer;
-      if (res)
-         res_handles[i] = res->res_handle;
+   util_set_vertex_buffers_count(grctx->vertex_buffer,
+                                 &grctx->num_vertex_buffers,
+                                 buffers, start_slot, num_buffers);
+
+   grctx->vertex_array_dirty = TRUE;
+}
+
+static void graw_hw_set_vertex_buffers(struct pipe_context *ctx)
+{
+   struct graw_context *grctx = (struct graw_context *)ctx;
+   struct graw_resource *res;
+   uint32_t res_handles[PIPE_MAX_ATTRIBS];
+
+   int i;
+
+   if (grctx->vertex_array_dirty) {
+      for (i = 0; i < grctx->num_vertex_buffers; i++) {
+         res = (struct graw_resource *)grctx->vertex_buffer[i].buffer;
+         if (res)
+            res_handles[i] = res->res_handle;
+      }
+  
+      graw_encoder_set_vertex_buffers(grctx->eq, grctx->num_vertex_buffers, &grctx->vertex_buffer, res_handles);
    }
-   graw_encoder_set_vertex_buffers(grctx->eq, num_buffers, buffers, res_handles);
 }
 
 static void graw_set_stencil_ref(struct pipe_context *ctx,
                                  const struct pipe_stencil_ref *ref)
 {
+   struct graw_context *grctx = (struct graw_context *)ctx;
+   graw_encoder_set_stencil_ref(grctx->eq, ref);
+}
 
+static void graw_set_blend_color(struct pipe_context *ctx,
+                                 const struct pipe_blend_color *color)
+{
+   struct graw_context *grctx = (struct graw_context *)ctx;
+   graw_encoder_set_blend_color(grctx->eq, color);
 }
 
 static void graw_set_index_buffer(struct pipe_context *ctx,
-                                  const struct pipe_index_buffer *buf)
+                                  const struct pipe_index_buffer *ib)
 {
-   struct graw_context *grctx = (struct graw_context *)ctx;
-   struct graw_resource *res;
-   uint32_t handle = 0;
-   if (buf) {
-      res = (struct graw_resource *)buf->buffer;
-      handle = res->res_handle;
-   }
-   graw_encoder_set_index_buffer(grctx->eq, buf, handle);
+        struct graw_context *grctx = (struct graw_context *)ctx;
+        uint32_t handle = 0;
+
+        if (ib) {
+                pipe_resource_reference(&grctx->index_buffer.buffer, ib->buffer);
+                memcpy(&grctx->index_buffer, ib, sizeof(*ib));
+        } else {
+                pipe_resource_reference(&grctx->index_buffer.buffer, NULL);
+        }
+        
 }
 
+static void graw_hw_set_index_buffer(struct pipe_context *ctx,
+                                     struct pipe_index_buffer *ib)
+{
+        struct graw_context *grctx = (struct graw_context *)ctx;
+        int handle = 0;
+        if (ib) {
+                struct graw_resource *grres = (struct graw_resource *)ib->buffer;
+                handle = grres->res_handle;
+        }
+        graw_encoder_set_index_buffer(grctx->eq, ib, handle);
+
+}
 static void graw_set_constant_buffer(struct pipe_context *ctx,
                                      uint shader, uint index,
                                      struct pipe_constant_buffer *buf)
@@ -401,11 +383,31 @@ static void graw_clear(struct pipe_context *ctx,
 }
 
 static void graw_draw_vbo(struct pipe_context *ctx,
-                                   const struct pipe_draw_info *info)
+                                   const struct pipe_draw_info *dinfo)
 {
    struct graw_context *grctx = (struct graw_context *)ctx;
+   struct pipe_index_buffer ib = {};
+   struct pipe_draw_info info = *dinfo;
+   if (info.indexed) {
+           pipe_resource_reference(&ib.buffer, grctx->index_buffer.buffer);
+           ib.user_buffer = grctx->index_buffer.user_buffer;
+           ib.index_size = grctx->index_buffer.index_size;
+           ib.offset = grctx->index_buffer.offset + info.start * ib.index_size;
 
-   graw_encoder_draw_vbo(grctx->eq, info);
+           if (ib.user_buffer) {
+                   u_upload_data(grctx->uploader, 0, info.count * ib.index_size,
+                                 ib.user_buffer, &ib.offset, &ib.buffer);
+                   ib.user_buffer = NULL;
+           }
+   } //else
+//           graw_hw_set_index_buffer(ctx, NULL);
+   u_upload_unmap(grctx->uploader);
+
+   graw_hw_set_vertex_buffers(ctx);
+   if (info.indexed)
+           graw_hw_set_index_buffer(ctx, &ib);
+
+   graw_encoder_draw_vbo(grctx->eq, &info);
 }
 
 
@@ -427,9 +429,10 @@ static void graw_flush(struct pipe_context *ctx,
    graw_flush_eq(grctx->eq, grctx);
 
    if (flags == PIPE_FLUSH_END_OF_FRAME) {
-      graw_flush_frontbuffer(ctx->screen,
-                             grctx->framebuffer.cbufs[0]->texture,
-                             0, 0, NULL);
+      if (grctx->framebuffer.nr_cbufs)
+         graw_flush_frontbuffer(ctx->screen,
+                                grctx->framebuffer.cbufs[0]->texture,
+                                0, 0, NULL);
    }
 }
 
@@ -519,6 +522,12 @@ static void *graw_create_sampler_state(struct pipe_context *ctx,
    return (void *)(unsigned long)handle;
 }
 
+static void graw_delete_sampler_state(struct pipe_context *ctx,
+                                      const struct pipe_sampler_state *state)
+{
+
+}
+
 static void graw_bind_fragment_sampler_states(struct pipe_context *ctx,
 						unsigned num_samplers,
 						void **samplers)
@@ -571,6 +580,7 @@ static void *graw_transfer_map(struct pipe_context *ctx,
                                struct pipe_transfer **transfer)
 {
    struct graw_context *grctx = (struct graw_context *)ctx;
+   struct graw_resource *grres = (struct graw_resource *)resource;
    enum pipe_format format = resource->format;
    struct graw_transfer *trans;
 
@@ -580,12 +590,13 @@ static void *graw_transfer_map(struct pipe_context *ctx,
 
    trans->lmsize = box->width * box->height * box->depth * util_format_get_blocksize(resource->format);
    trans->localmem = malloc(trans->lmsize);
-   if (1) {//usage & PIPE_TRANSFER_READ) {
+   if ((usage & PIPE_TRANSFER_DISCARD_RANGE) || grres->clean == TRUE)
+      memset(trans->localmem, 0, trans->lmsize);
+   else {
       struct graw_resource *grres = (struct graw_resource *)resource;
-      fprintf(stderr, "TODO READ\n");
       graw_flush(ctx, NULL, 0);
       graw_transfer_get_block(grres->res_handle, box, trans->localmem, trans->lmsize / 4);
-   }
+   } 
 
    trans->base.resource = resource;
    trans->base.level = level;
@@ -593,7 +604,7 @@ static void *graw_transfer_map(struct pipe_context *ctx,
    trans->base.box = *box;
    trans->base.stride = box->width * util_format_get_blocksize(resource->format);
    trans->base.layer_stride = 0;
-
+   trans->offset = 0;
 //   trans->offset = box->y / util_format_get_blockheight(format) * trans->base.stride +
 //      box->x / util_format_get_blockwidth(format) * util_format_get_blocksize(format);
 
@@ -609,7 +620,11 @@ static void graw_transfer_unmap(struct pipe_context *ctx,
    struct graw_transfer *trans = (struct graw_transfer *)transfer;
    struct graw_resource *grres = (struct graw_resource *)transfer->resource;
    if (trans->base.usage & PIPE_TRANSFER_WRITE) {
-      graw_transfer_block(grres->res_handle, transfer->level, &transfer->box, &transfer->box, trans->localmem + trans->offset, trans->lmsize / 4);
+
+      if (!(transfer->usage & PIPE_TRANSFER_FLUSH_EXPLICIT)) {
+         grres->clean = FALSE;
+         graw_transfer_block(grres->res_handle, transfer->level, &transfer->box, &transfer->box, trans->localmem + trans->offset, trans->lmsize / 4);
+      }
       
    }
 
@@ -629,7 +644,7 @@ static void graw_transfer_flush_region(struct pipe_context *ctx,
    uint32_t size;
 
    graw_transfer_block(grres->res_handle, transfer->level, &transfer->box, box, trans->localmem + trans->offset, box->width);
-   
+   grres->clean = FALSE;   
 }
                                        
 static void
@@ -637,79 +652,102 @@ graw_context_destroy( struct pipe_context *ctx )
 {
    struct graw_context *grctx = (struct graw_context *)ctx;
 
+    if (grctx->blitter)
+        util_blitter_destroy(grctx->blitter);
+   if (grctx->uploader)
+      u_upload_destroy(grctx->uploader);
+
+   util_slab_destroy(&grctx->texture_transfer_pool);
    FREE(grctx);
 }
 
 struct pipe_context *graw_context_create(struct pipe_screen *pscreen,
                                                          void *priv)
 {
-   struct graw_context *gr_ctx;
+   struct graw_context *grctx;
 
-   gr_ctx = CALLOC_STRUCT(graw_context);
+   grctx = CALLOC_STRUCT(graw_context);
 
-   gr_ctx->eq = graw_encoder_init_queue();
-   if (!gr_ctx->eq) {
-      free(gr_ctx);
+   grctx->eq = graw_encoder_init_queue();
+   if (!grctx->eq) {
+      free(grctx);
       return NULL;
    }
 
-   gr_ctx->eq->flush = graw_flush_eq;
-   gr_ctx->eq->closure = gr_ctx;
+   grctx->eq->flush = graw_flush_eq;
+   grctx->eq->closure = grctx;
 
-   gr_ctx->base.destroy = graw_context_destroy;
-   gr_ctx->base.create_surface = graw_create_surface;
-   gr_ctx->base.surface_destroy = graw_surface_destroy;
-   gr_ctx->base.set_framebuffer_state = graw_set_framebuffer_state;
-   gr_ctx->base.create_blend_state = graw_create_blend_state;
-   gr_ctx->base.bind_blend_state = graw_bind_blend_state;
-   gr_ctx->base.delete_blend_state = graw_delete_blend_state;
-   gr_ctx->base.create_depth_stencil_alpha_state = graw_create_depth_stencil_alpha_state;
-   gr_ctx->base.bind_depth_stencil_alpha_state = graw_bind_depth_stencil_alpha_state;
-   gr_ctx->base.delete_depth_stencil_alpha_state = graw_delete_depth_stencil_alpha_state;
-   gr_ctx->base.create_rasterizer_state = graw_create_rasterizer_state;
-   gr_ctx->base.bind_rasterizer_state = graw_bind_rasterizer_state;
-   gr_ctx->base.delete_rasterizer_state = graw_delete_rasterizer_state;
+   grctx->base.destroy = graw_context_destroy;
+   grctx->base.create_surface = graw_create_surface;
+   grctx->base.surface_destroy = graw_surface_destroy;
+   grctx->base.set_framebuffer_state = graw_set_framebuffer_state;
+   grctx->base.create_blend_state = graw_create_blend_state;
+   grctx->base.bind_blend_state = graw_bind_blend_state;
+   grctx->base.delete_blend_state = graw_delete_blend_state;
+   grctx->base.create_depth_stencil_alpha_state = graw_create_depth_stencil_alpha_state;
+   grctx->base.bind_depth_stencil_alpha_state = graw_bind_depth_stencil_alpha_state;
+   grctx->base.delete_depth_stencil_alpha_state = graw_delete_depth_stencil_alpha_state;
+   grctx->base.create_rasterizer_state = graw_create_rasterizer_state;
+   grctx->base.bind_rasterizer_state = graw_bind_rasterizer_state;
+   grctx->base.delete_rasterizer_state = graw_delete_rasterizer_state;
 
-   gr_ctx->base.set_viewport_state = graw_set_viewport_state;
-   gr_ctx->base.create_vertex_elements_state = graw_create_vertex_elements_state;
-   gr_ctx->base.bind_vertex_elements_state = graw_bind_vertex_elements_state;
-   gr_ctx->base.set_vertex_buffers = graw_set_vertex_buffers;
-   gr_ctx->base.set_index_buffer = graw_set_index_buffer;
-   gr_ctx->base.set_constant_buffer = graw_set_constant_buffer;
-   gr_ctx->base.transfer_inline_write = graw_transfer_inline_write;
-   gr_ctx->base.create_fs_state = graw_create_fs_state;
-   gr_ctx->base.create_vs_state = graw_create_vs_state;
-   gr_ctx->base.bind_vs_state = graw_bind_vs_state;
-   gr_ctx->base.bind_fs_state = graw_bind_fs_state;
-   gr_ctx->base.delete_vs_state = graw_delete_vs_state;
-   gr_ctx->base.delete_fs_state = graw_delete_fs_state;
+   grctx->base.set_viewport_state = graw_set_viewport_state;
+   grctx->base.create_vertex_elements_state = graw_create_vertex_elements_state;
+   grctx->base.bind_vertex_elements_state = graw_bind_vertex_elements_state;
+   grctx->base.delete_vertex_elements_state = graw_delete_vertex_elements_state;
+   grctx->base.set_vertex_buffers = graw_set_vertex_buffers;
+   grctx->base.set_index_buffer = graw_set_index_buffer;
+   grctx->base.set_constant_buffer = graw_set_constant_buffer;
+   grctx->base.transfer_inline_write = graw_transfer_inline_write;
+   grctx->base.create_fs_state = graw_create_fs_state;
+   grctx->base.create_vs_state = graw_create_vs_state;
+   grctx->base.bind_vs_state = graw_bind_vs_state;
+   grctx->base.bind_fs_state = graw_bind_fs_state;
+   grctx->base.delete_vs_state = graw_delete_vs_state;
+   grctx->base.delete_fs_state = graw_delete_fs_state;
    
-   gr_ctx->base.clear = graw_clear;
-   gr_ctx->base.draw_vbo = graw_draw_vbo;
-   gr_ctx->base.flush = graw_flush;
-   gr_ctx->base.screen = pscreen;
-   gr_ctx->base.create_sampler_view = graw_create_sampler_view;
-   gr_ctx->base.sampler_view_destroy = graw_destroy_sampler_view;
-   gr_ctx->base.set_fragment_sampler_views = graw_set_fragment_sampler_views;
-   gr_ctx->base.set_vertex_sampler_views = graw_set_vertex_sampler_views;
+   grctx->base.clear = graw_clear;
+   grctx->base.draw_vbo = graw_draw_vbo;
+   grctx->base.flush = graw_flush;
+   grctx->base.screen = pscreen;
+   grctx->base.create_sampler_view = graw_create_sampler_view;
+   grctx->base.sampler_view_destroy = graw_destroy_sampler_view;
+   grctx->base.set_fragment_sampler_views = graw_set_fragment_sampler_views;
+   grctx->base.set_vertex_sampler_views = graw_set_vertex_sampler_views;
 
-   gr_ctx->base.create_sampler_state = graw_create_sampler_state;
-   gr_ctx->base.bind_fragment_sampler_states = graw_bind_fragment_sampler_states;
-   gr_ctx->base.bind_vertex_sampler_states = graw_bind_vertex_sampler_states;
+   grctx->base.create_sampler_state = graw_create_sampler_state;
+   grctx->base.delete_sampler_state = graw_delete_sampler_state;
+   grctx->base.bind_fragment_sampler_states = graw_bind_fragment_sampler_states;
+   grctx->base.bind_vertex_sampler_states = graw_bind_vertex_sampler_states;
 
-   gr_ctx->base.set_polygon_stipple = graw_set_polygon_stipple;
-   gr_ctx->base.set_scissor_state = graw_set_scissor_state;
-   gr_ctx->base.set_sample_mask = graw_set_sample_mask;
-   gr_ctx->base.set_stencil_ref = graw_set_stencil_ref;
+   grctx->base.set_polygon_stipple = graw_set_polygon_stipple;
+   grctx->base.set_scissor_state = graw_set_scissor_state;
+   grctx->base.set_sample_mask = graw_set_sample_mask;
+   grctx->base.set_stencil_ref = graw_set_stencil_ref;
 
-   gr_ctx->base.transfer_map = graw_transfer_map;
-   gr_ctx->base.transfer_unmap = graw_transfer_unmap;
-   gr_ctx->base.transfer_flush_region = graw_transfer_flush_region;
+   grctx->base.set_blend_color = graw_set_blend_color;
 
+   grctx->base.transfer_map = graw_transfer_map;
+   grctx->base.transfer_unmap = graw_transfer_unmap;
+   grctx->base.transfer_flush_region = graw_transfer_flush_region;
 
-   util_slab_create(&gr_ctx->texture_transfer_pool, sizeof(struct graw_transfer),
+   graw_init_blit_functions(grctx);
+
+   util_slab_create(&grctx->texture_transfer_pool, sizeof(struct graw_transfer),
                     16, UTIL_SLAB_SINGLETHREADED);
-   return &gr_ctx->base;
+
+   grctx->uploader = u_upload_create(&grctx->base, 1024 * 1024, 256,
+                                     PIPE_BIND_INDEX_BUFFER);
+   if (!grctx->uploader)
+           goto fail;
+
+   grctx->blitter = util_blitter_create(&grctx->base);
+   if (grctx->blitter == NULL)
+      goto fail;
+
+   return &grctx->base;
+fail:
+   return NULL;
 }
 
 void graw_flush_frontbuffer(struct pipe_screen *screen,
@@ -759,18 +797,20 @@ struct pipe_resource *graw_resource_create(struct pipe_screen *pscreen,
 
    if (template->target == PIPE_BUFFER) {
       buf = CALLOC_STRUCT(graw_buffer);
+      buf->base.clean = TRUE;
       buf->base.base = *template;
       buf->base.base.screen = pscreen;
       pipe_reference_init(&buf->base.base.reference, 1);
-      handle = graw_renderer_resource_create(template->target, template->format, template->bind, template->width0, 1, 1);
+      handle = graw_renderer_resource_create(template->target, template->format, template->bind, template->width0, 1, 1, 0, 0, 0);
       buf->base.res_handle = handle;
       return &buf->base.base;
    } else {
       tex = CALLOC_STRUCT(graw_texture);
+      tex->base.clean = TRUE;
       tex->base.base = *template;
       tex->base.base.screen = pscreen;
       pipe_reference_init(&tex->base.base.reference, 1);
-      handle = graw_renderer_resource_create(template->target, template->format, template->bind, template->width0, template->height0, template->depth0);
+      handle = graw_renderer_resource_create(template->target, template->format, template->bind, template->width0, template->height0, template->depth0, template->array_size, template->last_level, template->nr_samples);
       tex->base.res_handle = handle;
 
       if (template->bind & (PIPE_BIND_DISPLAY_TARGET |
@@ -806,7 +846,7 @@ rempipe_resource_from_handle(struct pipe_screen *screen,
    pipe_reference_init(&rpr->base.base.reference, 1);
    rpr->base.base.screen = screen;      
 
-   handle = graw_renderer_resource_create(template->target, template->format, template->bind, template->width0, template->height0, template->depth0);
+   handle = graw_renderer_resource_create(template->target, template->format, template->bind, template->width0, template->height0, template->depth0, 0, 0, 0);
    rpr->base.res_handle = handle;
    rpr->dt = winsys->displaytarget_from_handle(winsys,
                                                template,

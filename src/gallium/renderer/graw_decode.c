@@ -379,10 +379,10 @@ static void graw_decode_bind_object(struct grend_decode_ctx *ctx)
 
    switch (obj_type) {
    case GRAW_OBJECT_BLEND:
-      grend_object_bind_blend(ctx, handle);
+      grend_object_bind_blend(ctx->grctx, handle);
       break;
    case GRAW_OBJECT_DSA:
-      grend_object_bind_dsa(ctx, handle);
+      grend_object_bind_dsa(ctx->grctx, handle);
       break;
    case GRAW_OBJECT_RASTERIZER:
       grend_object_bind_rasterizer(ctx->grctx, handle);
@@ -417,6 +417,26 @@ void graw_reset_decode(void)
    gdctx->ds = NULL;
 }
 
+static void graw_decode_set_stencil_ref(struct grend_decode_ctx *ctx)
+{
+   struct pipe_stencil_ref ref;
+   uint32_t val = ctx->ds->buf[ctx->ds->buf_offset + 1];
+   ref.ref_value[0] = val & 0xff;
+   ref.ref_value[1] = (val >> 8) & 0xff;
+   grend_set_stencil_ref(gdctx->grctx, &ref);
+}
+
+static void graw_decode_set_blend_color(struct grend_decode_ctx *ctx)
+{
+   struct pipe_blend_color color;
+   int i;
+   
+   for (i = 0; i < 4; i++)
+      color.color[i] = fui(ctx->ds->buf[ctx->ds->buf_offset + 1 + i]);
+
+   grend_set_blend_color(gdctx->grctx, &color);
+}
+
 void graw_decode_block(uint32_t *block, int ndw)
 {
    struct graw_decoder_state ds;
@@ -433,7 +453,7 @@ void graw_decode_block(uint32_t *block, int ndw)
    while (gdctx->ds->buf_offset < gdctx->ds->buf_total) {
       uint32_t header = gdctx->ds->buf[gdctx->ds->buf_offset];
 
-      fprintf(stderr,"cmd is %d (obj %d) len %d\n", header & 0xff, (header >> 8 & 0xff), (header >> 16));
+      fprintf(stderr,"[%d] cmd is %d (obj %d) len %d\n", gdctx->ds->buf_offset, header & 0xff, (header >> 8 & 0xff), (header >> 16));
       
       switch (header & 0xff) {
       case GRAW_CREATE_OBJECT:
@@ -474,6 +494,12 @@ void graw_decode_block(uint32_t *block, int ndw)
          break;
       case GRAW_SET_VERTEX_SAMPLER_VIEWS:
          graw_decode_set_vertex_sampler_views(gdctx, header >> 16);
+         break;
+      case GRAW_SET_STENCIL_REF:
+         graw_decode_set_stencil_ref(gdctx);
+         break;
+      case GRAW_SET_BLEND_COLOR:
+         graw_decode_set_blend_color(gdctx);
          break;
       }
       gdctx->ds->buf_offset += (header >> 16) + 1;

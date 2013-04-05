@@ -266,6 +266,10 @@ iter_instruction(struct tgsi_iterate_context *iter,
       snprintf(buf, 255, "%s = %s(abs(%s));\n", dsts[0], dstconv, srcs[0]);
       strcat(ctx->glsl_main, buf);
       break;
+   case TGSI_OPCODE_KIL:
+      snprintf(buf, 255, "if (%s < 0.0)\ndiscard;\n", srcs[0]);
+      strcat(ctx->glsl_main, buf);
+      break;
    case TGSI_OPCODE_LIT:
       snprintf(buf, 255, "%s.x = 1.0;\n", dsts[0]);
       strcat(ctx->glsl_main, buf);
@@ -274,6 +278,10 @@ iter_instruction(struct tgsi_iterate_context *iter,
       snprintf(buf, 255, "%s.z = pow(max(0.0, %s.y) * step(0.0, %s.x), clamp(%s.w, -128.0, 128.0));\n", dsts[0], srcs[0], srcs[0], srcs[0]);
       strcat(ctx->glsl_main, buf);
       snprintf(buf, 255, "%s.w = 1.0;\n", dsts[0]);
+      strcat(ctx->glsl_main, buf);
+      break;
+   case TGSI_OPCODE_EX2:
+      snprintf(buf, 255, "%s = %s(exp2(%s));\n", dsts[0], dstconv, srcs[0]);
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_RCP:

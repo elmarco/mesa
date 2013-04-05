@@ -18,6 +18,7 @@ struct qxl_3d_ram *ramp;
 void graw_renderer_init(void);
 int main(int argc, char **argv)
 {
+   int count = 0;
    fd = shm_open("dave", O_RDWR, 0600);
    if (fd == -1)
       return -1;
@@ -35,8 +36,18 @@ int main(int argc, char **argv)
       QXL3DCommand *cmd;
       int notify;
    restart:
+      count = 0;
       while (SPICE_RING_IS_EMPTY(&ramp->cmd_3d_ring)) {
          struct timespec req = {0, 50000000};
+
+         if (count < 20)
+            req.tv_nsec = 50000*count;
+         else if (count < 40)
+            req.tv_nsec = 500000*count;
+         else
+            req.tv_nsec = 50000000;
+         count++;
+
          nanosleep(&req, NULL);
       }
       
@@ -54,7 +65,10 @@ int main(int argc, char **argv)
                                        cmd->u.res_create.bind,
                                        cmd->u.res_create.width,
                                        cmd->u.res_create.height,
-                                       cmd->u.res_create.depth);
+                                       cmd->u.res_create.depth,
+                                       cmd->u.res_create.array_size,
+                                       cmd->u.res_create.last_level,
+                                       cmd->u.res_create.nr_samples);
          break;
       case QXL_3D_CMD_SUBMIT:
          fprintf(stderr,"cmd submit %lx %d\n", cmd->u.cmd_submit.phy_addr, cmd->u.cmd_submit.size);

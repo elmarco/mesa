@@ -23,7 +23,7 @@ struct graw_encoder_state {
 static inline void graw_encoder_write_dword(struct graw_encoder_state *state,
                                             uint32_t dword)
 {
-   fprintf(stderr,"writing 0x%x to %d\n", dword, state->buf_offset);
+   fprintf(stderr,"[%d] 0x%x\n", state->buf_offset, dword);
    state->buf[state->buf_offset++] = dword;
 }
 
@@ -40,7 +40,7 @@ static inline void graw_encoder_write_block(struct graw_encoder_state *state,
    int x;
    memcpy(state->buf + state->buf_offset, ptr, len);
    x = (len % 4);
-   printf("len is %d x is %d\n", len, x);
+   fprintf(stderr, "[%d] block %d x is %d\n", state->buf_offset, len, x);
    if (x) {
       uint8_t *mp = state->buf + state->buf_offset;
       mp += len;
@@ -138,4 +138,11 @@ int graw_encoder_write_constant_buffer(struct graw_encoder_state *enc,
 int graw_encode_dsa_state(struct graw_encoder_state *enc,
                           uint32_t handle,
                           const struct pipe_depth_stencil_alpha_state *dsa_state);
+
+int graw_encoder_set_stencil_ref(struct graw_encoder_state *enc,
+                                 const struct pipe_stencil_ref *ref);
+
+int graw_encoder_set_blend_color(struct graw_encoder_state *enc,
+                                 const struct pipe_blend_color *color);
+
 #endif

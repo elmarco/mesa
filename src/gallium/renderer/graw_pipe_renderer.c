@@ -65,7 +65,7 @@ static int process_cmd(void)
       ret = do_blocked_read(graw_fd, &decbuf, 7 * sizeof(uint32_t));
 
 	fprintf(stderr,"resource create\n");
-graw_renderer_resource_create(decbuf[0], decbuf[1], decbuf[2], decbuf[3], decbuf[4], decbuf[5], decbuf[6]);
+        graw_renderer_resource_create(decbuf[0], decbuf[1], decbuf[2], decbuf[3], decbuf[4], decbuf[5], decbuf[6], 0, 0, 0);
       break;
    case GRAW_FLUSH_FRONTBUFFER:
       ret = do_blocked_read(graw_fd, &decbuf, 1 * sizeof(uint32_t));

@@ -46,6 +46,9 @@ struct qxl_3d_resource_create {
 	uint32_t width;
 	uint32_t height;
         uint32_t depth;
+        uint32_t array_size;
+        uint32_t last_level;
+        uint32_t nr_samples;
         uint32_t pad;
 };
 

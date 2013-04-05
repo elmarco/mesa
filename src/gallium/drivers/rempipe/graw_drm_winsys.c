@@ -37,7 +37,10 @@ uint32_t graw_renderer_resource_create(enum pipe_texture_target target,
                                        uint32_t bind,
                                        uint32_t width,
                                        uint32_t height,
-                                       uint32_t depth)
+                                       uint32_t depth,
+                                       uint32_t array_size,
+                                       uint32_t last_level,
+                                       uint32_t nr_samples)
 {
    struct drm_qxl_3d_resource_create createcmd;
    int ret;
@@ -48,6 +51,9 @@ uint32_t graw_renderer_resource_create(enum pipe_texture_target target,
    createcmd.width = width;
    createcmd.height = height;
    createcmd.depth = depth;
+   createcmd.array_size = array_size;
+   createcmd.last_level = last_level;
+   createcmd.nr_samples = nr_samples;
    createcmd.res_handle = 0;
 
    ret = drmIoctl(global_hack_fd, DRM_IOCTL_QXL_3D_RESOURCE_CREATE, &createcmd);

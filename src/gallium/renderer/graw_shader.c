@@ -23,6 +23,15 @@ struct graw_shader_sampler {
    int tgsi_sampler_type;
 };
 
+struct immed {
+   int type;
+   union imm {
+      uint32_t ui;
+      int32_t i;
+      float f;
+   } val[4];
+};
+
 struct dump_ctx {
    struct tgsi_iterate_context iter;
    int prog_type;
@@ -40,8 +49,8 @@ struct dump_ctx {
    int num_samps;
    int num_consts;
 
-   int num_flt_imm;
-   float flt_imm[32];
+   int num_imm;
+   struct immed imm[32];
    unsigned fragcoord_input;
 };
 
@@ -144,13 +153,18 @@ iter_immediate(
 {
    struct dump_ctx *ctx = (struct dump_ctx *) iter;
    int i;
-   
-   if (imm->Immediate.DataType == TGSI_IMM_FLOAT32) {
-      int first = ctx->num_flt_imm;
-      for (i = 0; i < 4; i++)
-         ctx->flt_imm[first + i] = imm->u[i].Float;
-      ctx->num_flt_imm += 4;
+   int first = ctx->num_imm;
+   ctx->imm[first].type = imm->Immediate.DataType;
+   for (i = 0; i < 4; i++) {
+      if (imm->Immediate.DataType == TGSI_IMM_FLOAT32) {
+         ctx->imm[first].val[i].f = imm->u[i].Float;
+      } else if (imm->Immediate.DataType == TGSI_IMM_UINT32) {
+         ctx->imm[first].val[i].ui  = imm->u[i].Uint;
+      } else if (imm->Immediate.DataType == TGSI_IMM_INT32) {
+         ctx->imm[first].val[i].i = imm->u[i].Int;
+      } 
    }
+   ctx->num_imm++;
    return TRUE;
 }
 
@@ -238,7 +252,19 @@ iter_instruction(struct tgsi_iterate_context *iter,
           snprintf(srcs[i], 255, "samp%d%s", src->Register.Index, swizzle);
 	  sreg_index = src->Register.Index;
       } else if (src->Register.File == TGSI_FILE_IMMEDIATE) {
-         snprintf(srcs[i], 255, "%.4f", ctx->flt_imm[(src->Register.Index)]);
+         struct immed *imd = &ctx->imm[(src->Register.Index)];
+         int idx = src->Register.SwizzleX;
+         switch (imd->type) {
+         case TGSI_IMM_FLOAT32:
+            snprintf(srcs[i], 255, "%.4f", imd->val[idx].f);
+            break;
+         case TGSI_IMM_UINT32:
+            snprintf(srcs[i], 255, "%u", imd->val[idx].ui);
+            break;
+         case TGSI_IMM_INT32:
+            snprintf(srcs[i], 255, "%d", imd->val[idx].i);
+            break;
+         }
       }
    }
    switch (inst->Instruction.Opcode) {

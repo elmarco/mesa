@@ -305,7 +305,23 @@ iter_instruction(struct tgsi_iterate_context *iter,
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_KIL:
-      snprintf(buf, 255, "if (%s < 0.0)\ndiscard;\n", srcs[0]);
+      snprintf(buf, 255, "if (any(lessThan(%s, vec4(0.0))))\ndiscard;\n", srcs[0]);
+      strcat(ctx->glsl_main, buf);
+      break;
+   case TGSI_OPCODE_IF:
+      snprintf(buf, 255, "if (any(%s)) {\n", srcs[0]);
+      strcat(ctx->glsl_main, buf);
+      break;
+   case TGSI_OPCODE_ELSE:
+      snprintf(buf, 255, "} else {\n");
+      strcat(ctx->glsl_main, buf);
+      break;
+   case TGSI_OPCODE_ENDIF:
+      snprintf(buf, 255, "}\n");
+      strcat(ctx->glsl_main, buf);
+      break;
+   case TGSI_OPCODE_KILP:
+      snprintf(buf, 255, "discard;\n");
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_LIT:
@@ -367,6 +383,22 @@ iter_instruction(struct tgsi_iterate_context *iter,
       else
          snprintf(buf, 255, "%s = %s(textureProj(%s, %s));\n", dsts[0], dstconv, srcs[1], srcs[0]);
 
+      strcat(ctx->glsl_main, buf);
+      break;
+   case TGSI_OPCODE_F2I:
+      snprintf(buf, 255, "%s = int(%s);\n", dsts[0], srcs[0]);      
+      strcat(ctx->glsl_main, buf);
+      break;
+   case TGSI_OPCODE_SLT:
+      snprintf(buf, 255, "%s = %s(lessThan(%s, %s));\n", dsts[0], dstconv, srcs[0], srcs[1]);      
+      strcat(ctx->glsl_main, buf);
+      break;
+   case TGSI_OPCODE_SGE:
+      snprintf(buf, 255, "%s = %s(greaterThanEqual(%s, %s));\n", dsts[0], dstconv, srcs[0], srcs[1]);      
+      strcat(ctx->glsl_main, buf);
+      break;
+   case TGSI_OPCODE_POW:
+      snprintf(buf, 255, "%s = %s(pow(%s, %s));\n", dsts[0], dstconv, srcs[0], srcs[1]);
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_END:

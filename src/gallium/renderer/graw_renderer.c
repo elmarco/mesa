@@ -1183,3 +1183,9 @@ void grend_set_blend_color(struct grend_context *ctx,
    glBlendColor(color->color[0], color->color[1], color->color[2],
                 color->color[3]);
 }
+
+void grend_set_scissor_state(struct grend_context *ctx,
+                             struct pipe_scissor_state *ss)
+{
+   glScissor(ss->minx, ss->miny, ss->maxx - ss->minx, ss->maxy - ss->miny);
+}

@@ -145,4 +145,6 @@ int graw_encoder_set_stencil_ref(struct graw_encoder_state *enc,
 int graw_encoder_set_blend_color(struct graw_encoder_state *enc,
                                  const struct pipe_blend_color *color);
 
+int graw_encoder_set_scissor_state(struct graw_encoder_state *enc,
+                                   const struct pipe_scissor_state *ss);
 #endif

@@ -105,6 +105,7 @@ void graw_renderer_transfer_write(uint32_t handle, int level,
 void graw_renderer_transfer_send(uint32_t handle, struct pipe_box *box, void *ptr);
 void grend_set_stencil_ref(struct grend_context *ctx, struct pipe_stencil_ref *ref);
 void grend_set_blend_color(struct grend_context *ctx, struct pipe_blend_color *color);
+void grend_set_scissor_state(struct grend_context *ctx, struct pipe_scissor_state *ss);
 
 void grend_set_constants(struct grend_context *ctx,
                          uint32_t shader,

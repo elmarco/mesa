@@ -33,6 +33,7 @@ enum graw_cmd {
    GRAW_SET_VERTEX_SAMPLER_VIEWS,
    GRAW_SET_STENCIL_REF,
    GRAW_SET_BLEND_COLOR,
+   GRAW_SET_SCISSOR_STATE,
 };
 
 enum graw_scrn_cmd {

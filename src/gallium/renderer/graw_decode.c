@@ -444,6 +444,23 @@ static void graw_decode_set_blend_color(struct grend_decode_ctx *ctx)
    grend_set_blend_color(gdctx->grctx, &color);
 }
 
+static void graw_decode_set_scissor_state(struct grend_decode_ctx *ctx)
+{
+   struct pipe_scissor_state ss;
+   uint32_t temp;
+   
+   temp = ctx->ds->buf[ctx->ds->buf_offset + 1];
+   ss.minx = temp & 0xffff;
+   ss.miny = (temp >> 16) & 0xffff;
+
+   temp = ctx->ds->buf[ctx->ds->buf_offset + 2];
+   ss.maxx = temp & 0xffff;
+   ss.maxy = (temp >> 16) & 0xffff;
+
+   grend_set_scissor_state(gdctx->grctx, &ss);
+}
+
+
 void graw_decode_block(uint32_t *block, int ndw)
 {
    struct graw_decoder_state ds;
@@ -507,6 +524,9 @@ void graw_decode_block(uint32_t *block, int ndw)
          break;
       case GRAW_SET_BLEND_COLOR:
          graw_decode_set_blend_color(gdctx);
+         break;
+      case GRAW_SET_SCISSOR_STATE:
+         graw_decode_set_scissor_state(gdctx);
          break;
       }
       gdctx->ds->buf_offset += (header >> 16) + 1;

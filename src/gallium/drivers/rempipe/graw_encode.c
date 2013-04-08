@@ -392,6 +392,14 @@ int graw_encoder_set_blend_color(struct graw_encoder_state *enc,
       graw_encoder_write_dword(enc, uif(color->color[i]));
 }
 
+int graw_encoder_set_scissor_state(struct graw_encoder_state *enc,
+                                   const struct pipe_scissor_state *ss)
+{
+   graw_encoder_write_cmd_dword(enc, GRAW_CMD0(GRAW_SET_SCISSOR_STATE, 0, 2));
+   graw_encoder_write_dword(enc, (ss->minx | ss->miny << 16));
+   graw_encoder_write_dword(enc, (ss->maxx | ss->maxy << 16));
+}
+
 #define EQ_BUF_SIZE (16*1024)
 
 struct graw_encoder_state *graw_encoder_init_queue(void)

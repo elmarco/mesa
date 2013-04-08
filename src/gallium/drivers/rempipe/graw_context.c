@@ -569,7 +569,8 @@ static void graw_set_polygon_stipple(struct pipe_context *ctx,
 static void graw_set_scissor_state(struct pipe_context *ctx,
                                    const struct pipe_scissor_state *ss)
 {
-
+   struct graw_context *grctx = (struct graw_context *)ctx;
+   graw_encoder_set_scissor_state(grctx->eq, ss);
 }
 
 static void graw_set_sample_mask(struct pipe_context *ctx,

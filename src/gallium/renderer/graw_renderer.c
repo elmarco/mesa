@@ -802,6 +802,11 @@ void grend_object_bind_rasterizer(struct grend_context *ctx,
       glShadeModel(GL_SMOOTH);
    }
 
+   if (state->front_ccw)
+      glFrontFace(GL_CCW);
+   else
+      glFrontFace(GL_CW);
+
    if (state->scissor)
       glEnable(GL_SCISSOR_TEST);
    else

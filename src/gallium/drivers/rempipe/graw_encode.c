@@ -124,7 +124,8 @@ int graw_encode_rasterizer_state(struct graw_encoder_state *enc,
       (state->cull_face << 8) |
       (state->fill_front << 10) |
       (state->fill_back << 12) |
-      (state->scissor << 14);
+      (state->scissor << 14) |
+      (state->front_ccw << 15);
    
    graw_encoder_write_dword(enc, tmp);
    graw_encoder_write_dword(enc, uif(state->point_size));

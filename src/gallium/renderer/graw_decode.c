@@ -285,6 +285,7 @@ static void graw_decode_create_rasterizer(struct grend_decode_ctx *ctx, uint32_t
    rs_state->fill_front = (tmp >> 10) & 0x3;
    rs_state->fill_back = (tmp >> 12) & 0x3;
    rs_state->scissor = (tmp >> 14) & 0x1;
+   rs_state->front_ccw = (tmp >> 15) & 0x1;
    rs_state->point_size = fui(ctx->ds->buf[ctx->ds->buf_offset + 3]);
    rs_state->sprite_coord_enable = ctx->ds->buf[ctx->ds->buf_offset + 4];
    graw_object_insert(rs_state, sizeof(struct pipe_rasterizer_state), handle,

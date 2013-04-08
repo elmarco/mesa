@@ -273,7 +273,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_LRP:
-      snprintf(buf, 255, "%s = %s(mix(vec4(%s), vec4(%s), vec4(%s)));\n", dsts[0], dstconv, srcs[0], srcs[1], srcs[2]);
+      snprintf(buf, 255, "%s = %s(mix(vec4(%s), vec4(%s), vec4(%s)));\n", dsts[0], dstconv, srcs[2], srcs[1], srcs[0]);
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_DP2:

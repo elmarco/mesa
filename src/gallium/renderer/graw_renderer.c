@@ -338,10 +338,10 @@ void grend_transfer_inline_write(struct grend_context *ctx,
    res = graw_object_lookup(res_handle, GRAW_RESOURCE);
    if (res->target == GL_ELEMENT_ARRAY_BUFFER_ARB) {
       glBindBufferARB(GL_ELEMENT_ARRAY_BUFFER_ARB, res->id);
-      glBufferData(GL_ELEMENT_ARRAY_BUFFER_ARB, box->width, data, GL_STATIC_DRAW);
+      glBufferSubData(GL_ELEMENT_ARRAY_BUFFER_ARB, box->x, box->width, data);
    } else if (res->target == GL_ARRAY_BUFFER_ARB) {
       glBindBufferARB(GL_ARRAY_BUFFER_ARB, res->id);
-      glBufferData(GL_ARRAY_BUFFER_ARB, box->width, data, GL_STATIC_DRAW);
+      glBufferSubData(GL_ARRAY_BUFFER_ARB, box->x, box->width, data);
    } else {
       glBindTexture(res->target, res->id);
       glTexSubImage2D(res->target, level, box->x, box->y, box->width, box->height,

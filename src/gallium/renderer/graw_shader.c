@@ -226,7 +226,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
    for (i = 0; i < inst->Instruction.NumSrcRegs; i++) {
       const struct tgsi_full_src_register *src = &inst->Src[i];
       char swizzle[6] = {0};
-      
+      char negate = src->Register.Negate ? '-' : ' ';
       if (src->Register.SwizzleX != TGSI_SWIZZLE_X ||
           src->Register.SwizzleY != TGSI_SWIZZLE_Y ||
           src->Register.SwizzleZ != TGSI_SWIZZLE_Z ||
@@ -245,9 +245,9 @@ iter_instruction(struct tgsi_iterate_context *iter,
             }
       }
       else if (src->Register.File == TGSI_FILE_TEMPORARY)
-          snprintf(srcs[i], 255, "temp%d%s", src->Register.Index, swizzle);
+          snprintf(srcs[i], 255, "%ctemp%d%s", negate, src->Register.Index, swizzle);
       else if (src->Register.File == TGSI_FILE_CONSTANT)
-          snprintf(srcs[i], 255, "const%d%s", src->Register.Index, swizzle);
+          snprintf(srcs[i], 255, "%cconst%d%s", negate, src->Register.Index, swizzle);
       else if (src->Register.File == TGSI_FILE_SAMPLER) {
           snprintf(srcs[i], 255, "samp%d%s", src->Register.Index, swizzle);
 	  sreg_index = src->Register.Index;

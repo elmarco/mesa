@@ -110,13 +110,25 @@ int graw_encode_rasterizer_state(struct graw_encoder_state *enc,
 {
    uint32_t tmp;
 
-   graw_encoder_write_cmd_dword(enc, GRAW_CMD0(GRAW_CREATE_OBJECT, GRAW_OBJECT_RASTERIZER, 2 + 1));
+   graw_encoder_write_cmd_dword(enc, GRAW_CMD0(GRAW_CREATE_OBJECT, GRAW_OBJECT_RASTERIZER, 1 + 4));
    graw_encoder_write_dword(enc, handle);
 
    tmp = (state->flatshade << 0) |
       (state->depth_clip << 1) |
-      (state->gl_rasterization_rules << 2);
+      (state->gl_rasterization_rules << 2) |
+      (state->rasterizer_discard << 3) |
+      (state->flatshade_first << 4) |
+      (state->light_twoside << 5) |
+      (state->sprite_coord_mode << 6) |
+      (state->point_quad_rasterization << 7) |
+      (state->cull_face << 8) |
+      (state->fill_front << 10) |
+      (state->fill_back << 12) |
+      (state->scissor << 14);
+   
    graw_encoder_write_dword(enc, tmp);
+   graw_encoder_write_dword(enc, uif(state->point_size));
+   graw_encoder_write_dword(enc, state->sprite_coord_enable);
    graw_encoder_write_dword(enc, 0);
 }
 

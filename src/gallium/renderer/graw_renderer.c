@@ -500,6 +500,12 @@ void grend_draw_vbo(struct grend_context *ctx,
          glBindTexture(ctx->fs_views[i].texture->target, ctx->fs_views[i].texture->id);
          glEnable(ctx->fs_views[i].texture->target);
          grend_apply_sampler_state(ctx, sampler_id, ctx->fs_views[i].texture->target);
+         if (ctx->rs_state->point_quad_rasterization) {
+            if (ctx->rs_state->sprite_coord_enable & (1 << i))
+               glTexEnvi(GL_POINT_SPRITE_ARB, GL_COORD_REPLACE_ARB, GL_TRUE);
+            else
+               glTexEnvi(GL_POINT_SPRITE_ARB, GL_COORD_REPLACE_ARB, GL_FALSE);
+         }
       }
       sampler_id++;
    } 
@@ -787,11 +793,44 @@ void grend_object_bind_rasterizer(struct grend_context *ctx,
       glDisable(GL_DEPTH_CLAMP);
    }
 #endif
+   if (state->point_size)
+      glPointSize(state->point_size);
+   
    if (state->flatshade) {
       glShadeModel(GL_FLAT);
    } else {
       glShadeModel(GL_SMOOTH);
    }
+
+   if (state->scissor)
+      glEnable(GL_SCISSOR_TEST);
+   else
+      glDisable(GL_SCISSOR_TEST);
+
+   if (state->point_quad_rasterization) {
+      glEnable(GL_POINT_SPRITE);
+
+      if (state->sprite_coord_mode)
+         glPointParameteri(GL_POINT_SPRITE_COORD_ORIGIN, state->sprite_coord_mode ? GL_LOWER_LEFT : GL_UPPER_LEFT);
+   } else
+      glDisable(GL_POINT_SPRITE);
+
+   if (state->cull_face != PIPE_FACE_NONE) {
+      switch (state->cull_face) {
+      case PIPE_FACE_FRONT:
+         glCullFace(GL_FRONT);
+         break;
+      case PIPE_FACE_BACK:
+         glCullFace(GL_BACK);
+         break;
+      case PIPE_FACE_FRONT_AND_BACK:
+         glCullFace(GL_FRONT_AND_BACK);
+         break;
+      }
+      glEnable(GL_CULL_FACE);
+   } else
+      glDisable(GL_CULL_FACE);
+
    ctx->rs_state = state;
 }
 

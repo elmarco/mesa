@@ -269,14 +269,25 @@ static void graw_decode_create_dsa(struct grend_decode_ctx *ctx, uint32_t handle
 
 static void graw_decode_create_rasterizer(struct grend_decode_ctx *ctx, uint32_t handle, uint16_t length)
 {
-   struct pipe_rasterizer_state *rasterizer_state = CALLOC_STRUCT(pipe_rasterizer_state);
+   struct pipe_rasterizer_state *rs_state = CALLOC_STRUCT(pipe_rasterizer_state);
    uint32_t tmp;
 
    tmp = ctx->ds->buf[ctx->ds->buf_offset + 2];
-   rasterizer_state->flatshade = tmp & (1 << 0);
-   rasterizer_state->depth_clip = tmp & (1 << 1);
-   rasterizer_state->gl_rasterization_rules = tmp & (1 << 2);
-   graw_object_insert(rasterizer_state, sizeof(struct pipe_rasterizer_state), handle,
+   rs_state->flatshade = tmp & 1;
+   rs_state->depth_clip = (tmp >> 1) & 0x1;
+   rs_state->gl_rasterization_rules = (tmp >> 2) & 0x1;
+   rs_state->rasterizer_discard = (tmp >> 3) & 0x1;
+   rs_state->flatshade_first = (tmp >> 4) & 0x1;
+   rs_state->light_twoside = (tmp >> 5) & 0x1;
+   rs_state->sprite_coord_mode = (tmp >> 6) & 0x1;
+   rs_state->point_quad_rasterization = (tmp >> 7) & 0x1;
+   rs_state->cull_face = (tmp >> 8) & 0x3;
+   rs_state->fill_front = (tmp >> 10) & 0x3;
+   rs_state->fill_back = (tmp >> 12) & 0x3;
+   rs_state->scissor = (tmp >> 14) & 0x1;
+   rs_state->point_size = fui(ctx->ds->buf[ctx->ds->buf_offset + 3]);
+   rs_state->sprite_coord_enable = ctx->ds->buf[ctx->ds->buf_offset + 4];
+   graw_object_insert(rs_state, sizeof(struct pipe_rasterizer_state), handle,
                       GRAW_OBJECT_RASTERIZER);
 }
 

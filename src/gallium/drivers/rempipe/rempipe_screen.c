@@ -227,6 +227,8 @@ rempipe_is_format_supported( struct pipe_screen *screen,
    if (!format_desc)
       return FALSE;
 
+   if (util_format_is_intensity(format))
+      return FALSE;
    if (sample_count > 1)
       return FALSE;
 

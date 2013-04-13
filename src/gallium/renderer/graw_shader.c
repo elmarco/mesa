@@ -246,9 +246,10 @@ iter_instruction(struct tgsi_iterate_context *iter,
       }
       else if (src->Register.File == TGSI_FILE_TEMPORARY)
           snprintf(srcs[i], 255, "%ctemp%d%s", negate, src->Register.Index, swizzle);
-      else if (src->Register.File == TGSI_FILE_CONSTANT)
-          snprintf(srcs[i], 255, "%cconst%d%s", negate, src->Register.Index, swizzle);
-      else if (src->Register.File == TGSI_FILE_SAMPLER) {
+      else if (src->Register.File == TGSI_FILE_CONSTANT) {
+	  const char *cname = ctx->prog_type == TGSI_PROCESSOR_VERTEX ? "vsconst" : "fsconst";
+          snprintf(srcs[i], 255, "%c%s%d%s", negate, cname, src->Register.Index, swizzle);
+      } else if (src->Register.File == TGSI_FILE_SAMPLER) {
           snprintf(srcs[i], 255, "samp%d%s", src->Register.Index, swizzle);
 	  sreg_index = src->Register.Index;
       } else if (src->Register.File == TGSI_FILE_IMMEDIATE) {
@@ -464,7 +465,10 @@ static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
       strcat(glsl_final, buf);
    }
    for (i = 0; i < ctx->num_consts; i++) {
-      snprintf(buf, 255, "uniform vec4 const%d;\n", i);
+      if (ctx->prog_type == TGSI_PROCESSOR_VERTEX)
+	  snprintf(buf, 255, "uniform vec4 vsconst%d;\n", i);
+      else
+	  snprintf(buf, 255, "uniform vec4 fsconst%d;\n", i);
       strcat(glsl_final, buf);
    }
    for (i = 0; i < ctx->num_samps; i++) {

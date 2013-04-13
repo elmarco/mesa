@@ -465,12 +465,22 @@ void grend_draw_vbo(struct grend_context *ctx,
    for (i = 0; i < ctx->vs_consts.num_consts / 4; i++) {
       GLint loc;
       char name[10];
-      snprintf(name, 10, "const%d", i);
+      snprintf(name, 10, "vsconst%d", i);
       loc = glGetUniformLocation(ctx->program_id, name);
       if (loc == -1)
          fprintf(stderr,"unknown constant %s\n", name);
       else
          glUniform4fv(loc, 1, &ctx->vs_consts.consts[i * 4]);
+   }
+   for (i = 0; i < ctx->fs_consts.num_consts / 4; i++) {
+      GLint loc;
+      char name[10];
+      snprintf(name, 10, "fsconst%d", i);
+      loc = glGetUniformLocation(ctx->program_id, name);
+      if (loc == -1)
+         fprintf(stderr,"unknown constant %s\n", name);
+      else
+         glUniform4fv(loc, 1, &ctx->fs_consts.consts[i * 4]);
    }
 
    sampler_id = 0;

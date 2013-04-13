@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "util/u_memory.h"
+#include "util/u_math.h"
 #include "pipe/p_state.h"
 #include "graw_protocol.h"
 #include "graw_encode.h"
@@ -280,7 +281,11 @@ int graw_encoder_inline_write(struct graw_encoder_state *enc,
                               unsigned layer_stride)
 {
    uint32_t size = (stride ? stride : box->width) * box->height;
-   uint32_t length = 11 + size / 4;
+   uint32_t length;
+
+   size = align(size, 4);
+
+   length = 11 + size / 4;
    graw_encoder_write_cmd_dword(enc, GRAW_CMD0(GRAW_RESOURCE_INLINE_WRITE, 0, length));
    graw_encoder_write_dword(enc, res_handle);
    graw_encoder_write_dword(enc, level);

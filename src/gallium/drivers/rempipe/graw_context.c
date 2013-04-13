@@ -305,6 +305,7 @@ static void graw_transfer_inline_write(struct pipe_context *ctx,
    struct graw_resource *grres = (struct graw_resource *)res;
    void *ptr;
 
+   grres->clean = FALSE;
    graw_encoder_inline_write(grctx->eq, grres->res_handle, level, usage,
                              box, data, stride, layer_stride);
 }
@@ -596,6 +597,7 @@ static void *graw_transfer_map(struct pipe_context *ctx,
       return NULL;
 
    trans->lmsize = box->width * box->height * box->depth * util_format_get_blocksize(resource->format);
+   trans->lmsize = align(trans->lmsize, 4);
    trans->localmem = malloc(trans->lmsize);
    if ((usage & PIPE_TRANSFER_DISCARD_RANGE) || grres->clean == TRUE)
       memset(trans->localmem, 0, trans->lmsize);
@@ -630,6 +632,7 @@ static void graw_transfer_unmap(struct pipe_context *ctx,
 
       if (!(transfer->usage & PIPE_TRANSFER_FLUSH_EXPLICIT)) {
          grres->clean = FALSE;
+         graw_flush(ctx, NULL, 0);
          graw_transfer_block(grres->res_handle, transfer->level, &transfer->box, &transfer->box, trans->localmem + trans->offset, trans->lmsize / 4);
       }
       
@@ -650,6 +653,7 @@ static void graw_transfer_flush_region(struct pipe_context *ctx,
    uint32_t offset;
    uint32_t size;
 
+   graw_flush(ctx, NULL, 0);
    graw_transfer_block(grres->res_handle, transfer->level, &transfer->box, box, trans->localmem + trans->offset, box->width);
    grres->clean = FALSE;   
 }

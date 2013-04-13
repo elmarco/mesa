@@ -799,6 +799,19 @@ void grend_update_stencil_state(struct grend_context *ctx)
    ctx->stencil_state_dirty = FALSE;
 }
 
+static inline GLenum translate_fill(uint32_t mode)
+{
+   switch (mode) {
+   case PIPE_POLYGON_MODE_POINT:
+      return GL_POINT;
+   case PIPE_POLYGON_MODE_LINE:
+      return GL_LINE;
+   case PIPE_POLYGON_MODE_FILL:
+      return GL_FILL;
+   }
+   assert(0);
+   return 0;
+}
 void grend_object_bind_rasterizer(struct grend_context *ctx,
                                   uint32_t handle)
 {
@@ -817,7 +830,9 @@ void grend_object_bind_rasterizer(struct grend_context *ctx,
 #endif
    if (state->point_size)
       glPointSize(state->point_size);
-   
+
+   glPolygonMode(GL_FRONT, translate_fill(state->fill_front));
+   glPolygonMode(GL_BACK, translate_fill(state->fill_back));
    if (state->flatshade) {
       glShadeModel(GL_FLAT);
    } else {

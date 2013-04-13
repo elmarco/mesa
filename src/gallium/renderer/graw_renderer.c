@@ -526,17 +526,29 @@ void grend_draw_vbo(struct grend_context *ctx,
       int vbo_index = ctx->ve->elements[i].vertex_buffer_index;
       const struct util_format_description *desc = util_format_description(ctx->ve->elements[i].src_format);
       struct grend_buffer *buf;
-      GLenum type;
+      GLenum type = GL_FALSE;
       int sz;
       GLboolean norm = GL_FALSE;
       if (desc->channel[0].type == UTIL_FORMAT_TYPE_FLOAT)
          type = GL_FLOAT;
       else if (desc->channel[0].type == UTIL_FORMAT_TYPE_UNSIGNED &&
-         desc->channel[0].size == 8) 
+               desc->channel[0].size == 8) 
          type = GL_UNSIGNED_BYTE;
+      else if (desc->channel[0].type == UTIL_FORMAT_TYPE_SIGNED &&
+               desc->channel[0].size == 8) 
+         type = GL_BYTE;
       else if (desc->channel[0].type == UTIL_FORMAT_TYPE_UNSIGNED &&
-         desc->channel[0].size == 32) 
+               desc->channel[0].size == 16) 
+         type = GL_UNSIGNED_SHORT;
+      else if (desc->channel[0].type == UTIL_FORMAT_TYPE_SIGNED &&
+               desc->channel[0].size == 16) 
+         type = GL_SHORT;
+      else if (desc->channel[0].type == UTIL_FORMAT_TYPE_UNSIGNED &&
+               desc->channel[0].size == 32) 
          type = GL_UNSIGNED_INT;
+      else if (desc->channel[0].type == UTIL_FORMAT_TYPE_SIGNED &&
+               desc->channel[0].size == 32) 
+         type = GL_INT;
       if (desc->channel[0].normalized)
          norm = GL_TRUE;
       sz = desc->nr_channels;
@@ -576,10 +588,10 @@ void grend_draw_vbo(struct grend_context *ctx,
          break;
       }
 
-      if (info->instance_count == 0)        
-         glDrawElements(mode, info->count, elsz, 0);
+      if (info->instance_count <= 1)
+         glDrawElements(mode, info->count, elsz, (void *)ctx->ib.offset);
       else
-         glDrawElementsInstancedARB(mode, info->count, elsz, 0, info->instance_count);
+         glDrawElementsInstancedARB(mode, info->count, elsz, (void *)ctx->ib.offset, info->instance_count);
    }
 
    glActiveTexture(GL_TEXTURE0);
@@ -1141,10 +1153,15 @@ void graw_renderer_transfer_write(uint32_t res_handle,
       glBufferSubData(GL_ARRAY_BUFFER_ARB, transfer_box->x + box->x, box->width, data);
    } else {
       GLenum glformat  = GL_BGRA;
+      GLenum gltype = GL_UNSIGNED_BYTE;
       glBindTexture(res->target, res->id);
 
       if (res->base.format == PIPE_FORMAT_R8G8B8A8_UNORM)
          glformat = GL_RGBA;
+      else if (res->base.format == PIPE_FORMAT_I8_UNORM)
+         glformat = GL_RGB;
+      else if (res->base.format == PIPE_FORMAT_A8_UNORM)
+         glformat = GL_ALPHA;
 
       if (res->target == GL_TEXTURE_CUBE_MAP) {
          GLenum ctarget = GL_TEXTURE_CUBE_MAP_POSITIVE_X + box->z;
@@ -1183,7 +1200,7 @@ void graw_renderer_transfer_send(uint32_t res_handle, struct pipe_box *box, void
       void *data;
       glBindBufferARB(GL_ELEMENT_ARRAY_BUFFER_ARB, res->id);
       data = glMapBuffer(GL_ELEMENT_ARRAY_BUFFER_ARB, GL_READ_ONLY);
-      graw_transfer_write_return(data, send_size, myptr);
+      graw_transfer_write_return(data + box->x, send_size, myptr);
       glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER_ARB);
    } else if (res->target == GL_ARRAY_BUFFER_ARB) {
       uint32_t alloc_size = res->base.width0 * util_format_get_blocksize(res->base.format);
@@ -1191,7 +1208,7 @@ void graw_renderer_transfer_send(uint32_t res_handle, struct pipe_box *box, void
       void *data;
       glBindBufferARB(GL_ARRAY_BUFFER_ARB, res->id);
       data = glMapBuffer(GL_ARRAY_BUFFER_ARB, GL_READ_ONLY);
-      graw_transfer_write_return(data, send_size, myptr);
+      graw_transfer_write_return(data + box->x, send_size, myptr);
       glUnmapBuffer(GL_ARRAY_BUFFER_ARB);
    } else {
       fprintf(stderr,"TEXTURE TRANSFER %d %d\n", box->width, box->height);

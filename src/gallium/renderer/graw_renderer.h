@@ -115,6 +115,9 @@ void grend_set_constants(struct grend_context *ctx,
 
 void graw_transfer_write_return(void *data, uint32_t ndw, void *ptr);
 
+void graw_transfer_write_tex_return(struct pipe_resource *res,
+				    struct pipe_box *box,
+				    void *data, void *myptr);
 void graw_renderer_fini(void);
 void graw_reset_decode(void);
 

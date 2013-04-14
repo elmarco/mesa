@@ -183,3 +183,9 @@ void graw_transfer_write_return(void *data, uint32_t ndw, void *dummy)
       count -= amt;
    }
 }
+void graw_transfer_write_tex_return(struct pipe_resource *res,
+				    struct pipe_box *box,
+				    void *data, void *myptr)
+{
+  fprintf(stderr,"TODO\n");
+}

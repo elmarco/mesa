@@ -1250,7 +1250,8 @@ void graw_renderer_transfer_send(uint32_t res_handle, struct pipe_box *box, void
          break;
       }
       glGetTexImage(res->target, 0, format, type, data);
-      graw_transfer_write_return(data, send_size, myptr);
+      graw_transfer_write_tex_return(&res->base, box, data, myptr);
+      free(data);
    }
 }
 

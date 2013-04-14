@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include "qxl_3d_dev.h"
 #include "pipe/p_state.h"
+#include "util/u_format.h"
 #include "graw_renderer.h"
 #include "graw_renderer_glx.h"
 #define MAPPING_SIZE (64*1024*1024)
@@ -118,4 +119,21 @@ int main(int argc, char **argv)
 void graw_transfer_write_return(void *data, uint32_t ndw, void *myptr)
 {
   memcpy(myptr, data, ndw);
+}
+
+void graw_transfer_write_tex_return(struct pipe_resource *res,
+				    struct pipe_box *box,
+				    void *data, void *myptr)
+{
+   int h;
+   int elsize = util_format_get_blocksize(res->format);
+   void *dptr = myptr;
+   int resh = res->height0;
+
+   for (h = resh - box->y; h >= resh - box->y - box->height; h--) {
+      void *sptr = data + (h * elsize * res->width0) + box->x * elsize;
+      memcpy(dptr, sptr, box->width * elsize);
+      dptr += box->width * elsize;
+   }
+
 }

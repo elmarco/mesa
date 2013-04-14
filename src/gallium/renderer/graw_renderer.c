@@ -529,9 +529,12 @@ void grend_draw_vbo(struct grend_context *ctx,
       GLenum type = GL_FALSE;
       int sz;
       GLboolean norm = GL_FALSE;
-      if (desc->channel[0].type == UTIL_FORMAT_TYPE_FLOAT)
-         type = GL_FLOAT;
-      else if (desc->channel[0].type == UTIL_FORMAT_TYPE_UNSIGNED &&
+      if (desc->channel[0].type == UTIL_FORMAT_TYPE_FLOAT) {
+	 if (desc->channel[0].size == 32)
+	    type = GL_FLOAT;
+	 else if (desc->channel[0].size == 64)
+	    type = GL_DOUBLE;
+      } else if (desc->channel[0].type == UTIL_FORMAT_TYPE_UNSIGNED &&
                desc->channel[0].size == 8) 
          type = GL_UNSIGNED_BYTE;
       else if (desc->channel[0].type == UTIL_FORMAT_TYPE_SIGNED &&

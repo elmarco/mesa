@@ -130,7 +130,7 @@ void graw_transfer_write_tex_return(struct pipe_resource *res,
    void *dptr = myptr;
    int resh = res->height0;
 
-   for (h = resh - box->y; h >= resh - box->y - box->height; h--) {
+   for (h = resh - box->y - 1; h >= resh - box->y - box->height; h--) {
       void *sptr = data + (h * elsize * res->width0) + box->x * elsize;
       memcpy(dptr, sptr, box->width * elsize);
       dptr += box->width * elsize;

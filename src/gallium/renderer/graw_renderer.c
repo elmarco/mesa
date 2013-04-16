@@ -110,6 +110,61 @@ struct grend_context {
    boolean stencil_state_dirty;
 };
 
+static struct {
+   GLenum internalformat;
+   GLenum glformat;
+   GLenum gltype;
+} tex_conv_table[PIPE_FORMAT_COUNT] =
+   {
+      [PIPE_FORMAT_B8G8R8X8_UNORM] = {GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE },
+      [PIPE_FORMAT_B8G8R8A8_UNORM] = {GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE },
+
+      [PIPE_FORMAT_R8G8B8A8_UNORM] = {GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE },
+      [PIPE_FORMAT_R8G8B8X8_UNORM] = {GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE },
+
+      [PIPE_FORMAT_B4G4R4A4_UNORM] = {GL_RGBA4, GL_RGBA, GL_UNSIGNED_SHORT_4_4_4_4 },
+
+      [PIPE_FORMAT_S8_UINT] = {GL_DEPTH24_STENCIL8_EXT, GL_DEPTH_STENCIL, GL_UNSIGNED_BYTE},
+      [PIPE_FORMAT_Z24_UNORM_S8_UINT] = {GL_DEPTH24_STENCIL8_EXT, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8},
+
+      [PIPE_FORMAT_Z24X8_UNORM] = {GL_DEPTH_COMPONENT24, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT},
+      [PIPE_FORMAT_Z32_UNORM] = {GL_DEPTH_COMPONENT32, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT},      
+
+      [PIPE_FORMAT_A8_UNORM] = {GL_ALPHA8, GL_ALPHA, GL_UNSIGNED_BYTE },
+      [PIPE_FORMAT_A16_UNORM] = {GL_ALPHA16, GL_ALPHA, GL_UNSIGNED_SHORT },
+
+      [PIPE_FORMAT_L8_UNORM] = {GL_LUMINANCE8, GL_LUMINANCE, GL_UNSIGNED_BYTE },
+      [PIPE_FORMAT_L16_UNORM] = {GL_LUMINANCE16, GL_LUMINANCE, GL_UNSIGNED_BYTE },
+
+      [PIPE_FORMAT_L4A4_UNORM] = {GL_LUMINANCE4_ALPHA4, GL_LUMINANCE_ALPHA, GL_UNSIGNED_BYTE },
+      [PIPE_FORMAT_L8A8_UNORM] = {GL_LUMINANCE8_ALPHA8, GL_LUMINANCE_ALPHA, GL_UNSIGNED_BYTE },
+      [PIPE_FORMAT_L16A16_UNORM] = {GL_LUMINANCE16_ALPHA16, GL_LUMINANCE_ALPHA, GL_UNSIGNED_SHORT },
+      [PIPE_FORMAT_I8_UNORM] = {GL_INTENSITY8, GL_RGB, GL_UNSIGNED_BYTE },
+
+      [PIPE_FORMAT_B4G4R4X4_UNORM] = {GL_RGB4, GL_RGB, GL_UNSIGNED_SHORT_4_4_4_4 },
+      [PIPE_FORMAT_B2G3R3_UNORM] = {GL_R3_G3_B2, GL_RGB, GL_UNSIGNED_BYTE_3_3_2 },
+
+      [PIPE_FORMAT_B5G5R5X1_UNORM] = {GL_RGB5_A1, GL_RGBA, GL_UNSIGNED_BYTE },
+      [PIPE_FORMAT_B5G5R5A1_UNORM] = {GL_RGB5_A1, GL_RGBA, GL_UNSIGNED_BYTE },
+
+      [PIPE_FORMAT_R16G16B16X16_UNORM] = {GL_RGBA16, GL_RGBA, GL_UNSIGNED_SHORT },
+      [PIPE_FORMAT_R16G16B16A16_UNORM] = {GL_RGBA16, GL_RGBA, GL_UNSIGNED_SHORT },
+      [PIPE_FORMAT_B10G10R10X2_UNORM] = {GL_RGB10_A2, GL_RGBA, GL_UNSIGNED_INT },
+      [PIPE_FORMAT_B10G10R10A2_UNORM] = {GL_RGB10_A2, GL_RGBA, GL_UNSIGNED_INT },
+
+      [PIPE_FORMAT_R8_UNORM] = {GL_RED, GL_RED, GL_UNSIGNED_BYTE },
+      [PIPE_FORMAT_R8G8_UNORM] = {GL_RG, GL_RG, GL_UNSIGNED_BYTE },
+
+      [PIPE_FORMAT_R16_UNORM] = {GL_R16, GL_RED, GL_UNSIGNED_SHORT },
+      [PIPE_FORMAT_R16G16_UNORM] = {GL_RG16, GL_RG, GL_UNSIGNED_SHORT },
+
+      [PIPE_FORMAT_R16_FLOAT] = {GL_R16F, GL_RED, GL_FLOAT },
+      [PIPE_FORMAT_R16G16_FLOAT] = {GL_RG16F, GL_RG, GL_FLOAT },
+
+      [PIPE_FORMAT_B8G8R8X8_SRGB] = {GL_SRGB8, GL_RGB, GL_UNSIGNED_BYTE },
+      [PIPE_FORMAT_B8G8R8A8_SRGB] = {GL_SRGB8_ALPHA8, GL_RGB, GL_UNSIGNED_BYTE },
+   };
+
 static void grend_apply_sampler_state(struct grend_context *ctx, int id,
                                       int target);
 void grend_update_stencil_state(struct grend_context *ctx);
@@ -344,9 +399,13 @@ void grend_transfer_inline_write(struct grend_context *ctx,
       glBindBufferARB(GL_ARRAY_BUFFER_ARB, res->id);
       glBufferSubData(GL_ARRAY_BUFFER_ARB, box->x, box->width, data);
    } else {
+      GLenum glformat, gltype;
       glBindTexture(res->target, res->id);
+      glformat = tex_conv_table[res->base.format].glformat;
+      gltype = tex_conv_table[res->base.format].gltype; 
+
       glTexSubImage2D(res->target, level, box->x, box->y, box->width, box->height,
-                      GL_RGBA, GL_UNSIGNED_BYTE, data);
+                      glformat, gltype, data);
    }
 }
 
@@ -1044,59 +1103,7 @@ struct grend_context *grend_create_context(void)
    return CALLOC_STRUCT(grend_context);
 }
 
-static struct {
-   GLenum internalformat;
-   GLenum glformat;
-   GLenum gltype;
-} tex_conv_table[PIPE_FORMAT_COUNT] =
-   {
-      [PIPE_FORMAT_B8G8R8X8_UNORM] = {GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE },
-      [PIPE_FORMAT_B8G8R8A8_UNORM] = {GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE },
-      [PIPE_FORMAT_R8G8B8A8_UNORM] = {GL_RGBA8, GL_BGRA, GL_UNSIGNED_BYTE },
-      [PIPE_FORMAT_R8G8B8X8_UNORM] = {GL_RGBA8, GL_BGRA, GL_UNSIGNED_BYTE },
 
-      [PIPE_FORMAT_B4G4R4A4_UNORM] = {GL_RGBA4, GL_RGBA, GL_UNSIGNED_SHORT_4_4_4_4 },
-
-      [PIPE_FORMAT_S8_UINT] = {GL_DEPTH24_STENCIL8_EXT, GL_DEPTH_STENCIL, GL_UNSIGNED_BYTE},
-      [PIPE_FORMAT_Z24_UNORM_S8_UINT] = {GL_DEPTH24_STENCIL8_EXT, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8},
-
-      [PIPE_FORMAT_Z24X8_UNORM] = {GL_DEPTH_COMPONENT24, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT},
-      [PIPE_FORMAT_Z32_UNORM] = {GL_DEPTH_COMPONENT32, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT},      
-
-      [PIPE_FORMAT_A8_UNORM] = {GL_ALPHA8, GL_ALPHA, GL_UNSIGNED_BYTE },
-      [PIPE_FORMAT_A16_UNORM] = {GL_ALPHA16, GL_ALPHA, GL_UNSIGNED_SHORT },
-
-      [PIPE_FORMAT_L8_UNORM] = {GL_LUMINANCE8, GL_LUMINANCE, GL_UNSIGNED_BYTE },
-      [PIPE_FORMAT_L16_UNORM] = {GL_LUMINANCE16, GL_LUMINANCE, GL_UNSIGNED_BYTE },
-
-      [PIPE_FORMAT_L4A4_UNORM] = {GL_LUMINANCE4_ALPHA4, GL_LUMINANCE_ALPHA, GL_UNSIGNED_BYTE },
-      [PIPE_FORMAT_L8A8_UNORM] = {GL_LUMINANCE8_ALPHA8, GL_LUMINANCE_ALPHA, GL_UNSIGNED_BYTE },
-      [PIPE_FORMAT_L16A16_UNORM] = {GL_LUMINANCE16_ALPHA16, GL_LUMINANCE_ALPHA, GL_UNSIGNED_SHORT },
-      [PIPE_FORMAT_I8_UNORM] = {GL_INTENSITY8, GL_RGB, GL_UNSIGNED_BYTE },
-
-      [PIPE_FORMAT_B4G4R4X4_UNORM] = {GL_RGB4, GL_RGB, GL_UNSIGNED_SHORT_4_4_4_4 },
-      [PIPE_FORMAT_B2G3R3_UNORM] = {GL_R3_G3_B2, GL_RGB, GL_UNSIGNED_BYTE_3_3_2 },
-
-      [PIPE_FORMAT_B5G5R5X1_UNORM] = {GL_RGB5_A1, GL_RGBA, GL_UNSIGNED_BYTE },
-      [PIPE_FORMAT_B5G5R5A1_UNORM] = {GL_RGB5_A1, GL_RGBA, GL_UNSIGNED_BYTE },
-
-      [PIPE_FORMAT_R16G16B16X16_UNORM] = {GL_RGBA16, GL_RGBA, GL_UNSIGNED_SHORT },
-      [PIPE_FORMAT_R16G16B16A16_UNORM] = {GL_RGBA16, GL_RGBA, GL_UNSIGNED_SHORT },
-      [PIPE_FORMAT_B10G10R10X2_UNORM] = {GL_RGB10_A2, GL_RGBA, GL_UNSIGNED_INT },
-      [PIPE_FORMAT_B10G10R10A2_UNORM] = {GL_RGB10_A2, GL_RGBA, GL_UNSIGNED_INT },
-
-      [PIPE_FORMAT_R8_UNORM] = {GL_RED, GL_RED, GL_UNSIGNED_BYTE },
-      [PIPE_FORMAT_R8G8_UNORM] = {GL_RG, GL_RG, GL_UNSIGNED_BYTE },
-
-      [PIPE_FORMAT_R16_UNORM] = {GL_R16, GL_RED, GL_UNSIGNED_SHORT },
-      [PIPE_FORMAT_R16G16_UNORM] = {GL_RG16, GL_RG, GL_UNSIGNED_SHORT },
-
-      [PIPE_FORMAT_R16_FLOAT] = {GL_R16F, GL_RED, GL_FLOAT },
-      [PIPE_FORMAT_R16G16_FLOAT] = {GL_RG16F, GL_RG, GL_FLOAT },
-
-      [PIPE_FORMAT_B8G8R8X8_SRGB] = {GL_SRGB8, GL_RGB, GL_UNSIGNED_BYTE },
-      [PIPE_FORMAT_B8G8R8A8_SRGB] = {GL_SRGB8_ALPHA8, GL_RGB, GL_UNSIGNED_BYTE },
-   };
 void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target target, uint32_t format, uint32_t bind, uint32_t width, uint32_t height, uint32_t depth, uint32_t array_size, uint32_t last_level, uint32_t nr_samples)
 {
    struct grend_resource *gr = CALLOC_STRUCT(grend_resource);
@@ -1178,10 +1185,10 @@ void graw_renderer_transfer_write(uint32_t res_handle,
    res = graw_object_lookup(res_handle, GRAW_RESOURCE);
    if (res->target == GL_ELEMENT_ARRAY_BUFFER_ARB) {
       glBindBufferARB(GL_ELEMENT_ARRAY_BUFFER_ARB, res->id);
-      glBufferSubData(GL_ELEMENT_ARRAY_BUFFER_ARB, transfer_box->x + box->x, box->width, data);
+      glBufferSubData(GL_ELEMENT_ARRAY_BUFFER_ARB, transfer_box->x + box->x, box->width ? box->width : transfer_box->width, data);
    } else if (res->target == GL_ARRAY_BUFFER_ARB) {
       glBindBufferARB(GL_ARRAY_BUFFER_ARB, res->id);
-      glBufferSubData(GL_ARRAY_BUFFER_ARB, transfer_box->x + box->x, box->width, data);
+      glBufferSubData(GL_ARRAY_BUFFER_ARB, transfer_box->x + box->x, box->width ? box->width : transfer_box->width, data);
    } else {
       GLenum glformat;
       GLenum gltype;

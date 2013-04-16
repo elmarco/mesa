@@ -579,8 +579,8 @@ void grend_draw_vbo(struct grend_context *ctx,
       }
       sampler_id++;
    } 
-   glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
-   glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+//   glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+//   glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
 
    for (i = 0; i < ctx->ve->count; i++) {
       int vbo_index = ctx->ve->elements[i].vertex_buffer_index;
@@ -754,7 +754,7 @@ translate_stencil_op(GLuint op)
       CASE(INCR_WRAP);
       CASE(DECR_WRAP);
       CASE(INVERT);
-   defaulty:
+   default:
       assert("invalid stencilop token()" == NULL);
       return 0;
    }
@@ -779,7 +779,8 @@ void grend_object_bind_blend(struct grend_context *ctx,
       glDisable(GL_COLOR_LOGIC_OP);
 
    if (state->independent_blend_enable) {
-      
+      assert(0);
+      exit(-1);
    } else {
       if (state->rt[0].blend_enable) {
          glBlendFunc(translate_blend_factor(state->rt[0].rgb_src_factor),

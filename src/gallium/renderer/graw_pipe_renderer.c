@@ -185,6 +185,7 @@ void graw_transfer_write_return(void *data, uint32_t ndw, void *dummy)
 }
 void graw_transfer_write_tex_return(struct pipe_resource *res,
 				    struct pipe_box *box,
+                                    uint32_t level,
 				    void *data, void *myptr)
 {
   fprintf(stderr,"TODO\n");

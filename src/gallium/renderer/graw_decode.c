@@ -574,7 +574,7 @@ void graw_decode_get_transfer(uint32_t *data, uint32_t ndw)
 {
    uint32_t handle = data[0];
    struct pipe_box box;
-
+   uint32_t level;
 
    box.x = data[1];
    box.y = data[2];
@@ -582,6 +582,6 @@ void graw_decode_get_transfer(uint32_t *data, uint32_t ndw)
    box.width = data[4];
    box.height = data[5];
    box.depth = data[6];
-
-   graw_renderer_transfer_send(handle, &box, NULL);
+   level = data[7];
+   graw_renderer_transfer_send(handle, level, &box, NULL);
 }

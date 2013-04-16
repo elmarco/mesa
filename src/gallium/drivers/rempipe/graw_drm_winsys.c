@@ -119,13 +119,14 @@ static int qxl_3d_transfer_put(int fd, uint32_t res_handle, uint32_t bo_handle,
 }
 
 static int qxl_3d_transfer_get(int fd, uint32_t res_handle, uint32_t bo_handle,
-			struct drm_qxl_3d_box *box)
+                               struct drm_qxl_3d_box *box, uint32_t level)
 {
   struct drm_qxl_3d_transfer_get getcmd;
   int ret;
   
   getcmd.res_handle = res_handle;
   getcmd.bo_handle = bo_handle;
+  getcmd.level = level;
   getcmd.box = *box;
 
   ret = drmIoctl(fd, DRM_IOCTL_QXL_3D_TRANSFER_GET, &getcmd);
@@ -199,7 +200,8 @@ void graw_transfer_block(uint32_t res_handle, int level,
 }
 
 
-void graw_transfer_get_block(uint32_t res_handle, const struct pipe_box *box,
+void graw_transfer_get_block(uint32_t res_handle, uint32_t level,
+                             const struct pipe_box *box,
                              void *data, int ndw)
 {
 
@@ -215,7 +217,7 @@ void graw_transfer_get_block(uint32_t res_handle, const struct pipe_box *box,
       fprintf(stderr,"failed to create bo1 %d\n", ret);
       return;
    }
-   ret = qxl_3d_transfer_get(fd, res_handle, bo_handle, box);
+   ret = qxl_3d_transfer_get(fd, res_handle, bo_handle, box, level);
   
 
    ret = qxl_3d_wait(fd, bo_handle);

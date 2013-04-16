@@ -213,12 +213,12 @@ void graw_transfer_block(uint32_t res_handle, int level,
    
 }
 
-void graw_transfer_get_block(uint32_t res_handle, const struct pipe_box *box,
+void graw_transfer_get_block(uint32_t res_handle, int level, const struct pipe_box *box,
                              void *data, int ndw)
 {
    int ret;
 
-   buf[0] = GRAW_CMD0(GRAW_TRANSFER_GET, 0, 7);
+   buf[0] = GRAW_CMD0(GRAW_TRANSFER_GET, 0, 8);
    buf[1] = res_handle;
    buf[2] = box->x;
    buf[3] = box->y;
@@ -226,7 +226,8 @@ void graw_transfer_get_block(uint32_t res_handle, const struct pipe_box *box,
    buf[5] = box->width;
    buf[6] = box->height;
    buf[7] = box->depth;
-   write(graw_fd, buf, 8 * sizeof(uint32_t));
+   buf[8] = level;
+   write(graw_fd, buf, 9 * sizeof(uint32_t));
 
    ret = do_blocked_read(graw_fd, data, ndw * 4);
 }

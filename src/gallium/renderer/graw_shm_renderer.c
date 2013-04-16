@@ -7,6 +7,7 @@
 #include "qxl_3d_dev.h"
 #include "pipe/p_state.h"
 #include "util/u_format.h"
+#include "util/u_math.h"
 #include "graw_renderer.h"
 #include "graw_renderer_glx.h"
 #define MAPPING_SIZE (64*1024*1024)
@@ -84,6 +85,7 @@ int main(int argc, char **argv)
       case QXL_3D_TRANSFER_GET:
          fprintf(stderr,"got transfer get %d\n", cmd->u.transfer_get.res_handle);
 	 graw_renderer_transfer_send(cmd->u.transfer_get.res_handle,
+                                     cmd->u.transfer_get.level,
 				     (struct pipe_box *)&cmd->u.transfer_get.box,
 				     mapping + cmd->u.transfer_get.phy_addr);
 	 break;
@@ -123,15 +125,17 @@ void graw_transfer_write_return(void *data, uint32_t ndw, void *myptr)
 
 void graw_transfer_write_tex_return(struct pipe_resource *res,
 				    struct pipe_box *box,
+                                    uint32_t level,
 				    void *data, void *myptr)
 {
    int h;
    int elsize = util_format_get_blocksize(res->format);
    void *dptr = myptr;
-   int resh = res->height0;
+   int w = u_minify(res->width0, level);
+   int resh = u_minify(res->height0, level);
 
    for (h = resh - box->y - 1; h >= resh - box->y - box->height; h--) {
-      void *sptr = data + (h * elsize * res->width0) + box->x * elsize;
+      void *sptr = data + (h * elsize * w) + box->x * elsize;
       memcpy(dptr, sptr, box->width * elsize);
       dptr += box->width * elsize;
    }

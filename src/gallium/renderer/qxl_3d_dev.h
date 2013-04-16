@@ -32,6 +32,7 @@ struct qxl_3d_transfer_get {
         uint64_t phy_addr;
 	uint32_t res_handle;
 	struct drm_qxl_3d_box box;
+        uint32_t level;
 };
 
 struct qxl_3d_flush_buffer {

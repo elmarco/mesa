@@ -604,7 +604,7 @@ static void *graw_transfer_map(struct pipe_context *ctx,
    else {
       struct graw_resource *grres = (struct graw_resource *)resource;
       graw_flush(ctx, NULL, 0);
-      graw_transfer_get_block(grres->res_handle, box, trans->localmem, trans->lmsize / 4);
+      graw_transfer_get_block(grres->res_handle, level, box, trans->localmem, trans->lmsize / 4);
    } 
 
    trans->base.resource = resource;
@@ -785,7 +785,7 @@ void graw_flush_frontbuffer(struct pipe_screen *screen,
    box.width = res->width0;
    box.height = res->height0;
    box.depth = 1;
-   graw_transfer_get_block(gres->base.res_handle, &box, alloced, size / 4);
+   graw_transfer_get_block(gres->base.res_handle, 0, &box, alloced, size / 4);
 
    for (i = 0; i < res->height0; i++) {
      int offsrc = res->width0 * util_format_get_blocksize(res->format) * i;//(res->height0 - i - 1);

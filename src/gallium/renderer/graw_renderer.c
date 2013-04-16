@@ -1204,7 +1204,7 @@ void graw_renderer_transfer_write(uint32_t res_handle,
    }
 }
 
-void graw_renderer_transfer_send(uint32_t res_handle, struct pipe_box *box, void *myptr)
+void graw_renderer_transfer_send(uint32_t res_handle, uint32_t level, struct pipe_box *box, void *myptr)
 {
    struct grend_resource *res;
 
@@ -1227,9 +1227,11 @@ void graw_renderer_transfer_send(uint32_t res_handle, struct pipe_box *box, void
       graw_transfer_write_return(data + box->x, send_size, myptr);
       glUnmapBuffer(GL_ARRAY_BUFFER_ARB);
    } else {
-      fprintf(stderr,"TEXTURE TRANSFER %d %d\n", box->width, box->height);
+      fprintf(stderr,"TEXTURE TRANSFER %d %d %d\n", box->width, box->height, level);
       void *data;
-      uint32_t alloc_size = res->base.width0 * res->base.height0 * util_format_get_blocksize(res->base.format);
+      uint32_t w = u_minify(res->base.width0, level);
+      uint32_t h = u_minify(res->base.height0, level);
+      uint32_t alloc_size = w * h * util_format_get_blocksize(res->base.format);
       uint32_t send_size = box->width * box->height * util_format_get_blocksize(res->base.format);
       GLenum format, type;
       data = malloc(alloc_size);
@@ -1247,8 +1249,8 @@ void graw_renderer_transfer_send(uint32_t res_handle, struct pipe_box *box, void
          type = GL_UNSIGNED_BYTE;
          break;
       }
-      glGetTexImage(res->target, 0, format, type, data);
-      graw_transfer_write_tex_return(&res->base, box, data, myptr);
+      glGetTexImage(res->target, level, format, type, data);
+      graw_transfer_write_tex_return(&res->base, box, level, data, myptr);
       free(data);
    }
 }

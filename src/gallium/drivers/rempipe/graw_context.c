@@ -628,12 +628,14 @@ static void graw_transfer_unmap(struct pipe_context *ctx,
    struct graw_context *grctx = (struct graw_context *)ctx;
    struct graw_transfer *trans = (struct graw_transfer *)transfer;
    struct graw_resource *grres = (struct graw_resource *)transfer->resource;
+   struct pipe_box empty_box = { 0 };
+
    if (trans->base.usage & PIPE_TRANSFER_WRITE) {
 
       if (!(transfer->usage & PIPE_TRANSFER_FLUSH_EXPLICIT)) {
          grres->clean = FALSE;
          graw_flush(ctx, NULL, 0);
-         graw_transfer_block(grres->res_handle, transfer->level, &transfer->box, &transfer->box, trans->localmem + trans->offset, trans->lmsize / 4);
+         graw_transfer_block(grres->res_handle, transfer->level, &transfer->box, &empty_box, trans->localmem + trans->offset, trans->lmsize / 4);
       }
       
    }

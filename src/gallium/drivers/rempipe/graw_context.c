@@ -655,8 +655,11 @@ static void graw_transfer_flush_region(struct pipe_context *ctx,
    uint32_t offset;
    uint32_t size;
 
+   offset = trans->offset;
+   offset += box->x;
+
    graw_flush(ctx, NULL, 0);
-   graw_transfer_block(grres->res_handle, transfer->level, &transfer->box, box, trans->localmem + trans->offset, box->width);
+   graw_transfer_block(grres->res_handle, transfer->level, &transfer->box, box, trans->localmem + offset, box->width);
    grres->clean = FALSE;   
 }
                                        

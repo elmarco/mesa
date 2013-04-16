@@ -1185,6 +1185,23 @@ void graw_renderer_transfer_write(uint32_t res_handle,
    } else {
       GLenum glformat;
       GLenum gltype;
+      int width, height, depth, x, y, z;
+
+      x = transfer_box->x;
+      y = transfer_box->y;
+      z = transfer_box->z;
+      width = transfer_box->width;
+      height = transfer_box->height;
+      depth = transfer_box->depth;
+      if (box->width || box->height || box->depth) {
+         width = box->width;
+         height = box->height;
+         depth = box->depth;
+         x += box->x;
+         y += box->y;
+         z += box->z;
+      }
+
       glBindTexture(res->target, res->id);
 
       glformat = tex_conv_table[res->base.format].glformat;
@@ -1195,24 +1212,18 @@ void graw_renderer_transfer_write(uint32_t res_handle,
       }
 	 
       if (res->target == GL_TEXTURE_CUBE_MAP) {
-         GLenum ctarget = GL_TEXTURE_CUBE_MAP_POSITIVE_X + box->z;
+         GLenum ctarget = GL_TEXTURE_CUBE_MAP_POSITIVE_X + z;
 
-         glTexSubImage2D(ctarget, level, transfer_box->x + box->x,
-                         transfer_box->y + box->y, transfer_box->width, transfer_box->height,
+         glTexSubImage2D(ctarget, level, x, y, width, height,
                          glformat, gltype, data);
       } else if (res->target == GL_TEXTURE_3D) {
-         glTexSubImage3D(res->target, level, transfer_box->x + box->x,
-                         transfer_box->y + box->y, 
-                         box->z,
-                         box->width, box->height, box->depth,
+         glTexSubImage3D(res->target, level, x, y, z, width, height, depth,
                          glformat, gltype, data);
       } else if (res->target == GL_TEXTURE_1D) {
-         glTexSubImage1D(res->target, level, transfer_box->x + box->x,
-                         box->width,
+         glTexSubImage1D(res->target, level, x, width,
                          glformat, gltype, data);
       } else {
-         glTexSubImage2D(res->target, level, transfer_box->x + box->x,
-                         transfer_box->y + box->y, transfer_box->width, transfer_box->height,
+         glTexSubImage2D(res->target, level, x, y, width, height,
                          glformat, gltype, data);
       }
       fprintf(stderr,"TRANSFER FOR TEXTURE\n");

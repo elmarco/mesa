@@ -151,8 +151,9 @@ void grend_set_framebuffer_state(struct grend_context *ctx,
       GL_COLOR_ATTACHMENT7_EXT,
    };
 
-   if (!ctx->fb_id)
-      glGenFramebuffers(1, &ctx->fb_id);
+   if (ctx->fb_id)
+      glDeleteFramebuffers(1, &ctx->fb_id);
+   glGenFramebuffers(1, &ctx->fb_id);
 
    glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, ctx->fb_id);
 

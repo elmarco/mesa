@@ -27,7 +27,8 @@ graw_shm_renderer_SOURCES = \
         graw_shader.c \
         graw_object.c \
         graw_decode.c \
-        graw_renderer_glx.c
+        graw_renderer_glx.c \
+        send_scm.c
 
 graw_renderer_LDADD = -lX11
 graw_shm_renderer_LDADD = -lrt -lX11

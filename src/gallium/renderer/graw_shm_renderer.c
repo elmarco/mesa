@@ -2,14 +2,23 @@
 #include <time.h>
 
 #include <sys/mman.h>
+#include <sys/stat.h>
 #include <fcntl.h>
+#include <errno.h>
 #include <unistd.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <sys/eventfd.h>
+#include "send_scm.h"
 #include "qxl_3d_dev.h"
 #include "pipe/p_state.h"
 #include "util/u_format.h"
 #include "util/u_math.h"
 #include "graw_renderer.h"
 #include "graw_renderer_glx.h"
+
+#define USE_SOCKET 1
+
 #define MAPPING_SIZE (64*1024*1024)
 int fd;
 void *mapping;
@@ -17,16 +26,103 @@ int inited;
 
 struct qxl_3d_ram *ramp;
 
+static int send_irq(int fd, uint32_t pd)
+{
+   int ret;
+   uint64_t x = 1;
+   fprintf(stderr,"notify 3d %x\n", pd);
+
+   ramp->pad |= pd;
+
+   ret = write(fd, &x, sizeof(uint64_t));
+   if (ret != 8)
+      fprintf(stderr,"vm efd write failed %d %d\n", ret, errno);
+   return 0;
+}
+
+static int create_listening_socket(char * path) {
+
+    struct sockaddr_un local;
+    int len, conn_socket;
+
+    if ((conn_socket = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
+        perror("socket");
+        exit(1);
+    }
+
+    umask(0);
+
+    local.sun_family = AF_UNIX;
+    strcpy(local.sun_path, path);
+    unlink(local.sun_path);
+    len = strlen(local.sun_path) + sizeof(local.sun_family);
+    if (bind(conn_socket, (struct sockaddr *)&local, len) == -1) {
+        perror("bind");
+        exit(1);
+    }
+    umask(022);
+
+    if (listen(conn_socket, 5) == -1) {
+        perror("listen");
+        exit(1);
+    }
+    return conn_socket;
+}
+
 void graw_renderer_init(void);
 int main(int argc, char **argv)
 {
    int count = 0;
-   fd = shm_open("dave", O_RDWR, 0600);
+   int conn_socket, maxfd;
+   fd_set readset;
+   int vm_sock, vm_efd, vm_efd2;
+
+   fd = shm_open("dave", O_CREAT|O_RDWR, S_IRWXU);
    if (fd == -1)
       return -1;
 
-   mapping = mmap(0, MAPPING_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+   if (ftruncate(fd, MAPPING_SIZE) != 0) {
+      fprintf(stderr,"couldn't truncate\n");
+      exit(-1);
+   }
 
+   conn_socket = create_listening_socket("/tmp/shmemsock");
+   maxfd = conn_socket;
+
+   /* we only care about one opener in this code */
+   for (;;) {
+      int ret;
+      FD_ZERO(&readset);
+      FD_SET(conn_socket, &readset);
+      ret = select(maxfd+1, &readset, NULL, NULL, NULL);
+      if (ret == -1) {
+         perror("select()");
+         exit(-1);
+      }
+
+      printf("got connection.\n");
+      {
+         struct sockaddr_un remote;
+         socklen_t t = sizeof(remote);
+         int new_posn = 1;
+         vm_sock = accept(conn_socket, (struct sockaddr *)&remote, &t);
+         if (vm_sock == -1) {
+            perror("accept");
+            exit(1);
+         }
+
+         vm_efd = eventfd(0, 0);
+         vm_efd2 = eventfd(0, 0);
+         sendPosition(vm_sock, new_posn);
+         sendUpdate(vm_sock, -1, sizeof(long), fd);
+
+         sendUpdate(vm_sock, 1, sizeof(long), vm_efd);
+         sendUpdate(vm_sock, 2, sizeof(long), vm_efd2);
+         break;
+      }
+   }
+
+   mapping = mmap(0, MAPPING_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
    if (!mapping)
       return -1;
 
@@ -99,6 +195,7 @@ int main(int argc, char **argv)
 	 break;
       case QXL_3D_FENCE:
          ramp->last_fence = cmd->u.fence_id;
+         send_irq(vm_efd, 4);
          break;
       case 0xdeadbeef:
          if (inited) {
@@ -113,6 +210,10 @@ int main(int argc, char **argv)
          break;
       }
       SPICE_RING_POP(&ramp->cmd_3d_ring, notify);
+
+      if (notify) {
+         send_irq(vm_efd, 1);
+      }
       goto restart;
    }
    

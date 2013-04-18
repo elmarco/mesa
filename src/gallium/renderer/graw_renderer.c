@@ -12,6 +12,7 @@
 #include "util/u_inlines.h"
 #include "util/u_memory.h"
 #include "util/u_transfer.h"
+#include "util/u_double_list.h"
 #include "util/u_format.h"
 #include "tgsi/tgsi_text.h"
 
@@ -108,6 +109,7 @@ struct grend_context {
 
    struct pipe_depth_stencil_alpha_state *dsa;
    boolean stencil_state_dirty;
+   struct list_head programs;
 };
 
 static struct {
@@ -164,6 +166,34 @@ static struct {
       [PIPE_FORMAT_B8G8R8X8_SRGB] = {GL_SRGB8, GL_RGB, GL_UNSIGNED_BYTE },
       [PIPE_FORMAT_B8G8R8A8_SRGB] = {GL_SRGB8_ALPHA8, GL_RGB, GL_UNSIGNED_BYTE },
    };
+
+struct shader_programs {
+  struct list_head head;
+  GLuint id;
+  GLuint vs_id;
+  GLuint fs_id;
+};
+
+static void add_shader_program(struct grend_context *ctx,
+			int vs_id, int fs_id, int id) {
+  struct shader_programs *sprog = malloc(sizeof(struct shader_programs));
+  sprog->vs_id = vs_id;
+  sprog->fs_id = fs_id;
+  sprog->id = id;
+  list_add(&sprog->head, &ctx->programs);
+}
+
+static GLuint lookup_shader_program(struct grend_context *ctx,
+			   GLuint vs_id, GLuint fs_id)
+{
+  struct shader_programs *ent;
+  LIST_FOR_EACH_ENTRY(ent, &ctx->programs, head) {
+    if (ent->vs_id == vs_id && ent->fs_id == fs_id)
+      return ent->id;
+  }
+  return 0;
+}
+  
 
 static void grend_apply_sampler_state(struct grend_context *ctx, int id,
                                       int target);
@@ -504,18 +534,21 @@ void grend_draw_vbo(struct grend_context *ctx,
    GLuint vaoid;
    int i;
    int sampler_id;
+   GLuint prog_id;
   
    if (ctx->stencil_state_dirty)
       grend_update_stencil_state(ctx);
 
    if (ctx->shader_dirty) {
-      if (ctx->program_id)
-         glDeleteProgram(ctx->program_id);
-
-      ctx->program_id = glCreateProgram();
-      glAttachShader(ctx->program_id, ctx->vs->id);
-      glAttachShader(ctx->program_id, ctx->fs->id);
-      glLinkProgram(ctx->program_id);
+     prog_id = lookup_shader_program(ctx, ctx->vs->id, ctx->fs->id);
+     if (prog_id == 0) {
+       prog_id = glCreateProgram();
+       glAttachShader(prog_id, ctx->vs->id);
+       glAttachShader(prog_id, ctx->fs->id);
+       glLinkProgram(prog_id);
+       add_shader_program(ctx, ctx->vs->id, ctx->fs->id, prog_id);
+     }
+     ctx->program_id = prog_id;
    }
    glUseProgram(ctx->program_id);
    glGenVertexArrays(1, &vaoid);
@@ -1101,7 +1134,11 @@ graw_renderer_fini(void)
 
 struct grend_context *grend_create_context(void)
 {
-   return CALLOC_STRUCT(grend_context);
+   struct grend_context *grctx = CALLOC_STRUCT(grend_context);
+   list_inithead(&grctx->programs);
+   return grctx;
+
+   
 }
 
 

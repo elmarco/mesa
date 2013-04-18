@@ -553,6 +553,9 @@ void grend_draw_vbo(struct grend_context *ctx,
      }
      ctx->program_id = prog_id;
    }
+
+   glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, ctx->fb_id);
+
    glUseProgram(ctx->program_id);
    glGenVertexArrays(1, &vaoid);
 

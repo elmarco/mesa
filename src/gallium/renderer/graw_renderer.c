@@ -37,6 +37,9 @@ struct grend_resource {
    struct pipe_resource base;
    GLuint id;
    GLenum target;
+   /* fb id if we need to readback this resource */
+   GLuint readback_fb_id;
+  GLuint readback_fb_level;
 };
 
 struct grend_buffer {
@@ -1302,16 +1305,27 @@ void graw_renderer_transfer_send(uint32_t res_handle, uint32_t level, struct pip
       void *data;
       uint32_t w = u_minify(res->base.width0, level);
       uint32_t h = u_minify(res->base.height0, level);
-      uint32_t alloc_size = w * h * util_format_get_blocksize(res->base.format);
       uint32_t send_size = box->width * box->height * util_format_get_blocksize(res->base.format);
       GLenum format, type;
-      data = malloc(alloc_size);
+      int fb_id;
 
-      if (!data)
-         fprintf(stderr,"malloc failed %d\n", send_size);
+//      data = malloc(send_size);
 
-      fprintf(stderr,"writing %d %d\n", alloc_size, send_size);
-      glBindTexture(res->target, res->id);
+//      if (!data)
+      //       fprintf(stderr,"malloc failed %d\n", send_size);
+      fprintf(stderr,"writing %d %d\n", send_size);
+      if (res->readback_fb_id == 0 || res->readback_fb_level != level) {
+	if (res->readback_fb_id)
+	  glDeleteFramebuffers(1, &res->readback_fb_id);
+
+	glGenFramebuffers(1, &fb_id);
+	glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
+				  res->target, res->id, level);
+	res->readback_fb_id = fb_id;
+	res->readback_fb_level = level;
+      }
+      glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, res->readback_fb_id);
+      glReadBuffer(GL_COLOR_ATTACHMENT0_EXT);
 
       switch (res->base.format) {
       case PIPE_FORMAT_B8G8R8A8_UNORM:
@@ -1320,9 +1334,9 @@ void graw_renderer_transfer_send(uint32_t res_handle, uint32_t level, struct pip
          type = GL_UNSIGNED_BYTE;
          break;
       }
-      glGetTexImage(res->target, level, format, type, data);
-      graw_transfer_write_tex_return(&res->base, box, level, data, myptr);
-      free(data);
+      glReadPixels(box->x, box->y, box->width, box->height, format, type, myptr);
+      //      graw_transfer_write_tex_return(&res->base, box, level, data, myptr);
+//      free(data);
    }
 }
 

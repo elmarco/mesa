@@ -693,6 +693,7 @@ void grend_draw_vbo(struct grend_context *ctx,
          glDrawElementsInstancedARB(mode, info->count, elsz, (void *)ctx->ib.offset, info->instance_count);
    }
 
+   glDeleteVertexArrays(1, &vaoid);
    glActiveTexture(GL_TEXTURE0);
    glDisable(GL_TEXTURE_2D);
    glBindVertexArray(0);

@@ -1323,12 +1323,13 @@ void graw_renderer_transfer_send(uint32_t res_handle, uint32_t level, struct pip
 	  glDeleteFramebuffers(1, &res->readback_fb_id);
 
 	glGenFramebuffers(1, &fb_id);
+	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fb_id);
 	glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
 				  res->target, res->id, level);
 	res->readback_fb_id = fb_id;
 	res->readback_fb_level = level;
-      }
-      glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, res->readback_fb_id);
+      } else
+	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, res->readback_fb_id);
       glReadBuffer(GL_COLOR_ATTACHMENT0_EXT);
 
       switch (res->base.format) {

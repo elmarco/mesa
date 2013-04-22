@@ -24,6 +24,7 @@ int fd;
 void *mapping;
 int inited;
 
+extern int localrender;
 struct qxl_3d_ram *ramp;
 
 static int send_irq(int fd, uint32_t pd)
@@ -77,6 +78,8 @@ int main(int argc, char **argv)
    fd_set readset;
    int vm_sock, vm_efd, vm_efd2;
 
+   if (argc == 2 && !strcmp(argv[1], "-render"))
+      localrender = 1;
    fd = shm_open("dave", O_CREAT|O_RDWR, S_IRWXU);
    if (fd == -1)
       return -1;
@@ -134,6 +137,7 @@ int main(int argc, char **argv)
       QXL3DCommand *cmd;
       int notify;
    restart:
+      process_x_event();
       count = 0;
       while (SPICE_RING_IS_EMPTY(&ramp->cmd_3d_ring)) {
          struct timespec req = {0, 50000000};
@@ -204,7 +208,7 @@ int main(int argc, char **argv)
 
          }
          ramp->last_fence = 0;
-         graw_renderer_init_glx();
+         graw_renderer_init_glx(localrender);
          graw_renderer_init();
          inited = 1;
          break;

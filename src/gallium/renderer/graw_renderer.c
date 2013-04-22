@@ -26,6 +26,8 @@
 #include "graw_renderer_glx.h"
 #include "graw_decode.h"
 
+int localrender;
+
 struct grend_screen;
 
 struct grend_shader_state {
@@ -1062,21 +1064,25 @@ void grend_flush_frontbuffer(uint32_t res_handle)
 {
    struct grend_resource *res;
 
-#if 0
+   if (!localrender)
+      return;
+       
+#if 1
    res = graw_object_lookup(res_handle, GRAW_RESOURCE);
 
    glDrawBuffer(GL_NONE);
    glUseProgram(0);
+   
    glMatrixMode(GL_PROJECTION);
    glLoadIdentity();
    glOrtho(0, res->base.width0, 0, res->base.height0, -1, 1);
    glMatrixMode(GL_MODELVIEW);
    glLoadIdentity();
-
+   glDisable(GL_BLEND);
    glBindTexture(res->target, res->id);
    glBindFramebuffer(GL_FRAMEBUFFER_EXT, 0);
    glEnable(res->target);
-   glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+   glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
    glTexParameteri(res->target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
    glTexParameteri(res->target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
@@ -1094,7 +1100,7 @@ void grend_flush_frontbuffer(uint32_t res_handle)
    glVertex2f(0, VAL);
    glEnd();
    glDisable(res->target);
-   glutSwapBuffers();
+   swap_buffers();
 #endif
 }
 

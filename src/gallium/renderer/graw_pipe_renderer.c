@@ -56,7 +56,7 @@ static int process_cmd(void)
    fprintf(stderr,"cmd is %d %d %d\n", cmd, cmd &0xff, ret);
    switch (cmd & 0xff) {
    case GRAW_CREATE_RENDERER:
-      graw_renderer_init_glx();
+      graw_renderer_init_glx(0);
 //      graw_renderer_glut_init(decbuf[0], decbuf[1], decbuf[2], decbuf[3]);
       graw_renderer_init();
 

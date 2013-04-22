@@ -21,7 +21,7 @@ void graw_renderer_fini_glx(void)
    inited = 0;
 }
 
-void graw_renderer_init_glx(void)
+void graw_renderer_init_glx(int localrender)
 {
    int scrnum;
    Window root;
@@ -68,11 +68,30 @@ void graw_renderer_init_glx(void)
    attr.colormap = XCreateColormap(graw_dpy, root, visinfo->visual, AllocNone);
    attr.event_mask = StructureNotifyMask | ExposureMask;
    mask = CWBackPixel | CWBorderPixel | CWColormap | CWEventMask;
-   graw_win = XCreateWindow(graw_dpy, root, 0, 0, 1, 1, 
+   graw_win = XCreateWindow(graw_dpy, root, 0, 0, 1024, 768,
 		       0, visinfo->depth, InputOutput,
 		       visinfo->visual, mask, &attr);
 
    glXMakeCurrent(graw_dpy, graw_win, graw_ctx);
    inited = 1;
+
+   if (localrender) {
+      XMapWindow(graw_dpy, graw_win);
+   }
 }
 
+int process_x_event(void)
+{
+   if (!graw_dpy)
+      return;
+   if (XPending(graw_dpy))
+   {
+      XEvent event;
+      XNextEvent(graw_dpy, &event);
+   }
+}
+
+int swap_buffers(void)
+{
+   glXSwapBuffers(graw_dpy, graw_win);
+}

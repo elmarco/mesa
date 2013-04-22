@@ -1376,3 +1376,86 @@ void grend_set_scissor_state(struct grend_context *ctx,
 {
    glScissor(ss->minx, ss->miny, ss->maxx - ss->minx, ss->maxy - ss->miny);
 }
+
+void graw_renderer_resource_copy_region(struct grend_context *ctx,
+                                        uint32_t dst_handle, uint32_t dst_level,
+                                        uint32_t dstx, uint32_t dsty, uint32_t dstz,
+                                        uint32_t src_handle, uint32_t src_level,
+                                        const struct pipe_box *src_box)
+{
+   struct grend_resource *src_res, *dst_res;   
+   GLuint fb_ids[2];
+   GLbitfield glmask = 0;
+
+   src_res = graw_object_lookup(src_handle, GRAW_RESOURCE);
+   dst_res = graw_object_lookup(dst_handle, GRAW_RESOURCE);
+
+   glGenFramebuffers(2, fb_ids);
+   glBindFramebuffer(GL_FRAMEBUFFER_EXT, fb_ids[0]);
+   glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
+                             src_res->target, src_res->id, src_level);
+
+   glBindFramebuffer(GL_FRAMEBUFFER_EXT, fb_ids[1]);
+   glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
+                             dst_res->target, dst_res->id, dst_level);
+
+   glBindFramebuffer(GL_READ_FRAMEBUFFER, fb_ids[0]);
+   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fb_ids[1]);
+
+   glmask = GL_COLOR_BUFFER_BIT;
+      
+   glBlitFramebuffer(src_box->x, src_box->y,
+                     src_box->x + src_box->width,
+                     src_box->y + src_box->height, 
+                     dstx, dsty,
+                     dstx + src_box->width,
+                     dsty + src_box->height,
+                     glmask, GL_NEAREST);
+
+   glDeleteFramebuffers(2, fb_ids);
+}
+
+void graw_renderer_blit(struct grend_context *ctx,
+                        uint32_t dst_handle, uint32_t src_handle,
+                        const struct pipe_blit_info *info)
+{
+   struct grend_resource *src_res, *dst_res;
+   GLuint fb_ids[2];
+   GLbitfield glmask = 0;
+
+   src_res = graw_object_lookup(src_handle, GRAW_RESOURCE);
+   dst_res = graw_object_lookup(dst_handle, GRAW_RESOURCE);
+
+   if (src_res->target != dst_res->target) {
+      assert(0);
+   }
+
+   glGenFramebuffers(2, fb_ids);
+   glBindFramebuffer(GL_FRAMEBUFFER_EXT, fb_ids[0]);
+   glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
+                             src_res->target, src_res->id, info->src.level);
+
+   glBindFramebuffer(GL_FRAMEBUFFER_EXT, fb_ids[1]);
+   glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
+                             dst_res->target, dst_res->id, info->dst.level);
+
+   glBindFramebuffer(GL_READ_FRAMEBUFFER, fb_ids[0]);
+   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fb_ids[1]);
+
+   if (info->mask & PIPE_MASK_Z)
+      glmask |= GL_DEPTH_BUFFER_BIT;
+   if (info->mask & PIPE_MASK_S)
+      glmask |= GL_STENCIL_BUFFER_BIT;
+   if (info->mask & PIPE_MASK_RGBA)
+      glmask |= GL_COLOR_BUFFER_BIT;
+      
+   glBlitFramebuffer(info->src.box.x, info->src.box.y,
+                     info->src.box.x + info->src.box.width,
+                     info->src.box.y + info->src.box.height, 
+                     info->dst.box.x, info->dst.box.y,
+                     info->dst.box.x + info->dst.box.width,
+                     info->dst.box.y + info->dst.box.height,
+                     glmask, convert_mag_filter(info->filter));
+
+   glDeleteFramebuffers(2, fb_ids);
+}

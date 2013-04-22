@@ -418,6 +418,63 @@ int graw_encoder_set_scissor_state(struct graw_encoder_state *enc,
    graw_encoder_write_dword(enc, (ss->maxx | ss->maxy << 16));
 }
 
+int graw_encode_resource_copy_region(struct graw_encoder_state *enc,
+                                     uint32_t dst_res_handle,
+                                     unsigned dst_level,
+                                     unsigned dstx, unsigned dsty, unsigned dstz,
+                                     uint32_t src_res_handle,
+                                     unsigned src_level,
+                                     const struct pipe_box *src_box)
+{
+   graw_encoder_write_cmd_dword(enc, GRAW_CMD0(GRAW_RESOURCE_COPY_REGION, 0, 13));
+   graw_encoder_write_dword(enc, dst_res_handle);
+   graw_encoder_write_dword(enc, dst_level);
+   graw_encoder_write_dword(enc, dstx);
+   graw_encoder_write_dword(enc, dsty);
+   graw_encoder_write_dword(enc, dstz);
+   graw_encoder_write_dword(enc, src_res_handle);
+   graw_encoder_write_dword(enc, src_level);
+   graw_encoder_write_dword(enc, src_box->x);
+   graw_encoder_write_dword(enc, src_box->y);
+   graw_encoder_write_dword(enc, src_box->z);
+   graw_encoder_write_dword(enc, src_box->width);
+   graw_encoder_write_dword(enc, src_box->height);
+   graw_encoder_write_dword(enc, src_box->depth);
+}
+
+int graw_encode_blit(struct graw_encoder_state *enc,
+                     uint32_t dst_handle, uint32_t src_handle,
+                     const struct pipe_blit_info *blit)
+{
+   graw_encoder_write_cmd_dword(enc, GRAW_CMD0(GRAW_BLIT, 0, 23));
+   graw_encoder_write_dword(enc, blit->mask);
+   graw_encoder_write_dword(enc, blit->filter);
+   graw_encoder_write_dword(enc, blit->scissor_enable);
+   graw_encoder_write_dword(enc, (blit->scissor.minx | blit->scissor.miny << 16));
+   graw_encoder_write_dword(enc, (blit->scissor.maxx | blit->scissor.maxy << 16));
+
+   graw_encoder_write_dword(enc, dst_handle);
+   graw_encoder_write_dword(enc, blit->dst.level);
+   graw_encoder_write_dword(enc, blit->dst.format);
+   graw_encoder_write_dword(enc, blit->dst.box.x);
+   graw_encoder_write_dword(enc, blit->dst.box.y);
+   graw_encoder_write_dword(enc, blit->dst.box.z);
+   graw_encoder_write_dword(enc, blit->dst.box.width);
+   graw_encoder_write_dword(enc, blit->dst.box.height);
+   graw_encoder_write_dword(enc, blit->dst.box.depth);
+
+   graw_encoder_write_dword(enc, src_handle);
+   graw_encoder_write_dword(enc, blit->src.level);
+   graw_encoder_write_dword(enc, blit->src.format);
+   graw_encoder_write_dword(enc, blit->src.box.x);
+   graw_encoder_write_dword(enc, blit->src.box.y);
+   graw_encoder_write_dword(enc, blit->src.box.z);
+   graw_encoder_write_dword(enc, blit->src.box.width);
+   graw_encoder_write_dword(enc, blit->src.box.height);
+   graw_encoder_write_dword(enc, blit->src.box.depth);
+
+}
+
 #define EQ_BUF_SIZE (16*1024)
 
 struct graw_encoder_state *graw_encoder_init_queue(void)

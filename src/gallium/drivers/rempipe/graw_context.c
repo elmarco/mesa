@@ -580,6 +580,38 @@ static void graw_set_sample_mask(struct pipe_context *ctx,
 
 }
 
+static void graw_resource_copy_region(struct pipe_context *ctx,
+                                      struct pipe_resource *dst,
+                                      unsigned dst_level,
+                                      unsigned dstx, unsigned dsty, unsigned dstz,
+                                      struct pipe_resource *src,
+                                      unsigned src_level,
+                                      const struct pipe_box *src_box)
+{
+   struct graw_context *grctx = (struct graw_context *)ctx;
+   struct graw_resource *dres = (struct graw_resource *)dst;
+   struct graw_resource *sres = (struct graw_resource *)src;
+
+   dres->clean = FALSE;
+   return graw_encode_resource_copy_region(grctx->eq, dres->res_handle,
+                                           dst_level, dstx, dsty, dstz,
+                                           sres->res_handle, src_level,
+                                           src_box);
+}
+
+static void graw_blit(struct pipe_context *ctx,
+                      const struct pipe_blit_info *blit)
+{
+   struct graw_context *grctx = (struct graw_context *)ctx;
+   struct graw_resource *dres = (struct graw_resource *)blit->dst.resource;
+   struct graw_resource *sres = (struct graw_resource *)blit->src.resource;
+
+   dres->clean = FALSE;
+   return graw_encode_blit(grctx->eq, dres->res_handle, sres->res_handle,
+                           blit);
+
+}
+
 static void *graw_transfer_map(struct pipe_context *ctx,
                                struct pipe_resource *resource,
                                unsigned level,
@@ -747,8 +779,8 @@ struct pipe_context *graw_context_create(struct pipe_screen *pscreen,
    grctx->base.transfer_unmap = graw_transfer_unmap;
    grctx->base.transfer_flush_region = graw_transfer_flush_region;
 
-   graw_init_blit_functions(grctx);
-
+   grctx->base.resource_copy_region = graw_resource_copy_region;
+   grctx->base.blit =  graw_blit;
    util_slab_create(&grctx->texture_transfer_pool, sizeof(struct graw_transfer),
                     16, UTIL_SLAB_SINGLETHREADED);
 
@@ -757,9 +789,9 @@ struct pipe_context *graw_context_create(struct pipe_screen *pscreen,
    if (!grctx->uploader)
            goto fail;
 
-   grctx->blitter = util_blitter_create(&grctx->base);
-   if (grctx->blitter == NULL)
-      goto fail;
+   grctx->blitter = NULL;//util_blitter_create(&grctx->base);
+//   if (grctx->blitter == NULL)
+//      goto fail;
 
    return &grctx->base;
 fail:

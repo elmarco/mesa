@@ -147,4 +147,15 @@ int graw_encoder_set_blend_color(struct graw_encoder_state *enc,
 
 int graw_encoder_set_scissor_state(struct graw_encoder_state *enc,
                                    const struct pipe_scissor_state *ss);
+int graw_encode_resource_copy_region(struct graw_encoder_state *enc,
+                                     uint32_t dst_res_handle,
+                                     unsigned dst_level,
+                                     unsigned dstx, unsigned dsty, unsigned dstz,
+                                     uint32_t src_res_handle,
+                                     unsigned src_level,
+                                     const struct pipe_box *src_box);
+
+int graw_encode_blit(struct graw_encoder_state *enc,
+                     uint32_t dst_handle, uint32_t src_handle,
+                     const struct pipe_blit_info *blit);
 #endif

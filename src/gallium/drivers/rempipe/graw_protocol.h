@@ -34,6 +34,8 @@ enum graw_cmd {
    GRAW_SET_STENCIL_REF,
    GRAW_SET_BLEND_COLOR,
    GRAW_SET_SCISSOR_STATE,
+   GRAW_BLIT,
+   GRAW_RESOURCE_COPY_REGION,
 };
 
 enum graw_scrn_cmd {

@@ -472,6 +472,70 @@ static void graw_decode_set_scissor_state(struct grend_decode_ctx *ctx)
    grend_set_scissor_state(gdctx->grctx, &ss);
 }
 
+static void graw_decode_resource_copy_region(struct grend_decode_ctx *ctx)
+{
+   struct pipe_box box;
+   uint32_t dst_handle, src_handle;
+   uint32_t dst_level, dstx, dsty, dstz;
+   uint32_t src_level;
+
+   dst_handle = ctx->ds->buf[ctx->ds->buf_offset + 1];
+   dst_level = ctx->ds->buf[ctx->ds->buf_offset + 2];
+   dstx = ctx->ds->buf[ctx->ds->buf_offset + 3];
+   dsty = ctx->ds->buf[ctx->ds->buf_offset + 4];
+   dstz = ctx->ds->buf[ctx->ds->buf_offset + 5];
+   src_handle = ctx->ds->buf[ctx->ds->buf_offset + 6];
+   src_level = ctx->ds->buf[ctx->ds->buf_offset + 7];
+   box.x = ctx->ds->buf[ctx->ds->buf_offset + 8];
+   box.y = ctx->ds->buf[ctx->ds->buf_offset + 9];
+   box.z = ctx->ds->buf[ctx->ds->buf_offset + 10];
+   box.width = ctx->ds->buf[ctx->ds->buf_offset + 11];
+   box.height = ctx->ds->buf[ctx->ds->buf_offset + 12];
+   box.depth = ctx->ds->buf[ctx->ds->buf_offset + 13];
+
+   graw_renderer_resource_copy_region(gdctx->grctx, dst_handle,
+                                      dst_level, dstx, dsty, dstz,
+                                      src_handle, src_level,
+                                      &box);
+}
+
+
+static void graw_decode_blit(struct grend_decode_ctx *ctx)
+{
+   struct pipe_blit_info info;
+   uint32_t dst_handle, src_handle, temp;
+
+   info.mask = ctx->ds->buf[ctx->ds->buf_offset + 1];
+   info.filter = ctx->ds->buf[ctx->ds->buf_offset + 2];
+   info.scissor_enable = ctx->ds->buf[ctx->ds->buf_offset + 3] & 1;
+   temp = ctx->ds->buf[ctx->ds->buf_offset + 4];
+   info.scissor.minx = temp & 0xffff;
+   info.scissor.miny = (temp >> 16) & 0xffff;
+   temp = ctx->ds->buf[ctx->ds->buf_offset + 5];
+   info.scissor.maxx = temp & 0xffff;
+   info.scissor.maxy = (temp >> 16) & 0xffff;
+   dst_handle = ctx->ds->buf[ctx->ds->buf_offset + 6];
+   info.dst.level = ctx->ds->buf[ctx->ds->buf_offset + 7];
+   info.dst.format = ctx->ds->buf[ctx->ds->buf_offset + 8];
+   info.dst.box.x = ctx->ds->buf[ctx->ds->buf_offset + 9];
+   info.dst.box.y = ctx->ds->buf[ctx->ds->buf_offset + 10];
+   info.dst.box.z = ctx->ds->buf[ctx->ds->buf_offset + 11];
+   info.dst.box.width = ctx->ds->buf[ctx->ds->buf_offset + 12];
+   info.dst.box.height = ctx->ds->buf[ctx->ds->buf_offset + 13];
+   info.dst.box.depth = ctx->ds->buf[ctx->ds->buf_offset + 14];
+
+   src_handle = ctx->ds->buf[ctx->ds->buf_offset + 15];
+   info.src.level = ctx->ds->buf[ctx->ds->buf_offset + 16];
+   info.src.format = ctx->ds->buf[ctx->ds->buf_offset + 17];
+   info.src.box.x = ctx->ds->buf[ctx->ds->buf_offset + 18];
+   info.src.box.y = ctx->ds->buf[ctx->ds->buf_offset + 19];
+   info.src.box.z = ctx->ds->buf[ctx->ds->buf_offset + 20];
+   info.src.box.width = ctx->ds->buf[ctx->ds->buf_offset + 21];
+   info.src.box.height = ctx->ds->buf[ctx->ds->buf_offset + 22];
+   info.src.box.depth = ctx->ds->buf[ctx->ds->buf_offset + 23]; 
+
+   graw_renderer_blit(gdctx->grctx, dst_handle, src_handle, &info);
+}
 
 void graw_decode_block(uint32_t *block, int ndw)
 {
@@ -539,6 +603,12 @@ void graw_decode_block(uint32_t *block, int ndw)
          break;
       case GRAW_SET_SCISSOR_STATE:
          graw_decode_set_scissor_state(gdctx);
+         break;
+      case GRAW_BLIT:
+         graw_decode_blit(gdctx);
+         break;
+      case GRAW_RESOURCE_COPY_REGION:
+         graw_decode_resource_copy_region(gdctx);
          break;
       }
       gdctx->ds->buf_offset += (header >> 16) + 1;

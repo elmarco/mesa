@@ -102,6 +102,16 @@ void graw_renderer_transfer_write(uint32_t handle, int level,
                                   struct pipe_box *box,
                                   void *data);
 
+void graw_renderer_resource_copy_region(struct grend_context *ctx,
+                                        uint32_t dst_handle, uint32_t dst_level,
+                                        uint32_t dstx, uint32_t dsty, uint32_t dstz,
+                                        uint32_t src_handle, uint32_t src_level,
+                                        const struct pipe_box *src_box);
+
+void graw_renderer_blit(struct grend_context *ctx,
+                        uint32_t dst_handle, uint32_t src_handle,
+                        const struct pipe_blit_info *info);
+
 void graw_renderer_transfer_send(uint32_t handle, uint32_t level, struct pipe_box *box, void *ptr);
 void grend_set_stencil_ref(struct grend_context *ctx, struct pipe_stencil_ref *ref);
 void grend_set_blend_color(struct grend_context *ctx, struct pipe_blend_color *color);

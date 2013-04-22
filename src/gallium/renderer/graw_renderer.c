@@ -514,6 +514,7 @@ void grend_clear(struct grend_context *ctx,
                  double depth, unsigned stencil)
 {
    GLbitfield bits = 0;
+   glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, ctx->fb_id);
    glUseProgram(0);
    glClearColor(color->f[0], color->f[1], color->f[2], color->f[3]);
 

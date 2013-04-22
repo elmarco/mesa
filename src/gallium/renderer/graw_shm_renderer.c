@@ -155,12 +155,12 @@ int main(int argc, char **argv)
       
       cmd = SPICE_RING_CONS_ITEM(&ramp->cmd_3d_ring);
     
-      fprintf(stderr, "got cmd %x\n", cmd->type);
+//      fprintf(stderr, "got cmd %x\n", cmd->type);
 
       switch (cmd->type) {
       case QXL_3D_CMD_CREATE_RESOURCE:
-         fprintf(stderr,"got res create %d %d\n", cmd->u.res_create.width,
-                 cmd->u.res_create.height);
+//         fprintf(stderr,"got res create %d %d\n", cmd->u.res_create.width,
+//                 cmd->u.res_create.height);
          graw_renderer_resource_create(cmd->u.res_create.handle,
                                        cmd->u.res_create.target,
                                        cmd->u.res_create.format,
@@ -173,24 +173,24 @@ int main(int argc, char **argv)
                                        cmd->u.res_create.nr_samples);
          break;
       case QXL_3D_CMD_SUBMIT:
-         fprintf(stderr,"cmd submit %lx %d\n", cmd->u.cmd_submit.phy_addr, cmd->u.cmd_submit.size);
+//         fprintf(stderr,"cmd submit %lx %d\n", cmd->u.cmd_submit.phy_addr, cmd->u.cmd_submit.size);
 
          {
             uint32_t *cmdmap = mapping + cmd->u.cmd_submit.phy_addr;
-            fprintf(stderr,"%08x %08x\n", cmdmap[0], cmdmap[1]);
+//            fprintf(stderr,"%08x %08x\n", cmdmap[0], cmdmap[1]);
             graw_decode_block(cmdmap, cmd->u.cmd_submit.size / 4);
          }
 
          break;
       case QXL_3D_TRANSFER_GET:
-         fprintf(stderr,"got transfer get %d\n", cmd->u.transfer_get.res_handle);
+//         fprintf(stderr,"got transfer get %d\n", cmd->u.transfer_get.res_handle);
 	 graw_renderer_transfer_send(cmd->u.transfer_get.res_handle,
                                      cmd->u.transfer_get.level,
 				     (struct pipe_box *)&cmd->u.transfer_get.box,
 				     mapping + cmd->u.transfer_get.phy_addr);
 	 break;
       case QXL_3D_TRANSFER_PUT:
-         fprintf(stderr,"got transfer putt %d\n", cmd->u.transfer_put.res_handle);
+//         fprintf(stderr,"got transfer putt %d\n", cmd->u.transfer_put.res_handle);
 	 graw_renderer_transfer_write(cmd->u.transfer_put.res_handle,
 				      cmd->u.transfer_put.level,
 				      (struct pipe_box *)&cmd->u.transfer_put.transfer_box,

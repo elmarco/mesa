@@ -1337,6 +1337,8 @@ void graw_renderer_transfer_send(uint32_t res_handle, uint32_t level, struct pip
 	res->readback_fb_level = level;
       } else
 	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, res->readback_fb_id);
+
+      glPixelStorei(GL_PACK_INVERT_MESA, 1);
       glReadBuffer(GL_COLOR_ATTACHMENT0_EXT);
 
       switch (res->base.format) {
@@ -1346,7 +1348,11 @@ void graw_renderer_transfer_send(uint32_t res_handle, uint32_t level, struct pip
          type = GL_UNSIGNED_BYTE;
          break;
       }
-      glReadPixels(box->x, box->y, box->width, box->height, format, type, myptr);
+
+      y1 = h - box->y - box->height;
+      glReadPixels(box->x, y1, box->width, box->height, format, type, myptr);
+
+      glPixelStorei(GL_PACK_INVERT_MESA, 0);
       //      graw_transfer_write_tex_return(&res->base, box, level, data, myptr);
 //      free(data);
    }
@@ -1386,7 +1392,7 @@ void graw_renderer_resource_copy_region(struct grend_context *ctx,
    struct grend_resource *src_res, *dst_res;   
    GLuint fb_ids[2];
    GLbitfield glmask = 0;
-
+   GLint sy1, sy2, dy1, dy2;
    src_res = graw_object_lookup(src_handle, GRAW_RESOURCE);
    dst_res = graw_object_lookup(dst_handle, GRAW_RESOURCE);
 
@@ -1403,13 +1409,18 @@ void graw_renderer_resource_copy_region(struct grend_context *ctx,
    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fb_ids[1]);
 
    glmask = GL_COLOR_BUFFER_BIT;
-      
-   glBlitFramebuffer(src_box->x, src_box->y,
+
+   sy1 = src_res->base.height0 - src_box->y - src_box->height;
+   sy2 = sy1 + src_box->height;
+   dy1 = dst_res->base.height0 - dsty - src_box->height;
+   dy2 = dy1 + src_box->height;
+
+   glBlitFramebuffer(src_box->x, sy1,
                      src_box->x + src_box->width,
-                     src_box->y + src_box->height, 
-                     dstx, dsty,
+                     sy2,
+                     dstx, dy1,
                      dstx + src_box->width,
-                     dsty + src_box->height,
+                     dy2,
                      glmask, GL_NEAREST);
 
    glDeleteFramebuffers(2, fb_ids);
@@ -1422,18 +1433,21 @@ void graw_renderer_blit(struct grend_context *ctx,
    struct grend_resource *src_res, *dst_res;
    GLuint fb_ids[2];
    GLbitfield glmask = 0;
+   int y1, y2;
+   GLuint src_target;
 
    src_res = graw_object_lookup(src_handle, GRAW_RESOURCE);
    dst_res = graw_object_lookup(dst_handle, GRAW_RESOURCE);
 
-   if (src_res->target != dst_res->target) {
-      assert(0);
-   }
-
    glGenFramebuffers(2, fb_ids);
    glBindFramebuffer(GL_FRAMEBUFFER_EXT, fb_ids[0]);
-   glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
-                             src_res->target, src_res->id, info->src.level);
+
+   if (src_res->target == GL_TEXTURE_CUBE_MAP) {
+      glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
+                                GL_TEXTURE_CUBE_MAP_POSITIVE_X + info->src.level, src_res->id, 0);
+   } else
+      glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
+                                src_res->target, src_res->id, info->src.level);
 
    glBindFramebuffer(GL_FRAMEBUFFER_EXT, fb_ids[1]);
    glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
@@ -1448,10 +1462,14 @@ void graw_renderer_blit(struct grend_context *ctx,
       glmask |= GL_STENCIL_BUFFER_BIT;
    if (info->mask & PIPE_MASK_RGBA)
       glmask |= GL_COLOR_BUFFER_BIT;
+
+   y1 = info->src.box.y;
+   y2 = (info->src.box.y + info->src.box.height);
       
-   glBlitFramebuffer(info->src.box.x, info->src.box.y,
+   glBlitFramebuffer(info->src.box.x,
+                     y1,
                      info->src.box.x + info->src.box.width,
-                     info->src.box.y + info->src.box.height, 
+                     y2,
                      info->dst.box.x, info->dst.box.y,
                      info->dst.box.x + info->dst.box.width,
                      info->dst.box.y + info->dst.box.height,

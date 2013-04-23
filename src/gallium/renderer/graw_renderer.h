@@ -98,8 +98,8 @@ void grend_set_index_buffer(struct grend_context *ctx,
                             uint32_t offset);
 
 void graw_renderer_transfer_write(uint32_t handle, int level,
-                                  struct pipe_box *transfer_box,
-                                  struct pipe_box *box,
+                                  uint32_t src_stride,
+                                  struct pipe_box *dst_box,
                                   void *data);
 
 void graw_renderer_resource_copy_region(struct grend_context *ctx,
@@ -129,6 +129,13 @@ void graw_transfer_write_tex_return(struct pipe_resource *res,
 				    struct pipe_box *box,
                                     uint32_t level,
 				    void *data, void *myptr);
+
+int graw_renderer_set_scanout(uint32_t res_handle,
+                              struct pipe_box *box);
+
+int graw_renderer_flush_buffer(uint32_t res_handle,
+                               struct pipe_box *box);
+
 void graw_renderer_fini(void);
 void graw_reset_decode(void);
 

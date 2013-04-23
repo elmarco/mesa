@@ -30,6 +30,7 @@ int localrender;
 
 struct grend_screen;
 
+static uint32_t res_id;
 struct grend_shader_state {
    GLuint id;
    unsigned type;
@@ -117,6 +118,7 @@ struct grend_context {
    struct list_head programs;
 };
 
+static struct grend_resource *frontbuffer;
 static struct {
    GLenum internalformat;
    GLenum glformat;
@@ -1227,8 +1229,8 @@ void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target tar
 
 void graw_renderer_transfer_write(uint32_t res_handle,
                                   int level,
-                                  struct pipe_box *transfer_box,
-                                  struct pipe_box *box,
+                                  uint32_t src_stride,
+                                  struct pipe_box *dst_box,
                                   void *data)
 {
    struct grend_resource *res;
@@ -1237,29 +1239,14 @@ void graw_renderer_transfer_write(uint32_t res_handle,
    res = graw_object_lookup(res_handle, GRAW_RESOURCE);
    if (res->target == GL_ELEMENT_ARRAY_BUFFER_ARB) {
       glBindBufferARB(GL_ELEMENT_ARRAY_BUFFER_ARB, res->id);
-      glBufferSubData(GL_ELEMENT_ARRAY_BUFFER_ARB, transfer_box->x + box->x, box->width ? box->width : transfer_box->width, data);
+      glBufferSubData(GL_ELEMENT_ARRAY_BUFFER_ARB, dst_box->x, dst_box->width, data);
    } else if (res->target == GL_ARRAY_BUFFER_ARB) {
       glBindBufferARB(GL_ARRAY_BUFFER_ARB, res->id);
-      glBufferSubData(GL_ARRAY_BUFFER_ARB, transfer_box->x + box->x, box->width ? box->width : transfer_box->width, data);
+      glBufferSubData(GL_ARRAY_BUFFER_ARB, dst_box->x, dst_box->width, data);
    } else {
       GLenum glformat;
       GLenum gltype;
-      int width, height, depth, x, y, z;
-
-      x = transfer_box->x;
-      y = transfer_box->y;
-      z = transfer_box->z;
-      width = transfer_box->width;
-      height = transfer_box->height;
-      depth = transfer_box->depth;
-      if (box->width || box->height || box->depth) {
-         width = box->width;
-         height = box->height;
-         depth = box->depth;
-         x += box->x;
-         y += box->y;
-         z += box->z;
-      }
+      int old_stride = 0;
 
       glBindTexture(res->target, res->id);
 
@@ -1270,22 +1257,29 @@ void graw_renderer_transfer_write(uint32_t res_handle,
 	 gltype = GL_UNSIGNED_BYTE;
       }
 	 
+      if (src_stride) {
+         glGetIntegerv(GL_UNPACK_ROW_LENGTH, &old_stride);
+         glPixelStorei(GL_UNPACK_ROW_LENGTH, src_stride / 4);
+      }
       if (res->target == GL_TEXTURE_CUBE_MAP) {
-         GLenum ctarget = GL_TEXTURE_CUBE_MAP_POSITIVE_X + z;
+         GLenum ctarget = GL_TEXTURE_CUBE_MAP_POSITIVE_X + dst_box->z;
 
-         glTexSubImage2D(ctarget, level, x, y, width, height,
+         glTexSubImage2D(ctarget, level, dst_box->x, dst_box->y, dst_box->width, dst_box->height,
                          glformat, gltype, data);
       } else if (res->target == GL_TEXTURE_3D) {
-         glTexSubImage3D(res->target, level, x, y, z, width, height, depth,
+         glTexSubImage3D(res->target, level, dst_box->x, dst_box->y, dst_box->z,
+                         dst_box->width, dst_box->height, dst_box->depth,
                          glformat, gltype, data);
       } else if (res->target == GL_TEXTURE_1D) {
-         glTexSubImage1D(res->target, level, x, width,
+         glTexSubImage1D(res->target, level, dst_box->x, dst_box->width,
                          glformat, gltype, data);
       } else {
-         glTexSubImage2D(res->target, level, x, y, width, height,
+         glTexSubImage2D(res->target, level, dst_box->x, dst_box->y,
+                         dst_box->width, dst_box->height,
                          glformat, gltype, data);
       }
-      fprintf(stderr,"TRANSFER FOR TEXTURE\n");
+      if (src_stride)
+         glPixelStorei(GL_UNPACK_ROW_LENGTH, old_stride);
    }
 }
 
@@ -1319,7 +1313,7 @@ void graw_renderer_transfer_send(uint32_t res_handle, uint32_t level, struct pip
       uint32_t send_size = box->width * box->height * util_format_get_blocksize(res->base.format);
       GLenum format, type;
       int fb_id;
-
+      GLint  y1, y2;
 //      data = malloc(send_size);
 
 //      if (!data)
@@ -1476,4 +1470,49 @@ void graw_renderer_blit(struct grend_context *ctx,
                      glmask, convert_mag_filter(info->filter));
 
    glDeleteFramebuffers(2, fb_ids);
+}
+
+int graw_renderer_set_scanout(uint32_t res_handle,
+                              struct pipe_box *box)
+{
+   struct grend_resource *res;
+   res = graw_object_lookup(res_handle, GRAW_RESOURCE);
+   if (!res)
+      return 0;
+
+   frontbuffer = res;
+   return 0;
+}
+
+int graw_renderer_flush_buffer(uint32_t res_handle,
+                               struct pipe_box *box)
+{
+   struct grend_resource *res;
+   GLuint fb_id;
+
+   if (!localrender)
+      return;
+
+   res = graw_object_lookup(res_handle, GRAW_RESOURCE);
+   if (!res)
+      return 0;
+
+   if (res != frontbuffer)
+      return 0;
+
+   glGenFramebuffers(1, &fb_id);
+
+   glBindFramebuffer(GL_FRAMEBUFFER_EXT, fb_id);
+   glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
+                             res->target, res->id, 0);
+
+   glBindFramebuffer(GL_READ_FRAMEBUFFER, fb_id);
+   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+
+   glBlitFramebuffer(0, 0, res->base.width0, res->base.height0,
+                     0, res->base.height0, res->base.width0, 0,
+                     GL_COLOR_BUFFER_BIT, GL_NEAREST);
+   glDeleteFramebuffers(1, &fb_id);
+   swap_buffers();
+   return 0;
 }

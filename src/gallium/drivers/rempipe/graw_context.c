@@ -667,7 +667,7 @@ static void graw_transfer_unmap(struct pipe_context *ctx,
       if (!(transfer->usage & PIPE_TRANSFER_FLUSH_EXPLICIT)) {
          grres->clean = FALSE;
          graw_flush(ctx, NULL, 0);
-         graw_transfer_block(grres->res_handle, transfer->level, &transfer->box, &empty_box, trans->localmem + trans->offset, trans->lmsize / 4);
+         graw_transfer_block(grres->res_handle, transfer->level, &transfer->box, 0, trans->localmem + trans->offset, trans->lmsize / 4);
       }
       
    }
@@ -686,12 +686,20 @@ static void graw_transfer_flush_region(struct pipe_context *ctx,
    struct graw_transfer *trans = (struct graw_transfer *)transfer;
    uint32_t offset;
    uint32_t size;
+   struct pipe_box hw_box;
 
    offset = trans->offset;
    offset += box->x;
 
+   hw_box.x = transfer->box.x + box->x;
+   hw_box.y = transfer->box.y + box->y;
+   hw_box.z = transfer->box.z + box->z;
+   hw_box.width = box->width;
+   hw_box.height = box->height;
+   hw_box.depth = box->depth;
+
    graw_flush(ctx, NULL, 0);
-   graw_transfer_block(grres->res_handle, transfer->level, &transfer->box, box, trans->localmem + offset, box->width);
+   graw_transfer_block(grres->res_handle, transfer->level, &hw_box, 0, trans->localmem + offset, box->width);
    grres->clean = FALSE;   
 }
                                        

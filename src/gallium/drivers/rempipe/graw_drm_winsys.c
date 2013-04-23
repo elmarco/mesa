@@ -101,18 +101,18 @@ static int qxl_3d_alloc(int fd, int size, uint32_t *handle)
 }
 
 static int qxl_3d_transfer_put(int fd, uint32_t res_handle, uint32_t bo_handle,
-			struct drm_qxl_3d_box *box,
-			struct drm_qxl_3d_box *transfer_box,
-			uint32_t level)
+                               struct drm_qxl_3d_box *box,
+                               uint32_t src_stride,
+                               uint32_t level)
 {
   struct drm_qxl_3d_transfer_put putcmd;
   int ret;
 
   putcmd.res_handle = res_handle;
   putcmd.bo_handle = bo_handle;
-  putcmd.box = *box;
-  putcmd.transfer_box = *transfer_box;
-  putcmd.level = level;
+  putcmd.dst_box = *box;
+  putcmd.src_stride = src_stride;
+  putcmd.dst_level = level;
 
   ret = drmIoctl(fd, DRM_IOCTL_QXL_3D_TRANSFER_PUT, &putcmd);
   return ret;
@@ -168,8 +168,8 @@ static void gem_close(int fd, uint32_t handle)
 }
 
 void graw_transfer_block(uint32_t res_handle, int level,
-                         const struct pipe_box *transfer_box,
                          const struct pipe_box *box,
+                         uint32_t src_stride,
                          void *data, int ndw)
 {
    int ret;
@@ -193,7 +193,7 @@ void graw_transfer_block(uint32_t res_handle, int level,
    memcpy(ptr, data, ndw*4);
 
    ret = qxl_3d_transfer_put(fd, res_handle, bo_handle, box,
-                             transfer_box, level);
+                             src_stride, level);
 
    munmap(ptr, size);
    gem_close(fd, bo_handle);

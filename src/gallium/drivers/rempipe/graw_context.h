@@ -98,8 +98,8 @@ void graw_flush_frontbuffer(struct pipe_screen *screen,
 
 void graw_transfer_block(uint32_t res_handle,
                          int level,
-                         const struct pipe_box *transfer_box,
-                         const struct pipe_box *box,
+                         const struct pipe_box *dst_box,
+                         uint32_t src_stride,
                          void *data, int ndw);
 void graw_transfer_get_block(uint32_t res_handle, uint32_t level,
                              const struct pipe_box *box,

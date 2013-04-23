@@ -192,14 +192,22 @@ int main(int argc, char **argv)
       case QXL_3D_TRANSFER_PUT:
 //         fprintf(stderr,"got transfer putt %d\n", cmd->u.transfer_put.res_handle);
 	 graw_renderer_transfer_write(cmd->u.transfer_put.res_handle,
-				      cmd->u.transfer_put.level,
-				      (struct pipe_box *)&cmd->u.transfer_put.transfer_box,
-				      (struct pipe_box *)&cmd->u.transfer_put.box,
+				      cmd->u.transfer_put.dst_level,
+				      cmd->u.transfer_put.src_stride,
+				      (struct pipe_box *)&cmd->u.transfer_put.dst_box,
 				      mapping + cmd->u.transfer_put.phy_addr);
 	 break;
       case QXL_3D_FENCE:
          ramp->last_fence = cmd->u.fence_id;
          send_irq(vm_efd, 4);
+         break;
+      case QXL_3D_SET_SCANOUT:
+         graw_renderer_set_scanout(cmd->u.set_scanout.res_handle,
+                                   (struct pipe_box *)&cmd->u.set_scanout.box);
+         break;
+      case QXL_3D_FLUSH_BUFFER:
+         graw_renderer_flush_buffer(cmd->u.flush_buffer.res_handle,
+                                   (struct pipe_box *)&cmd->u.flush_buffer.box);
          break;
       case 0xdeadbeef:
          if (inited) {

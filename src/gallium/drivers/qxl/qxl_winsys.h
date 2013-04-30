@@ -44,6 +44,15 @@ struct qxl_winsys {
                        uint32_t res_handle, const struct pipe_box *box,
                        uint32_t level);
                        
+   uint32_t (*resource_create)(struct qxl_winsys *qws,
+                               enum pipe_texture_target target,
+                               uint32_t format, uint32_t bind,
+                               uint32_t width, uint32_t height,
+                               uint32_t depth, uint32_t array_size,
+                               uint32_t last_level, uint32_t nr_samples);
+
+   int (*submit_cmd)(struct qxl_winsys *qws, uint32_t *block, int ndw);
+  
 };
 
 #endif

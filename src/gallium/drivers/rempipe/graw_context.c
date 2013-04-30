@@ -422,9 +422,10 @@ static void graw_draw_vbo(struct pipe_context *ctx,
 static void graw_flush_eq(struct graw_encoder_state *eq, void *closure)
 {
    struct graw_context *gr_ctx = closure;
-
+   struct rempipe_screen *rs = rempipe_screen(gr_ctx->base.screen);
    /* send the buffer to the remote side for decoding - for now jdi */
-   graw_decode_block(eq->buf, eq->buf_offset);
+   
+   rs->qws->submit_cmd(rs->qws, eq->buf, eq->buf_offset);
    eq->buf_offset = 0;
 }
 
@@ -435,15 +436,6 @@ static void graw_flush(struct pipe_context *ctx,
    struct graw_context *grctx = (struct graw_context *)ctx;
 
    graw_flush_eq(grctx->eq, grctx);
-
-#if 0
-   if (flags == PIPE_FLUSH_END_OF_FRAME) {
-      if (grctx->framebuffer.nr_cbufs)
-         graw_flush_frontbuffer(ctx->screen,
-                                grctx->framebuffer.cbufs[0]->texture,
-                                0, 0, NULL);
-   }
-#endif
 }
 
 static struct pipe_sampler_view *graw_create_sampler_view(struct pipe_context *ctx,
@@ -858,6 +850,7 @@ void graw_flush_frontbuffer(struct pipe_screen *screen,
 struct pipe_resource *graw_resource_create(struct pipe_screen *pscreen,
                                            const struct pipe_resource *template)
 {
+   struct rempipe_screen *rs = rempipe_screen(pscreen);
    struct graw_buffer *buf;
    struct graw_texture *tex;
    uint32_t handle;
@@ -868,7 +861,7 @@ struct pipe_resource *graw_resource_create(struct pipe_screen *pscreen,
       buf->base.base = *template;
       buf->base.base.screen = pscreen;
       pipe_reference_init(&buf->base.base.reference, 1);
-      handle = graw_renderer_resource_create(template->target, template->format, template->bind, template->width0, 1, 1, 0, 0, 0);
+      handle = rs->qws->resource_create(rs->qws, template->target, template->format, template->bind, template->width0, 1, 1, 0, 0, 0);
       buf->base.res_handle = handle;
       return &buf->base.base;
    } else {
@@ -877,7 +870,7 @@ struct pipe_resource *graw_resource_create(struct pipe_screen *pscreen,
       tex->base.base = *template;
       tex->base.base.screen = pscreen;
       pipe_reference_init(&tex->base.base.reference, 1);
-      handle = graw_renderer_resource_create(template->target, template->format, template->bind, template->width0, template->height0, template->depth0, template->array_size, template->last_level, template->nr_samples);
+      handle = rs->qws->resource_create(rs->qws, template->target, template->format, template->bind, template->width0, template->height0, template->depth0, template->array_size, template->last_level, template->nr_samples);
       tex->base.res_handle = handle;
 
       if (template->bind & (PIPE_BIND_DISPLAY_TARGET |
@@ -906,6 +899,7 @@ rempipe_resource_from_handle(struct pipe_screen *screen,
                              struct winsys_handle *whandle)
 {
    struct sw_winsys *winsys = rempipe_screen(screen)->winsys;
+   struct rempipe_screen *rs = rempipe_screen(screen);
    struct graw_texture *rpr = CALLOC_STRUCT(graw_texture);
    uint32_t handle;
 
@@ -914,7 +908,7 @@ rempipe_resource_from_handle(struct pipe_screen *screen,
    rpr->base.base.screen = screen;      
 
    if ((whandle->handle & (1<<30)) == 0) {
-      handle = graw_renderer_resource_create(template->target, template->format, template->bind, template->width0, template->height0, template->depth0, 0, 0, 0);
+      handle = rs->qws->resource_create(rs->qws, template->target, template->format, template->bind, template->width0, template->height0, template->depth0, 0, 0, 0);
       rpr->base.res_handle = handle;
       rpr->dt = winsys->displaytarget_from_handle(winsys,
                                                   template,

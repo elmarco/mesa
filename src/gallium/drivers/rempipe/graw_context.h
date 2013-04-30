@@ -109,8 +109,6 @@ void graw_transfer_get_block(struct rempipe_screen *rs,
                              void *data, int ndw);
 void grend_flush_frontbuffer(uint32_t res_handle);
 
-uint32_t graw_renderer_resource_create(enum pipe_texture_target target, uint32_t format, uint32_t bind, uint32_t width, uint32_t height, uint32_t depth, uint32_t array_size, uint32_t last_level, uint32_t nr_samples);
-
 struct pipe_resource *
 rempipe_resource_from_handle(struct pipe_screen *screen,
                              const struct pipe_resource *templat,

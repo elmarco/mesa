@@ -359,6 +359,62 @@ qxl_drm_winsys_destroy(struct qxl_winsys *qws)
    FREE(qdws);
 }
 
+static uint32_t qxl_drm_winsys_resource_create(struct qxl_winsys *qws,
+                                               enum pipe_texture_target target,
+                                               uint32_t format,
+                                               uint32_t bind,
+                                               uint32_t width,
+                                               uint32_t height,
+                                               uint32_t depth,
+                                               uint32_t array_size,
+                                               uint32_t last_level,
+                                               uint32_t nr_samples)
+{
+   struct qxl_drm_winsys *qdws = qxl_drm_winsys(qws);
+   struct drm_qxl_3d_resource_create createcmd;
+   int ret;
+
+   createcmd.target = target;
+   createcmd.format = format;
+   createcmd.bind = bind;
+   createcmd.width = width;
+   createcmd.height = height;
+   createcmd.depth = depth;
+   createcmd.array_size = array_size;
+   createcmd.last_level = last_level;
+   createcmd.nr_samples = nr_samples;
+   createcmd.res_handle = 0;
+
+   ret = drmIoctl(qdws->fd, DRM_IOCTL_QXL_3D_RESOURCE_CREATE, &createcmd);
+   if (ret == 0)
+      return createcmd.res_handle;
+   return 0;
+}
+
+static int qxl_drm_winsys_submit_cmd(struct qxl_winsys *qws, uint32_t *block, int ndw)
+{
+   struct qxl_drm_winsys *qdws = qxl_drm_winsys(qws);
+   struct drm_qxl_execbuffer eb;
+   struct drm_qxl_command cmd;
+   int ret;
+
+   if (ndw == 0)
+      return;
+
+   cmd.command = (unsigned long)(void*)block;
+   cmd.command_size = ndw * 4;
+   cmd.relocs_num = 0;
+   cmd.relocs = 0;
+   cmd.type = 0;
+    
+   eb.flags = QXL_EXECBUFFER_3D;
+   eb.commands_num = 1;
+   eb.commands = (unsigned long)(void*)&cmd;
+
+   ret = drmIoctl(qdws->fd, DRM_IOCTL_QXL_EXECBUFFER, &eb);
+   return ret;
+}
+
 struct qxl_winsys *
 qxl_drm_winsys_create(int drmFD)
 {
@@ -391,7 +447,8 @@ qxl_drm_winsys_create(int drmFD)
    qdws->base.bo_get_handle = qxl_bo_get_handle;
    qdws->base.transfer_put = qxl_bo_transfer_put;
    qdws->base.transfer_get = qxl_bo_transfer_get;
-   
+   qdws->base.resource_create = qxl_drm_winsys_resource_create;
+   qdws->base.submit_cmd = qxl_drm_winsys_submit_cmd;
    return &qdws->base;
 
  fail:

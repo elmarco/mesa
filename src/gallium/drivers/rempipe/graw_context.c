@@ -640,9 +640,10 @@ static void *graw_transfer_map(struct pipe_context *ctx,
          memset(trans->localmem, 0, trans->lmsize);
    } else {
       struct graw_resource *grres = (struct graw_resource *)resource;
+      struct rempipe_screen *rs = rempipe_screen(ctx->screen);
       if (!(usage & PIPE_TRANSFER_UNSYNCHRONIZED))
          graw_flush(ctx, NULL, 0);
-      graw_transfer_get_block(grres->res_handle, level, box, trans->localmem, trans->lmsize / 4);
+      graw_transfer_get_block(rs, grres->res_handle, level, box, trans->localmem, trans->lmsize / 4);
    }
 
    trans->base.resource = resource;
@@ -667,14 +668,16 @@ static void graw_transfer_unmap(struct pipe_context *ctx,
    struct graw_transfer *trans = (struct graw_transfer *)transfer;
    struct graw_resource *grres = (struct graw_resource *)transfer->resource;
    struct pipe_box empty_box = { 0 };
+   struct rempipe_screen *rs = rempipe_screen(ctx->screen);
 
    if (trans->base.usage & PIPE_TRANSFER_WRITE) {
 
       if (!(transfer->usage & PIPE_TRANSFER_FLUSH_EXPLICIT)) {
+         struct rempipe_screen *rs = rempipe_screen(ctx->screen);
          grres->clean = FALSE;
          if (!(transfer->usage & PIPE_TRANSFER_UNSYNCHRONIZED))
             graw_flush(ctx, NULL, 0);
-         graw_transfer_block(grres->res_handle, transfer->level, &transfer->box, 0, trans->localmem + trans->offset, trans->lmsize / 4);
+         graw_transfer_block(rs, grres->res_handle, transfer->level, &transfer->box, 0, trans->localmem + trans->offset, trans->lmsize / 4);
       }
       
    }
@@ -694,7 +697,7 @@ static void graw_transfer_flush_region(struct pipe_context *ctx,
    uint32_t offset;
    uint32_t size;
    struct pipe_box hw_box;
-
+   struct rempipe_screen *rs = rempipe_screen(ctx->screen);
    offset = trans->offset;
    offset += box->x;
 
@@ -707,7 +710,7 @@ static void graw_transfer_flush_region(struct pipe_context *ctx,
 
    if (!(transfer->usage & PIPE_TRANSFER_UNSYNCHRONIZED))
       graw_flush(ctx, NULL, 0);
-   graw_transfer_block(grres->res_handle, transfer->level, &hw_box, 0, trans->localmem + offset, box->width);
+   graw_transfer_block(rs, grres->res_handle, transfer->level, &hw_box, 0, trans->localmem + offset, box->width);
    grres->clean = FALSE;   
 }
                                        
@@ -819,6 +822,7 @@ void graw_flush_frontbuffer(struct pipe_screen *screen,
                             unsigned level, unsigned layer,
                             void *winsys_drawable_handle)
 {
+#if 0
    struct sw_winsys *winsys = rempipe_screen(screen)->winsys;
    struct graw_texture *gres = (struct graw_texture *)res;
    void *map;
@@ -848,7 +852,7 @@ void graw_flush_frontbuffer(struct pipe_screen *screen,
    winsys->displaytarget_unmap(winsys, gres->dt);
 
 //   winsys->displaytarget_display(winsys, gres->dt, winsys_drawable_handle);
-
+#endif
 }
 
 struct pipe_resource *graw_resource_create(struct pipe_screen *pscreen,

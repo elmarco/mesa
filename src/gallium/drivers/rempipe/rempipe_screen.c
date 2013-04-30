@@ -364,7 +364,7 @@ static void
 rp_destroy_qxl_screen(struct pipe_screen *screen)
 {
    struct rempipe_screen *rp_screen = rempipe_screen(screen);
-   struct qxl_winsys *qws = rp_screen->winsys;
+   struct qxl_winsys *qws = rp_screen->qws;
 
    if (qws)
       qws->destroy(qws);
@@ -379,7 +379,8 @@ rempipe_create_qxl_screen(struct qxl_winsys *qws)
    if (!screen)
       return NULL;
 
-   screen->winsys = qws;
+   screen->qws = qws;
+   screen->winsys = NULL;
    screen->base.get_name = rempipe_get_name;
    screen->base.get_vendor = rempipe_get_vendor;
    screen->base.get_param = rempipe_get_param;

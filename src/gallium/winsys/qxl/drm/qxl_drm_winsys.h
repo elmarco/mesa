@@ -7,11 +7,25 @@
 #include "pipe/p_screen.h"
 #include "pipe/p_context.h"
 #include "qxl/qxl_winsys.h"
+#include "pipebuffer/pb_bufmgr.h"
 
+struct qxl_bomgr;
+struct qxl_drm_winsys;
+
+struct qxl_bo {
+   struct pb_buffer base;
+   struct qxl_bomgr *mgr;
+   struct qxl_drm_winsys *qws;
+   uint32_t handle;
+   void *ptr;
+};
+  
 struct qxl_drm_winsys
 {
    struct qxl_winsys base;
    int fd;
+   struct pb_manager *kman;
+   struct pb_manager *cman;
 };
 
 struct qxl_drm_buffer {

@@ -25,6 +25,25 @@ struct qxl_winsys {
                           struct qxl_winsys_buffer *buffer);
 
    void (*destroy)(struct qxl_winsys *qws);
+
+   /* 3d fns */
+   struct pb_buffer *(*bo_create)(struct qxl_winsys *qws,
+                                  unsigned size,
+                                  unsigned alignment);
+
+   boolean (*bo_is_busy)(struct pb_buffer *buf);
+   void (*bo_wait)(struct pb_buffer *buf);
+   void *(*bo_map)(struct pb_buffer *buf);
+   unsigned int (*bo_get_handle)(struct pb_buffer *buf);
+
+   int (*transfer_put)(struct pb_buffer *buf,
+                       uint32_t res_handle, const struct pipe_box *box,
+                       uint32_t src_stride, uint32_t level);
+
+   int (*transfer_get)(struct pb_buffer *buf,
+                       uint32_t res_handle, const struct pipe_box *box,
+                       uint32_t level);
+                       
 };
 
 #endif

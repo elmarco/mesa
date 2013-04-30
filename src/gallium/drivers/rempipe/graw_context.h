@@ -5,6 +5,7 @@
 #include "pipe/p_context.h"
 #include "graw_protocol.h"
 
+#include "rempipe.h"
 #include "util/u_slab.h"
 
 struct graw_screen;
@@ -96,12 +97,14 @@ void graw_flush_frontbuffer(struct pipe_screen *screen,
                             unsigned level, unsigned layer,
                             void *winsys_drawable_handle);
 
-void graw_transfer_block(uint32_t res_handle,
+void graw_transfer_block(struct rempipe_screen *rs,
+                         uint32_t res_handle,
                          int level,
                          const struct pipe_box *dst_box,
                          uint32_t src_stride,
                          void *data, int ndw);
-void graw_transfer_get_block(uint32_t res_handle, uint32_t level,
+void graw_transfer_get_block(struct rempipe_screen *rs,
+                             uint32_t res_handle, uint32_t level,
                              const struct pipe_box *box,
                              void *data, int ndw);
 void grend_flush_frontbuffer(uint32_t res_handle);

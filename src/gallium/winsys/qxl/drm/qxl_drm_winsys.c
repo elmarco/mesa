@@ -391,6 +391,16 @@ static uint32_t qxl_drm_winsys_resource_create(struct qxl_winsys *qws,
    return 0;
 }
 
+static void qxl_drm_winsys_resource_unref(struct qxl_winsys *qws,
+                                          uint32_t res_handle)
+{
+   struct qxl_drm_winsys *qdws = qxl_drm_winsys(qws);
+   struct drm_qxl_3d_resource_unref unrefcmd;
+
+   unrefcmd.res_handle = res_handle;
+   drmIoctl(qdws->fd, DRM_IOCTL_QXL_3D_RESOURCE_UNREF, &unrefcmd);
+}
+
 static int qxl_drm_winsys_submit_cmd(struct qxl_winsys *qws, uint32_t *block, int ndw)
 {
    struct qxl_drm_winsys *qdws = qxl_drm_winsys(qws);
@@ -448,6 +458,7 @@ qxl_drm_winsys_create(int drmFD)
    qdws->base.transfer_put = qxl_bo_transfer_put;
    qdws->base.transfer_get = qxl_bo_transfer_get;
    qdws->base.resource_create = qxl_drm_winsys_resource_create;
+   qdws->base.resource_unref = qxl_drm_winsys_resource_unref;
    qdws->base.submit_cmd = qxl_drm_winsys_submit_cmd;
    return &qdws->base;
 

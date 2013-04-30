@@ -209,6 +209,9 @@ int main(int argc, char **argv)
          graw_renderer_flush_buffer(cmd->u.flush_buffer.res_handle,
                                    (struct pipe_box *)&cmd->u.flush_buffer.box);
          break;
+      case QXL_3D_RESOURCE_UNREF:
+         graw_renderer_resource_unref(cmd->u.res_unref.res_handle);
+         break;
       case 0xdeadbeef:
          if (inited) {
             graw_renderer_fini();

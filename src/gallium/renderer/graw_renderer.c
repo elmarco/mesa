@@ -1228,6 +1228,22 @@ void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target tar
    graw_object_insert(gr, sizeof(*gr), handle, GRAW_RESOURCE);
 }
 
+void graw_renderer_resource_unref(uint32_t res_handle)
+{
+   struct grend_resource *res;
+
+   res = graw_object_lookup(res_handle, GRAW_RESOURCE);
+
+   if (res->target == GL_ELEMENT_ARRAY_BUFFER_ARB) {
+      glDeleteBuffers(1, &res->id);
+   } else if (res->target == GL_ARRAY_BUFFER_ARB) {
+      glDeleteBuffers(1, &res->id);
+   } else
+      glDeleteTextures(1, &res->id);
+
+   graw_object_destroy(res_handle, GRAW_RESOURCE);
+}
+
 void graw_renderer_transfer_write(uint32_t res_handle,
                                   int level,
                                   uint32_t src_stride,

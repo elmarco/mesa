@@ -923,6 +923,16 @@ void
 graw_resource_destroy(struct pipe_screen *pscreen,
                       struct pipe_resource *pt)
 {
+   struct rempipe_screen *rs = rempipe_screen(pscreen);
+   if (pt->target == PIPE_BUFFER) {
+      struct graw_buffer *buf = (struct graw_buffer *)pt;
 
+      rs->qws->resource_unref(rs->qws, buf->base.res_handle);
+      FREE(buf);
+   } else {
+      struct graw_texture *tex = (struct graw_texture *)pt;
 
+      rs->qws->resource_unref(rs->qws, tex->base.res_handle);
+      FREE(tex);
+   }
 }

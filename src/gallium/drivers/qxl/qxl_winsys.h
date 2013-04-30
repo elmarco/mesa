@@ -51,6 +51,7 @@ struct qxl_winsys {
                                uint32_t depth, uint32_t array_size,
                                uint32_t last_level, uint32_t nr_samples);
 
+   void (*resource_unref)(struct qxl_winsys *qws, uint32_t res_handle);
    int (*submit_cmd)(struct qxl_winsys *qws, uint32_t *block, int ndw);
   
 };

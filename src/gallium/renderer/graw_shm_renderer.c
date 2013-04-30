@@ -31,7 +31,7 @@ static int send_irq(int fd, uint32_t pd)
 {
    int ret;
    uint64_t x = 1;
-   fprintf(stderr,"notify 3d %x\n", pd);
+   //   fprintf(stderr,"notify 3d %x\n", pd);
 
    ramp->pad |= pd;
 

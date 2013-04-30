@@ -571,20 +571,21 @@ void grend_draw_vbo(struct grend_context *ctx,
       char name[10];
       snprintf(name, 10, "vsconst%d", i);
       loc = glGetUniformLocation(ctx->program_id, name);
-      if (loc == -1)
-         fprintf(stderr,"unknown constant %s\n", name);
-      else
+      if (loc != -1)
          glUniform4fv(loc, 1, &ctx->vs_consts.consts[i * 4]);
+//      else
+//         fprintf(stderr,"unknown constant %s\n", name);
    }
    for (i = 0; i < ctx->fs_consts.num_consts / 4; i++) {
       GLint loc;
       char name[10];
       snprintf(name, 10, "fsconst%d", i);
       loc = glGetUniformLocation(ctx->program_id, name);
-      if (loc == -1)
-         fprintf(stderr,"unknown constant %s\n", name);
-      else
+      if (loc != -1)
          glUniform4fv(loc, 1, &ctx->fs_consts.consts[i * 4]);
+//      else
+//         fprintf(stderr,"unknown constant %s\n", name);
+
    }
 
    sampler_id = 0;
@@ -701,10 +702,10 @@ void grend_draw_vbo(struct grend_context *ctx,
          glDrawElementsInstancedARB(mode, info->count, elsz, (void *)ctx->ib.offset, info->instance_count);
    }
 
-   glDeleteVertexArrays(1, &vaoid);
    glActiveTexture(GL_TEXTURE0);
    glDisable(GL_TEXTURE_2D);
    glBindVertexArray(0);
+   //   glDeleteVertexArrays(1, &vaoid);
 }
 
 static GLenum translate_blend_func(uint32_t pipe_blend)
@@ -1306,7 +1307,7 @@ void graw_renderer_transfer_send(uint32_t res_handle, uint32_t level, struct pip
       graw_transfer_write_return(data + box->x, send_size, myptr);
       glUnmapBuffer(GL_ARRAY_BUFFER_ARB);
    } else {
-      fprintf(stderr,"TEXTURE TRANSFER %d %d %d\n", box->width, box->height, level);
+
       void *data;
       uint32_t w = u_minify(res->base.width0, level);
       uint32_t h = u_minify(res->base.height0, level);
@@ -1315,7 +1316,7 @@ void graw_renderer_transfer_send(uint32_t res_handle, uint32_t level, struct pip
       int fb_id;
       GLint  y1, y2;
 //      data = malloc(send_size);
-
+      fprintf(stderr,"TEXTURE TRANSFER %d %d %d %d %d\n", res_handle, res->readback_fb_id, box->width, box->height, level);
 //      if (!data)
       //       fprintf(stderr,"malloc failed %d\n", send_size);
       fprintf(stderr,"writing %d %d\n", send_size);
@@ -1404,9 +1405,9 @@ void graw_renderer_resource_copy_region(struct grend_context *ctx,
 
    glmask = GL_COLOR_BUFFER_BIT;
 
-   sy1 = src_res->base.height0 - src_box->y - src_box->height;
+   sy1 = src_box->y;
    sy2 = sy1 + src_box->height;
-   dy1 = dst_res->base.height0 - dsty - src_box->height;
+   dy1 = dsty;
    dy2 = dy1 + src_box->height;
 
    glBlitFramebuffer(src_box->x, sy1,
@@ -1459,6 +1460,11 @@ void graw_renderer_blit(struct grend_context *ctx,
 
    y1 = info->src.box.y;
    y2 = (info->src.box.y + info->src.box.height);
+
+   if (info->scissor_enable)
+      glEnable(GL_SCISSOR_TEST);
+   else
+      glDisable(GL_SCISSOR_TEST);
       
    glBlitFramebuffer(info->src.box.x,
                      y1,
@@ -1481,6 +1487,7 @@ int graw_renderer_set_scanout(uint32_t res_handle,
       return 0;
 
    frontbuffer = res;
+   fprintf(stderr,"setting frontbuffer to %d\n", res_handle);
    return 0;
 }
 
@@ -1497,8 +1504,10 @@ int graw_renderer_flush_buffer(uint32_t res_handle,
    if (!res)
       return 0;
 
-   if (res != frontbuffer)
+   if (res != frontbuffer) {
+      fprintf(stderr,"not the frontbuffer %d\n", res_handle);
       return 0;
+   }
 
    glGenFramebuffers(1, &fb_id);
 

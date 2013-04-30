@@ -43,13 +43,18 @@ static struct pipe_screen *create_screen(int fd)
    if (!qws)
       return NULL;
 
+#if 1
+   screen = rempipe_create_qxl_screen(qws);
+   if (!screen)
+      return NULL;
+#else
    screen = qxl_screen_create(qws);
    if (!screen)
       return NULL;
    screen = always_sw_screen_wrap(screen);
    if (!screen)
       return NULL;
-
+#endif
    screen = debug_screen_wrap(screen);
 
    return screen;

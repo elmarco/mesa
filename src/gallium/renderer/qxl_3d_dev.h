@@ -81,7 +81,7 @@ typedef struct QXL3DCommand {
    } u;
 } QXL3DCommand;
 
-#define QXL_3D_COMMAND_RING_SIZE 32
+#define QXL_3D_COMMAND_RING_SIZE 64
 
 SPICE_RING_DECLARE(QXL3DCommandRing, QXL3DCommand, QXL_3D_COMMAND_RING_SIZE);
 

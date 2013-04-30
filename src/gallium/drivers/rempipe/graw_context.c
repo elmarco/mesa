@@ -20,6 +20,7 @@
 #include "tgsi/tgsi_text.h"
 
 #include "state_tracker/graw.h"
+#include "state_tracker/drm_driver.h"
 
 #include "graw_protocol.h"
 
@@ -435,12 +436,14 @@ static void graw_flush(struct pipe_context *ctx,
 
    graw_flush_eq(grctx->eq, grctx);
 
+#if 0
    if (flags == PIPE_FLUSH_END_OF_FRAME) {
       if (grctx->framebuffer.nr_cbufs)
          graw_flush_frontbuffer(ctx->screen,
                                 grctx->framebuffer.cbufs[0]->texture,
                                 0, 0, NULL);
    }
+#endif
 }
 
 static struct pipe_sampler_view *graw_create_sampler_view(struct pipe_context *ctx,
@@ -631,13 +634,16 @@ static void *graw_transfer_map(struct pipe_context *ctx,
    trans->lmsize = box->width * box->height * box->depth * util_format_get_blocksize(resource->format);
    trans->lmsize = align(trans->lmsize, 4);
    trans->localmem = malloc(trans->lmsize);
-   if ((usage & PIPE_TRANSFER_DISCARD_RANGE) || grres->clean == TRUE)
-      memset(trans->localmem, 0, trans->lmsize);
-   else {
+   if ((usage & PIPE_TRANSFER_DISCARD_RANGE) || grres->clean == TRUE ||
+       (usage & (PIPE_TRANSFER_WRITE | PIPE_TRANSFER_FLUSH_EXPLICIT))) {
+      if ((usage & PIPE_TRANSFER_READ))
+         memset(trans->localmem, 0, trans->lmsize);
+   } else {
       struct graw_resource *grres = (struct graw_resource *)resource;
-      graw_flush(ctx, NULL, 0);
+      if (!(usage & PIPE_TRANSFER_UNSYNCHRONIZED))
+         graw_flush(ctx, NULL, 0);
       graw_transfer_get_block(grres->res_handle, level, box, trans->localmem, trans->lmsize / 4);
-   } 
+   }
 
    trans->base.resource = resource;
    trans->base.level = level;
@@ -666,7 +672,8 @@ static void graw_transfer_unmap(struct pipe_context *ctx,
 
       if (!(transfer->usage & PIPE_TRANSFER_FLUSH_EXPLICIT)) {
          grres->clean = FALSE;
-         graw_flush(ctx, NULL, 0);
+         if (!(transfer->usage & PIPE_TRANSFER_UNSYNCHRONIZED))
+            graw_flush(ctx, NULL, 0);
          graw_transfer_block(grres->res_handle, transfer->level, &transfer->box, 0, trans->localmem + trans->offset, trans->lmsize / 4);
       }
       
@@ -698,7 +705,8 @@ static void graw_transfer_flush_region(struct pipe_context *ctx,
    hw_box.height = box->height;
    hw_box.depth = box->depth;
 
-   graw_flush(ctx, NULL, 0);
+   if (!(transfer->usage & PIPE_TRANSFER_UNSYNCHRONIZED))
+      graw_flush(ctx, NULL, 0);
    graw_transfer_block(grres->res_handle, transfer->level, &hw_box, 0, trans->localmem + offset, box->width);
    grres->clean = FALSE;   
 }
@@ -822,7 +830,6 @@ void graw_flush_frontbuffer(struct pipe_screen *screen,
    grend_flush_frontbuffer(gres->base.res_handle);
    if (!alloced) {
       fprintf(stderr,"Failed to malloc\n");
-
    }
    map = winsys->displaytarget_map(winsys, gres->dt, 0);
 
@@ -902,12 +909,15 @@ rempipe_resource_from_handle(struct pipe_screen *screen,
    pipe_reference_init(&rpr->base.base.reference, 1);
    rpr->base.base.screen = screen;      
 
-   handle = graw_renderer_resource_create(template->target, template->format, template->bind, template->width0, template->height0, template->depth0, 0, 0, 0);
-   rpr->base.res_handle = handle;
-   rpr->dt = winsys->displaytarget_from_handle(winsys,
-                                               template,
-                                               whandle,
-                                               &rpr->stride);
+   if ((whandle->handle & (1<<30)) == 0) {
+      handle = graw_renderer_resource_create(template->target, template->format, template->bind, template->width0, template->height0, template->depth0, 0, 0, 0);
+      rpr->base.res_handle = handle;
+      rpr->dt = winsys->displaytarget_from_handle(winsys,
+                                                  template,
+                                                  whandle,
+                                                  &rpr->stride);
+   } else
+      rpr->base.res_handle = whandle->handle & ~(1<<30);
    return &rpr->base.base;
 }   
 

@@ -48,6 +48,7 @@ enum graw_scrn_cmd {
    GRAW_DESTROY_RENDERER = 7,
    GRAW_TRANSFER_GET = 8,
    GRAW_TRANSFER_PUT = 9,
+   GRAW_SET_SCANOUT_SURFACE = 10,
 };
 
 /* 

@@ -39,7 +39,7 @@ static int graw_decode_create_shader(struct grend_decode_ctx *ctx, uint32_t type
       return -1;
    }
 
-   fprintf(stderr,"shader\n%s\n", &ctx->ds->buf[ctx->ds->buf_offset + 2]);
+//   fprintf(stderr,"shader\n%s\n", &ctx->ds->buf[ctx->ds->buf_offset + 2]);
    if (!tgsi_text_translate(&ctx->ds->buf[ctx->ds->buf_offset + 2], tokens, DECODE_MAX_TOKENS)) {
       fprintf(stderr,"failed to translate\n");
       free(tokens);
@@ -553,7 +553,7 @@ void graw_decode_block(uint32_t *block, int ndw)
    while (gdctx->ds->buf_offset < gdctx->ds->buf_total) {
       uint32_t header = gdctx->ds->buf[gdctx->ds->buf_offset];
 
-      fprintf(stderr,"[%d] cmd is %d (obj %d) len %d\n", gdctx->ds->buf_offset, header & 0xff, (header >> 8 & 0xff), (header >> 16));
+//      fprintf(stderr,"[%d] cmd is %d (obj %d) len %d\n", gdctx->ds->buf_offset, header & 0xff, (header >> 8 & 0xff), (header >> 16));
       
       switch (header & 0xff) {
       case GRAW_CREATE_OBJECT:

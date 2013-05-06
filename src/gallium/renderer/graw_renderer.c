@@ -30,7 +30,11 @@ int localrender;
 
 struct grend_screen;
 
-static uint32_t res_id;
+struct grend_fence {
+   uint32_t fence_id;
+   GLsync syncobj;
+};
+
 struct grend_shader_state {
    GLuint id;
    unsigned type;
@@ -109,7 +113,7 @@ struct grend_context {
 
    struct pipe_sampler_state *sampler_state[PIPE_MAX_SAMPLERS];
    int num_sampler_states;
-   int fb_id;
+   uint32_t fb_id;
 
    uint8_t stencil_refs[2];
 
@@ -213,7 +217,6 @@ void grend_create_surface(struct grend_context *ctx,
    
 {
    struct grend_surface *surf;
-   struct grend_resource *tex;
 
    surf = CALLOC_STRUCT(grend_surface);
 
@@ -306,8 +309,6 @@ void grend_create_vertex_elements_state(struct grend_context *ctx,
                                         const struct pipe_vertex_element *elements)
 {
    struct grend_vertex_element *v = CALLOC_STRUCT(grend_vertex_element);
-   int i;
-   int max_vbo_index = 0;
 
    v->count = num_elements;
    memcpy(v->elements, elements, sizeof(struct pipe_vertex_element) * num_elements);
@@ -320,7 +321,6 @@ void grend_bind_vertex_elements_state(struct grend_context *ctx,
                                       uint32_t handle)
 {
    struct grend_vertex_element *v;
-   int i;
 
    if (!handle) {
       ctx->ve = NULL;
@@ -391,7 +391,7 @@ void grend_set_single_fs_sampler_view(struct grend_context *ctx,
    struct grend_resource *res;
 
    res = graw_object_lookup(res_handle, GRAW_RESOURCE);
-   ctx->fs_views[index].texture = &res->base;
+   ctx->fs_views[index].texture = res;
 }
 
 void grend_set_num_fs_sampler_views(struct grend_context *ctx,
@@ -407,7 +407,7 @@ void grend_set_single_vs_sampler_view(struct grend_context *ctx,
    struct grend_resource *res;
 
    res = graw_object_lookup(res_handle, GRAW_RESOURCE);
-   ctx->vs_views[index].texture = &res->base;
+   ctx->vs_views[index].texture = res;
 }
 
 void grend_set_num_vs_sampler_views(struct grend_context *ctx,
@@ -426,7 +426,6 @@ void grend_transfer_inline_write(struct grend_context *ctx,
                                  unsigned layer_stride)
 {
    struct grend_resource *res;
-   void *ptr;
 
    res = graw_object_lookup(res_handle, GRAW_RESOURCE);
    if (res->target == GL_ELEMENT_ARRAY_BUFFER_ARB) {
@@ -476,7 +475,7 @@ void grend_create_fs(struct grend_context *ctx,
    state->id = glCreateShader(GL_FRAGMENT_SHADER);
    glsl_prog = tgsi_convert(fs->tokens, 0);
    if (glsl_prog) {
-      glShaderSource(state->id, 1, &glsl_prog, NULL);
+      glShaderSource(state->id, 1, (const char **)&glsl_prog, NULL);
       glCompileShader(state->id);
       fprintf(stderr,"FS:\n%s\n", glsl_prog);
    }
@@ -661,9 +660,9 @@ void grend_draw_vbo(struct grend_context *ctx,
          norm = GL_TRUE;
       sz = desc->nr_channels;
 
-      buf = ctx->vbo[vbo_index].buffer;
+      buf = (struct grend_buffer *)ctx->vbo[vbo_index].buffer;
       glBindBuffer(GL_ARRAY_BUFFER, buf->base.id);
-      glVertexAttribPointer(i, sz, type, norm, ctx->vbo[vbo_index].stride, (void *)(ctx->ve->elements[i].src_offset + ctx->vbo[vbo_index].buffer_offset));
+      glVertexAttribPointer(i, sz, type, norm, ctx->vbo[vbo_index].stride, (void *)(unsigned long)(ctx->ve->elements[i].src_offset + ctx->vbo[vbo_index].buffer_offset));
       if (ctx->ve->elements[i].instance_divisor)
          glVertexAttribDivisorARB(i, ctx->ve->elements[i].instance_divisor);
       glEnableVertexAttribArray(i);
@@ -697,9 +696,9 @@ void grend_draw_vbo(struct grend_context *ctx,
       }
 
       if (info->instance_count <= 1)
-         glDrawElements(mode, info->count, elsz, (void *)ctx->ib.offset);
+         glDrawElements(mode, info->count, elsz, (void *)(unsigned long)ctx->ib.offset);
       else
-         glDrawElementsInstancedARB(mode, info->count, elsz, (void *)ctx->ib.offset, info->instance_count);
+         glDrawElementsInstancedARB(mode, info->count, elsz, (void *)(unsigned long)ctx->ib.offset, info->instance_count);
    }
 
    glActiveTexture(GL_TEXTURE0);
@@ -843,7 +842,6 @@ void grend_object_bind_dsa(struct grend_context *ctx,
                            uint32_t handle)
 {
    struct pipe_depth_stencil_alpha_state *state;
-   int i;
 
    if (handle == 0) {
       glDisable(GL_DEPTH_TEST);
@@ -998,7 +996,7 @@ static GLuint convert_wrap(int wrap)
    case PIPE_TEX_WRAP_MIRROR_REPEAT: return GL_MIRRORED_REPEAT;
    default:
       assert(0);
-      return;
+      return -1;
    }
 } 
 
@@ -1121,6 +1119,12 @@ static GLenum tgsitargettogltarget(const enum pipe_texture_target target)
       return GL_TEXTURE_RECTANGLE_NV;
    case PIPE_TEXTURE_CUBE:
       return GL_TEXTURE_CUBE_MAP;
+   case PIPE_BUFFER:
+   case PIPE_TEXTURE_1D_ARRAY:
+   case PIPE_TEXTURE_2D_ARRAY:
+   case PIPE_TEXTURE_CUBE_ARRAY:
+   default:
+      return PIPE_BUFFER;
    }
    return PIPE_BUFFER;
 }
@@ -1251,7 +1255,6 @@ void graw_renderer_transfer_write(uint32_t res_handle,
                                   void *data)
 {
    struct grend_resource *res;
-   void *ptr;
 
    res = graw_object_lookup(res_handle, GRAW_RESOURCE);
    if (res->target == GL_ELEMENT_ARRAY_BUFFER_ARB) {
@@ -1307,7 +1310,6 @@ void graw_renderer_transfer_send(uint32_t res_handle, uint32_t level, struct pip
    res = graw_object_lookup(res_handle, GRAW_RESOURCE);
 
    if (res->target == GL_ELEMENT_ARRAY_BUFFER_ARB) {
-      uint32_t alloc_size = res->base.width0 * util_format_get_blocksize(res->base.format);
       uint32_t send_size = box->width * util_format_get_blocksize(res->base.format);      
       void *data;
       glBindBufferARB(GL_ELEMENT_ARRAY_BUFFER_ARB, res->id);
@@ -1315,7 +1317,6 @@ void graw_renderer_transfer_send(uint32_t res_handle, uint32_t level, struct pip
       graw_transfer_write_return(data + box->x, send_size, myptr);
       glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER_ARB);
    } else if (res->target == GL_ARRAY_BUFFER_ARB) {
-      uint32_t alloc_size = res->base.width0 * util_format_get_blocksize(res->base.format);
       uint32_t send_size = box->width * util_format_get_blocksize(res->base.format);      
       void *data;
       glBindBufferARB(GL_ARRAY_BUFFER_ARB, res->id);
@@ -1323,19 +1324,14 @@ void graw_renderer_transfer_send(uint32_t res_handle, uint32_t level, struct pip
       graw_transfer_write_return(data + box->x, send_size, myptr);
       glUnmapBuffer(GL_ARRAY_BUFFER_ARB);
    } else {
-
-      void *data;
-      uint32_t w = u_minify(res->base.width0, level);
       uint32_t h = u_minify(res->base.height0, level);
-      uint32_t send_size = box->width * box->height * util_format_get_blocksize(res->base.format);
       GLenum format, type;
-      int fb_id;
-      GLint  y1, y2;
+      GLuint fb_id;
+      GLint  y1;
 //      data = malloc(send_size);
       fprintf(stderr,"TEXTURE TRANSFER %d %d %d %d %d\n", res_handle, res->readback_fb_id, box->width, box->height, level);
 //      if (!data)
       //       fprintf(stderr,"malloc failed %d\n", send_size);
-      fprintf(stderr,"writing %d %d\n", send_size);
       if (res->readback_fb_id == 0 || res->readback_fb_level != level) {
 	if (res->readback_fb_id)
 	  glDeleteFramebuffers(1, &res->readback_fb_id);
@@ -1445,7 +1441,6 @@ void graw_renderer_blit(struct grend_context *ctx,
    GLuint fb_ids[2];
    GLbitfield glmask = 0;
    int y1, y2;
-   GLuint src_target;
 
    src_res = graw_object_lookup(src_handle, GRAW_RESOURCE);
    dst_res = graw_object_lookup(dst_handle, GRAW_RESOURCE);
@@ -1514,7 +1509,7 @@ int graw_renderer_flush_buffer(uint32_t res_handle,
    GLuint fb_id;
 
    if (!localrender)
-      return;
+      return 0;
 
    res = graw_object_lookup(res_handle, GRAW_RESOURCE);
    if (!res)

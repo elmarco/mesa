@@ -21,6 +21,8 @@
 
 #define MAPPING_SIZE (64*1024*1024)
 int fd;
+
+int vm_efd;
 void *mapping;
 int inited;
 
@@ -76,7 +78,7 @@ int main(int argc, char **argv)
    int count = 0;
    int conn_socket, maxfd;
    fd_set readset;
-   int vm_sock, vm_efd, vm_efd2;
+   int vm_sock, vm_efd2;
 
    if (argc == 2 && !strcmp(argv[1], "-render"))
       localrender = 1;
@@ -149,10 +151,12 @@ int main(int argc, char **argv)
          else
             req.tv_nsec = 50000000;
          count++;
-
+         graw_renderer_check_fences();
          nanosleep(&req, NULL);
+
       }
       
+      graw_renderer_check_fences();
       cmd = SPICE_RING_CONS_ITEM(&ramp->cmd_3d_ring);
     
 //      fprintf(stderr, "got cmd %x\n", cmd->type);
@@ -198,8 +202,7 @@ int main(int argc, char **argv)
 				      mapping + cmd->u.transfer_put.phy_addr);
 	 break;
       case QXL_3D_FENCE:
-         ramp->last_fence = cmd->u.fence_id;
-         send_irq(vm_efd, 4);
+         graw_renderer_create_fence(cmd->u.fence_id);
          break;
       case QXL_3D_SET_SCANOUT:
          graw_renderer_set_scanout(cmd->u.set_scanout.res_handle,
@@ -256,4 +259,10 @@ void graw_transfer_write_tex_return(struct pipe_resource *res,
       dptr += box->width * elsize;
    }
 
+}
+
+void graw_write_fence(unsigned fence_id)
+{
+   ramp->last_fence = fence_id;
+   send_irq(vm_efd, 4);
 }

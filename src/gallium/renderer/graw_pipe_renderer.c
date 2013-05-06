@@ -190,3 +190,8 @@ void graw_transfer_write_tex_return(struct pipe_resource *res,
 {
   fprintf(stderr,"TODO\n");
 }
+
+void graw_write_fence(unsigned fence_id)
+{
+
+}

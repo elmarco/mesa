@@ -33,7 +33,10 @@ struct grend_screen;
 struct grend_fence {
    uint32_t fence_id;
    GLsync syncobj;
+   struct list_head fences;
 };
+
+struct list_head fence_list;
 
 struct grend_shader_state {
    GLuint id;
@@ -1140,6 +1143,7 @@ graw_renderer_init(void)
    }
    
    glewInit();
+   list_inithead(&fence_list);
 }
 
 void
@@ -1158,8 +1162,6 @@ struct grend_context *grend_create_context(void)
    struct grend_context *grctx = CALLOC_STRUCT(grend_context);
    list_inithead(&grctx->programs);
    return grctx;
-
-   
 }
 
 
@@ -1535,4 +1537,45 @@ int graw_renderer_flush_buffer(uint32_t res_handle,
    glDeleteFramebuffers(1, &fb_id);
    swap_buffers();
    return 0;
+}
+
+int graw_renderer_create_fence(int client_fence_id)
+{
+   struct grend_fence *fence;
+
+   fence = malloc(sizeof(struct grend_fence));
+   if (!fence)
+      return -1;
+
+   fence->fence_id = client_fence_id;
+   fence->syncobj = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+   list_addtail(&fence->fences, &fence_list);
+   return 0;
+}
+
+void graw_renderer_check_fences(void)
+{
+   struct grend_fence *fence, *stor;
+   uint32_t latest_id = 0;
+   GLenum glret;
+
+   if (!inited)
+      return;
+
+   LIST_FOR_EACH_ENTRY_SAFE(fence, stor, &fence_list, fences) {
+      glret = glClientWaitSync(fence->syncobj, 0, 0);
+      if (glret == GL_ALREADY_SIGNALED){
+         latest_id = fence->fence_id;
+         list_del(&fence->fences);
+         free(fence);
+      }
+      /* don't bother checking any subsequent ones */
+      if (glret == GL_TIMEOUT_EXPIRED) {
+         break;
+      }
+   }
+
+   if (latest_id == 0)
+      return;
+   graw_write_fence(latest_id);
 }

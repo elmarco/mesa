@@ -142,4 +142,8 @@ void graw_reset_decode(void);
 
 void graw_decode_block(uint32_t *block, int ndw);
 
+int graw_renderer_create_fence(int client_fence_id);
+
+void graw_write_fence(unsigned fence_id);
+void graw_renderer_check_fences(void);
 #endif

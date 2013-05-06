@@ -228,7 +228,8 @@ static int
 qxl_bo_transfer_put(struct pb_buffer *_buf,
                     uint32_t res_handle,
                     const struct pipe_box *box,
-                    uint32_t src_stride, uint32_t level)
+                    uint32_t src_stride,
+                    uint32_t buf_offset, uint32_t level)
 {
    struct qxl_bo *bo = get_qxl_bo(_buf);
    struct drm_qxl_3d_transfer_put putcmd;
@@ -238,6 +239,7 @@ qxl_bo_transfer_put(struct pb_buffer *_buf,
    putcmd.bo_handle = bo->handle;
    putcmd.dst_box = *(struct drm_qxl_3d_box *)box;
    putcmd.src_stride = src_stride;
+   putcmd.src_offset = buf_offset;
    putcmd.dst_level = level;
 
    ret = drmIoctl(bo->qws->fd, DRM_IOCTL_QXL_3D_TRANSFER_PUT, &putcmd);

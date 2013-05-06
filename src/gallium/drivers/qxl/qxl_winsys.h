@@ -38,7 +38,8 @@ struct qxl_winsys {
 
    int (*transfer_put)(struct pb_buffer *buf,
                        uint32_t res_handle, const struct pipe_box *box,
-                       uint32_t src_stride, uint32_t level);
+                       uint32_t src_stride, uint32_t buf_offset,
+                       uint32_t level);
 
    int (*transfer_get)(struct pb_buffer *buf,
                        uint32_t res_handle, const struct pipe_box *box,

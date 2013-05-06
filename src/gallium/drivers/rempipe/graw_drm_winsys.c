@@ -58,7 +58,7 @@ void graw_transfer_block(struct rempipe_screen *rs,
    memcpy(ptr, data, ndw * 4);
   
    ret = rs->qws->transfer_put(buf, res_handle, box,
-                               src_stride, level);
+                               src_stride, 0, level);
    pb_reference(&buf, NULL);
 }
 

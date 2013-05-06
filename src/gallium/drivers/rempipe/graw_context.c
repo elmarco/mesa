@@ -19,6 +19,7 @@
 #include "util/u_blitter.h"
 #include "tgsi/tgsi_text.h"
 
+#include "pipebuffer/pb_buffer.h"
 #include "state_tracker/graw.h"
 #include "state_tracker/drm_driver.h"
 
@@ -615,27 +616,49 @@ static void *graw_transfer_map(struct pipe_context *ctx,
                                struct pipe_transfer **transfer)
 {
    struct graw_context *grctx = (struct graw_context *)ctx;
+   struct rempipe_screen *rs = rempipe_screen(ctx->screen);
+
    struct graw_resource *grres = (struct graw_resource *)resource;
    enum pipe_format format = resource->format;
    struct graw_transfer *trans;
+   void *ptr;
 
    trans = util_slab_alloc(&grctx->texture_transfer_pool);
    if (trans == NULL)
       return NULL;
 
+   /* allocate a bo */
    trans->lmsize = box->width * box->height * box->depth * util_format_get_blocksize(resource->format);
    trans->lmsize = align(trans->lmsize, 4);
-   trans->localmem = malloc(trans->lmsize);
+
+   trans->bo = rs->qws->bo_create(rs->qws, trans->lmsize, 0);
+   if (!trans->bo) {
+      util_slab_free(&grctx->texture_transfer_pool, trans);
+      return NULL;
+   }
+
+   ptr = rs->qws->bo_map(trans->bo);
+   if (!ptr) {
+      pb_reference(&trans->bo, NULL);
+      util_slab_free(&grctx->texture_transfer_pool, trans);
+      return NULL;
+   }
+
    if ((usage & PIPE_TRANSFER_DISCARD_RANGE) || grres->clean == TRUE ||
        (usage & (PIPE_TRANSFER_WRITE | PIPE_TRANSFER_FLUSH_EXPLICIT))) {
       if ((usage & PIPE_TRANSFER_READ))
-         memset(trans->localmem, 0, trans->lmsize);
+         memset(ptr, 0, trans->lmsize);
    } else {
       struct graw_resource *grres = (struct graw_resource *)resource;
       struct rempipe_screen *rs = rempipe_screen(ctx->screen);
+
       if (!(usage & PIPE_TRANSFER_UNSYNCHRONIZED))
          graw_flush(ctx, NULL, 0);
-      graw_transfer_get_block(rs, grres->res_handle, level, box, trans->localmem, trans->lmsize / 4);
+
+      rs->qws->transfer_get(trans->bo, grres->hw_res, box, level);
+
+      /* wait for data */
+      rs->qws->bo_wait(trans->bo);
    }
 
    trans->base.resource = resource;
@@ -650,17 +673,16 @@ static void *graw_transfer_map(struct pipe_context *ctx,
 
    *transfer = &trans->base;
 
-   return trans->localmem;
+   return ptr;
 }
 
 static void graw_transfer_unmap(struct pipe_context *ctx,
                                  struct pipe_transfer *transfer)
 {
+   struct rempipe_screen *rs = rempipe_screen(ctx->screen);
    struct graw_context *grctx = (struct graw_context *)ctx;
    struct graw_transfer *trans = (struct graw_transfer *)transfer;
    struct graw_resource *grres = (struct graw_resource *)transfer->resource;
-   struct pipe_box empty_box = { 0 };
-   struct rempipe_screen *rs = rempipe_screen(ctx->screen);
 
    if (trans->base.usage & PIPE_TRANSFER_WRITE) {
 
@@ -669,13 +691,15 @@ static void graw_transfer_unmap(struct pipe_context *ctx,
          grres->clean = FALSE;
          if (!(transfer->usage & PIPE_TRANSFER_UNSYNCHRONIZED))
             graw_flush(ctx, NULL, 0);
-         graw_transfer_block(rs, grres->res_handle, transfer->level, &transfer->box, 0, trans->localmem + trans->offset, trans->lmsize / 4);
+
+         rs->qws->transfer_put(trans->bo, grres->hw_res,
+                               &transfer->box, 0, 0, transfer->level);
+         rs->qws->bo_wait(trans->bo);
       }
       
    }
 
-   FREE(trans->localmem);
-
+   pb_reference(&trans->bo, NULL);
    util_slab_free(&grctx->texture_transfer_pool, trans);
 }
 
@@ -702,7 +726,9 @@ static void graw_transfer_flush_region(struct pipe_context *ctx,
 
    if (!(transfer->usage & PIPE_TRANSFER_UNSYNCHRONIZED))
       graw_flush(ctx, NULL, 0);
-   graw_transfer_block(rs, grres->res_handle, transfer->level, &hw_box, 0, trans->localmem + offset, box->width);
+
+   rs->qws->transfer_put(trans->bo, grres->hw_res,
+                         &hw_box, 0, offset, transfer->level);
    grres->clean = FALSE;   
 }
                                        

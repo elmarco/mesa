@@ -77,7 +77,7 @@ struct graw_context {
 
 struct graw_transfer {
    struct pipe_transfer base;
-   void *localmem;
+   struct pb_buffer *bo;
    uint32_t lmsize;
    uint32_t offset;
 };
@@ -97,16 +97,6 @@ void graw_flush_frontbuffer(struct pipe_screen *screen,
                             unsigned level, unsigned layer,
                             void *winsys_drawable_handle);
 
-void graw_transfer_block(struct rempipe_screen *rs,
-                         uint32_t res_handle,
-                         int level,
-                         const struct pipe_box *dst_box,
-                         uint32_t src_stride,
-                         void *data, int ndw);
-void graw_transfer_get_block(struct rempipe_screen *rs,
-                             uint32_t res_handle, uint32_t level,
-                             const struct pipe_box *box,
-                             void *data, int ndw);
 void grend_flush_frontbuffer(uint32_t res_handle);
 
 struct pipe_resource *

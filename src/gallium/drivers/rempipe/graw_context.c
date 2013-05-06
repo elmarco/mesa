@@ -873,6 +873,7 @@ struct pipe_resource *graw_resource_create(struct pipe_screen *pscreen,
       handle = rs->qws->resource_create(rs->qws, template->target, template->format, template->bind, template->width0, template->height0, template->depth0, template->array_size, template->last_level, template->nr_samples);
       tex->base.res_handle = handle;
 
+#if 0
       if (template->bind & (PIPE_BIND_DISPLAY_TARGET |
                             PIPE_BIND_SCANOUT |
                             PIPE_BIND_SHARED))
@@ -887,7 +888,7 @@ struct pipe_resource *graw_resource_create(struct pipe_screen *pscreen,
                                                 &tex->stride );
       }
       
-
+#endif
       return &tex->base.base;
    }
 }
@@ -924,6 +925,7 @@ graw_resource_destroy(struct pipe_screen *pscreen,
                       struct pipe_resource *pt)
 {
    struct rempipe_screen *rs = rempipe_screen(pscreen);
+#if 0
    if (pt->target == PIPE_BUFFER) {
       struct graw_buffer *buf = (struct graw_buffer *)pt;
 
@@ -935,4 +937,5 @@ graw_resource_destroy(struct pipe_screen *pscreen,
       rs->qws->resource_unref(rs->qws, tex->base.res_handle);
       FREE(tex);
    }
+#endif
 }

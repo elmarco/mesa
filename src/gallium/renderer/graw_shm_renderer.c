@@ -151,12 +151,12 @@ int main(int argc, char **argv)
          else
             req.tv_nsec = 50000000;
          count++;
-         graw_renderer_check_fences();
+//         graw_renderer_check_fences();
          nanosleep(&req, NULL);
 
       }
       
-      graw_renderer_check_fences();
+//      graw_renderer_check_fences();
       cmd = SPICE_RING_CONS_ITEM(&ramp->cmd_3d_ring);
     
 //      fprintf(stderr, "got cmd %x\n", cmd->type);
@@ -202,7 +202,8 @@ int main(int argc, char **argv)
 				      mapping + cmd->u.transfer_put.phy_addr);
 	 break;
       case QXL_3D_FENCE:
-         graw_renderer_create_fence(cmd->u.fence_id);
+         graw_write_fence(cmd->u.fence_id);
+//         graw_renderer_create_fence(cmd->u.fence_id);
          break;
       case QXL_3D_SET_SCANOUT:
          graw_renderer_set_scanout(cmd->u.set_scanout.res_handle,

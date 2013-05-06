@@ -1567,10 +1567,11 @@ void graw_renderer_check_fences(void)
       if (glret == GL_ALREADY_SIGNALED){
          latest_id = fence->fence_id;
          list_del(&fence->fences);
+         glDeleteSync(fence->syncobj);
          free(fence);
       }
       /* don't bother checking any subsequent ones */
-      if (glret == GL_TIMEOUT_EXPIRED) {
+      else if (glret == GL_TIMEOUT_EXPIRED) {
          break;
       }
    }

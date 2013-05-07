@@ -226,7 +226,7 @@ qxl_winsys_bo_create(struct qxl_winsys *qws,
 
 static int
 qxl_bo_transfer_put(struct pb_buffer *_buf,
-                    uint32_t res_handle,
+                    struct qxl_hw_res *res,
                     const struct pipe_box *box,
                     uint32_t src_stride,
                     uint32_t buf_offset, uint32_t level)
@@ -235,7 +235,7 @@ qxl_bo_transfer_put(struct pb_buffer *_buf,
    struct drm_qxl_3d_transfer_put putcmd;
    int ret;
 
-   putcmd.res_handle = res_handle;
+   putcmd.res_handle = res->res_handle;
    putcmd.bo_handle = bo->handle;
    putcmd.dst_box = *(struct drm_qxl_3d_box *)box;
    putcmd.src_stride = src_stride;
@@ -248,7 +248,7 @@ qxl_bo_transfer_put(struct pb_buffer *_buf,
 
 static int
 qxl_bo_transfer_get(struct pb_buffer *_buf,
-                    uint32_t res_handle,
+                    struct qxl_hw_res *res,
                     const struct pipe_box *box,
                     uint32_t level)
 {
@@ -256,7 +256,7 @@ qxl_bo_transfer_get(struct pb_buffer *_buf,
    struct drm_qxl_3d_transfer_get getcmd;
    int ret;
 
-   getcmd.res_handle = res_handle;
+   getcmd.res_handle = res->res_handle;
    getcmd.bo_handle = bo->handle;
    getcmd.level = level;
    getcmd.box = *(struct drm_qxl_3d_box *)box;
@@ -361,7 +361,22 @@ qxl_drm_winsys_destroy(struct qxl_winsys *qws)
    FREE(qdws);
 }
 
-static uint32_t qxl_drm_winsys_resource_create(struct qxl_winsys *qws,
+static void qxl_drm_resource_reference(struct qxl_drm_winsys *qdws,
+                                       struct qxl_hw_res **dres,
+                                       struct qxl_hw_res *sres)
+{
+   struct qxl_hw_res *old = *dres;
+   struct drm_qxl_3d_resource_unref unrefcmd;
+   if (pipe_reference(&(*dres)->reference, &sres->reference)) {
+      unrefcmd.res_handle = old->res_handle;
+      drmIoctl(qdws->fd, DRM_IOCTL_QXL_3D_RESOURCE_UNREF, &unrefcmd);
+      
+      FREE(old);
+   }
+   *dres = sres;
+}
+
+static struct qxl_hw_res *qxl_drm_winsys_resource_create(struct qxl_winsys *qws,
                                                enum pipe_texture_target target,
                                                uint32_t format,
                                                uint32_t bind,
@@ -375,6 +390,11 @@ static uint32_t qxl_drm_winsys_resource_create(struct qxl_winsys *qws,
    struct qxl_drm_winsys *qdws = qxl_drm_winsys(qws);
    struct drm_qxl_3d_resource_create createcmd;
    int ret;
+   struct qxl_hw_res *res;
+
+   res = CALLOC_STRUCT(qxl_hw_res);
+   if (!res)
+      return NULL;
 
    createcmd.target = target;
    createcmd.format = format;
@@ -388,33 +408,146 @@ static uint32_t qxl_drm_winsys_resource_create(struct qxl_winsys *qws,
    createcmd.res_handle = 0;
 
    ret = drmIoctl(qdws->fd, DRM_IOCTL_QXL_3D_RESOURCE_CREATE, &createcmd);
-   if (ret == 0)
-      return createcmd.res_handle;
-   return 0;
+   if (ret != 0) {
+      FREE(res);
+      return NULL;
+   }
+
+   res->res_handle = createcmd.res_handle;
+   pipe_reference_init(&res->reference, 1);
+   res->num_cs_references = 0;
+   return res;
+}
+
+static struct qxl_hw_res *qxl_drm_winsys_resource_create_handle(struct qxl_winsys *qws,
+                                                                struct winsys_handle *whandle)
+{
+   struct qxl_drm_winsys *qdws = qxl_drm_winsys(qws);
+   struct qxl_hw_res *res;
+
+   res = CALLOC_STRUCT(qxl_hw_res);
+   if (!res)
+      return NULL;
+
+   res->res_handle = whandle->handle & ~(1<<30);
+   pipe_reference_init(&res->reference, 1);
+   res->num_cs_references = 0;
+   return res;  
 }
 
 static void qxl_drm_winsys_resource_unref(struct qxl_winsys *qws,
-                                          uint32_t res_handle)
+                                          struct qxl_hw_res *hres)
 {
    struct qxl_drm_winsys *qdws = qxl_drm_winsys(qws);
-   struct drm_qxl_3d_resource_unref unrefcmd;
 
-   unrefcmd.res_handle = res_handle;
-   drmIoctl(qdws->fd, DRM_IOCTL_QXL_3D_RESOURCE_UNREF, &unrefcmd);
+   qxl_drm_resource_reference(qdws, &hres, NULL);
 }
 
-static int qxl_drm_winsys_submit_cmd(struct qxl_winsys *qws, uint32_t *block, int ndw)
+static struct qxl_cmd_buf *qxl_drm_cmd_buf_create(struct qxl_winsys *qws)
 {
    struct qxl_drm_winsys *qdws = qxl_drm_winsys(qws);
+   struct qxl_drm_cmd_buf *cbuf;
+
+   cbuf = CALLOC_STRUCT(qxl_drm_cmd_buf);
+   if (!cbuf)
+      return NULL;
+
+   cbuf->ws = qws;
+
+   cbuf->nres = 512;
+   cbuf->res_bo = (struct qxl_hw_res **)
+      CALLOC(1, cbuf->nres * sizeof(struct qxl_hw_buf*));
+   if (!cbuf->res_bo) {
+      return FALSE;
+   }
+
+   cbuf->base.buf = cbuf->buf;
+   return &cbuf->base;
+}
+
+static void qxl_drm_cmd_buf_destroy(struct qxl_cmd_buf *_cbuf)
+{
+   struct qxl_drm_cmd_buf *cbuf = (struct qxl_drm_cmd_buf *)_cbuf;
+
+   FREE(cbuf->res_bo);
+   FREE(cbuf);
+
+}
+
+static boolean qxl_drm_lookup_res(struct qxl_drm_cmd_buf *cbuf, struct qxl_hw_res *res)
+{
+   int i;
+
+   for (i = 0; i < cbuf->cres; i++)
+      if (cbuf->res_bo[i] == res)
+         return TRUE;
+   return FALSE;
+}
+
+static void qxl_drm_add_res(struct qxl_drm_winsys *qdws,
+                            struct qxl_drm_cmd_buf *cbuf, struct qxl_hw_res *res)
+{
+   if (cbuf->cres > cbuf->nres)
+      assert(0);
+
+   cbuf->res_bo[cbuf->cres] = NULL;
+   qxl_drm_resource_reference(qdws, &cbuf->res_bo[cbuf->cres], res);
+   p_atomic_inc(&res->num_cs_references);
+   cbuf->cres++;
+}
+
+static void qxl_drm_release_all_res(struct qxl_drm_winsys *qdws,
+                                    struct qxl_drm_cmd_buf *cbuf)
+{
+   int i;
+
+   for (i = 0; i < cbuf->cres; i++) {
+      p_atomic_dec(&cbuf->res_bo[i]->num_cs_references);
+      qxl_drm_resource_reference(qdws, &cbuf->res_bo[i], NULL);
+   }
+   cbuf->cres = 0;
+}
+
+static void qxl_drm_emit_res(struct qxl_winsys *qws,
+                             struct qxl_cmd_buf *_cbuf, struct qxl_hw_res *res)
+{
+   struct qxl_drm_winsys *qdws = qxl_drm_winsys(qws);
+   struct qxl_drm_cmd_buf *cbuf = (struct qxl_drm_cmd_buf *)_cbuf;
+   int i;
+   boolean already_in_list = qxl_drm_lookup_res(cbuf, res);
+   
+   cbuf->base.buf[cbuf->base.cdw++] = res->res_handle;
+
+   if (!already_in_list)
+      qxl_drm_add_res(qdws, cbuf, res);
+}
+
+static boolean qxl_drm_res_is_ref(struct qxl_winsys *qws,
+                               struct qxl_cmd_buf *_cbuf,
+                               struct qxl_hw_res *res)
+{
+   struct qxl_drm_winsys *qdws = qxl_drm_winsys(qws);
+   struct qxl_drm_cmd_buf *cbuf = (struct qxl_drm_cmd_buf *)_cbuf;
+   
+   if (!res->num_cs_references)
+      return FALSE;
+
+   return TRUE;
+}
+
+static int qxl_drm_winsys_submit_cmd(struct qxl_winsys *qws, struct qxl_cmd_buf *_cbuf)
+{
+   struct qxl_drm_winsys *qdws = qxl_drm_winsys(qws);
+   struct qxl_drm_cmd_buf *cbuf = (struct qxl_drm_cmd_buf *)_cbuf;
    struct drm_qxl_execbuffer eb;
    struct drm_qxl_command cmd;
    int ret;
 
-   if (ndw == 0)
-      return;
+   if (cbuf->base.cdw == 0)
+      return 0;
 
-   cmd.command = (unsigned long)(void*)block;
-   cmd.command_size = ndw * 4;
+   cmd.command = (unsigned long)(void*)cbuf->buf;
+   cmd.command_size = cbuf->base.cdw * 4;
    cmd.relocs_num = 0;
    cmd.relocs = 0;
    cmd.type = 0;
@@ -424,6 +557,10 @@ static int qxl_drm_winsys_submit_cmd(struct qxl_winsys *qws, uint32_t *block, in
    eb.commands = (unsigned long)(void*)&cmd;
 
    ret = drmIoctl(qdws->fd, DRM_IOCTL_QXL_EXECBUFFER, &eb);
+
+   cbuf->base.cdw = 0;
+
+   qxl_drm_release_all_res(qdws, cbuf);
    return ret;
 }
 
@@ -461,7 +598,12 @@ qxl_drm_winsys_create(int drmFD)
    qdws->base.transfer_get = qxl_bo_transfer_get;
    qdws->base.resource_create = qxl_drm_winsys_resource_create;
    qdws->base.resource_unref = qxl_drm_winsys_resource_unref;
+   qdws->base.resource_create_from_handle = qxl_drm_winsys_resource_create_handle;
+   qdws->base.cmd_buf_create = qxl_drm_cmd_buf_create;
+   qdws->base.cmd_buf_destroy = qxl_drm_cmd_buf_destroy;
    qdws->base.submit_cmd = qxl_drm_winsys_submit_cmd;
+   qdws->base.emit_res = qxl_drm_emit_res;
+   qdws->base.res_is_referenced = qxl_drm_res_is_ref;
    return &qdws->base;
 
  fail:

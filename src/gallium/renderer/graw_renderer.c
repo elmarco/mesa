@@ -377,8 +377,12 @@ void grend_set_single_vbo(struct grend_context *ctx,
    ctx->vbo[index].stride = stride;
    ctx->vbo[index].buffer_offset = buffer_offset;
 
-   res = graw_object_lookup(res_handle, GRAW_RESOURCE);
-   ctx->vbo[index].buffer = &res->base;
+   if (res_handle == 0)
+      ctx->vbo[index].buffer = NULL;
+   else {
+      res = graw_object_lookup(res_handle, GRAW_RESOURCE);
+      ctx->vbo[index].buffer = &res->base;
+   }
 }
 
 void grend_set_num_vbo(struct grend_context *ctx,
@@ -391,9 +395,10 @@ void grend_set_single_fs_sampler_view(struct grend_context *ctx,
                                       int index,
                                       uint32_t res_handle)
 {
-   struct grend_resource *res;
+   struct grend_resource *res = NULL;
 
-   res = graw_object_lookup(res_handle, GRAW_RESOURCE);
+   if (res_handle)
+      res = graw_object_lookup(res_handle, GRAW_RESOURCE);
    ctx->fs_views[index].texture = res;
 }
 
@@ -407,9 +412,10 @@ void grend_set_single_vs_sampler_view(struct grend_context *ctx,
                                       int index,
                                       uint32_t res_handle)
 {
-   struct grend_resource *res;
+   struct grend_resource *res = NULL;
 
-   res = graw_object_lookup(res_handle, GRAW_RESOURCE);
+   if (res_handle)
+      res = graw_object_lookup(res_handle, GRAW_RESOURCE);
    ctx->vs_views[index].texture = res;
 }
 
@@ -1238,6 +1244,7 @@ void graw_renderer_resource_unref(uint32_t res_handle)
 {
    struct grend_resource *res;
 
+   fprintf(stderr,"unref res %d\n", res_handle);
    res = graw_object_lookup(res_handle, GRAW_RESOURCE);
 
    if (res->target == GL_ELEMENT_ARRAY_BUFFER_ARB) {
@@ -1259,6 +1266,10 @@ void graw_renderer_transfer_write(uint32_t res_handle,
    struct grend_resource *res;
 
    res = graw_object_lookup(res_handle, GRAW_RESOURCE);
+   if (res == NULL) {
+      assert(0);
+      return;
+   }
    if (res->target == GL_ELEMENT_ARRAY_BUFFER_ARB) {
       glBindBufferARB(GL_ELEMENT_ARRAY_BUFFER_ARB, res->id);
       glBufferSubData(GL_ELEMENT_ARRAY_BUFFER_ARB, dst_box->x, dst_box->width, data);

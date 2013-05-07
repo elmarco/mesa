@@ -12,7 +12,7 @@ struct graw_screen;
 
 struct graw_resource {
    struct pipe_resource base;
-   uint32_t res_handle;
+   struct qxl_hw_res *hw_res;
    boolean clean;
 };
 
@@ -48,6 +48,7 @@ struct graw_sampler_view {
    
 struct graw_context {
    struct pipe_context base;
+   struct qxl_cmd_buf *cbuf;
    uint32_t vaoid;
 
    struct graw_vertex_element *ve;
@@ -105,4 +106,6 @@ rempipe_resource_from_handle(struct pipe_screen *screen,
                              struct winsys_handle *whandle);
 
 void graw_init_blit_functions(struct graw_context *grctx);
+
+void graw_flush_eq(struct graw_context *ctx, void *closure);
 #endif

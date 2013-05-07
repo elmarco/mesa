@@ -110,8 +110,10 @@ void *graw_object_lookup(uint32_t handle, enum graw_object_type type)
       obj = util_hash_table_get(res_hash, intptr_to_pointer(handle));
    else
       obj = util_hash_table_get(handle_hash, intptr_to_pointer(handle));
-   if (!obj)
+   if (!obj) {
+      assert(0);
       return NULL;
+   }
 
    if (obj->type != type)
       return NULL;

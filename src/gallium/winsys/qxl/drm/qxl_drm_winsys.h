@@ -19,6 +19,12 @@ struct qxl_bo {
    uint32_t handle;
    void *ptr;
 };
+
+struct qxl_hw_res {
+   struct pipe_reference reference;
+   uint32_t res_handle;
+   int num_cs_references;
+};
   
 struct qxl_drm_winsys
 {
@@ -37,6 +43,17 @@ struct qxl_drm_buffer {
    uint32_t handle;
    uint32_t name;
    uint32_t size;
+};
+
+struct qxl_drm_cmd_buf {
+   struct qxl_cmd_buf base;
+
+   uint32_t buf[QXL_MAX_CMDBUF_DWORDS];
+   
+   unsigned nres;
+   unsigned cres;
+   struct qxl_hw_res **res_bo;
+   struct qxl_winsys *ws;
 };
 
 static INLINE struct qxl_drm_buffer *

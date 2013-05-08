@@ -193,6 +193,7 @@ static void qxl_bo_wait(struct pb_buffer *_buf)
    int ret;
 
    waitcmd.handle = bo->handle;
+   waitcmd.flags = 0;
  again:
    ret = drmIoctl(bo->qws->fd, DRM_IOCTL_QXL_3D_WAIT, &waitcmd);
    if (ret == -EAGAIN)

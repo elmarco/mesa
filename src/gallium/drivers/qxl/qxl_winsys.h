@@ -54,6 +54,7 @@ struct qxl_winsys {
    int (*transfer_get)(struct pb_buffer *buf,
                        struct qxl_hw_res *res,
                        const struct pipe_box *box,
+                       uint32_t buf_offset,
                        uint32_t level);
                        
    struct qxl_hw_res *(*resource_create)(struct qxl_winsys *qws,

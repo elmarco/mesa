@@ -14,6 +14,7 @@ struct graw_resource {
    struct pipe_resource base;
    struct qxl_hw_res *hw_res;
    boolean clean;
+   struct pb_buffer *backing_bo; /* for vbo uploads at least */
 };
 
 struct graw_buffer {

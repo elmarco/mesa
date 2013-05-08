@@ -617,26 +617,33 @@ static void *graw_transfer_map(struct pipe_context *ctx,
 {
    struct graw_context *grctx = (struct graw_context *)ctx;
    struct rempipe_screen *rs = rempipe_screen(ctx->screen);
-
    struct graw_resource *grres = (struct graw_resource *)resource;
    enum pipe_format format = resource->format;
    struct graw_transfer *trans;
    void *ptr;
+   boolean readback = TRUE;
+   struct qxl_bo *bo;
 
-   if (rs->qws->res_is_referenced(rs->qws, grctx->cbuf, grres->hw_res))
+   if ((!(usage & PIPE_TRANSFER_UNSYNCHRONIZED)) && rs->qws->res_is_referenced(rs->qws, grctx->cbuf, grres->hw_res))
       graw_flush(ctx, NULL, 0);
+
    trans = util_slab_alloc(&grctx->texture_transfer_pool);
    if (trans == NULL)
       return NULL;
 
-   /* allocate a bo */
    trans->lmsize = box->width * box->height * box->depth * util_format_get_blocksize(resource->format);
    trans->lmsize = align(trans->lmsize, 4);
 
-   trans->bo = rs->qws->bo_create(rs->qws, trans->lmsize, 0);
-   if (!trans->bo) {
-      util_slab_free(&grctx->texture_transfer_pool, trans);
-      return NULL;
+   if (grres->backing_bo) {
+      trans->bo = NULL;
+      pb_reference(&trans->bo, grres->backing_bo);
+   } else {
+      /* allocate a bo */
+      trans->bo = rs->qws->bo_create(rs->qws, trans->lmsize, 0);
+      if (!trans->bo) {
+         util_slab_free(&grctx->texture_transfer_pool, trans);
+         return NULL;
+      }
    }
 
    ptr = rs->qws->bo_map(trans->bo);
@@ -646,18 +653,23 @@ static void *graw_transfer_map(struct pipe_context *ctx,
       return NULL;
    }
 
-   if ((usage & PIPE_TRANSFER_DISCARD_RANGE) || grres->clean == TRUE ||
-       (usage & (PIPE_TRANSFER_WRITE | PIPE_TRANSFER_FLUSH_EXPLICIT))) {
+   if (grres->clean)
+      readback = FALSE;
+   else if (usage & PIPE_TRANSFER_DISCARD_RANGE)
+      readback = FALSE;
+   else if ((usage & (PIPE_TRANSFER_WRITE | PIPE_TRANSFER_FLUSH_EXPLICIT)) ==
+            (PIPE_TRANSFER_WRITE | PIPE_TRANSFER_FLUSH_EXPLICIT))
+      readback = FALSE;
+
+   if (readback == FALSE) {
       if ((usage & PIPE_TRANSFER_READ))
          memset(ptr, 0, trans->lmsize);
    } else {
       struct graw_resource *grres = (struct graw_resource *)resource;
       struct rempipe_screen *rs = rempipe_screen(ctx->screen);
+      uint32_t offset = grres->backing_bo ? box->x : 0;
 
-      if (!(usage & PIPE_TRANSFER_UNSYNCHRONIZED))
-         graw_flush(ctx, NULL, 0);
-
-      rs->qws->transfer_get(trans->bo, grres->hw_res, box, level);
+      rs->qws->transfer_get(trans->bo, grres->hw_res, box, offset, level);
 
       /* wait for data */
       rs->qws->bo_wait(trans->bo);
@@ -669,13 +681,10 @@ static void *graw_transfer_map(struct pipe_context *ctx,
    trans->base.box = *box;
    trans->base.stride = box->width * util_format_get_blocksize(resource->format);
    trans->base.layer_stride = 0;
-   trans->offset = 0;
-//   trans->offset = box->y / util_format_get_blockheight(format) * trans->base.stride +
-//      box->x / util_format_get_blockwidth(format) * util_format_get_blocksize(format);
-
+   trans->offset = grres->backing_bo ? box->x : 0;
    *transfer = &trans->base;
 
-   return ptr;
+   return ptr + trans->offset;
 }
 
 static void graw_transfer_unmap(struct pipe_context *ctx,
@@ -691,12 +700,10 @@ static void graw_transfer_unmap(struct pipe_context *ctx,
       if (!(transfer->usage & PIPE_TRANSFER_FLUSH_EXPLICIT)) {
          struct rempipe_screen *rs = rempipe_screen(ctx->screen);
          grres->clean = FALSE;
-         if (!(transfer->usage & PIPE_TRANSFER_UNSYNCHRONIZED))
-            graw_flush(ctx, NULL, 0);
 
          rs->qws->transfer_put(trans->bo, grres->hw_res,
-                               &transfer->box, 0, 0, transfer->level);
-         rs->qws->bo_wait(trans->bo);
+                               &transfer->box, 0, trans->offset, transfer->level);
+
       }
       
    }
@@ -728,11 +735,9 @@ static void graw_transfer_flush_region(struct pipe_context *ctx,
    hw_box.height = box->height;
    hw_box.depth = box->depth;
 
-   if (!(transfer->usage & PIPE_TRANSFER_UNSYNCHRONIZED))
-      graw_flush(ctx, NULL, 0);
-
    rs->qws->transfer_put(trans->bo, grres->hw_res,
                          &hw_box, 0, offset, transfer->level);
+
    grres->clean = FALSE;   
 }
                                        
@@ -892,6 +897,12 @@ struct pipe_resource *graw_resource_create(struct pipe_screen *pscreen,
       buf->base.base.screen = pscreen;
       pipe_reference_init(&buf->base.base.reference, 1);
       buf->base.hw_res = rs->qws->resource_create(rs->qws, template->target, template->format, template->bind, template->width0, 1, 1, 0, 0, 0);
+
+      if (buf->base.base.bind == PIPE_BIND_VERTEX_BUFFER ||
+         buf->base.base.bind == PIPE_BIND_INDEX_BUFFER) {
+         uint32_t size = template->width0;
+         buf->base.backing_bo = rs->qws->bo_create(rs->qws, size, 0);
+      }
       assert(buf->base.hw_res);
       return &buf->base.base;
    } else {
@@ -957,7 +968,8 @@ graw_resource_destroy(struct pipe_screen *pscreen,
 
    if (pt->target == PIPE_BUFFER) {
       struct graw_buffer *buf = (struct graw_buffer *)pt;
-      
+      if (buf->base.backing_bo)
+         pb_reference(&buf->base.backing_bo, NULL);
       rs->qws->resource_unref(rs->qws, buf->base.hw_res);
       FREE(buf);
    } else {

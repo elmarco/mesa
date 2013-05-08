@@ -251,6 +251,7 @@ static int
 qxl_bo_transfer_get(struct pb_buffer *_buf,
                     struct qxl_hw_res *res,
                     const struct pipe_box *box,
+                    uint32_t buf_offset,
                     uint32_t level)
 {
    struct qxl_bo *bo = get_qxl_bo(_buf);
@@ -260,6 +261,7 @@ qxl_bo_transfer_get(struct pb_buffer *_buf,
    getcmd.res_handle = res->res_handle;
    getcmd.bo_handle = bo->handle;
    getcmd.level = level;
+   getcmd.dst_offset = buf_offset;
    getcmd.box = *(struct drm_qxl_3d_box *)box;
    ret = drmIoctl(bo->qws->fd, DRM_IOCTL_QXL_3D_TRANSFER_GET, &getcmd);
    return ret;

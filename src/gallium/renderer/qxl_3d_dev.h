@@ -12,7 +12,6 @@ enum qxl_3d_cmd_type {
 	QXL_3D_DESTROY_CONTEXT,
 	QXL_3D_TRANSFER_GET,
 	QXL_3D_TRANSFER_PUT,
-	QXL_3D_FENCE,
         QXL_3D_SET_SCANOUT,
         QXL_3D_FLUSH_BUFFER,
 	QXL_3D_RESOURCE_UNREF,
@@ -71,16 +70,17 @@ struct qxl_3d_cmd_submit {
 	uint32_t size;
 };
 
+#define QXL_3D_COMMAND_EMIT_FENCE (1 << 0)
 typedef struct QXL3DCommand {
    uint32_t type;
-   uint32_t pad;
+   uint32_t flags;
+   uint64_t fence_id;
    union qxl_3d_cmds {
       struct qxl_3d_resource_create res_create;
       struct qxl_3d_transfer_put transfer_put;
       struct qxl_3d_transfer_get transfer_get;
-      uint64_t fence_id;
       struct qxl_3d_cmd_submit cmd_submit;
-      unsigned char pads[120];
+      unsigned char pads[112];
       struct qxl_3d_set_scanout set_scanout;
       struct qxl_3d_flush_buffer flush_buffer;
       struct qxl_3d_resource_unref res_unref;

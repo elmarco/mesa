@@ -151,12 +151,12 @@ int main(int argc, char **argv)
          else
             req.tv_nsec = 50000000;
          count++;
-//         graw_renderer_check_fences();
+         graw_renderer_check_fences();
          nanosleep(&req, NULL);
 
       }
       
-//      graw_renderer_check_fences();
+      graw_renderer_check_fences();
       cmd = SPICE_RING_CONS_ITEM(&ramp->cmd_3d_ring);
     
 //      fprintf(stderr, "got cmd %x\n", cmd->type);
@@ -194,17 +194,13 @@ int main(int argc, char **argv)
 				     mapping + cmd->u.transfer_get.phy_addr);
 	 break;
       case QXL_3D_TRANSFER_PUT:
-//         fprintf(stderr,"got transfer putt %d\n", cmd->u.transfer_put.res_handle);
 	 graw_renderer_transfer_write(cmd->u.transfer_put.res_handle,
 				      cmd->u.transfer_put.dst_level,
 				      cmd->u.transfer_put.src_stride,
 				      (struct pipe_box *)&cmd->u.transfer_put.dst_box,
 				      mapping + cmd->u.transfer_put.phy_addr);
 	 break;
-      case QXL_3D_FENCE:
-         graw_write_fence(cmd->u.fence_id);
-//         graw_renderer_create_fence(cmd->u.fence_id);
-         break;
+
       case QXL_3D_SET_SCANOUT:
          graw_renderer_set_scanout(cmd->u.set_scanout.res_handle,
                                    (struct pipe_box *)&cmd->u.set_scanout.box);
@@ -228,6 +224,10 @@ int main(int argc, char **argv)
          inited = 1;
          break;
       }
+
+      if (cmd->flags & QXL_3D_COMMAND_EMIT_FENCE)
+         graw_renderer_create_fence(cmd->fence_id);
+
       SPICE_RING_POP(&ramp->cmd_3d_ring, notify);
 
       if (notify) {

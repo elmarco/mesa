@@ -138,6 +138,8 @@ static struct {
       [PIPE_FORMAT_R8G8B8A8_UNORM] = {GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE },
       [PIPE_FORMAT_R8G8B8X8_UNORM] = {GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE },
 
+      [PIPE_FORMAT_B5G6R5_UNORM] = {GL_RGB4, GL_RGBA, GL_UNSIGNED_SHORT_5_6_5 },
+
       [PIPE_FORMAT_B4G4R4A4_UNORM] = {GL_RGBA4, GL_RGBA, GL_UNSIGNED_SHORT_4_4_4_4 },
 
       [PIPE_FORMAT_S8_UINT] = {GL_DEPTH24_STENCIL8_EXT, GL_DEPTH_STENCIL, GL_UNSIGNED_BYTE},
@@ -467,7 +469,7 @@ void grend_create_vs(struct grend_context *ctx,
    if (glsl_prog) {
       glShaderSource(state->id, 1, &glsl_prog, NULL);
       glCompileShader(state->id);
-      fprintf(stderr,"VS:\n%s\n", glsl_prog);
+//      fprintf(stderr,"VS:\n%s\n", glsl_prog);
    }
    graw_object_insert(state, sizeof(*state), handle, GRAW_OBJECT_VS);
 
@@ -486,7 +488,7 @@ void grend_create_fs(struct grend_context *ctx,
    if (glsl_prog) {
       glShaderSource(state->id, 1, (const char **)&glsl_prog, NULL);
       glCompileShader(state->id);
-      fprintf(stderr,"FS:\n%s\n", glsl_prog);
+//      fprintf(stderr,"FS:\n%s\n", glsl_prog);
    }
    graw_object_insert(state, sizeof(*state), handle, GRAW_OBJECT_FS);
 
@@ -570,9 +572,12 @@ void grend_draw_vbo(struct grend_context *ctx,
    glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, ctx->fb_id);
 
    glUseProgram(ctx->program_id);
-   glGenVertexArrays(1, &vaoid);
+   if (ctx->vaoid)
+      glDeleteVertexArrays(1, &ctx->vaoid);
 
-   glBindVertexArray(vaoid);
+   glGenVertexArrays(1, &ctx->vaoid);
+
+   glBindVertexArray(ctx->vaoid);
 
    for (i = 0; i < ctx->vs_consts.num_consts / 4; i++) {
       GLint loc;
@@ -713,6 +718,10 @@ void grend_draw_vbo(struct grend_context *ctx,
    glActiveTexture(GL_TEXTURE0);
    glDisable(GL_TEXTURE_2D);
    glBindVertexArray(0);
+
+   for (i = 0; i < ctx->ve->count; i++) {
+      glDisableVertexAttribArray(i);
+   }
    //   glDeleteVertexArrays(1, &vaoid);
 }
 
@@ -1244,7 +1253,6 @@ void graw_renderer_resource_unref(uint32_t res_handle)
 {
    struct grend_resource *res;
 
-   fprintf(stderr,"unref res %d\n", res_handle);
    res = graw_object_lookup(res_handle, GRAW_RESOURCE);
 
    if (res->target == GL_ELEMENT_ARRAY_BUFFER_ARB) {

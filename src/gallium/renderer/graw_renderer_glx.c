@@ -1,3 +1,4 @@
+#include <GL/glew.h>
 
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
@@ -78,6 +79,9 @@ void graw_renderer_init_glx(int localrender)
    if (localrender) {
       XMapWindow(graw_dpy, graw_win);
    }
+
+   glewInit();
+
 }
 
 int process_x_event(void)

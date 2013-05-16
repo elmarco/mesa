@@ -1157,7 +1157,6 @@ graw_renderer_init(void)
       graw_object_init_hash();
    }
    
-   glewInit();
    list_inithead(&fence_list);
 }
 

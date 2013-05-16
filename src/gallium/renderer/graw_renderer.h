@@ -146,4 +146,7 @@ int graw_renderer_create_fence(int client_fence_id);
 
 void graw_write_fence(unsigned fence_id);
 void graw_renderer_check_fences(void);
+
+int swap_buffers(void);
+
 #endif

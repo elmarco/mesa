@@ -537,7 +537,7 @@ static void graw_decode_blit(struct grend_decode_ctx *ctx)
    graw_renderer_blit(gdctx->grctx, dst_handle, src_handle, &info);
 }
 
-void graw_decode_block(uint32_t *block, int ndw)
+static void graw_decode_block(uint32_t *block, int ndw)
 {
    struct graw_decoder_state ds;
    int i = 0;
@@ -617,6 +617,15 @@ void graw_decode_block(uint32_t *block, int ndw)
 
 }
 
+void graw_decode_block_iov(struct graw_iovec *iov, unsigned int niovs,
+                           uint64_t offset, int ndw)
+{
+   uint32_t *block = (uint32_t *)(iov[0].iov_base + offset);
+
+   graw_decode_block(block, ndw);
+
+}
+#if 0
 void graw_decode_transfer(uint32_t *data, uint32_t ndw)
 {
    uint32_t handle = data[0];
@@ -655,3 +664,4 @@ void graw_decode_get_transfer(uint32_t *data, uint32_t ndw)
    level = data[7];
    graw_renderer_transfer_send(handle, level, &box, NULL);
 }
+#endif

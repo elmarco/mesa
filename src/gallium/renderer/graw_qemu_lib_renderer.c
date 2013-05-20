@@ -25,7 +25,8 @@ static void *dev_cookie;
 extern int localrender;
 
 void graw_renderer_init(void);
-static void graw_process_cmd(QXL3DCommand *cmd);
+static void graw_process_cmd(QXL3DCommand *cmd, struct graw_iovec *iov,
+                             unsigned int niovs);
 
 void graw_renderer_set_vram_params(void *ptr, uint32_t size)
 {
@@ -59,6 +60,7 @@ void graw_renderer_ping(void)
 {
    QXL3DCommand *cmd;
    int notify;
+   struct graw_iovec iov;
 
  retry:
    if (SPICE_RING_IS_EMPTY(&ramp->cmd_3d_ring))
@@ -66,8 +68,11 @@ void graw_renderer_ping(void)
 
    graw_renderer_check_fences();
    cmd = SPICE_RING_CONS_ITEM(&ramp->cmd_3d_ring);
-    
-   graw_process_cmd(cmd);
+
+   iov.iov_base = mapping;
+   iov.iov_len = 0;
+
+   graw_process_cmd(cmd, &iov, 1);
 //      fprintf(stderr, "got cmd %x\n", cmd->type);
 
    SPICE_RING_POP(&ramp->cmd_3d_ring, notify);
@@ -82,10 +87,15 @@ void graw_renderer_ping(void)
 void graw_process_vcmd(void *cmd)
 {
    QXL3DCommand *qcmd = cmd;
-   graw_process_cmd(qcmd);
+   struct graw_iovec iov;
+
+   iov.iov_base = mapping;
+   iov.iov_len = 0;
+   graw_process_cmd(qcmd, &iov, 1);
 }
 
-static void graw_process_cmd(QXL3DCommand *cmd)
+static void graw_process_cmd(QXL3DCommand *cmd, struct graw_iovec *iov,
+                             unsigned int niovs)
 {
    static int inited;
 
@@ -110,23 +120,26 @@ static void graw_process_cmd(QXL3DCommand *cmd)
    {
       uint32_t *cmdmap = mapping + cmd->u.cmd_submit.phy_addr;
 //            fprintf(stderr,"%08x %08x\n", cmdmap[0], cmdmap[1]);
-      graw_decode_block(cmdmap, cmd->u.cmd_submit.size / 4);
+//      graw_decode_block(cmdmap, cmd->u.cmd_submit.size / 4);          
+      graw_decode_block_iov(iov, niovs, cmd->u.cmd_submit.phy_addr, cmd->u.cmd_submit.size / 4);
    }
    
    break;
    case QXL_3D_TRANSFER_GET:
 //         fprintf(stderr,"got transfer get %d\n", cmd->u.transfer_get.res_handle);
-      graw_renderer_transfer_send(cmd->u.transfer_get.res_handle,
-                                  cmd->u.transfer_get.level,
-                                  (struct pipe_box *)&cmd->u.transfer_get.box,
-                                  mapping + cmd->u.transfer_get.phy_addr);
+      graw_renderer_transfer_send_iov(cmd->u.transfer_get.res_handle,
+                                      cmd->u.transfer_get.level,
+                                      (struct pipe_box *)&cmd->u.transfer_get.box,
+                                      cmd->u.transfer_get.phy_addr, iov,
+                                      niovs);
       break;
    case QXL_3D_TRANSFER_PUT:
-      graw_renderer_transfer_write(cmd->u.transfer_put.res_handle,
+      graw_renderer_transfer_write_iov(cmd->u.transfer_put.res_handle,
                                    cmd->u.transfer_put.dst_level,
                                    cmd->u.transfer_put.src_stride,
                                    (struct pipe_box *)&cmd->u.transfer_put.dst_box,
-                                   mapping + cmd->u.transfer_put.phy_addr);
+                                   cmd->u.transfer_put.phy_addr, iov,
+                                   niovs);
       break;
       
    case QXL_3D_SET_SCANOUT:
@@ -158,9 +171,12 @@ static void graw_process_cmd(QXL3DCommand *cmd)
 
 }
 
-void graw_transfer_write_return(void *data, uint32_t ndw, void *myptr)
+void graw_transfer_write_return(void *data, uint32_t ndw, struct graw_iovec *iov, int iovec_cnt)
 {
-  memcpy(myptr, data, ndw);
+   if (iovec_cnt == 1)
+      memcpy(iov[0].iov_base, data, ndw);
+   else
+      fprintf(stderr,"iovec cnt is > 0\n");
 }
 
 void graw_transfer_write_tex_return(struct pipe_resource *res,

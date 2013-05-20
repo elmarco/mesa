@@ -60,6 +60,5 @@ enum graw_scrn_cmd {
 #define GRAW_CMD0(cmd, obj, len) ((cmd) | ((obj) << 8) | ((len) << 16))
 
 void graw_renderer_init(void);
-void graw_decode_block(uint32_t *block, int ndw);
 
 #endif

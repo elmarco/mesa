@@ -76,17 +76,17 @@ static int process_cmd(void)
       fprintf(stderr,"submit cmd pre %d %d\n", ndw, ret);
       ret = do_blocked_read(graw_fd, &cmdbuf, ndw * sizeof(uint32_t));
       fprintf(stderr,"submit cmd %d %d\n", ndw, ret);
-      graw_decode_block(cmdbuf, ndw);
+//      graw_decode_block(cmdbuf, ndw);
       break;
    case GRAW_TRANSFER_PUT:
       ndw = cmd >> 16;
       ret = do_blocked_read(graw_fd, &cmdbuf, ndw * sizeof(uint32_t));
-      graw_decode_transfer(cmdbuf, ndw);
+//      graw_decode_transfer(cmdbuf, ndw);
       break;
    case GRAW_TRANSFER_GET:
       ndw = cmd >> 16;
       ret = do_blocked_read(graw_fd, &decbuf, 7 * sizeof(uint32_t));
-      graw_decode_get_transfer(decbuf, ndw);
+//      graw_decode_get_transfer(decbuf, ndw);
       break;
    default:
       fprintf(stderr,"read unknown cmd %d\n", cmd);
@@ -173,7 +173,7 @@ int main(int argc, char **argv)
    socket_main();
 }
 
-void graw_transfer_write_return(void *data, uint32_t ndw, void *dummy)
+void graw_transfer_write_return(void *data, uint32_t ndw, struct graw_iovec *iov, int iovec_cnt)
 {
    uint32_t count = ndw;
    while (count) {

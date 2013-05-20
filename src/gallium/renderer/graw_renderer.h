@@ -1,6 +1,7 @@
 #ifndef GRAW_RENDERER_H
 #define GRAW_RENDERER_H
 
+#include "graw_iov.h"
 struct grend_context;
 
 struct grend_resource;
@@ -98,10 +99,12 @@ void grend_set_index_buffer(struct grend_context *ctx,
                             uint32_t index_size,
                             uint32_t offset);
 
-void graw_renderer_transfer_write(uint32_t handle, int level,
-                                  uint32_t src_stride,
-                                  struct pipe_box *dst_box,
-                                  void *data);
+void graw_renderer_transfer_write_iov(uint32_t handle, int level,
+                                      uint32_t src_stride,
+                                      struct pipe_box *dst_box,
+                                      uint64_t offset,
+                                      struct graw_iovec *iovec,
+                                      unsigned int iovec_cnt);
 
 void graw_renderer_resource_copy_region(struct grend_context *ctx,
                                         uint32_t dst_handle, uint32_t dst_level,
@@ -113,7 +116,7 @@ void graw_renderer_blit(struct grend_context *ctx,
                         uint32_t dst_handle, uint32_t src_handle,
                         const struct pipe_blit_info *info);
 
-void graw_renderer_transfer_send(uint32_t handle, uint32_t level, struct pipe_box *box, void *ptr);
+void graw_renderer_transfer_send_iov(uint32_t handle, uint32_t level, struct pipe_box *box, uint64_t offset, struct graw_iovec *iov, int iovec_cnt);
 void grend_set_stencil_ref(struct grend_context *ctx, struct pipe_stencil_ref *ref);
 void grend_set_blend_color(struct grend_context *ctx, struct pipe_blend_color *color);
 void grend_set_scissor_state(struct grend_context *ctx, struct pipe_scissor_state *ss);
@@ -124,7 +127,7 @@ void grend_set_constants(struct grend_context *ctx,
                          uint32_t num_constant,
                          float *data);
 
-void graw_transfer_write_return(void *data, uint32_t ndw, void *ptr);
+void graw_transfer_write_return(void *data, uint32_t ndw, struct graw_iovec *iov, int iovec_cnt);
 
 void graw_transfer_write_tex_return(struct pipe_resource *res,
 				    struct pipe_box *box,
@@ -140,7 +143,7 @@ int graw_renderer_flush_buffer(uint32_t res_handle,
 void graw_renderer_fini(void);
 void graw_reset_decode(void);
 
-void graw_decode_block(uint32_t *block, int ndw);
+void graw_decode_block_iov(struct graw_iovec *iov, uint32_t niovs, uint64_t offset, int ndw);
 
 int graw_renderer_create_fence(int client_fence_id);
 

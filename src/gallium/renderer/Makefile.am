@@ -29,7 +29,8 @@ libgrend_la_SOURCES = \
         graw_renderer.c \
         graw_shader.c \
         graw_object.c \
-        graw_decode.c
+        graw_decode.c \
+        iov.c
 
 lib_LTLIBRARIES = libgmoney.la
 noinst_LTLIBRARIES = libgrend.la

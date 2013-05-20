@@ -1264,14 +1264,16 @@ void graw_renderer_resource_unref(uint32_t res_handle)
    graw_object_destroy(res_handle, GRAW_RESOURCE);
 }
 
-void graw_renderer_transfer_write(uint32_t res_handle,
-                                  int level,
-                                  uint32_t src_stride,
-                                  struct pipe_box *dst_box,
-                                  void *data)
+void graw_renderer_transfer_write_iov(uint32_t res_handle,
+                                      int level,
+                                      uint32_t src_stride,
+                                      struct pipe_box *dst_box,
+                                      uint64_t offset,
+                                      struct graw_iovec *iov,
+                                      unsigned int num_iovs)
 {
    struct grend_resource *res;
-
+   void *data = iov[0].iov_base + offset;
    res = graw_object_lookup(res_handle, GRAW_RESOURCE);
    if (res == NULL) {
       assert(0);
@@ -1323,10 +1325,10 @@ void graw_renderer_transfer_write(uint32_t res_handle,
    }
 }
 
-void graw_renderer_transfer_send(uint32_t res_handle, uint32_t level, struct pipe_box *box, void *myptr)
+void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t level, struct pipe_box *box, uint64_t offset, struct graw_iovec *iov, int num_iovs)
 {
    struct grend_resource *res;
-
+   void *myptr = iov[0].iov_base + offset;
    res = graw_object_lookup(res_handle, GRAW_RESOURCE);
 
    if (res->target == GL_ELEMENT_ARRAY_BUFFER_ARB) {
@@ -1334,24 +1336,24 @@ void graw_renderer_transfer_send(uint32_t res_handle, uint32_t level, struct pip
       void *data;
       glBindBufferARB(GL_ELEMENT_ARRAY_BUFFER_ARB, res->id);
       data = glMapBuffer(GL_ELEMENT_ARRAY_BUFFER_ARB, GL_READ_ONLY);
-      graw_transfer_write_return(data + box->x, send_size, myptr);
+      graw_transfer_write_return(data + box->x, send_size, iov, num_iovs);
       glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER_ARB);
    } else if (res->target == GL_ARRAY_BUFFER_ARB) {
       uint32_t send_size = box->width * util_format_get_blocksize(res->base.format);      
       void *data;
       glBindBufferARB(GL_ARRAY_BUFFER_ARB, res->id);
       data = glMapBuffer(GL_ARRAY_BUFFER_ARB, GL_READ_ONLY);
-      graw_transfer_write_return(data + box->x, send_size, myptr);
+      graw_transfer_write_return(data + box->x, send_size, iov, num_iovs);
       glUnmapBuffer(GL_ARRAY_BUFFER_ARB);
    } else {
       uint32_t h = u_minify(res->base.height0, level);
       GLenum format, type;
       GLuint fb_id;
       GLint  y1;
-//      data = malloc(send_size);
+//    data = malloc(send_size);
       fprintf(stderr,"TEXTURE TRANSFER %d %d %d %d %d\n", res_handle, res->readback_fb_id, box->width, box->height, level);
-//      if (!data)
-      //       fprintf(stderr,"malloc failed %d\n", send_size);
+//    if (!data)
+//         fprintf(stderr,"malloc failed %d\n", send_size);
       if (res->readback_fb_id == 0 || res->readback_fb_level != level) {
 	if (res->readback_fb_id)
 	  glDeleteFramebuffers(1, &res->readback_fb_id);

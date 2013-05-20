@@ -79,6 +79,7 @@ int main(int argc, char **argv)
    int conn_socket, maxfd;
    fd_set readset;
    int vm_sock, vm_efd2;
+   struct graw_iovec iov;
 
    if (argc == 2 && !strcmp(argv[1], "-render"))
       localrender = 1;
@@ -133,6 +134,9 @@ int main(int argc, char **argv)
 
    ramp = mapping;
 
+   iov.iov_base = mapping;
+   iov.iov_len = 0;
+
    SPICE_RING_INIT(&ramp->cmd_3d_ring);
    ramp->version = 1;
    {
@@ -180,25 +184,25 @@ int main(int argc, char **argv)
 //         fprintf(stderr,"cmd submit %lx %d\n", cmd->u.cmd_submit.phy_addr, cmd->u.cmd_submit.size);
 
          {
-            uint32_t *cmdmap = mapping + cmd->u.cmd_submit.phy_addr;
-//            fprintf(stderr,"%08x %08x\n", cmdmap[0], cmdmap[1]);
-            graw_decode_block(cmdmap, cmd->u.cmd_submit.size / 4);
+            graw_decode_block_iov(&iov, 1, cmd->u.cmd_submit.phy_addr, cmd->u.cmd_submit.size / 4);
          }
 
          break;
       case QXL_3D_TRANSFER_GET:
 //         fprintf(stderr,"got transfer get %d\n", cmd->u.transfer_get.res_handle);
-	 graw_renderer_transfer_send(cmd->u.transfer_get.res_handle,
+	 graw_renderer_transfer_send_iov(cmd->u.transfer_get.res_handle,
                                      cmd->u.transfer_get.level,
 				     (struct pipe_box *)&cmd->u.transfer_get.box,
-				     mapping + cmd->u.transfer_get.phy_addr);
+                                     cmd->u.transfer_get.phy_addr,
+                                         &iov, 1);
 	 break;
       case QXL_3D_TRANSFER_PUT:
-	 graw_renderer_transfer_write(cmd->u.transfer_put.res_handle,
+	 graw_renderer_transfer_write_iov(cmd->u.transfer_put.res_handle,
 				      cmd->u.transfer_put.dst_level,
 				      cmd->u.transfer_put.src_stride,
 				      (struct pipe_box *)&cmd->u.transfer_put.dst_box,
-				      mapping + cmd->u.transfer_put.phy_addr);
+                                      cmd->u.transfer_put.phy_addr,
+                                          &iov, 1);
 	 break;
 
       case QXL_3D_SET_SCANOUT:
@@ -238,9 +242,12 @@ int main(int argc, char **argv)
    
 }
 
-void graw_transfer_write_return(void *data, uint32_t ndw, void *myptr)
+void graw_transfer_write_return(void *data, uint32_t ndw, struct graw_iovec *iov, int iovec_cnt)
 {
-  memcpy(myptr, data, ndw);
+   if (iovec_cnt == 1)
+      memcpy(iov[0].iov_base, data, ndw);
+   else
+      fprintf(stderr,"iovec cnt is > 0\n");
 }
 
 void graw_transfer_write_tex_return(struct pipe_resource *res,

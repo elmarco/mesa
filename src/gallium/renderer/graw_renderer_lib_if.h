@@ -11,6 +11,8 @@ GREND_EXPORT void graw_renderer_set_vram_params(void *ptr, uint32_t size);
 GREND_EXPORT void graw_renderer_ping(void);
 /* */
 
+GREND_EXPORT void graw_process_vcmd(void *cmd);
+
 struct graw_renderer_callbacks {
    /* send IRQ to guest */
    void (*send_irq)(void *cookie, uint32_t irq);

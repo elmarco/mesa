@@ -25,6 +25,7 @@ static void *dev_cookie;
 extern int localrender;
 
 void graw_renderer_init(void);
+static void graw_process_cmd(QXL3DCommand *cmd);
 
 void graw_renderer_set_vram_params(void *ptr, uint32_t size)
 {
@@ -58,7 +59,6 @@ void graw_renderer_ping(void)
 {
    QXL3DCommand *cmd;
    int notify;
-   static int inited;
 
  retry:
    if (SPICE_RING_IS_EMPTY(&ramp->cmd_3d_ring))
@@ -67,7 +67,27 @@ void graw_renderer_ping(void)
    graw_renderer_check_fences();
    cmd = SPICE_RING_CONS_ITEM(&ramp->cmd_3d_ring);
     
+   graw_process_cmd(cmd);
 //      fprintf(stderr, "got cmd %x\n", cmd->type);
+
+   SPICE_RING_POP(&ramp->cmd_3d_ring, notify);
+
+   if (notify) {
+      send_irq(1);
+   }
+   
+   goto retry;
+}
+
+void graw_process_vcmd(void *cmd)
+{
+   QXL3DCommand *qcmd = cmd;
+   graw_process_cmd(qcmd);
+}
+
+static void graw_process_cmd(QXL3DCommand *cmd)
+{
+   static int inited;
 
    switch (cmd->type) {
    case QXL_3D_CMD_CREATE_RESOURCE:
@@ -135,13 +155,7 @@ void graw_renderer_ping(void)
    
    if (cmd->flags & QXL_3D_COMMAND_EMIT_FENCE)
       graw_renderer_create_fence(cmd->fence_id);
-   
-   SPICE_RING_POP(&ramp->cmd_3d_ring, notify);
 
-   if (notify) {
-      send_irq(1);
-   }
-   goto retry;
 }
 
 void graw_transfer_write_return(void *data, uint32_t ndw, void *myptr)

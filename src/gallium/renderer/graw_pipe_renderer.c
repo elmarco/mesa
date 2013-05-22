@@ -173,20 +173,23 @@ int main(int argc, char **argv)
    socket_main();
 }
 
-void graw_transfer_write_return(void *data, uint32_t ndw, struct graw_iovec *iov, int iovec_cnt)
+void graw_transfer_write_return(void *data, uint32_t bytes, uint64_t offset,
+                                struct graw_iovec *iov, int iovec_cnt)
 {
-   uint32_t count = ndw;
+   uint32_t count = bytes;
    while (count) {
       int amt = count < 4096 ? count : 4096;
 
-      write(graw_fd, data + (ndw - count), amt);
+      write(graw_fd, data + (bytes - count), amt);
       count -= amt;
    }
 }
 void graw_transfer_write_tex_return(struct pipe_resource *res,
 				    struct pipe_box *box,
-                                    uint32_t level,
-				    void *data, void *myptr)
+                                       uint32_t level,
+                                       uint64_t offset,
+                                       struct graw_iovec *iov,
+                                       int num_iovs, void *myptr, int size)
 {
   fprintf(stderr,"TODO\n");
 }

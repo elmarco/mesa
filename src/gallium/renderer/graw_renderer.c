@@ -1264,6 +1264,18 @@ void graw_renderer_resource_unref(uint32_t res_handle)
    graw_object_destroy(res_handle, GRAW_RESOURCE);
 }
 
+static void iov_element_upload(void *cookie, uint32_t doff, void *src, int len)
+{
+   struct pipe_box *d_box = cookie;
+   glBufferSubData(GL_ELEMENT_ARRAY_BUFFER_ARB, d_box->x + doff, len, src);
+}
+
+static void iov_vertex_upload(void *cookie, uint32_t doff, void *src, int len)
+{
+   struct pipe_box *d_box = cookie;
+   glBufferSubData(GL_ARRAY_BUFFER_ARB, d_box->x + doff, len, src);
+}
+
 void graw_renderer_transfer_write_iov(uint32_t res_handle,
                                       int level,
                                       uint32_t src_stride,
@@ -1273,7 +1285,8 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
                                       unsigned int num_iovs)
 {
    struct grend_resource *res;
-   void *data = iov[0].iov_base + offset;
+   void *data;
+   int need_temp;
    res = graw_object_lookup(res_handle, GRAW_RESOURCE);
    if (res == NULL) {
       assert(0);
@@ -1281,14 +1294,21 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
    }
    if (res->target == GL_ELEMENT_ARRAY_BUFFER_ARB) {
       glBindBufferARB(GL_ELEMENT_ARRAY_BUFFER_ARB, res->id);
-      glBufferSubData(GL_ELEMENT_ARRAY_BUFFER_ARB, dst_box->x, dst_box->width, data);
+      graw_iov_to_buf_cb(iov, num_iovs, offset, dst_box->width, &iov_element_upload, (void *)dst_box);
    } else if (res->target == GL_ARRAY_BUFFER_ARB) {
       glBindBufferARB(GL_ARRAY_BUFFER_ARB, res->id);
-      glBufferSubData(GL_ARRAY_BUFFER_ARB, dst_box->x, dst_box->width, data);
+      graw_iov_to_buf_cb(iov, num_iovs, offset, dst_box->width, &iov_vertex_upload, (void *)dst_box);
    } else {
       GLenum glformat;
       GLenum gltype;
       int old_stride = 0;
+
+      if (num_iovs > 1) {
+         GLuint size = graw_iov_size(iov, num_iovs);
+         data = malloc(size);
+         graw_iov_to_buf(iov, num_iovs, offset, data, size - offset);
+      } else
+         data = iov[0].iov_base + offset;
 
       glBindTexture(res->target, res->id);
 
@@ -1322,13 +1342,20 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
       }
       if (src_stride)
          glPixelStorei(GL_UNPACK_ROW_LENGTH, old_stride);
+      if (num_iovs > 1)
+         free(data);
    }
+
 }
 
 void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t level, struct pipe_box *box, uint64_t offset, struct graw_iovec *iov, int num_iovs)
 {
    struct grend_resource *res;
    void *myptr = iov[0].iov_base + offset;
+   int need_temp = 0;
+
+   if (num_iovs > 1)
+      need_temp = 1;
    res = graw_object_lookup(res_handle, GRAW_RESOURCE);
 
    if (res->target == GL_ELEMENT_ARRAY_BUFFER_ARB) {
@@ -1336,24 +1363,31 @@ void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t level, struct
       void *data;
       glBindBufferARB(GL_ELEMENT_ARRAY_BUFFER_ARB, res->id);
       data = glMapBuffer(GL_ELEMENT_ARRAY_BUFFER_ARB, GL_READ_ONLY);
-      graw_transfer_write_return(data + box->x, send_size, iov, num_iovs);
+      graw_transfer_write_return(data + box->x, send_size, offset, iov, num_iovs);
       glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER_ARB);
    } else if (res->target == GL_ARRAY_BUFFER_ARB) {
       uint32_t send_size = box->width * util_format_get_blocksize(res->base.format);      
       void *data;
       glBindBufferARB(GL_ARRAY_BUFFER_ARB, res->id);
       data = glMapBuffer(GL_ARRAY_BUFFER_ARB, GL_READ_ONLY);
-      graw_transfer_write_return(data + box->x, send_size, iov, num_iovs);
+      graw_transfer_write_return(data + box->x, send_size, offset, iov, num_iovs);
       glUnmapBuffer(GL_ARRAY_BUFFER_ARB);
    } else {
       uint32_t h = u_minify(res->base.height0, level);
       GLenum format, type;
       GLuint fb_id;
       GLint  y1;
-//    data = malloc(send_size);
-      fprintf(stderr,"TEXTURE TRANSFER %d %d %d %d %d\n", res_handle, res->readback_fb_id, box->width, box->height, level);
-//    if (!data)
-//         fprintf(stderr,"malloc failed %d\n", send_size);
+      uint32_t send_size = 0;
+      void *data;
+      if (need_temp) {
+         send_size = box->width * box->height * box->depth * util_format_get_blocksize(res->base.format);      
+         data = malloc(send_size);
+         if (!data)
+            fprintf(stderr,"malloc failed %d\n", send_size);
+      } else
+         data = myptr;
+      fprintf(stderr,"TEXTURE TRANSFER %d %d %d %d %d, temp:%d\n", res_handle, res->readback_fb_id, box->width, box->height, level, need_temp);
+
       if (res->readback_fb_id == 0 || res->readback_fb_level != level) {
 	if (res->readback_fb_id)
 	  glDeleteFramebuffers(1, &res->readback_fb_id);
@@ -1382,8 +1416,10 @@ void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t level, struct
       glReadPixels(box->x, y1, box->width, box->height, format, type, myptr);
 
       glPixelStorei(GL_PACK_INVERT_MESA, 0);
-      //      graw_transfer_write_tex_return(&res->base, box, level, data, myptr);
-//      free(data);
+      if (need_temp) {
+         graw_transfer_write_tex_return(&res->base, box, level, offset, iov, num_iovs, myptr, send_size);
+         free(data);
+      }
    }
 }
 

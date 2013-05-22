@@ -242,19 +242,21 @@ int main(int argc, char **argv)
    
 }
 
-void graw_transfer_write_return(void *data, uint32_t ndw, struct graw_iovec *iov, int iovec_cnt)
+void graw_transfer_write_return(void *data, uint32_t bytes, uint64_t offset,
+                                struct graw_iovec *iov, int num_iovs)
 {
-   if (iovec_cnt == 1)
-      memcpy(iov[0].iov_base, data, ndw);
-   else
-      fprintf(stderr,"iovec cnt is > 0\n");
+   graw_iov_from_buf(iov, num_iovs, offset, data, bytes);
 }
 
 void graw_transfer_write_tex_return(struct pipe_resource *res,
 				    struct pipe_box *box,
                                     uint32_t level,
-				    void *data, void *myptr)
+                                    uint64_t offset,
+                                    struct graw_iovec *iov,
+                                    int num_iovs,
+				    void *myptr, int size)
 {
+#if 0
    int h;
    int elsize = util_format_get_blocksize(res->format);
    void *dptr = myptr;
@@ -266,7 +268,8 @@ void graw_transfer_write_tex_return(struct pipe_resource *res,
       memcpy(dptr, sptr, box->width * elsize);
       dptr += box->width * elsize;
    }
-
+#endif
+   graw_iov_from_buf(iov, num_iovs, offset, myptr, size);
 }
 
 void graw_write_fence(unsigned fence_id)

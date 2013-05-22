@@ -49,9 +49,7 @@ static int send_irq(uint32_t pd)
    uint64_t x = 1;
    //   fprintf(stderr,"notify 3d %x\n", pd);
 
-   ramp->pad |= pd;
-
-   rcbs->send_irq(dev_cookie, 0);
+   rcbs->send_irq(dev_cookie, pd);
 
    return 0;
 }
@@ -84,14 +82,13 @@ void graw_renderer_ping(void)
    goto retry;
 }
 
-void graw_process_vcmd(void *cmd)
+void graw_process_vcmd(void *cmd, struct graw_iovec *iov, unsigned int niovs)
 {
    QXL3DCommand *qcmd = cmd;
-   struct graw_iovec iov;
 
-   iov.iov_base = mapping;
-   iov.iov_len = 0;
-   graw_process_cmd(qcmd, &iov, 1);
+   graw_renderer_check_fences();
+   graw_process_cmd(qcmd, iov, niovs);
+   graw_renderer_check_fences();
 }
 
 static void graw_process_cmd(QXL3DCommand *cmd, struct graw_iovec *iov,
@@ -171,36 +168,41 @@ static void graw_process_cmd(QXL3DCommand *cmd, struct graw_iovec *iov,
 
 }
 
-void graw_transfer_write_return(void *data, uint32_t ndw, struct graw_iovec *iov, int iovec_cnt)
+void graw_transfer_write_return(void *data, uint32_t bytes, uint64_t offset,
+                                struct graw_iovec *iov, int num_iovs)
 {
-   if (iovec_cnt == 1)
-      memcpy(iov[0].iov_base, data, ndw);
-   else
-      fprintf(stderr,"iovec cnt is > 0\n");
+   graw_iov_from_buf(iov, num_iovs, offset, data, bytes);
 }
 
 void graw_transfer_write_tex_return(struct pipe_resource *res,
 				    struct pipe_box *box,
                                     uint32_t level,
-				    void *data, void *myptr)
+                                    uint64_t offset,
+                                    struct graw_iovec *iov,
+                                    int num_iovs,
+				    void *myptr, int size)
 {
+#if 0
    int h;
    int elsize = util_format_get_blocksize(res->format);
    void *dptr = myptr;
    int w = u_minify(res->width0, level);
    int resh = u_minify(res->height0, level);
 
+   graw_iob_
    for (h = resh - box->y - 1; h >= resh - box->y - box->height; h--) {
       void *sptr = data + (h * elsize * w) + box->x * elsize;
       memcpy(dptr, sptr, box->width * elsize);
       dptr += box->width * elsize;
    }
-
+#endif
+   graw_iov_from_buf(iov, num_iovs, offset, myptr, size);
 }
 
 void graw_write_fence(unsigned fence_id)
 {
-   ramp->last_fence = fence_id;
+   rcbs->write_fence(dev_cookie, fence_id);   
+//   ramp->last_fence = fence_id;
    send_irq(4);
 }
 

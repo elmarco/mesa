@@ -127,12 +127,16 @@ void grend_set_constants(struct grend_context *ctx,
                          uint32_t num_constant,
                          float *data);
 
-void graw_transfer_write_return(void *data, uint32_t ndw, struct graw_iovec *iov, int iovec_cnt);
+void graw_transfer_write_return(void *data, uint32_t bytes, uint64_t offset,
+                                struct graw_iovec *iov, int iovec_cnt);
 
 void graw_transfer_write_tex_return(struct pipe_resource *res,
 				    struct pipe_box *box,
                                     uint32_t level,
-				    void *data, void *myptr);
+                                    uint64_t offset,
+                                    struct graw_iovec *iov,
+                                    int num_iovs,
+				    void *myptr, int size);
 
 int graw_renderer_set_scanout(uint32_t res_handle,
                               struct pipe_box *box);

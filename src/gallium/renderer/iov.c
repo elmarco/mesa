@@ -67,6 +67,26 @@ size_t graw_iov_to_buf(const struct graw_iovec *iov, const unsigned int iov_cnt,
     return done;
 }
 
+size_t graw_iov_to_buf_cb(const struct graw_iovec *iov, const unsigned int iov_cnt,
+                          size_t offset, size_t bytes, IOCallback iovcb,
+                          void *cookie)
+{
+    size_t done;
+    unsigned int i;
+    for (i = 0, done = 0; (offset || done < bytes) && i < iov_cnt; i++) {
+        if (offset < iov[i].iov_len) {
+            size_t len = MIN(iov[i].iov_len - offset, bytes - done);
+	    (*iovcb)(cookie, done, iov[i].iov_base + offset, len);
+            done += len;
+            offset = 0;
+        } else {
+            offset -= iov[i].iov_len;
+        }
+    }
+    assert(offset == 0);
+    return done;
+}
+
 #if 0
 size_t iov_memset(const struct graw_iovec *iov, const unsigned int iov_cnt,
                   size_t offset, int fillc, size_t bytes)

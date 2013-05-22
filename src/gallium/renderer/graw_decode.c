@@ -621,8 +621,16 @@ void graw_decode_block_iov(struct graw_iovec *iov, unsigned int niovs,
                            uint64_t offset, int ndw)
 {
    uint32_t *block = (uint32_t *)(iov[0].iov_base + offset);
-
-   graw_decode_block(block, ndw);
+   void *data;
+   if (niovs > 1) {
+      data = malloc(ndw * 4);
+      graw_iov_to_buf(iov, niovs, offset, data, ndw * 4);
+   }
+   else
+      data = (uint32_t *)(iov[0].iov_base + offset);
+   graw_decode_block(data, ndw);
+   if (niovs > 1)
+      free(data);
 
 }
 #if 0

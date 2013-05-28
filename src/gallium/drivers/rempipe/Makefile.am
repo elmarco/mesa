@@ -34,4 +34,5 @@ librempipe_la_SOURCES = \
 	rempipe_screen.c \
 	graw_context.c \
 	graw_encode.c \
-	graw_drm_winsys.c
+	graw_drm_winsys.c \
+        graw_transfer.c

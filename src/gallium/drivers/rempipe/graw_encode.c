@@ -21,7 +21,7 @@ static int graw_encoder_write_cmd_dword(struct graw_context *ctx,
    int len = (dword >> 16);
 
    if ((ctx->cbuf->cdw + len + 1) > QXL_MAX_CMDBUF_DWORDS)
-      graw_flush_eq(ctx, NULL);
+      ctx->base.flush(&ctx->base, NULL, 0);
 
    graw_encoder_write_dword(ctx->cbuf, dword);
    return 0;

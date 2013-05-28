@@ -33,6 +33,28 @@
 #include "state_tracker/sw_winsys.h"
  struct pipe_screen encscreen;
 
+static void graw_buffer_flush(struct graw_context *grctx,
+                           struct graw_buffer *buf)
+{
+   struct rempipe_screen *rs = rempipe_screen(grctx->base.screen);
+   struct pipe_box hw_box;
+   struct pipe_resource *res = &buf->base.base;
+   assert(buf->base.backing_bo);
+
+   assert(buf->on_list);
+
+   buf->dirt_box.height = 1;
+   buf->dirt_box.depth = 1;
+   buf->dirt_box.x = 0;
+   buf->dirt_box.y = 0;
+   buf->dirt_box.z = 0;
+
+   grctx->num_transfers++;
+   rs->qws->transfer_put(buf->base.backing_bo, buf->base.hw_res,
+                         &buf->dirt_box, 0, 0, 0);
+
+}
+
 static struct pipe_surface *graw_create_surface(struct pipe_context *ctx,
                                                 struct pipe_resource *resource,
                                                 const struct pipe_surface *templ)
@@ -411,6 +433,7 @@ static void graw_draw_vbo(struct pipe_context *ctx,
 //           graw_hw_set_index_buffer(ctx, NULL);
    u_upload_unmap(grctx->uploader);
 
+   grctx->num_draws++;
    graw_hw_set_vertex_buffers(ctx);
    if (info.indexed)
            graw_hw_set_index_buffer(ctx, &ib);
@@ -419,11 +442,13 @@ static void graw_draw_vbo(struct pipe_context *ctx,
 }
 
 
-void graw_flush_eq(struct graw_context *ctx, void *closure)
+static void graw_flush_eq(struct graw_context *ctx, void *closure)
 {
    struct rempipe_screen *rs = rempipe_screen(ctx->base.screen);
    /* send the buffer to the remote side for decoding - for now jdi */
    
+//   fprintf(stderr,"flush transfers: %d draws %d\n", ctx->num_transfers, ctx->num_draws);
+   ctx->num_transfers = ctx->num_draws = 0;
    rs->qws->submit_cmd(rs->qws, ctx->cbuf);
 }
 
@@ -432,7 +457,16 @@ static void graw_flush(struct pipe_context *ctx,
                        enum pipe_flush_flags flags)
 {
    struct graw_context *grctx = (struct graw_context *)ctx;
+   struct graw_buffer *buf, *tmp;
 
+   LIST_FOR_EACH_ENTRY_SAFE(buf, tmp, &grctx->to_flush_bufs, flush_list) {
+      struct pipe_resource *res = &buf->base.base;
+      graw_buffer_flush(grctx, buf);
+      list_del(&buf->flush_list);
+      buf->on_list = FALSE;
+      pipe_resource_reference(&res, NULL);   
+
+   }
    graw_flush_eq(grctx, grctx);
 }
 
@@ -694,6 +728,7 @@ struct pipe_context *graw_context_create(struct pipe_screen *pscreen,
 
    graw_init_transfer_functions(grctx);
 
+   list_inithead(&grctx->to_flush_bufs);
    util_slab_create(&grctx->texture_transfer_pool, sizeof(struct graw_transfer),
                     16, UTIL_SLAB_SINGLETHREADED);
 

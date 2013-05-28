@@ -7,6 +7,7 @@
 
 #include "rempipe.h"
 #include "util/u_slab.h"
+#include "util/u_double_list.h"
 
 struct graw_screen;
 
@@ -19,6 +20,10 @@ struct graw_resource {
 
 struct graw_buffer {
    struct graw_resource base;
+   struct list_head flush_list;
+   boolean on_list;
+   /* for backed buffers */
+   struct pipe_box dirt_box;
 };
 
 struct graw_texture {
@@ -75,6 +80,10 @@ struct graw_context {
    struct pipe_vertex_buffer vertex_buffer[PIPE_MAX_ATTRIBS];
    unsigned num_vertex_buffers;
    boolean vertex_array_dirty;
+
+   int num_transfers;
+   int num_draws;
+   struct list_head to_flush_bufs;
 };
 
 struct graw_transfer {
@@ -107,8 +116,6 @@ rempipe_resource_from_handle(struct pipe_screen *screen,
                              struct winsys_handle *whandle);
 
 void graw_init_blit_functions(struct graw_context *grctx);
-
-void graw_flush_eq(struct graw_context *ctx, void *closure);
 
 void graw_init_transfer_functions(struct graw_context *grctx);
 #endif

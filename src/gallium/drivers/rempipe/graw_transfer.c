@@ -119,6 +119,23 @@ static void graw_transfer_flush_region(struct pipe_context *ctx,
    uint32_t size;
    struct pipe_box hw_box;
    struct rempipe_screen *rs = rempipe_screen(ctx->screen);
+
+   if (grres->backing_bo) {
+      struct graw_buffer *buf = (struct graw_buffer *)grres;
+
+      if (!buf->on_list) {
+         struct pipe_resource *res = NULL;
+
+         list_addtail(&buf->flush_list, &grctx->to_flush_bufs);
+         buf->on_list = TRUE;
+         pipe_resource_reference(&res, &buf->base.base);
+
+      }
+      buf->dirt_box.width += box->width;
+      grres->clean = FALSE;
+      return;
+   }
+
    offset = trans->offset;
    if (box->x || box->y)
       fprintf(stderr, "box->x is %d box->y is %d\n", box->x, box->y);

@@ -50,6 +50,7 @@ struct grend_resource {
    /* fb id if we need to readback this resource */
    GLuint readback_fb_id;
   GLuint readback_fb_level;
+   int is_front;
 };
 
 struct grend_buffer {
@@ -1310,38 +1311,49 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
       } else
          data = iov[0].iov_base + offset;
 
-      glBindTexture(res->target, res->id);
-
-      glformat = tex_conv_table[res->base.format].glformat;
-      gltype = tex_conv_table[res->base.format].gltype; 
-      if (glformat == 0) {
-	 glformat = GL_BGRA;
-	 gltype = GL_UNSIGNED_BYTE;
-      }
-	 
       if (src_stride) {
          glGetIntegerv(GL_UNPACK_ROW_LENGTH, &old_stride);
          glPixelStorei(GL_UNPACK_ROW_LENGTH, src_stride / 4);
       }
-      if (res->target == GL_TEXTURE_CUBE_MAP) {
-         GLenum ctarget = GL_TEXTURE_CUBE_MAP_POSITIVE_X + dst_box->z;
 
-         glTexSubImage2D(ctarget, level, dst_box->x, dst_box->y, dst_box->width, dst_box->height,
-                         glformat, gltype, data);
-      } else if (res->target == GL_TEXTURE_3D) {
-         glTexSubImage3D(res->target, level, dst_box->x, dst_box->y, dst_box->z,
-                         dst_box->width, dst_box->height, dst_box->depth,
-                         glformat, gltype, data);
-      } else if (res->target == GL_TEXTURE_1D) {
-         glTexSubImage1D(res->target, level, dst_box->x, dst_box->width,
-                         glformat, gltype, data);
+      if (res->is_front) {
+         glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
+         glPixelZoom(1.0f, -1.0f);
+         glWindowPos2i(dst_box->x, res->base.height0 - dst_box->y);
+//         glRasterPos2i(dst_box->x, res->base.height0 - dst_box->y - dst_box->height);
+         glDrawPixels(dst_box->width, dst_box->height, GL_BGRA,
+                      GL_UNSIGNED_BYTE, data);
       } else {
-         glTexSubImage2D(res->target, level, dst_box->x, dst_box->y,
-                         dst_box->width, dst_box->height,
-                         glformat, gltype, data);
+         glBindTexture(res->target, res->id);
+
+         glformat = tex_conv_table[res->base.format].glformat;
+         gltype = tex_conv_table[res->base.format].gltype; 
+         if (glformat == 0) {
+            glformat = GL_BGRA;
+            gltype = GL_UNSIGNED_BYTE;
+         }
+	 
+         if (res->target == GL_TEXTURE_CUBE_MAP) {
+            GLenum ctarget = GL_TEXTURE_CUBE_MAP_POSITIVE_X + dst_box->z;
+            
+            glTexSubImage2D(ctarget, level, dst_box->x, dst_box->y, dst_box->width, dst_box->height,
+                            glformat, gltype, data);
+         } else if (res->target == GL_TEXTURE_3D) {
+            glTexSubImage3D(res->target, level, dst_box->x, dst_box->y, dst_box->z,
+                            dst_box->width, dst_box->height, dst_box->depth,
+                            glformat, gltype, data);
+         } else if (res->target == GL_TEXTURE_1D) {
+            glTexSubImage1D(res->target, level, dst_box->x, dst_box->width,
+                            glformat, gltype, data);
+         } else {
+            glTexSubImage2D(res->target, level, dst_box->x, dst_box->y,
+                            dst_box->width, dst_box->height,
+                            glformat, gltype, data);
+         }
       }
       if (src_stride)
          glPixelStorei(GL_UNPACK_ROW_LENGTH, old_stride);
+
       if (num_iovs > 1)
          free(data);
    }
@@ -1388,20 +1400,23 @@ void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t level, struct
          data = myptr;
       fprintf(stderr,"TEXTURE TRANSFER %d %d %d %d %d, temp:%d\n", res_handle, res->readback_fb_id, box->width, box->height, level, need_temp);
 
-      if (res->readback_fb_id == 0 || res->readback_fb_level != level) {
-	if (res->readback_fb_id)
-	  glDeleteFramebuffers(1, &res->readback_fb_id);
-
-	glGenFramebuffers(1, &fb_id);
-	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fb_id);
-	glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
-				  res->target, res->id, level);
-	res->readback_fb_id = fb_id;
-	res->readback_fb_level = level;
+      if (!res->is_front) {
+         if (res->readback_fb_id == 0 || res->readback_fb_level != level) {
+            if (res->readback_fb_id)
+               glDeleteFramebuffers(1, &res->readback_fb_id);
+            
+            glGenFramebuffers(1, &fb_id);
+            glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fb_id);
+            glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
+                                      res->target, res->id, level);
+            res->readback_fb_id = fb_id;
+            res->readback_fb_level = level;
+         } else
+            glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, res->readback_fb_id);
+         glPixelStorei(GL_PACK_INVERT_MESA, 1);
+      
       } else
-	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, res->readback_fb_id);
-
-      glPixelStorei(GL_PACK_INVERT_MESA, 1);
+         glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
       glReadBuffer(GL_COLOR_ATTACHMENT0_EXT);
 
       switch (res->base.format) {
@@ -1466,12 +1481,15 @@ void graw_renderer_resource_copy_region(struct grend_context *ctx,
    glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
                              src_res->target, src_res->id, src_level);
 
-   glBindFramebuffer(GL_FRAMEBUFFER_EXT, fb_ids[1]);
-   glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
-                             dst_res->target, dst_res->id, dst_level);
-
    glBindFramebuffer(GL_READ_FRAMEBUFFER, fb_ids[0]);
-   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fb_ids[1]);
+      
+   if (!dst_res->is_front) {
+      glBindFramebuffer(GL_FRAMEBUFFER_EXT, fb_ids[1]);
+      glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
+                                dst_res->target, dst_res->id, dst_level);
+      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fb_ids[1]);
+   } else
+      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 
    glmask = GL_COLOR_BUFFER_BIT;
 
@@ -1513,12 +1531,16 @@ void graw_renderer_blit(struct grend_context *ctx,
       glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
                                 src_res->target, src_res->id, info->src.level);
 
-   glBindFramebuffer(GL_FRAMEBUFFER_EXT, fb_ids[1]);
-   glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
-                             dst_res->target, dst_res->id, info->dst.level);
-
    glBindFramebuffer(GL_READ_FRAMEBUFFER, fb_ids[0]);
-   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fb_ids[1]);
+
+   if (!dst_res->is_front) {
+      glBindFramebuffer(GL_FRAMEBUFFER_EXT, fb_ids[1]);
+      glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
+                                dst_res->target, dst_res->id, info->dst.level);
+      
+      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fb_ids[1]);
+   } else
+      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 
    if (info->mask & PIPE_MASK_Z)
       glmask |= GL_DEPTH_BUFFER_BIT;
@@ -1527,8 +1549,13 @@ void graw_renderer_blit(struct grend_context *ctx,
    if (info->mask & PIPE_MASK_RGBA)
       glmask |= GL_COLOR_BUFFER_BIT;
 
-   y1 = info->src.box.y;
-   y2 = (info->src.box.y + info->src.box.height);
+   if (!dst_res->is_front) {
+      y1 = info->src.box.y;
+      y2 = (info->src.box.y + info->src.box.height);
+   } else {
+      y1 = (info->src.box.y + info->src.box.height);
+      y2 = info->src.box.y;
+   }
 
    if (info->scissor_enable)
       glEnable(GL_SCISSOR_TEST);
@@ -1555,6 +1582,10 @@ int graw_renderer_set_scanout(uint32_t res_handle,
    if (!res)
       return 0;
 
+   if (frontbuffer && frontbuffer != res) {
+      frontbuffer->is_front = 0;
+      res->is_front = 1;
+   }
    frontbuffer = res;
    fprintf(stderr,"setting frontbuffer to %d\n", res_handle);
    return 0;
@@ -1578,19 +1609,24 @@ int graw_renderer_flush_buffer(uint32_t res_handle,
       return 0;
    }
 
-   glGenFramebuffers(1, &fb_id);
+   if (!res->is_front) {
+      glGenFramebuffers(1, &fb_id);
 
-   glBindFramebuffer(GL_FRAMEBUFFER_EXT, fb_id);
-   glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
-                             res->target, res->id, 0);
+      glBindFramebuffer(GL_FRAMEBUFFER_EXT, fb_id);
+      glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
+                                res->target, res->id, 0);
 
-   glBindFramebuffer(GL_READ_FRAMEBUFFER, fb_id);
-   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-
-   glBlitFramebuffer(0, 0, res->base.width0, res->base.height0,
-                     0, res->base.height0, res->base.width0, 0,
-                     GL_COLOR_BUFFER_BIT, GL_NEAREST);
-   glDeleteFramebuffers(1, &fb_id);
+      glBindFramebuffer(GL_READ_FRAMEBUFFER, fb_id);
+      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+      
+      glBlitFramebuffer(0, 0, res->base.width0, res->base.height0,
+                        0, res->base.height0, res->base.width0, 0,
+                        GL_COLOR_BUFFER_BIT, GL_NEAREST);
+      glDeleteFramebuffers(1, &fb_id);
+   } else {
+      glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+   }
    swap_buffers();
    return 0;
 }

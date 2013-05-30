@@ -1265,6 +1265,7 @@ void graw_renderer_resource_unref(uint32_t res_handle)
    graw_object_destroy(res_handle, GRAW_RESOURCE);
 }
 
+static int use_sub_data = 0;
 static void iov_element_upload(void *cookie, uint32_t doff, void *src, int len)
 {
    struct pipe_box *d_box = cookie;
@@ -1295,10 +1296,33 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
    }
    if (res->target == GL_ELEMENT_ARRAY_BUFFER_ARB) {
       glBindBufferARB(GL_ELEMENT_ARRAY_BUFFER_ARB, res->id);
-      graw_iov_to_buf_cb(iov, num_iovs, offset, dst_box->width, &iov_element_upload, (void *)dst_box);
+
+      if (use_sub_data == 1) {
+         graw_iov_to_buf_cb(iov, num_iovs, offset, dst_box->width, &iov_element_upload, (void *)dst_box);
+      } else {
+         data = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER_ARB, dst_box->x, dst_box->width, GL_MAP_INVALIDATE_RANGE_BIT | GL_MAP_UNSYNCHRONIZED_BIT | GL_MAP_WRITE_BIT);
+         if (data == NULL) {
+            fprintf(stderr,"map failed for element buffer\n");
+            graw_iov_to_buf_cb(iov, num_iovs, offset, dst_box->width, &iov_element_upload, (void *)dst_box);
+         } else {
+            graw_iov_to_buf(iov, num_iovs, offset, data, dst_box->width);
+            glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER_ARB);
+         }
+      }
    } else if (res->target == GL_ARRAY_BUFFER_ARB) {
       glBindBufferARB(GL_ARRAY_BUFFER_ARB, res->id);
-      graw_iov_to_buf_cb(iov, num_iovs, offset, dst_box->width, &iov_vertex_upload, (void *)dst_box);
+      if (use_sub_data == 1) {
+         graw_iov_to_buf_cb(iov, num_iovs, offset, dst_box->width, &iov_vertex_upload, (void *)dst_box);
+      } else {
+         data = glMapBufferRange(GL_ARRAY_BUFFER_ARB, dst_box->x, dst_box->width, GL_MAP_INVALIDATE_RANGE_BIT | GL_MAP_UNSYNCHRONIZED_BIT | GL_MAP_WRITE_BIT);
+         if (data == NULL) {
+            fprintf(stderr,"map failed for array\n");
+            graw_iov_to_buf_cb(iov, num_iovs, offset, dst_box->width, &iov_vertex_upload, (void *)dst_box);
+         } else {
+            graw_iov_to_buf(iov, num_iovs, offset, data, dst_box->width);
+            glUnmapBuffer(GL_ARRAY_BUFFER_ARB);
+         }
+      }
    } else {
       GLenum glformat;
       GLenum gltype;

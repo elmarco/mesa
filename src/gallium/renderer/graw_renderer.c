@@ -1702,7 +1702,6 @@ int graw_renderer_create_fence(int client_fence_id)
    if (!fence)
       return -1;
 
-   fprintf(stderr, "creating fence %d\n", client_fence_id);
    fence->fence_id = client_fence_id;
    fence->syncobj = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
    list_addtail(&fence->fences, &fence_list);

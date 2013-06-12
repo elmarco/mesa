@@ -52,7 +52,6 @@ static void graw_process_cmd(QXL3DCommand *cmd, struct graw_iovec *iov,
 {
    static int inited;
 
-   fprintf(stderr,"type %d flags %d\n", cmd->type, cmd->flags);
    switch (cmd->type) {
    case QXL_3D_CMD_CREATE_RESOURCE:
 //         fprintf(stderr,"got res create %d %d\n", cmd->u.res_create.width,

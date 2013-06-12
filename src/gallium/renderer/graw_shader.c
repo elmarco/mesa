@@ -5,6 +5,8 @@
 #include "graw_shader.h"
 /* start convert of tgsi to glsl */
 
+int graw_shader_use_explicit = 0;
+
 struct graw_shader_io {
    unsigned		name;
    unsigned		gpr;
@@ -424,7 +426,7 @@ prolog(struct tgsi_iterate_context *iter)
 static void emit_header(struct dump_ctx *ctx, char *glsl_final)
 {
    strcat(glsl_final, "#version 130\n");
-   if (ctx->prog_type == TGSI_PROCESSOR_VERTEX)
+   if (ctx->prog_type == TGSI_PROCESSOR_VERTEX && graw_shader_use_explicit)
       strcat(glsl_final, "#extension GL_ARB_explicit_attrib_location : enable\n");
    strcat(glsl_final, "#extension GL_ARB_texture_rectangle : require\n");
 
@@ -448,7 +450,7 @@ static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
    char buf[255];
 
    for (i = 0; i < ctx->num_inputs; i++) {
-      if (ctx->prog_type == TGSI_PROCESSOR_VERTEX) {
+      if (ctx->prog_type == TGSI_PROCESSOR_VERTEX && graw_shader_use_explicit) {
          snprintf(buf, 255, "layout(location=%d) ", ctx->inputs[i].first);
          strcat(glsl_final, buf);
       }

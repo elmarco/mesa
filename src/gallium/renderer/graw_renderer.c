@@ -25,6 +25,7 @@
 #include "graw_renderer_glx.h"
 #include "graw_decode.h"
 
+extern int graw_shader_use_explicit;
 int localrender;
 
 struct grend_screen;
@@ -647,6 +648,9 @@ void grend_draw_vbo(struct grend_context *ctx,
       GLenum type = GL_FALSE;
       int sz;
       GLboolean norm = GL_FALSE;
+      GLint loc;
+      char name[10];
+
       if (desc->channel[0].type == UTIL_FORMAT_TYPE_FLOAT) {
 	 if (desc->channel[0].size == 32)
 	    type = GL_FLOAT;
@@ -676,7 +680,16 @@ void grend_draw_vbo(struct grend_context *ctx,
 
       buf = (struct grend_buffer *)ctx->vbo[vbo_index].buffer;
       glBindBuffer(GL_ARRAY_BUFFER, buf->base.id);
-      glVertexAttribPointer(i, sz, type, norm, ctx->vbo[vbo_index].stride, (void *)(unsigned long)(ctx->ve->elements[i].src_offset + ctx->vbo[vbo_index].buffer_offset));
+
+      if (graw_shader_use_explicit) {
+         loc = i;
+      } else {
+         snprintf(name, 10, "in_%d", i);
+         loc = glGetAttribLocation(ctx->program_id, name);
+         if (loc == -1)
+            fprintf(stderr,"cannot find loc %s\n", name);
+      }
+      glVertexAttribPointer(loc, sz, type, norm, ctx->vbo[vbo_index].stride, (void *)(unsigned long)(ctx->ve->elements[i].src_offset + ctx->vbo[vbo_index].buffer_offset));
       if (ctx->ve->elements[i].instance_divisor)
          glVertexAttribDivisorARB(i, ctx->ve->elements[i].instance_divisor);
       glEnableVertexAttribArray(i);

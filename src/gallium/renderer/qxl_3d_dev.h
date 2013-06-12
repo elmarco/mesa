@@ -35,6 +35,7 @@ struct qxl_3d_transfer_get {
 	uint32_t res_handle;
 	struct drm_qxl_3d_box box;
         uint32_t level;
+        uint32_t dx, dy;
 };
 
 struct qxl_3d_flush_buffer {
@@ -80,7 +81,6 @@ typedef struct QXL3DCommand {
       struct qxl_3d_transfer_put transfer_put;
       struct qxl_3d_transfer_get transfer_get;
       struct qxl_3d_cmd_submit cmd_submit;
-      unsigned char pads[112];
       struct qxl_3d_set_scanout set_scanout;
       struct qxl_3d_flush_buffer flush_buffer;
       struct qxl_3d_resource_unref res_unref;
@@ -88,14 +88,5 @@ typedef struct QXL3DCommand {
 } QXL3DCommand;
 
 #define QXL_3D_COMMAND_RING_SIZE 64
-
-SPICE_RING_DECLARE(QXL3DCommandRing, QXL3DCommand, QXL_3D_COMMAND_RING_SIZE);
-
-struct qxl_3d_ram {
-	uint32_t version;
-	uint32_t pad;
-        uint64_t last_fence;
-        QXL3DCommandRing cmd_3d_ring;
-};
 
 #endif

@@ -1,6 +1,3 @@
-#include <GL/glew.h>
-#include <GL/gl.h>
-#include <GL/glut.h>
 
 #include <stdio.h>
 #include "pipe/p_shader_tokens.h"
@@ -850,15 +847,7 @@ rempipe_resource_from_handle(struct pipe_screen *screen,
    pipe_reference_init(&rpr->base.base.reference, 1);
    rpr->base.base.screen = screen;      
 
-   if ((whandle->handle & (1<<30)) == 0) {
-      rpr->base.hw_res = rs->qws->resource_create(rs->qws, template->target, template->format, template->bind, template->width0, template->height0, template->depth0, 0, 0, 0);
-//      rpr->base.res_handle = handle;
-      rpr->dt = winsys->displaytarget_from_handle(winsys,
-                                                  template,
-                                                  whandle,
-                                                  &rpr->stride);
-   } else
-      rpr->base.hw_res = rs->qws->resource_create_from_handle(rs->qws, whandle);
+   rpr->base.hw_res = rs->qws->resource_create_from_handle(rs->qws, whandle);
    return &rpr->base.base;
 }   
 

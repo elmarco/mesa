@@ -9,7 +9,7 @@
 #include <sys/ioctl.h>
 #include <errno.h>
 #include <xf86drm.h>
-#include "qxl_drm.h"
+#include "virgl_drm.h"
 
 struct qxl_bomgr {
    struct pb_manager base;
@@ -100,12 +100,12 @@ static struct pb_buffer *qxl_bomgr_create_bo(struct pb_manager *_mgr,
    struct qxl_bomgr *mgr = qxl_bomgr(_mgr);
    struct qxl_drm_winsys *qdws = mgr->qws;
    struct qxl_bo *bo;
-   struct drm_qxl_3d_alloc alloccmd;
+   struct drm_virgl_alloc alloccmd;
    int ret;
 
    alloccmd.size = size;
    alloccmd.handle = 0;
-   ret = drmIoctl(qdws->fd, DRM_IOCTL_QXL_3D_ALLOC, &alloccmd);
+   ret = drmIoctl(qdws->fd, DRM_IOCTL_VIRGL_ALLOC, &alloccmd);
    if (ret != 0)
       return NULL;
 
@@ -132,13 +132,13 @@ static boolean qxl_bomgr_is_buffer_busy(struct pb_manager *mgr,
                                         struct pb_buffer *_buf)
 {
    struct qxl_bo *bo = get_qxl_bo(_buf);
-   struct drm_qxl_3d_wait waitcmd;
+   struct drm_virgl_3d_wait waitcmd;
    int ret;
 
    waitcmd.handle = bo->handle;
-   waitcmd.flags = QXL_3D_WAIT_NOWAIT;
+   waitcmd.flags = VIRGL_WAIT_NOWAIT;
  again:
-   ret = drmIoctl(bo->qws->fd, DRM_IOCTL_QXL_3D_WAIT, &waitcmd);
+   ret = drmIoctl(bo->qws->fd, DRM_IOCTL_VIRGL_WAIT, &waitcmd);
    return (ret != 0 ? TRUE : FALSE);
 }
 
@@ -166,7 +166,7 @@ static struct pb_manager *qxl_bomgr_create(struct qxl_drm_winsys *qdws)
 
 static void *qxl_bo_map(struct pb_buffer *_buf)
 {
-   struct drm_qxl_map mmap_arg;
+   struct drm_virgl_map mmap_arg;
    struct qxl_bo *bo = get_qxl_bo(_buf);
    void *ptr;
 
@@ -174,7 +174,7 @@ static void *qxl_bo_map(struct pb_buffer *_buf)
       return bo->ptr;
 
    mmap_arg.handle = bo->handle;
-   if (drmIoctl(bo->qws->fd, DRM_IOCTL_QXL_MAP, &mmap_arg))
+   if (drmIoctl(bo->qws->fd, DRM_IOCTL_VIRGL_MAP, &mmap_arg))
       return NULL;
 
    ptr = os_mmap(0, bo->base.size, PROT_READ|PROT_WRITE, MAP_SHARED,
@@ -189,13 +189,13 @@ static void *qxl_bo_map(struct pb_buffer *_buf)
 static void qxl_bo_wait(struct pb_buffer *_buf)
 {
    struct qxl_bo *bo = get_qxl_bo(_buf);
-   struct drm_qxl_3d_wait waitcmd;
+   struct drm_virgl_3d_wait waitcmd;
    int ret;
 
    waitcmd.handle = bo->handle;
    waitcmd.flags = 0;
  again:
-   ret = drmIoctl(bo->qws->fd, DRM_IOCTL_QXL_3D_WAIT, &waitcmd);
+   ret = drmIoctl(bo->qws->fd, DRM_IOCTL_VIRGL_WAIT, &waitcmd);
    if (ret == -EAGAIN)
       goto again;
 }
@@ -233,17 +233,17 @@ qxl_bo_transfer_put(struct pb_buffer *_buf,
                     uint32_t buf_offset, uint32_t level)
 {
    struct qxl_bo *bo = get_qxl_bo(_buf);
-   struct drm_qxl_3d_transfer_put putcmd;
+   struct drm_virgl_3d_transfer_put putcmd;
    int ret;
 
    putcmd.res_handle = res->res_handle;
    putcmd.bo_handle = bo->handle;
-   putcmd.dst_box = *(struct drm_qxl_3d_box *)box;
+   putcmd.dst_box = *(struct drm_virgl_3d_box *)box;
    putcmd.src_stride = src_stride;
    putcmd.src_offset = buf_offset;
    putcmd.dst_level = level;
 
-   ret = drmIoctl(bo->qws->fd, DRM_IOCTL_QXL_3D_TRANSFER_PUT, &putcmd);
+   ret = drmIoctl(bo->qws->fd, DRM_IOCTL_VIRGL_TRANSFER_PUT, &putcmd);
    return ret;
 }
 
@@ -255,15 +255,15 @@ qxl_bo_transfer_get(struct pb_buffer *_buf,
                     uint32_t level)
 {
    struct qxl_bo *bo = get_qxl_bo(_buf);
-   struct drm_qxl_3d_transfer_get getcmd;
+   struct drm_virgl_3d_transfer_get getcmd;
    int ret;
 
    getcmd.res_handle = res->res_handle;
    getcmd.bo_handle = bo->handle;
    getcmd.level = level;
    getcmd.dst_offset = buf_offset;
-   getcmd.box = *(struct drm_qxl_3d_box *)box;
-   ret = drmIoctl(bo->qws->fd, DRM_IOCTL_QXL_3D_TRANSFER_GET, &getcmd);
+   getcmd.box = *(struct drm_virgl_3d_box *)box;
+   ret = drmIoctl(bo->qws->fd, DRM_IOCTL_VIRGL_TRANSFER_GET, &getcmd);
    return ret;
 }
 
@@ -283,12 +283,12 @@ qxl_drm_buffer_from_handle(struct qxl_winsys *qws,
    struct qxl_drm_winsys *qdws = qxl_drm_winsys(qws);
    struct qxl_drm_buffer *buf = CALLOC_STRUCT(qxl_drm_buffer);
    struct drm_gem_open open_arg;
-   struct drm_qxl_bo_info info_arg;
+//   struct drm_qxl_bo_info info_arg;
    if (!buf)
       return NULL;
 
    memset(&open_arg, 0, sizeof(open_arg));
-   memset(&info_arg, 0, sizeof(info_arg));
+//   memset(&info_arg, 0, sizeof(info_arg));
 
    buf->magic = 0xDEADBEEF;
    buf->flinked = TRUE;
@@ -302,12 +302,15 @@ qxl_drm_buffer_from_handle(struct qxl_winsys *qws,
    buf->handle = open_arg.handle;
    buf->name = whandle->handle;
    
+
+#if 0
    info_arg.handle = buf->handle;
    if (drmIoctl(qdws->fd, DRM_IOCTL_QXL_BO_INFO, &info_arg)) {
       goto err;
    }
 
    *stride = info_arg.stride;
+#endif
    return (struct qxl_winsys_buffer *)buf;
  err:
    FREE(buf);
@@ -315,43 +318,6 @@ qxl_drm_buffer_from_handle(struct qxl_winsys *qws,
 
 }
 
-static void *
-qxl_drm_buffer_map(struct qxl_winsys *qws,
-                   struct qxl_winsys_buffer *buffer,
-                   boolean write)
-{
-   struct qxl_drm_winsys *qdws = qxl_drm_winsys(qws);
-   struct qxl_drm_buffer *qbuf = qxl_drm_buffer(buffer);
-   struct drm_qxl_map qxl_map;
-   struct drm_qxl_update_area qxl_ua;
-   void *map;
-
-
-   if (qbuf->ptr)
-      return qbuf->ptr;
-
-   memset(&qxl_map, 0, sizeof(qxl_map));
-   qxl_map.handle = qbuf->handle;
-
-   if (drmIoctl(qdws->fd, DRM_IOCTL_QXL_MAP, &qxl_map)) {
-      return NULL;
-   }
-
-    map = mmap(0, qbuf->size, PROT_READ | PROT_WRITE, MAP_SHARED, qdws->fd,
-               qxl_map.offset);
-    if (map == MAP_FAILED) {
-        return NULL;
-    }
-    qbuf->ptr = map;
-    return map;
-}
-
-static void
-qxl_drm_buffer_unmap(struct qxl_winsys *qws,
-                     struct qxl_winsys_buffer *buffer)
-{
-
-}
 
 static void
 qxl_drm_winsys_destroy(struct qxl_winsys *qws)
@@ -369,10 +335,10 @@ static void qxl_drm_resource_reference(struct qxl_drm_winsys *qdws,
                                        struct qxl_hw_res *sres)
 {
    struct qxl_hw_res *old = *dres;
-   struct drm_qxl_3d_resource_unref unrefcmd;
+   struct drm_virgl_3d_resource_unref unrefcmd;
    if (pipe_reference(&(*dres)->reference, &sres->reference)) {
       unrefcmd.res_handle = old->res_handle;
-      drmIoctl(qdws->fd, DRM_IOCTL_QXL_3D_RESOURCE_UNREF, &unrefcmd);
+      drmIoctl(qdws->fd, DRM_IOCTL_VIRGL_RESOURCE_UNREF, &unrefcmd);
       
       FREE(old);
    }
@@ -391,7 +357,7 @@ static struct qxl_hw_res *qxl_drm_winsys_resource_create(struct qxl_winsys *qws,
                                                uint32_t nr_samples)
 {
    struct qxl_drm_winsys *qdws = qxl_drm_winsys(qws);
-   struct drm_qxl_3d_resource_create createcmd;
+   struct drm_virgl_3d_resource_create createcmd;
    int ret;
    struct qxl_hw_res *res;
 
@@ -410,7 +376,7 @@ static struct qxl_hw_res *qxl_drm_winsys_resource_create(struct qxl_winsys *qws,
    createcmd.nr_samples = nr_samples;
    createcmd.res_handle = 0;
 
-   ret = drmIoctl(qdws->fd, DRM_IOCTL_QXL_3D_RESOURCE_CREATE, &createcmd);
+   ret = drmIoctl(qdws->fd, DRM_IOCTL_VIRGL_RESOURCE_CREATE, &createcmd);
    if (ret != 0) {
       FREE(res);
       return NULL;
@@ -432,7 +398,7 @@ static struct qxl_hw_res *qxl_drm_winsys_resource_create_handle(struct qxl_winsy
    if (!res)
       return NULL;
 
-   res->res_handle = whandle->handle & ~(1<<30);
+   res->res_handle = whandle->handle;
    pipe_reference_init(&res->reference, 1);
    res->num_cs_references = 0;
    return res;  
@@ -542,24 +508,16 @@ static int qxl_drm_winsys_submit_cmd(struct qxl_winsys *qws, struct qxl_cmd_buf 
 {
    struct qxl_drm_winsys *qdws = qxl_drm_winsys(qws);
    struct qxl_drm_cmd_buf *cbuf = (struct qxl_drm_cmd_buf *)_cbuf;
-   struct drm_qxl_execbuffer eb;
-   struct drm_qxl_command cmd;
+   struct drm_virgl_execbuffer eb;
    int ret;
 
    if (cbuf->base.cdw == 0)
       return 0;
 
-   cmd.command = (unsigned long)(void*)cbuf->buf;
-   cmd.command_size = cbuf->base.cdw * 4;
-   cmd.relocs_num = 0;
-   cmd.relocs = 0;
-   cmd.type = 0;
-    
-   eb.flags = QXL_EXECBUFFER_3D;
-   eb.commands_num = 1;
-   eb.commands = (unsigned long)(void*)&cmd;
+   eb.command = (unsigned long)(void*)cbuf->buf;
+   eb.size = cbuf->base.cdw * 4;
 
-   ret = drmIoctl(qdws->fd, DRM_IOCTL_QXL_EXECBUFFER, &eb);
+   ret = drmIoctl(qdws->fd, DRM_IOCTL_VIRGL_EXECBUFFER, &eb);
 
    cbuf->base.cdw = 0;
 
@@ -590,8 +548,6 @@ qxl_drm_winsys_create(int drmFD)
 
    qdws->base.buffer_from_handle = qxl_drm_buffer_from_handle;
    qdws->base.buffer_destroy = qxl_drm_buffer_destroy;
-   qdws->base.buffer_map = qxl_drm_buffer_map;
-   qdws->base.buffer_unmap = qxl_drm_buffer_unmap;
    
    qdws->base.bo_create = qxl_winsys_bo_create;
    qdws->base.bo_map = qxl_bo_map;

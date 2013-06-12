@@ -1,6 +1,5 @@
 #include <GL/glew.h>
 #include <GL/gl.h>
-#include <GL/glut.h>
 
 #include <stdio.h>
 #include "pipe/p_shader_tokens.h"
@@ -1435,12 +1434,17 @@ void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t level, struct
                                       res->target, res->id, level);
             res->readback_fb_id = fb_id;
             res->readback_fb_level = level;
-         } else
+            y1 = h - box->y - box->height;
+         } else {
             glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, res->readback_fb_id);
+         }
          glPixelStorei(GL_PACK_INVERT_MESA, 1);
       
-      } else
+      } else {
          glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
+         y1 = box->y;
+      }
+            
       glReadBuffer(GL_COLOR_ATTACHMENT0_EXT);
 
       switch (res->base.format) {
@@ -1451,12 +1455,11 @@ void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t level, struct
          break;
       }
 
-      y1 = h - box->y - box->height;
-      glReadPixels(box->x, y1, box->width, box->height, format, type, myptr);
+      glReadPixels(box->x, y1, box->width, box->height, format, type, data);
 
       glPixelStorei(GL_PACK_INVERT_MESA, 0);
       if (need_temp) {
-         graw_transfer_write_tex_return(&res->base, box, level, offset, iov, num_iovs, myptr, send_size);
+         graw_transfer_write_tex_return(&res->base, box, level, offset, iov, num_iovs, data, send_size);
          free(data);
       }
    }
@@ -1533,14 +1536,13 @@ void graw_renderer_resource_copy_region(struct grend_context *ctx,
    glDeleteFramebuffers(2, fb_ids);
 }
 
-void graw_renderer_blit(struct grend_context *ctx,
-                        uint32_t dst_handle, uint32_t src_handle,
-                        const struct pipe_blit_info *info)
+static void graw_renderer_blit_int(uint32_t dst_handle, uint32_t src_handle,
+                                   const struct pipe_blit_info *info)
 {
    struct grend_resource *src_res, *dst_res;
    GLuint fb_ids[2];
    GLbitfield glmask = 0;
-   int y1, y2;
+   int y1, y2, dst_y1, dst_y2;
 
    src_res = graw_object_lookup(src_handle, GRAW_RESOURCE);
    dst_res = graw_object_lookup(dst_handle, GRAW_RESOURCE);
@@ -1555,7 +1557,6 @@ void graw_renderer_blit(struct grend_context *ctx,
       glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
                                 src_res->target, src_res->id, info->src.level);
 
-   glBindFramebuffer(GL_READ_FRAMEBUFFER, fb_ids[0]);
 
    if (!dst_res->is_front) {
       glBindFramebuffer(GL_FRAMEBUFFER_EXT, fb_ids[1]);
@@ -1566,6 +1567,8 @@ void graw_renderer_blit(struct grend_context *ctx,
    } else
       glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 
+   glBindFramebuffer(GL_READ_FRAMEBUFFER, fb_ids[0]);
+
    if (info->mask & PIPE_MASK_Z)
       glmask |= GL_DEPTH_BUFFER_BIT;
    if (info->mask & PIPE_MASK_S)
@@ -1573,12 +1576,18 @@ void graw_renderer_blit(struct grend_context *ctx,
    if (info->mask & PIPE_MASK_RGBA)
       glmask |= GL_COLOR_BUFFER_BIT;
 
+
    if (!dst_res->is_front) {
       y1 = info->src.box.y;
       y2 = (info->src.box.y + info->src.box.height);
+      dst_y1 = info->dst.box.y;
+      dst_y2 = info->dst.box.y + info->dst.box.height;
    } else {
       y1 = (info->src.box.y + info->src.box.height);
       y2 = info->src.box.y;
+      dst_y1 = dst_res->base.height0 - (info->dst.box.y + info->dst.box.height);
+      dst_y2 = dst_res->base.height0 - info->dst.box.y;
+
    }
 
    if (info->scissor_enable)
@@ -1590,12 +1599,20 @@ void graw_renderer_blit(struct grend_context *ctx,
                      y1,
                      info->src.box.x + info->src.box.width,
                      y2,
-                     info->dst.box.x, info->dst.box.y,
+                     info->dst.box.x,
+                     dst_y1,
                      info->dst.box.x + info->dst.box.width,
-                     info->dst.box.y + info->dst.box.height,
+                     dst_y2,
                      glmask, convert_mag_filter(info->filter));
 
    glDeleteFramebuffers(2, fb_ids);
+}
+
+void graw_renderer_blit(struct grend_context *ctx,
+                        uint32_t dst_handle, uint32_t src_handle,
+                        const struct pipe_blit_info *info)
+{
+   graw_renderer_blit_int(dst_handle, src_handle, info);
 }
 
 int graw_renderer_set_scanout(uint32_t res_handle,
@@ -1606,10 +1623,32 @@ int graw_renderer_set_scanout(uint32_t res_handle,
    if (!res)
       return 0;
 
+#if 0
    if (frontbuffer && frontbuffer != res) {
-      frontbuffer->is_front = 0;
+      struct pipe_blit_info bi;
+
+      bi.dst.level = 0;
+      bi.dst.box.x = bi.dst.box.y = bi.dst.box.z = 0;
+      bi.dst.box.width = res->base.width0;
+      bi.dst.box.height = res->base.height0;
+      bi.dst.box.depth = 1;
+
+      bi.src.level = 0;
+      bi.src.box.x = bi.src.box.y = bi.src.box.z = 0;
+      bi.src.box.width = res->base.width0;
+      bi.src.box.height = res->base.height0;
+      bi.src.box.depth = 1;
+
+      bi.mask = PIPE_MASK_RGBA;
+      bi.filter = PIPE_TEX_FILTER_NEAREST;
+      bi.scissor_enable = 0;
+
       res->is_front = 1;
+      graw_renderer_blit_int(res_handle, res_handle, &bi);
+      
+      frontbuffer->is_front = 0;
    }
+#endif
    frontbuffer = res;
    fprintf(stderr,"setting frontbuffer to %d\n", res_handle);
    return 0;
@@ -1663,6 +1702,7 @@ int graw_renderer_create_fence(int client_fence_id)
    if (!fence)
       return -1;
 
+   fprintf(stderr, "creating fence %d\n", client_fence_id);
    fence->fence_id = client_fence_id;
    fence->syncobj = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
    list_addtail(&fence->fences, &fence_list);

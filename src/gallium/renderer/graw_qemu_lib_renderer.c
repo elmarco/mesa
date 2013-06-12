@@ -19,8 +19,6 @@
 #include "graw_renderer_lib_if.h"
 static struct graw_renderer_callbacks *rcbs;
 
-static volatile struct qxl_3d_ram *ramp;
-static void *mapping;
 static void *dev_cookie;
 extern int localrender;
 
@@ -28,58 +26,16 @@ void graw_renderer_init(void);
 static void graw_process_cmd(QXL3DCommand *cmd, struct graw_iovec *iov,
                              unsigned int niovs);
 
-void graw_renderer_set_vram_params(void *ptr, uint32_t size)
-{
-   ramp = mapping = ptr;
-   
-   SPICE_RING_INIT(&ramp->cmd_3d_ring);
-   ramp->version = 1;
-   localrender = 1;
-}
-
 void graw_lib_renderer_init(void *cookie, struct graw_renderer_callbacks *cbs)
 {
    dev_cookie = cookie;
    rcbs = cbs;
+   localrender = 1;
 }
 
-static int send_irq(uint32_t pd)
+static void send_irq(uint32_t pd)
 {
-   int ret;
-   uint64_t x = 1;
-   //   fprintf(stderr,"notify 3d %x\n", pd);
-
    rcbs->send_irq(dev_cookie, pd);
-
-   return 0;
-}
-
-void graw_renderer_ping(void)
-{
-   QXL3DCommand *cmd;
-   int notify;
-   struct graw_iovec iov;
-
- retry:
-   if (SPICE_RING_IS_EMPTY(&ramp->cmd_3d_ring))
-      return;
-
-   graw_renderer_check_fences();
-   cmd = SPICE_RING_CONS_ITEM(&ramp->cmd_3d_ring);
-
-   iov.iov_base = mapping;
-   iov.iov_len = 0;
-
-   graw_process_cmd(cmd, &iov, 1);
-//      fprintf(stderr, "got cmd %x\n", cmd->type);
-
-   SPICE_RING_POP(&ramp->cmd_3d_ring, notify);
-
-   if (notify) {
-      send_irq(1);
-   }
-   
-   goto retry;
 }
 
 void graw_process_vcmd(void *cmd, struct graw_iovec *iov, unsigned int niovs)
@@ -96,6 +52,7 @@ static void graw_process_cmd(QXL3DCommand *cmd, struct graw_iovec *iov,
 {
    static int inited;
 
+   fprintf(stderr,"type %d flags %d\n", cmd->type, cmd->flags);
    switch (cmd->type) {
    case QXL_3D_CMD_CREATE_RESOURCE:
 //         fprintf(stderr,"got res create %d %d\n", cmd->u.res_create.width,
@@ -115,9 +72,6 @@ static void graw_process_cmd(QXL3DCommand *cmd, struct graw_iovec *iov,
 //         fprintf(stderr,"cmd submit %lx %d\n", cmd->u.cmd_submit.phy_addr, cmd->u.cmd_submit.size);
       
    {
-      uint32_t *cmdmap = mapping + cmd->u.cmd_submit.phy_addr;
-//            fprintf(stderr,"%08x %08x\n", cmdmap[0], cmdmap[1]);
-//      graw_decode_block(cmdmap, cmd->u.cmd_submit.size / 4);          
       graw_decode_block_iov(iov, niovs, cmd->u.cmd_submit.phy_addr, cmd->u.cmd_submit.size / 4);
    }
    
@@ -157,7 +111,6 @@ static void graw_process_cmd(QXL3DCommand *cmd, struct graw_iovec *iov,
          graw_renderer_fini();
          
       }
-      ramp->last_fence = 0;
       graw_renderer_init();
       inited = 1;
       break;
@@ -202,7 +155,6 @@ void graw_transfer_write_tex_return(struct pipe_resource *res,
 void graw_write_fence(unsigned fence_id)
 {
    rcbs->write_fence(dev_cookie, fence_id);   
-//   ramp->last_fence = fence_id;
    send_irq(4);
 }
 
@@ -210,4 +162,9 @@ int swap_buffers(void)
 {
     rcbs->swap_buffers(dev_cookie);  
     return 0;
+}
+
+void graw_renderer_poll(void)
+{
+   graw_renderer_check_fences();
 }

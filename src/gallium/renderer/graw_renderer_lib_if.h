@@ -4,12 +4,7 @@
 #define GRAW_RENDERER_LIB_IF_H
 
 #define GREND_EXPORT  __attribute__((visibility("default")))
-/* from virgl->graw renderer */
-/* set up ptr and size of VRAM object */
-GREND_EXPORT void graw_renderer_set_vram_params(void *ptr, uint32_t size);
-/* guest wants attention - wake up renderer */
-GREND_EXPORT void graw_renderer_ping(void);
-/* */
+GREND_EXPORT void graw_renderer_poll(void); /* force fences */
 
 GREND_EXPORT void graw_process_vcmd(void *cmd, struct graw_iovec *iov, unsigned int num_iovs);
 

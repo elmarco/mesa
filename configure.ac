@@ -672,7 +672,7 @@ AC_ARG_ENABLE([gallium-tests],
 # Option for Gallium drivers
 
 # Keep this in sync with the --with-gallium-drivers help string default value
-GALLIUM_DRIVERS_DEFAULT="r300,r600,svga,swrast,qxl"
+GALLIUM_DRIVERS_DEFAULT="r300,r600,svga,swrast,qxl,virgl"
 
 AC_ARG_WITH([gallium-drivers],
     [AS_HELP_STRING([--with-gallium-drivers@<:@=DIRS...@:>@],
@@ -1895,6 +1895,17 @@ if test -n "$with_gallium_drivers"; then
             fi
             gallium_check_st "qxl/drm" "dri-qxl" "" "" "" ""
             ;;
+        xvirgl)
+            HAVE_GALLIUM_VIRGL=yes
+            HAVE_GALLIUM_QXL=yes
+            gallium_require_drm_loader
+            GALLIUM_DRIVERS_DIRS="$GALLIUM_DRIVERS_DIRS qxl softpipe rempipe"
+            if test "x$MESA_LLVM" = x1; then
+                HAVE_GALLIUM_LLVMPIPE=yes
+                GALLIUM_DRIVERS_DIRS="$GALLIUM_DRIVERS_DIRS llvmpipe"
+            fi
+            gallium_check_st "qxl/drm" "dri-virgl" "" "" "" ""
+            ;;
         xfreedreno)
             HAVE_GALLIUM_FREEDRENO=yes
             PKG_CHECK_MODULES([FREEDRENO], [libdrm_freedreno >= $LIBDRM_FREEDRENO_REQUIRED])
@@ -2155,6 +2166,7 @@ AC_CONFIG_FILES([Makefile
 		src/gallium/targets/dri-nouveau/Makefile
 		src/gallium/targets/dri-qxl/Makefile
 		src/gallium/targets/dri-swrast/Makefile
+		src/gallium/targets/dri-virgl/Makefile
 		src/gallium/targets/dri-vmwgfx/Makefile
 		src/gallium/targets/egl-static/Makefile
 		src/gallium/targets/gbm/Makefile

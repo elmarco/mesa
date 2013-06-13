@@ -42,7 +42,6 @@ void graw_process_vcmd(void *cmd, struct graw_iovec *iov, unsigned int niovs)
 {
    QXL3DCommand *qcmd = cmd;
 
-   graw_renderer_check_fences();
    graw_process_cmd(qcmd, iov, niovs);
    graw_renderer_check_fences();
 }

@@ -143,6 +143,7 @@ struct grend_context {
    struct pipe_depth_stencil_alpha_state *dsa;
    boolean stencil_state_dirty;
    struct list_head programs;
+   boolean need_prog_rebind;
 };
 
 static struct grend_resource *frontbuffer;
@@ -615,6 +616,7 @@ void grend_clear(struct grend_context *ctx,
    GLbitfield bits = 0;
    glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, ctx->fb_id);
    glUseProgram(0);
+   ctx->need_prog_rebind = TRUE;
    glClearColor(color->f[0], color->f[1], color->f[2], color->f[3]);
 
    if (buffers & PIPE_CLEAR_DEPTH)
@@ -658,8 +660,11 @@ void grend_draw_vbo(struct grend_context *ctx,
    }
 
    glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, ctx->fb_id);
-
-   glUseProgram(ctx->prog->id);
+   
+   if (ctx->need_prog_rebind) {
+      glUseProgram(ctx->prog->id);
+      ctx->need_prog_rebind = FALSE;
+   }
 
    if (!ctx->vaoid)
      glGenVertexArrays(1, &ctx->vaoid);

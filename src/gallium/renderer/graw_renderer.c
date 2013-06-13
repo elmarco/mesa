@@ -144,6 +144,10 @@ struct grend_context {
    boolean stencil_state_dirty;
    struct list_head programs;
    boolean need_prog_rebind;
+
+   GLint view_cur_x, view_cur_y;
+   GLsizei view_width, view_height;
+   GLclampd view_near_val, view_far_val;
 };
 
 static struct grend_resource *frontbuffer;
@@ -387,8 +391,23 @@ void grend_set_viewport_state(struct grend_context *ctx,
 
    far_val = near_val + (state->scale[2] * 2.0f);
 
-   glViewport(x, y, width, height);
-   glDepthRange(near_val, far_val);
+   if (ctx->view_cur_x != x ||
+       ctx->view_cur_y != y ||
+       ctx->view_width != width ||
+       ctx->view_height != height) {
+      glViewport(x, y, width, height);
+      ctx->view_cur_x = x;
+      ctx->view_cur_y = y;
+      ctx->view_width = width;
+      ctx->view_height = height;
+   }
+
+   if (ctx->view_near_val != near_val ||
+       ctx->view_far_val != far_val) {
+      glDepthRange(near_val, far_val);
+      ctx->view_near_val = near_val;
+      ctx->view_far_val = far_val;
+   }
 }
 
 void grend_create_vertex_elements_state(struct grend_context *ctx,

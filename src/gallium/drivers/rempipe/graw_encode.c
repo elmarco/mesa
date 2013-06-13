@@ -357,9 +357,17 @@ int graw_encode_sampler_view(struct graw_context *ctx,
                              struct graw_resource *res,
                              const struct pipe_sampler_view *state)
 {
-   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_CREATE_OBJECT, GRAW_OBJECT_SAMPLER_VIEW ,2));
+   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_CREATE_OBJECT, GRAW_OBJECT_SAMPLER_VIEW, 5));
    graw_encoder_write_dword(ctx->cbuf, handle);
    graw_encoder_write_res(ctx, res);
+   if (res->base.target == PIPE_BUFFER) {
+      graw_encoder_write_dword(ctx->cbuf, state->u.buf.first_element);
+      graw_encoder_write_dword(ctx->cbuf, state->u.buf.last_element);
+   } else {
+      graw_encoder_write_dword(ctx->cbuf, state->u.tex.first_layer | state->u.tex.last_layer << 16);
+      graw_encoder_write_dword(ctx->cbuf, state->u.tex.first_level | state->u.tex.last_level << 8);
+   }
+   graw_encoder_write_dword(ctx->cbuf, state->swizzle_r | (state->swizzle_g << 3) | (state->swizzle_b << 6) | (state->swizzle_a << 9));
 }
 
 int graw_encode_set_fragment_sampler_views(struct graw_context *ctx,

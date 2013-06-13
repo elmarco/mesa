@@ -133,7 +133,7 @@ struct grend_context {
 
    struct grend_constants vs_consts;
    struct grend_constants fs_consts;
-
+   bool vs_const_dirty, fs_const_dirty;
    struct pipe_sampler_state *sampler_state[PIPE_MAX_SAMPLERS];
    int num_sampler_states;
    uint32_t fb_id;
@@ -429,10 +429,13 @@ void grend_set_constants(struct grend_context *ctx,
 {
    struct grend_constants *consts;
    int i;
-   if (shader == 0)
+   if (shader == 0) {
       consts = &ctx->vs_consts;
-   else
+      ctx->vs_const_dirty = TRUE;
+   } else {
       consts = &ctx->fs_consts;
+      ctx->fs_const_dirty = TRUE;
+   }
    consts->num_consts = num_constant;
    for (i = 0; i < num_constant; i++)
       consts->consts[i] = data[i];
@@ -637,6 +640,7 @@ void grend_draw_vbo(struct grend_context *ctx,
    int i;
    int sampler_id;
    GLuint prog_id;
+   bool new_program = FALSE;
   
    if (ctx->stencil_state_dirty)
       grend_update_stencil_state(ctx);
@@ -647,31 +651,35 @@ void grend_draw_vbo(struct grend_context *ctx,
      if (!prog) {
        prog = add_shader_program(ctx, ctx->vs, ctx->fs);
      }
-     ctx->prog = prog;
+     if (ctx->prog != prog) {
+       new_program = TRUE;
+       ctx->prog = prog;
+     }
    }
 
    glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, ctx->fb_id);
 
    glUseProgram(ctx->prog->id);
-   if (ctx->vaoid)
-      glDeleteVertexArrays(1, &ctx->vaoid);
 
-   glGenVertexArrays(1, &ctx->vaoid);
+   if (!ctx->vaoid)
+     glGenVertexArrays(1, &ctx->vaoid);
 
    glBindVertexArray(ctx->vaoid);
 
-   if (ctx->prog->vs_const_locs) {
+   if (ctx->prog->vs_const_locs && (ctx->vs_const_dirty || new_program)) {
      for (i = 0; i < ctx->vs_consts.num_consts / 4; i++) {
        if (ctx->prog->vs_const_locs[i] != -1)
 	 glUniform4fv(ctx->prog->vs_const_locs[i], 1, &ctx->vs_consts.consts[i * 4]);
      }
+     ctx->vs_const_dirty = FALSE;
    }
 
-   if (ctx->prog->fs_const_locs) {
+   if (ctx->prog->fs_const_locs && (ctx->fs_const_dirty || new_program)) {
      for (i = 0; i < ctx->fs_consts.num_consts / 4; i++) {
        if (ctx->prog->fs_const_locs[i] != -1)
 	 glUniform4fv(ctx->prog->fs_const_locs[i], 1, &ctx->fs_consts.consts[i * 4]);
      }
+     ctx->fs_const_dirty = FALSE;
    }
 
    sampler_id = 0;

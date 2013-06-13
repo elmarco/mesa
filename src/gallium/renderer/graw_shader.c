@@ -253,7 +253,8 @@ iter_instruction(struct tgsi_iterate_context *iter,
 	  const char *cname = ctx->prog_type == TGSI_PROCESSOR_VERTEX ? "vsconst" : "fsconst";
           snprintf(srcs[i], 255, "%c%s%d%s", negate, cname, src->Register.Index, swizzle);
       } else if (src->Register.File == TGSI_FILE_SAMPLER) {
-          snprintf(srcs[i], 255, "samp%d%s", src->Register.Index, swizzle);
+	  const char *cname = ctx->prog_type == TGSI_PROCESSOR_VERTEX ? "vssamp" : "fssamp";
+          snprintf(srcs[i], 255, "%s%d%s", cname, src->Register.Index, swizzle);
 	  sreg_index = src->Register.Index;
       } else if (src->Register.File == TGSI_FILE_IMMEDIATE) {
          struct immed *imd = &ctx->imm[(src->Register.Index)];
@@ -475,13 +476,16 @@ static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
       strcat(glsl_final, buf);
    }
    for (i = 0; i < ctx->num_samps; i++) {
-      snprintf(buf, 255, "uniform sampler%s samp%d;\n", samplertypeconv(ctx->samplers[i].tgsi_sampler_type), i);
+      if (ctx->prog_type == TGSI_PROCESSOR_VERTEX)
+         snprintf(buf, 255, "uniform sampler%s vssamp%d;\n", samplertypeconv(ctx->samplers[i].tgsi_sampler_type), i);
+      else
+         snprintf(buf, 255, "uniform sampler%s fssamp%d;\n", samplertypeconv(ctx->samplers[i].tgsi_sampler_type), i);
       strcat(glsl_final, buf);
    }
 }
 
 char *tgsi_convert(const struct tgsi_token *tokens,
-                  int flags)
+                   int flags, int *num_samplers, int *num_consts, int *num_inputs)
 {
    struct dump_ctx ctx;
    char *glsl_final;
@@ -503,5 +507,8 @@ char *tgsi_convert(const struct tgsi_token *tokens,
    emit_ios(&ctx, glsl_final);
    strcat(glsl_final, ctx.glsl_main);
    free(ctx.glsl_main);
+   *num_samplers = ctx.num_samps;
+   *num_consts = ctx.num_consts;
+   *num_inputs = ctx.num_inputs;
    return glsl_final;
 }

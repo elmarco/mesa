@@ -38,10 +38,29 @@ struct grend_fence {
 
 struct list_head fence_list;
 
+struct grend_linked_shader_program {
+  struct list_head head;
+  GLuint id;
+
+  struct grend_shader_state *vs;
+  struct grend_shader_state *fs;
+
+  GLuint *fs_samp_locs;
+  GLuint *vs_samp_locs;
+
+  GLuint *fs_const_locs;
+  GLuint *vs_const_locs;
+
+  GLuint *attrib_locs;
+};
+
 struct grend_shader_state {
    GLuint id;
    unsigned type;
    char *glsl_prog;
+   int num_samplers;
+   int num_consts;
+   int num_inputs;
 };
 struct grend_resource {
    struct pipe_resource base;
@@ -99,7 +118,7 @@ struct grend_context {
    struct grend_shader_state *fs;
 
    bool shader_dirty;
-   int program_id;
+   struct grend_linked_shader_program *prog;
    int num_fs_views;
    /* frag samplers */
    struct grend_sampler_view fs_views[PIPE_MAX_SHADER_SAMPLER_VIEWS];
@@ -184,29 +203,91 @@ static struct {
       [PIPE_FORMAT_B8G8R8A8_SRGB] = {GL_SRGB8_ALPHA8, GL_RGB, GL_UNSIGNED_BYTE },
    };
 
-struct shader_programs {
-  struct list_head head;
-  GLuint id;
-  GLuint vs_id;
-  GLuint fs_id;
-};
 
-static void add_shader_program(struct grend_context *ctx,
-			int vs_id, int fs_id, int id) {
-  struct shader_programs *sprog = malloc(sizeof(struct shader_programs));
-  sprog->vs_id = vs_id;
-  sprog->fs_id = fs_id;
-  sprog->id = id;
+
+static struct grend_linked_shader_program *add_shader_program(struct grend_context *ctx,
+							       struct grend_shader_state *vs,
+							       struct grend_shader_state *fs) {
+  struct grend_linked_shader_program *sprog = malloc(sizeof(struct grend_linked_shader_program));
+  char name[10];
+  int i;
+  GLuint prog_id;
+
+  prog_id = glCreateProgram();
+  glAttachShader(prog_id, vs->id);
+  glAttachShader(prog_id, fs->id);
+  glLinkProgram(prog_id);
+
+  sprog->vs = vs;
+  sprog->fs = fs;
+  sprog->id = prog_id;
   list_add(&sprog->head, &ctx->programs);
+  
+  if (vs->num_samplers) {
+    sprog->vs_samp_locs = calloc(vs->num_samplers, sizeof(uint32_t));
+    if (sprog->vs_samp_locs) {
+      for (i = 0; i < vs->num_samplers; i++) {
+	snprintf(name, 10, "vssamp%d", i);
+	sprog->vs_samp_locs[i] = glGetUniformLocation(prog_id, name);
+      }
+    }
+  } else
+    sprog->vs_samp_locs = NULL;
+
+  if (fs->num_samplers) {
+    sprog->fs_samp_locs = calloc(fs->num_samplers, sizeof(uint32_t));
+    if (sprog->fs_samp_locs) {
+      for (i = 0; i < fs->num_samplers; i++) {
+	snprintf(name, 10, "fssamp%d", i);
+	sprog->fs_samp_locs[i] = glGetUniformLocation(prog_id, name);
+      }
+    }
+  } else
+    sprog->fs_samp_locs = NULL;
+
+  if (vs->num_consts) {
+    sprog->vs_const_locs = calloc(vs->num_consts, sizeof(uint32_t));
+    if (sprog->vs_const_locs) {
+      for (i = 0; i < vs->num_consts; i++) {
+	snprintf(name, 10, "vsconst%d", i);
+	sprog->vs_const_locs[i] = glGetUniformLocation(prog_id, name);
+      }
+    }
+  } else
+    sprog->vs_const_locs = NULL;
+
+  if (fs->num_consts) {
+    sprog->fs_const_locs = calloc(fs->num_consts, sizeof(uint32_t));
+    if (sprog->fs_const_locs) {
+      for (i = 0; i < fs->num_consts; i++) {
+	snprintf(name, 10, "fsconst%d", i);
+	sprog->fs_const_locs[i] = glGetUniformLocation(prog_id, name);
+      }
+    }
+  } else
+    sprog->fs_const_locs = NULL;
+
+  if (vs->num_inputs) {
+    sprog->attrib_locs = calloc(vs->num_inputs, sizeof(uint32_t));
+    if (sprog->attrib_locs) {
+      for (i = 0; i < vs->num_inputs; i++) {
+	snprintf(name, 10, "in_%d", i);
+	sprog->attrib_locs[i] = glGetAttribLocation(prog_id, name);
+      }
+    }
+  } else
+    sprog->attrib_locs = NULL;
+   
+  return sprog;
 }
 
-static GLuint lookup_shader_program(struct grend_context *ctx,
+static struct grend_linked_shader_program *lookup_shader_program(struct grend_context *ctx,
 			   GLuint vs_id, GLuint fs_id)
 {
-  struct shader_programs *ent;
+  struct grend_linked_shader_program *ent;
   LIST_FOR_EACH_ENTRY(ent, &ctx->programs, head) {
-    if (ent->vs_id == vs_id && ent->fs_id == fs_id)
-      return ent->id;
+    if (ent->vs->id == vs_id && ent->fs->id == fs_id)
+      return ent;
   }
   return 0;
 }
@@ -466,12 +547,13 @@ void grend_create_vs(struct grend_context *ctx,
    const GLchar *glsl_prog;
 
    state->id = glCreateShader(GL_VERTEX_SHADER);
-   glsl_prog = tgsi_convert(vs->tokens, 0);
+   glsl_prog = tgsi_convert(vs->tokens, 0, &state->num_samplers, &state->num_consts, &state->num_inputs);
    if (glsl_prog) {
       glShaderSource(state->id, 1, &glsl_prog, NULL);
       glCompileShader(state->id);
-//      fprintf(stderr,"VS:\n%s\n", glsl_prog);
-   }
+      //      fprintf(stderr,"VS:\n%s\n", glsl_prog);
+   } else
+     fprintf(stderr,"failed to convert VS prog\n");
    graw_object_insert(state, sizeof(*state), handle, GRAW_OBJECT_VS);
 
    return;
@@ -485,12 +567,13 @@ void grend_create_fs(struct grend_context *ctx,
    GLchar *glsl_prog;
 
    state->id = glCreateShader(GL_FRAGMENT_SHADER);
-   glsl_prog = tgsi_convert(fs->tokens, 0);
+   glsl_prog = tgsi_convert(fs->tokens, 0, &state->num_samplers, &state->num_consts, &state->num_inputs);
    if (glsl_prog) {
       glShaderSource(state->id, 1, (const char **)&glsl_prog, NULL);
       glCompileShader(state->id);
-//      fprintf(stderr,"FS:\n%s\n", glsl_prog);
-   }
+      //      fprintf(stderr,"FS:\n%s\n", glsl_prog);
+   } else
+     fprintf(stderr,"failed to convert FS prog\n");
    graw_object_insert(state, sizeof(*state), handle, GRAW_OBJECT_FS);
 
    return;
@@ -559,20 +642,17 @@ void grend_draw_vbo(struct grend_context *ctx,
       grend_update_stencil_state(ctx);
 
    if (ctx->shader_dirty) {
-     prog_id = lookup_shader_program(ctx, ctx->vs->id, ctx->fs->id);
-     if (prog_id == 0) {
-       prog_id = glCreateProgram();
-       glAttachShader(prog_id, ctx->vs->id);
-       glAttachShader(prog_id, ctx->fs->id);
-       glLinkProgram(prog_id);
-       add_shader_program(ctx, ctx->vs->id, ctx->fs->id, prog_id);
+     struct grend_linked_shader_program *prog;
+     prog = lookup_shader_program(ctx, ctx->vs->id, ctx->fs->id);
+     if (!prog) {
+       prog = add_shader_program(ctx, ctx->vs, ctx->fs);
      }
-     ctx->program_id = prog_id;
+     ctx->prog = prog;
    }
 
    glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, ctx->fb_id);
 
-   glUseProgram(ctx->program_id);
+   glUseProgram(ctx->prog->id);
    if (ctx->vaoid)
       glDeleteVertexArrays(1, &ctx->vaoid);
 
@@ -580,50 +660,35 @@ void grend_draw_vbo(struct grend_context *ctx,
 
    glBindVertexArray(ctx->vaoid);
 
-   for (i = 0; i < ctx->vs_consts.num_consts / 4; i++) {
-      GLint loc;
-      char name[10];
-      snprintf(name, 10, "vsconst%d", i);
-      loc = glGetUniformLocation(ctx->program_id, name);
-      if (loc != -1)
-         glUniform4fv(loc, 1, &ctx->vs_consts.consts[i * 4]);
-//      else
-//         fprintf(stderr,"unknown constant %s\n", name);
+   if (ctx->prog->vs_const_locs) {
+     for (i = 0; i < ctx->vs_consts.num_consts / 4; i++) {
+       if (ctx->prog->vs_const_locs[i] != -1)
+	 glUniform4fv(ctx->prog->vs_const_locs[i], 1, &ctx->vs_consts.consts[i * 4]);
+     }
    }
-   for (i = 0; i < ctx->fs_consts.num_consts / 4; i++) {
-      GLint loc;
-      char name[10];
-      snprintf(name, 10, "fsconst%d", i);
-      loc = glGetUniformLocation(ctx->program_id, name);
-      if (loc != -1)
-         glUniform4fv(loc, 1, &ctx->fs_consts.consts[i * 4]);
-//      else
-//         fprintf(stderr,"unknown constant %s\n", name);
 
+   if (ctx->prog->fs_const_locs) {
+     for (i = 0; i < ctx->fs_consts.num_consts / 4; i++) {
+       if (ctx->prog->fs_const_locs[i] != -1)
+	 glUniform4fv(ctx->prog->fs_const_locs[i], 1, &ctx->fs_consts.consts[i * 4]);
+     }
    }
 
    sampler_id = 0;
    for (i = 0; i < ctx->num_vs_views; i++) {
-      GLint loc;
-      char name[10];
-      snprintf(name, 10, "samp%d", i);
-      loc = glGetUniformLocation(ctx->program_id, name);
-      glUniform1i(loc, sampler_id);
-
+     if (ctx->prog->vs_samp_locs)
+         glUniform1i(ctx->prog->vs_samp_locs[i], sampler_id);
+      glUniform1i(ctx->prog->vs_samp_locs[i], sampler_id);
       glActiveTexture(GL_TEXTURE0 + sampler_id);
       glBindTexture(ctx->vs_views[i].texture->target, ctx->vs_views[i].texture->id);
       glEnable(ctx->vs_views[i].texture->target);
       grend_apply_sampler_state(ctx, sampler_id, ctx->vs_views[i].texture->target);
       sampler_id++;
-
    } 
 
    for (i = 0; i < ctx->num_fs_views; i++) {
-      GLint loc;
-      char name[10];
-      snprintf(name, 10, "samp%d", i);
-      loc = glGetUniformLocation(ctx->program_id, name);
-      glUniform1i(loc, sampler_id);
+     if (ctx->prog->fs_samp_locs)
+         glUniform1i(ctx->prog->fs_samp_locs[i], sampler_id);
       if (ctx->fs_views[i].texture) {
          glActiveTexture(GL_TEXTURE0 + sampler_id);
          glBindTexture(ctx->fs_views[i].texture->target, ctx->fs_views[i].texture->id);
@@ -649,7 +714,6 @@ void grend_draw_vbo(struct grend_context *ctx,
       int sz;
       GLboolean norm = GL_FALSE;
       GLint loc;
-      char name[10];
 
       if (desc->channel[0].type == UTIL_FORMAT_TYPE_FLOAT) {
 	 if (desc->channel[0].size == 32)
@@ -684,10 +748,12 @@ void grend_draw_vbo(struct grend_context *ctx,
       if (graw_shader_use_explicit) {
          loc = i;
       } else {
-         snprintf(name, 10, "in_%d", i);
-         loc = glGetAttribLocation(ctx->program_id, name);
-         if (loc == -1)
-            fprintf(stderr,"cannot find loc %s\n", name);
+	if (ctx->prog->attrib_locs) {
+	  loc = ctx->prog->attrib_locs[i];
+	} else loc = -1;
+
+	if (loc == -1)
+	  fprintf(stderr,"cannot find loc %d\n", i);
       }
       glVertexAttribPointer(loc, sz, type, norm, ctx->vbo[vbo_index].stride, (void *)(unsigned long)(ctx->ve->elements[i].src_offset + ctx->vbo[vbo_index].buffer_offset));
       if (ctx->ve->elements[i].instance_divisor)

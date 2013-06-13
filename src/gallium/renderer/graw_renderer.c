@@ -680,7 +680,7 @@ void grend_draw_vbo(struct grend_context *ctx,
 
    glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, ctx->fb_id);
    
-   if (ctx->need_prog_rebind) {
+   if (ctx->need_prog_rebind || new_program) {
       glUseProgram(ctx->prog->id);
       ctx->need_prog_rebind = FALSE;
    }

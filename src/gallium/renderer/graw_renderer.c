@@ -129,7 +129,9 @@ struct grend_context {
    int num_fs_views;
    /* frag samplers */
    struct grend_sampler_view fs_views[PIPE_MAX_SHADER_SAMPLER_VIEWS];
+   uint32_t fs_views_res_id[PIPE_MAX_SHADER_SAMPLER_VIEWS];
 
+   int old_fs_ids[PIPE_MAX_SHADER_SAMPLER_VIEWS];
    int num_vs_views;
    /* frag samplers */
    struct grend_sampler_view vs_views[PIPE_MAX_SHADER_SAMPLER_VIEWS];
@@ -142,6 +144,8 @@ struct grend_context {
    struct grend_constants fs_consts;
    bool vs_const_dirty, fs_const_dirty;
    struct pipe_sampler_state *sampler_state[PIPE_MAX_SAMPLERS];
+   struct pipe_sampler_state cur_sampler_states[PIPE_MAX_SAMPLERS];
+
    int num_sampler_states;
    uint32_t fb_id;
 
@@ -548,9 +552,16 @@ void grend_set_single_fs_sampler_view(struct grend_context *ctx,
 {
    struct grend_resource *res = NULL;
 
-   if (res_handle)
-      res = graw_object_lookup(res_handle, GRAW_RESOURCE);
-   ctx->fs_views[index].texture = res;
+   if (res_handle) {
+      if (ctx->fs_views_res_id[index] != res_handle) {
+         res = graw_object_lookup(res_handle, GRAW_RESOURCE);
+         ctx->fs_views[index].texture = res;
+         ctx->fs_views_res_id[index] = res_handle;
+      }
+   } else {
+      ctx->fs_views_res_id[index] = 0;
+      ctx->fs_views[index].texture = NULL;
+   }
 }
 
 void grend_set_num_fs_sampler_views(struct grend_context *ctx,
@@ -765,13 +776,17 @@ void grend_draw_vbo(struct grend_context *ctx,
    } 
 
    for (i = 0; i < ctx->num_fs_views; i++) {
-     if (ctx->prog->fs_samp_locs)
+      struct grend_resource *texture = ctx->fs_views[i].texture;
+      if (ctx->prog->fs_samp_locs)
          glUniform1i(ctx->prog->fs_samp_locs[i], sampler_id);
-      if (ctx->fs_views[i].texture) {
+      if (texture) {
          glActiveTexture(GL_TEXTURE0 + sampler_id);
-         glBindTexture(ctx->fs_views[i].texture->target, ctx->fs_views[i].texture->id);
-         glEnable(ctx->fs_views[i].texture->target);
-         grend_apply_sampler_state(ctx, sampler_id, ctx->fs_views[i].texture->target);
+         glBindTexture(texture->target, texture->id);
+         glEnable(texture->target);
+         if (ctx->old_fs_ids[i] != texture->id) {
+            grend_apply_sampler_state(ctx, sampler_id, texture->target);
+            ctx->old_fs_ids[i] = texture->id;
+         }
          if (ctx->rs_state->point_quad_rasterization) {
             if (ctx->rs_state->sprite_coord_enable & (1 << i))
                glTexEnvi(GL_POINT_SPRITE_ARB, GL_COORD_REPLACE_ARB, GL_TRUE);
@@ -1196,15 +1211,29 @@ static void grend_apply_sampler_state(struct grend_context *ctx, int id,
                                       int target)
 {
    struct pipe_sampler_state *state = ctx->sampler_state[id];
+   bool set_all = FALSE;
+   if (ctx->cur_sampler_states[id].max_lod == -1)
+      set_all = TRUE;
 
-   glTexParameteri(target, GL_TEXTURE_WRAP_S, convert_wrap(state->wrap_s));
-   glTexParameteri(target, GL_TEXTURE_WRAP_T, convert_wrap(state->wrap_t));
-   glTexParameteri(target, GL_TEXTURE_WRAP_R, convert_wrap(state->wrap_r));
-   glTexParameterf(target, GL_TEXTURE_MIN_FILTER, convert_min_filter(state->min_img_filter, state->min_mip_filter));
-   glTexParameterf(target, GL_TEXTURE_MAG_FILTER, convert_mag_filter(state->mag_img_filter));
-   glTexParameterf(target, GL_TEXTURE_MIN_LOD, state->min_lod);
-   glTexParameterf(target, GL_TEXTURE_MAX_LOD, state->max_lod);
-   glTexParameterf(target, GL_TEXTURE_LOD_BIAS, state->lod_bias);
+   if (ctx->cur_sampler_states[id].wrap_s != state->wrap_s || set_all)
+      glTexParameteri(target, GL_TEXTURE_WRAP_S, convert_wrap(state->wrap_s));
+   if (ctx->cur_sampler_states[id].wrap_t != state->wrap_t || set_all)
+      glTexParameteri(target, GL_TEXTURE_WRAP_T, convert_wrap(state->wrap_t));
+   if (ctx->cur_sampler_states[id].wrap_r != state->wrap_r || set_all)
+      glTexParameteri(target, GL_TEXTURE_WRAP_R, convert_wrap(state->wrap_r));
+   if (ctx->cur_sampler_states[id].min_img_filter != state->min_img_filter ||
+       ctx->cur_sampler_states[id].min_mip_filter != state->min_mip_filter || set_all)
+      glTexParameterf(target, GL_TEXTURE_MIN_FILTER, convert_min_filter(state->min_img_filter, state->min_mip_filter));
+   if (ctx->cur_sampler_states[id].min_img_filter != state->mag_img_filter || set_all)
+      glTexParameterf(target, GL_TEXTURE_MAG_FILTER, convert_mag_filter(state->mag_img_filter));
+   if (ctx->cur_sampler_states[id].min_lod != state->min_lod || set_all)
+      glTexParameterf(target, GL_TEXTURE_MIN_LOD, state->min_lod);
+   if (ctx->cur_sampler_states[id].max_lod != state->max_lod || set_all)
+      glTexParameterf(target, GL_TEXTURE_MAX_LOD, state->max_lod);
+   if (ctx->cur_sampler_states[id].lod_bias != state->lod_bias || set_all)
+      glTexParameterf(target, GL_TEXTURE_LOD_BIAS, state->lod_bias);
+
+   ctx->cur_sampler_states[id] = *state;
 }
 
 void grend_flush(struct grend_context *ctx)
@@ -1306,7 +1335,12 @@ graw_renderer_fini(void)
 struct grend_context *grend_create_context(void)
 {
    struct grend_context *grctx = CALLOC_STRUCT(grend_context);
+   int i;
+
    list_inithead(&grctx->programs);
+   for (i = 0; i < PIPE_MAX_SAMPLERS; i++)
+      grctx->cur_sampler_states[i].max_lod = -1;
+
    return grctx;
 }
 

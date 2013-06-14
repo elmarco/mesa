@@ -83,6 +83,7 @@ struct grend_surface {
    GLuint res_handle;
    GLuint format;
    GLuint val0, val1;
+   struct grend_resource *texture;
 };
 
 struct grend_sampler {
@@ -326,6 +327,7 @@ void grend_create_surface(struct grend_context *ctx,
    surf->format = format;
    surf->val0 = val0;
    surf->val1 = val1;
+   surf->texture = graw_object_lookup(res_handle, GRAW_RESOURCE);
 
    graw_object_insert(surf, sizeof(*surf), handle, GRAW_SURFACE);
 }
@@ -358,7 +360,7 @@ void grend_set_framebuffer_state(struct grend_context *ctx,
       GLuint attachment;
       zsurf = graw_object_lookup(zsurf_handle, GRAW_SURFACE);
 
-      tex = graw_object_lookup(zsurf->res_handle, GRAW_RESOURCE);
+      tex = zsurf->texture;
   
       if (tex->base.format == PIPE_FORMAT_S8_UINT)
          attachment = GL_STENCIL_ATTACHMENT;
@@ -372,7 +374,7 @@ void grend_set_framebuffer_state(struct grend_context *ctx,
 
    for (i = 0; i < nr_cbufs; i++) {
       surf = graw_object_lookup(surf_handle[i], GRAW_SURFACE);
-      tex = graw_object_lookup(surf->res_handle, GRAW_RESOURCE);
+      tex = surf->texture;
 
       if (tex->target == GL_TEXTURE_CUBE_MAP) {
          glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, buffers[i],

@@ -96,9 +96,15 @@ struct grend_sampler_view {
 };
 
 struct grend_vertex_element {
+   struct pipe_vertex_element base;
+   GLenum type;
+   GLboolean norm;
+   GLuint nr_chan;
+};
+
+struct grend_vertex_element_array {
    unsigned count;
-   struct pipe_vertex_element elements[PIPE_MAX_ATTRIBS];
-   GLuint vboids[PIPE_MAX_ATTRIBS];
+   struct grend_vertex_element elements[PIPE_MAX_ATTRIBS];
 };
 
 struct grend_constants {
@@ -109,8 +115,9 @@ struct grend_constants {
 struct grend_context {
    struct pipe_context base;
    GLuint vaoid;
+   GLuint num_enabled_attribs;
 
-   struct grend_vertex_element *ve;
+   struct grend_vertex_element_array *ve;
    int num_vbos;
    struct pipe_vertex_buffer vbo[PIPE_MAX_ATTRIBS];
 
@@ -415,10 +422,45 @@ void grend_create_vertex_elements_state(struct grend_context *ctx,
                                         unsigned num_elements,
                                         const struct pipe_vertex_element *elements)
 {
-   struct grend_vertex_element *v = CALLOC_STRUCT(grend_vertex_element);
+   struct grend_vertex_element_array *v = CALLOC_STRUCT(grend_vertex_element_array);
+   const struct util_format_description *desc;
+   GLenum type = GL_FALSE;
+   int i;
 
    v->count = num_elements;
-   memcpy(v->elements, elements, sizeof(struct pipe_vertex_element) * num_elements);
+   for (i = 0; i < num_elements; i++) {
+      memcpy(&v->elements[i].base, &elements[i], sizeof(struct pipe_vertex_element));
+
+      desc = util_format_description(elements[i].src_format);
+
+      if (desc->channel[0].type == UTIL_FORMAT_TYPE_FLOAT) {
+	 if (desc->channel[0].size == 32)
+	    type = GL_FLOAT;
+	 else if (desc->channel[0].size == 64)
+	    type = GL_DOUBLE;
+      } else if (desc->channel[0].type == UTIL_FORMAT_TYPE_UNSIGNED &&
+                 desc->channel[0].size == 8) 
+         type = GL_UNSIGNED_BYTE;
+      else if (desc->channel[0].type == UTIL_FORMAT_TYPE_SIGNED &&
+               desc->channel[0].size == 8) 
+         type = GL_BYTE;
+      else if (desc->channel[0].type == UTIL_FORMAT_TYPE_UNSIGNED &&
+               desc->channel[0].size == 16) 
+         type = GL_UNSIGNED_SHORT;
+      else if (desc->channel[0].type == UTIL_FORMAT_TYPE_SIGNED &&
+               desc->channel[0].size == 16) 
+         type = GL_SHORT;
+      else if (desc->channel[0].type == UTIL_FORMAT_TYPE_UNSIGNED &&
+               desc->channel[0].size == 32) 
+         type = GL_UNSIGNED_INT;
+      else if (desc->channel[0].type == UTIL_FORMAT_TYPE_SIGNED &&
+               desc->channel[0].size == 32) 
+         type = GL_INT;
+      v->elements[i].type = type;
+      if (desc->channel[0].normalized)
+         v->elements[i].norm = GL_TRUE;
+      v->elements[i].nr_chan = desc->nr_channels;
+   }
 
    graw_object_insert(v, sizeof(struct grend_vertex_element), handle,
                       GRAW_OBJECT_VERTEX_ELEMENTS);
@@ -427,7 +469,7 @@ void grend_create_vertex_elements_state(struct grend_context *ctx,
 void grend_bind_vertex_elements_state(struct grend_context *ctx,
                                       uint32_t handle)
 {
-   struct grend_vertex_element *v;
+   struct grend_vertex_element_array *v;
 
    if (!handle) {
       ctx->ve = NULL;
@@ -685,8 +727,10 @@ void grend_draw_vbo(struct grend_context *ctx,
       ctx->need_prog_rebind = FALSE;
    }
 
-   if (!ctx->vaoid)
-     glGenVertexArrays(1, &ctx->vaoid);
+   if (!ctx->vaoid) {
+      ctx->num_enabled_attribs = 0;
+      glGenVertexArrays(1, &ctx->vaoid);
+   }
 
    glBindVertexArray(ctx->vaoid);
 
@@ -735,44 +779,12 @@ void grend_draw_vbo(struct grend_context *ctx,
       }
       sampler_id++;
    } 
-//   glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
-//   glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
 
    for (i = 0; i < ctx->ve->count; i++) {
-      int vbo_index = ctx->ve->elements[i].vertex_buffer_index;
-      const struct util_format_description *desc = util_format_description(ctx->ve->elements[i].src_format);
+      struct grend_vertex_element *ve = &ctx->ve->elements[i];
+      int vbo_index = ctx->ve->elements[i].base.vertex_buffer_index;
       struct grend_buffer *buf;
-      GLenum type = GL_FALSE;
-      int sz;
-      GLboolean norm = GL_FALSE;
       GLint loc;
-
-      if (desc->channel[0].type == UTIL_FORMAT_TYPE_FLOAT) {
-	 if (desc->channel[0].size == 32)
-	    type = GL_FLOAT;
-	 else if (desc->channel[0].size == 64)
-	    type = GL_DOUBLE;
-      } else if (desc->channel[0].type == UTIL_FORMAT_TYPE_UNSIGNED &&
-               desc->channel[0].size == 8) 
-         type = GL_UNSIGNED_BYTE;
-      else if (desc->channel[0].type == UTIL_FORMAT_TYPE_SIGNED &&
-               desc->channel[0].size == 8) 
-         type = GL_BYTE;
-      else if (desc->channel[0].type == UTIL_FORMAT_TYPE_UNSIGNED &&
-               desc->channel[0].size == 16) 
-         type = GL_UNSIGNED_SHORT;
-      else if (desc->channel[0].type == UTIL_FORMAT_TYPE_SIGNED &&
-               desc->channel[0].size == 16) 
-         type = GL_SHORT;
-      else if (desc->channel[0].type == UTIL_FORMAT_TYPE_UNSIGNED &&
-               desc->channel[0].size == 32) 
-         type = GL_UNSIGNED_INT;
-      else if (desc->channel[0].type == UTIL_FORMAT_TYPE_SIGNED &&
-               desc->channel[0].size == 32) 
-         type = GL_INT;
-      if (desc->channel[0].normalized)
-         norm = GL_TRUE;
-      sz = desc->nr_channels;
 
       buf = (struct grend_buffer *)ctx->vbo[vbo_index].buffer;
       glBindBuffer(GL_ARRAY_BUFFER, buf->base.id);
@@ -787,10 +799,21 @@ void grend_draw_vbo(struct grend_context *ctx,
 	if (loc == -1)
 	  fprintf(stderr,"cannot find loc %d\n", i);
       }
-      glVertexAttribPointer(loc, sz, type, norm, ctx->vbo[vbo_index].stride, (void *)(unsigned long)(ctx->ve->elements[i].src_offset + ctx->vbo[vbo_index].buffer_offset));
-      if (ctx->ve->elements[i].instance_divisor)
-         glVertexAttribDivisorARB(i, ctx->ve->elements[i].instance_divisor);
-      glEnableVertexAttribArray(i);
+      glVertexAttribPointer(loc, ve->nr_chan, ve->type, ve->norm, ctx->vbo[vbo_index].stride, (void *)(unsigned long)(ctx->ve->elements[i].base.src_offset + ctx->vbo[vbo_index].buffer_offset));
+      glVertexAttribDivisorARB(i, ctx->ve->elements[i].base.instance_divisor);
+
+   }
+
+
+   if (ctx->num_enabled_attribs != ctx->ve->count) {
+      if (ctx->ve->count > ctx->num_enabled_attribs) {
+         for (i = ctx->num_enabled_attribs; i < ctx->ve->count; i++)
+            glEnableVertexAttribArray(i);
+      } else if (ctx->ve->count < ctx->num_enabled_attribs) {
+         for (i = ctx->ve->count; i < ctx->num_enabled_attribs; i++)
+            glDisableVertexAttribArray(i);
+      }
+      ctx->num_enabled_attribs = ctx->ve->count;
    }
 
    if (info->indexed) {
@@ -828,12 +851,8 @@ void grend_draw_vbo(struct grend_context *ctx,
 
    glActiveTexture(GL_TEXTURE0);
    glDisable(GL_TEXTURE_2D);
-   glBindVertexArray(0);
 
-   for (i = 0; i < ctx->ve->count; i++) {
-      glDisableVertexAttribArray(i);
-   }
-   //   glDeleteVertexArrays(1, &vaoid);
+   glBindVertexArray(0);
 }
 
 static GLenum translate_blend_func(uint32_t pipe_blend)

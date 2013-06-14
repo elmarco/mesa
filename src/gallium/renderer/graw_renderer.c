@@ -45,11 +45,9 @@ struct grend_linked_shader_program {
   struct grend_shader_state *vs;
   struct grend_shader_state *fs;
 
-  GLuint *fs_samp_locs;
-  GLuint *vs_samp_locs;
+  GLuint *samp_locs[PIPE_SHADER_TYPES];
 
-  GLuint *fs_const_locs;
-  GLuint *vs_const_locs;
+  GLuint *const_locs[PIPE_SHADER_TYPES];
 
   GLuint *attrib_locs;
 };
@@ -112,6 +110,13 @@ struct grend_constants {
    uint32_t num_consts;
 };
 
+struct grend_shader_view {
+   int num_views;
+   struct grend_sampler_view views[PIPE_MAX_SHADER_SAMPLER_VIEWS];
+   uint32_t res_id[PIPE_MAX_SHADER_SAMPLER_VIEWS];
+   uint32_t old_ids[PIPE_MAX_SHADER_SAMPLER_VIEWS];
+};
+
 struct grend_context {
    struct pipe_context base;
    GLuint vaoid;
@@ -126,15 +131,8 @@ struct grend_context {
 
    bool shader_dirty;
    struct grend_linked_shader_program *prog;
-   int num_fs_views;
-   /* frag samplers */
-   struct grend_sampler_view fs_views[PIPE_MAX_SHADER_SAMPLER_VIEWS];
-   uint32_t fs_views_res_id[PIPE_MAX_SHADER_SAMPLER_VIEWS];
 
-   int old_fs_ids[PIPE_MAX_SHADER_SAMPLER_VIEWS];
-   int num_vs_views;
-   /* frag samplers */
-   struct grend_sampler_view vs_views[PIPE_MAX_SHADER_SAMPLER_VIEWS];
+   struct grend_shader_view views[PIPE_SHADER_TYPES];
 
    struct pipe_rasterizer_state *rs_state;
 
@@ -239,50 +237,51 @@ static struct grend_linked_shader_program *add_shader_program(struct grend_conte
   sprog->fs = fs;
   sprog->id = prog_id;
   list_add(&sprog->head, &ctx->programs);
-  
+
   if (vs->num_samplers) {
-    sprog->vs_samp_locs = calloc(vs->num_samplers, sizeof(uint32_t));
-    if (sprog->vs_samp_locs) {
+    sprog->samp_locs[PIPE_SHADER_VERTEX] = calloc(vs->num_samplers, sizeof(uint32_t));
+    if (sprog->samp_locs[PIPE_SHADER_VERTEX]) {
       for (i = 0; i < vs->num_samplers; i++) {
 	snprintf(name, 10, "vssamp%d", i);
-	sprog->vs_samp_locs[i] = glGetUniformLocation(prog_id, name);
+	sprog->samp_locs[PIPE_SHADER_VERTEX][i] = glGetUniformLocation(prog_id, name);
       }
     }
   } else
-    sprog->vs_samp_locs = NULL;
+    sprog->samp_locs[PIPE_SHADER_VERTEX] = NULL;
 
   if (fs->num_samplers) {
-    sprog->fs_samp_locs = calloc(fs->num_samplers, sizeof(uint32_t));
-    if (sprog->fs_samp_locs) {
+    sprog->samp_locs[PIPE_SHADER_FRAGMENT] = calloc(fs->num_samplers, sizeof(uint32_t));
+    if (sprog->samp_locs[PIPE_SHADER_FRAGMENT]) {
       for (i = 0; i < fs->num_samplers; i++) {
 	snprintf(name, 10, "fssamp%d", i);
-	sprog->fs_samp_locs[i] = glGetUniformLocation(prog_id, name);
+	sprog->samp_locs[PIPE_SHADER_FRAGMENT][i] = glGetUniformLocation(prog_id, name);
       }
     }
   } else
-    sprog->fs_samp_locs = NULL;
+    sprog->samp_locs[PIPE_SHADER_FRAGMENT] = NULL;
 
+  
   if (vs->num_consts) {
-    sprog->vs_const_locs = calloc(vs->num_consts, sizeof(uint32_t));
-    if (sprog->vs_const_locs) {
+    sprog->const_locs[PIPE_SHADER_VERTEX] = calloc(vs->num_consts, sizeof(uint32_t));
+    if (sprog->const_locs[PIPE_SHADER_VERTEX]) {
       for (i = 0; i < vs->num_consts; i++) {
 	snprintf(name, 10, "vsconst%d", i);
-	sprog->vs_const_locs[i] = glGetUniformLocation(prog_id, name);
+	sprog->const_locs[PIPE_SHADER_VERTEX][i] = glGetUniformLocation(prog_id, name);
       }
     }
   } else
-    sprog->vs_const_locs = NULL;
+    sprog->const_locs[PIPE_SHADER_VERTEX] = NULL;
 
   if (fs->num_consts) {
-    sprog->fs_const_locs = calloc(fs->num_consts, sizeof(uint32_t));
-    if (sprog->fs_const_locs) {
+    sprog->const_locs[PIPE_SHADER_FRAGMENT] = calloc(fs->num_consts, sizeof(uint32_t));
+    if (sprog->const_locs[PIPE_SHADER_FRAGMENT]) {
       for (i = 0; i < fs->num_consts; i++) {
 	snprintf(name, 10, "fsconst%d", i);
-	sprog->fs_const_locs[i] = glGetUniformLocation(prog_id, name);
+	sprog->const_locs[PIPE_SHADER_FRAGMENT][i] = glGetUniformLocation(prog_id, name);
       }
     }
   } else
-    sprog->fs_const_locs = NULL;
+    sprog->const_locs[PIPE_SHADER_FRAGMENT] = NULL;
 
   if (vs->num_inputs) {
     sprog->attrib_locs = calloc(vs->num_inputs, sizeof(uint32_t));
@@ -562,21 +561,21 @@ void grend_set_single_fs_sampler_view(struct grend_context *ctx,
    struct grend_resource *res = NULL;
 
    if (res_handle) {
-      if (ctx->fs_views_res_id[index] != res_handle) {
+      if (ctx->views[PIPE_SHADER_FRAGMENT].res_id[index] != res_handle) {
          res = graw_object_lookup(res_handle, GRAW_RESOURCE);
-         ctx->fs_views[index].texture = res;
-         ctx->fs_views_res_id[index] = res_handle;
+         ctx->views[PIPE_SHADER_FRAGMENT].views[index].texture = res;
+         ctx->views[PIPE_SHADER_FRAGMENT].res_id[index] = res_handle;
       }
    } else {
-      ctx->fs_views_res_id[index] = 0;
-      ctx->fs_views[index].texture = NULL;
+      ctx->views[PIPE_SHADER_FRAGMENT].res_id[index] = 0;
+      ctx->views[PIPE_SHADER_FRAGMENT].views[index].texture = NULL;
    }
 }
 
 void grend_set_num_fs_sampler_views(struct grend_context *ctx,
                                     int num_fs_sampler_views)
 {
-   ctx->num_fs_views = num_fs_sampler_views;
+   ctx->views[PIPE_SHADER_FRAGMENT].num_views = num_fs_sampler_views;
 }
 
 void grend_set_single_vs_sampler_view(struct grend_context *ctx,
@@ -587,13 +586,13 @@ void grend_set_single_vs_sampler_view(struct grend_context *ctx,
 
    if (res_handle)
       res = graw_object_lookup(res_handle, GRAW_RESOURCE);
-   ctx->vs_views[index].texture = res;
+   ctx->views[PIPE_SHADER_VERTEX].views[index].texture = res;
 }
 
 void grend_set_num_vs_sampler_views(struct grend_context *ctx,
                                     int num_vs_sampler_views)
 {
-   ctx->num_vs_views = num_vs_sampler_views;
+   ctx->views[PIPE_SHADER_VERTEX].num_views = num_vs_sampler_views;
 }
 
 void grend_transfer_inline_write(struct grend_context *ctx,
@@ -754,45 +753,45 @@ void grend_draw_vbo(struct grend_context *ctx,
 
    glBindVertexArray(ctx->vaoid);
 
-   if (ctx->prog->vs_const_locs && (ctx->vs_const_dirty || new_program)) {
+   if (ctx->prog->const_locs[PIPE_SHADER_VERTEX] && (ctx->vs_const_dirty || new_program)) {
      for (i = 0; i < ctx->vs_consts.num_consts / 4; i++) {
-       if (ctx->prog->vs_const_locs[i] != -1)
-	 glUniform4fv(ctx->prog->vs_const_locs[i], 1, &ctx->vs_consts.consts[i * 4]);
+       if (ctx->prog->const_locs[PIPE_SHADER_VERTEX][i] != -1)
+	 glUniform4fv(ctx->prog->const_locs[PIPE_SHADER_VERTEX][i], 1, &ctx->vs_consts.consts[i * 4]);
      }
      ctx->vs_const_dirty = FALSE;
    }
 
-   if (ctx->prog->fs_const_locs && (ctx->fs_const_dirty || new_program)) {
+   if (ctx->prog->const_locs[PIPE_SHADER_FRAGMENT] && (ctx->fs_const_dirty || new_program)) {
      for (i = 0; i < ctx->fs_consts.num_consts / 4; i++) {
-       if (ctx->prog->fs_const_locs[i] != -1)
-	 glUniform4fv(ctx->prog->fs_const_locs[i], 1, &ctx->fs_consts.consts[i * 4]);
+       if (ctx->prog->const_locs[PIPE_SHADER_FRAGMENT][i] != -1)
+	 glUniform4fv(ctx->prog->const_locs[PIPE_SHADER_FRAGMENT][i], 1, &ctx->fs_consts.consts[i * 4]);
      }
      ctx->fs_const_dirty = FALSE;
    }
 
    sampler_id = 0;
-   for (i = 0; i < ctx->num_vs_views; i++) {
-     if (ctx->prog->vs_samp_locs)
-         glUniform1i(ctx->prog->vs_samp_locs[i], sampler_id);
+   for (i = 0; i < ctx->views[PIPE_SHADER_VERTEX].num_views; i++) {
+     if (ctx->prog->samp_locs[PIPE_SHADER_VERTEX])
+         glUniform1i(ctx->prog->samp_locs[PIPE_SHADER_VERTEX][i], sampler_id);
    
       glActiveTexture(GL_TEXTURE0 + sampler_id);
-      glBindTexture(ctx->vs_views[i].texture->target, ctx->vs_views[i].texture->id);
-      glEnable(ctx->vs_views[i].texture->target);
-      grend_apply_sampler_state(ctx, sampler_id, ctx->vs_views[i].texture->target);
+      glBindTexture(ctx->views[PIPE_SHADER_VERTEX].views[i].texture->target, ctx->views[PIPE_SHADER_VERTEX].views[i].texture->id);
+      glEnable(ctx->views[PIPE_SHADER_VERTEX].views[i].texture->target);
+      grend_apply_sampler_state(ctx, sampler_id, ctx->views[PIPE_SHADER_VERTEX].views[i].texture->target);
       sampler_id++;
    } 
 
-   for (i = 0; i < ctx->num_fs_views; i++) {
-      struct grend_resource *texture = ctx->fs_views[i].texture;
-      if (ctx->prog->fs_samp_locs)
-         glUniform1i(ctx->prog->fs_samp_locs[i], sampler_id);
+   for (i = 0; i < ctx->views[PIPE_SHADER_FRAGMENT].num_views; i++) {
+      struct grend_resource *texture = ctx->views[PIPE_SHADER_FRAGMENT].views[i].texture;
+      if (ctx->prog->samp_locs[PIPE_SHADER_FRAGMENT])
+         glUniform1i(ctx->prog->samp_locs[PIPE_SHADER_FRAGMENT][i], sampler_id);
       if (texture) {
          glActiveTexture(GL_TEXTURE0 + sampler_id);
          glBindTexture(texture->target, texture->id);
          glEnable(texture->target);
-         if (ctx->old_fs_ids[i] != texture->id) {
+         if (ctx->views[PIPE_SHADER_FRAGMENT].old_ids[i] != texture->id) {
             grend_apply_sampler_state(ctx, sampler_id, texture->target);
-            ctx->old_fs_ids[i] = texture->id;
+            ctx->views[PIPE_SHADER_FRAGMENT].old_ids[i] = texture->id;
          }
          if (ctx->rs_state->point_quad_rasterization) {
             if (ctx->rs_state->sprite_coord_enable & (1 << i))

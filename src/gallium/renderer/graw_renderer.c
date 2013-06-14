@@ -121,7 +121,7 @@ struct grend_constants {
 
 struct grend_shader_view {
    int num_views;
-   struct grend_sampler_view views[PIPE_MAX_SHADER_SAMPLER_VIEWS];
+   struct grend_sampler_view *views[PIPE_MAX_SHADER_SAMPLER_VIEWS];
    uint32_t res_id[PIPE_MAX_SHADER_SAMPLER_VIEWS];
    uint32_t old_ids[PIPE_MAX_SHADER_SAMPLER_VIEWS];
 };
@@ -584,20 +584,12 @@ void grend_set_num_vbo(struct grend_context *ctx,
 void grend_set_single_sampler_view(struct grend_context *ctx,
                                    uint32_t shader_type,
                                    int index,
-                                   uint32_t res_handle)
+                                   uint32_t handle)
 {
-   struct grend_resource *res = NULL;
+   struct grend_sampler_view *view = NULL;
 
-   if (res_handle) {
-      if (ctx->views[shader_type].res_id[index] != res_handle) {
-         res = graw_object_lookup(res_handle, GRAW_RESOURCE);
-         ctx->views[shader_type].views[index].texture = res;
-         ctx->views[shader_type].res_id[index] = res_handle;
-      }
-   } else {
-      ctx->views[shader_type].res_id[index] = 0;
-      ctx->views[shader_type].views[index].texture = NULL;
-   }
+   view = graw_object_lookup(handle, GRAW_OBJECT_SAMPLER_VIEW);
+   ctx->views[shader_type].views[index] = view;
 }
 
 void grend_set_num_sampler_views(struct grend_context *ctx,
@@ -773,7 +765,12 @@ void grend_draw_vbo(struct grend_context *ctx,
    sampler_id = 0;
    for (shader_type = PIPE_SHADER_VERTEX; shader_type <= PIPE_SHADER_FRAGMENT; shader_type++) {
       for (i = 0; i < ctx->views[shader_type].num_views; i++) {
-         struct grend_resource *texture = ctx->views[shader_type].views[i].texture;
+         struct grend_resource *texture = NULL;
+
+         if (ctx->views[shader_type].views[i]) {
+            fprintf(stderr,"got illegal number of views %d %d\n", shader_type, ctx->views[shader_type].num_views);
+            texture = ctx->views[shader_type].views[i]->texture;
+         }
          if (ctx->prog->samp_locs[shader_type])
             glUniform1i(ctx->prog->samp_locs[shader_type][i], sampler_id);
          if (texture) {

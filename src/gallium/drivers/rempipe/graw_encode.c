@@ -374,13 +374,13 @@ int graw_encode_sampler_view(struct graw_context *ctx,
 int graw_encode_set_sampler_views(struct graw_context *ctx,
                                   uint32_t shader_type,
                                   uint32_t num_handles,
-                                  struct graw_resource **res)
+                                  uint32_t *handles)
 {
    int i;
    graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_SET_SAMPLER_VIEWS, 0, num_handles + 1));
    graw_encoder_write_dword(ctx->cbuf, shader_type);
    for (i = 0; i < num_handles; i++)
-      graw_encoder_write_res(ctx, res[i]);
+      graw_encoder_write_dword(ctx->cbuf, handles[i]);
    return 0;
 }
 

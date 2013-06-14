@@ -119,7 +119,7 @@ int graw_encode_sampler_view(struct graw_context *ctx,
 int graw_encode_set_sampler_views(struct graw_context *ctx,
                                   uint32_t shader_type,
                                   uint32_t num_res,
-                                  struct graw_resource **res);
+                                  uint32_t *handles);
 
 int graw_encode_bind_fragment_sampler_states(struct graw_context *ctx,
                                              uint32_t num_handles,

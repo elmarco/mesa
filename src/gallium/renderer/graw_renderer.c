@@ -758,11 +758,6 @@ void grend_draw_vbo(struct grend_context *ctx,
       ctx->need_prog_rebind = FALSE;
    }
 
-   if (!ctx->vaoid) {
-      ctx->num_enabled_attribs = 0;
-      glGenVertexArrays(1, &ctx->vaoid);
-   }
-
    glBindVertexArray(ctx->vaoid);
 
    for (shader_type = PIPE_SHADER_VERTEX; shader_type <= PIPE_SHADER_FRAGMENT; shader_type++) {
@@ -869,9 +864,7 @@ void grend_draw_vbo(struct grend_context *ctx,
          glDrawElementsInstancedARB(mode, info->count, elsz, (void *)(unsigned long)ctx->ib.offset, info->instance_count);
    }
 
-   glActiveTexture(GL_TEXTURE0);
-   glDisable(GL_TEXTURE_2D);
-
+   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
    glBindVertexArray(0);
 }
 
@@ -1344,6 +1337,7 @@ struct grend_context *grend_create_context(void)
    for (i = 0; i < PIPE_MAX_SAMPLERS; i++)
       grctx->cur_sampler_states[i].max_lod = -1;
 
+   glGenVertexArrays(1, &grctx->vaoid);
    return grctx;
 }
 

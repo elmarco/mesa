@@ -149,9 +149,9 @@ static void graw_decode_set_fragment_sampler_views(struct grend_decode_ctx *ctx,
    num_samps = length;
    for (i = 0; i < num_samps; i++) {
       uint32_t handle = ctx->ds->buf[ctx->ds->buf_offset + 1 + i];
-      grend_set_single_fs_sampler_view(ctx->grctx, i, handle);
+      grend_set_single_sampler_view(ctx->grctx, PIPE_SHADER_FRAGMENT, i, handle);
    }
-   grend_set_num_fs_sampler_views(ctx->grctx, num_samps);
+   grend_set_num_sampler_views(ctx->grctx, PIPE_SHADER_FRAGMENT, num_samps);
 }
 
 static void graw_decode_set_vertex_sampler_views(struct grend_decode_ctx *ctx, uint16_t length)
@@ -161,9 +161,9 @@ static void graw_decode_set_vertex_sampler_views(struct grend_decode_ctx *ctx, u
    num_samps = length;
    for (i = 0; i < num_samps; i++) {
       uint32_t handle = ctx->ds->buf[ctx->ds->buf_offset + 1 + i];
-      grend_set_single_vs_sampler_view(ctx->grctx, i, handle);
+      grend_set_single_sampler_view(ctx->grctx, PIPE_SHADER_VERTEX, i, handle);
    }
-   grend_set_num_vs_sampler_views(ctx->grctx, num_samps);
+   grend_set_num_sampler_views(ctx->grctx, PIPE_SHADER_VERTEX, num_samps);
 }
 
 static void graw_decode_resource_inline_write(struct grend_decode_ctx *ctx, uint16_t length)

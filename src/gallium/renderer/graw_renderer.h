@@ -73,16 +73,13 @@ void grend_transfer_inline_write(struct grend_context *ctx,
 
 void grend_set_viewport_state(struct grend_context *ctx,
                               const struct pipe_viewport_state *state);
-void grend_set_num_fs_sampler_views(struct grend_context *ctx,
-                                    int num_fs_sampler_views);
-void grend_set_single_fs_sampler_view(struct grend_context *ctx,
-                                      int index,
-                                      uint32_t res_handle);
-void grend_set_num_vs_sampler_views(struct grend_context *ctx,
-                                    int num_fs_sampler_views);
-void grend_set_single_vs_sampler_view(struct grend_context *ctx,
-                                      int index,
-                                      uint32_t res_handle);
+void grend_set_num_sampler_views(struct grend_context *ctx,
+                                 uint32_t shader_type,
+                                 int num_sampler_views);
+void grend_set_single_sampler_view(struct grend_context *ctx,
+                                   uint32_t shader_type,
+                                   int index,
+                                   uint32_t res_handle);
 
 void grend_object_bind_blend(struct grend_context *ctx,
                              uint32_t handle);

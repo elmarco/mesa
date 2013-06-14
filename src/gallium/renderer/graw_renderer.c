@@ -550,45 +550,30 @@ void grend_set_num_vbo(struct grend_context *ctx,
    ctx->num_vbos = num_vbo;
 }
 
-void grend_set_single_fs_sampler_view(struct grend_context *ctx,
-                                      int index,
-                                      uint32_t res_handle)
+void grend_set_single_sampler_view(struct grend_context *ctx,
+                                   uint32_t shader_type,
+                                   int index,
+                                   uint32_t res_handle)
 {
    struct grend_resource *res = NULL;
 
    if (res_handle) {
-      if (ctx->views[PIPE_SHADER_FRAGMENT].res_id[index] != res_handle) {
+      if (ctx->views[shader_type].res_id[index] != res_handle) {
          res = graw_object_lookup(res_handle, GRAW_RESOURCE);
-         ctx->views[PIPE_SHADER_FRAGMENT].views[index].texture = res;
-         ctx->views[PIPE_SHADER_FRAGMENT].res_id[index] = res_handle;
+         ctx->views[shader_type].views[index].texture = res;
+         ctx->views[shader_type].res_id[index] = res_handle;
       }
    } else {
-      ctx->views[PIPE_SHADER_FRAGMENT].res_id[index] = 0;
-      ctx->views[PIPE_SHADER_FRAGMENT].views[index].texture = NULL;
+      ctx->views[shader_type].res_id[index] = 0;
+      ctx->views[shader_type].views[index].texture = NULL;
    }
 }
 
-void grend_set_num_fs_sampler_views(struct grend_context *ctx,
-                                    int num_fs_sampler_views)
+void grend_set_num_sampler_views(struct grend_context *ctx,
+                                    uint32_t shader_type,
+                                    int num_sampler_views)
 {
-   ctx->views[PIPE_SHADER_FRAGMENT].num_views = num_fs_sampler_views;
-}
-
-void grend_set_single_vs_sampler_view(struct grend_context *ctx,
-                                      int index,
-                                      uint32_t res_handle)
-{
-   struct grend_resource *res = NULL;
-
-   if (res_handle)
-      res = graw_object_lookup(res_handle, GRAW_RESOURCE);
-   ctx->views[PIPE_SHADER_VERTEX].views[index].texture = res;
-}
-
-void grend_set_num_vs_sampler_views(struct grend_context *ctx,
-                                    int num_vs_sampler_views)
-{
-   ctx->views[PIPE_SHADER_VERTEX].num_views = num_vs_sampler_views;
+   ctx->views[shader_type].num_views = num_sampler_views;
 }
 
 void grend_transfer_inline_write(struct grend_context *ctx,

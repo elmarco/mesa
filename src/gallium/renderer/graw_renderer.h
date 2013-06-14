@@ -46,6 +46,10 @@ void grend_create_surface(struct grend_context *ctx,
                           uint32_t handle,
                           uint32_t res_handle, uint32_t format,
                           uint32_t val0, uint32_t val1);
+void grend_create_sampler_view(struct grend_context *ctx,
+                               uint32_t handle,
+                               uint32_t res_handle, uint32_t format,
+                               uint32_t val0, uint32_t val1, uint32_t swizzle_packed);
 
 void grend_create_vertex_elements_state(struct grend_context *ctx,
                                         uint32_t handle,

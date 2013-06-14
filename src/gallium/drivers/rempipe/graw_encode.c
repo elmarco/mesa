@@ -357,9 +357,10 @@ int graw_encode_sampler_view(struct graw_context *ctx,
                              struct graw_resource *res,
                              const struct pipe_sampler_view *state)
 {
-   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_CREATE_OBJECT, GRAW_OBJECT_SAMPLER_VIEW, 5));
+   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_CREATE_OBJECT, GRAW_OBJECT_SAMPLER_VIEW, 6));
    graw_encoder_write_dword(ctx->cbuf, handle);
    graw_encoder_write_res(ctx, res);
+   graw_encoder_write_dword(ctx->cbuf, state->format);
    if (res->base.target == PIPE_BUFFER) {
       graw_encoder_write_dword(ctx->cbuf, state->u.buf.first_element);
       graw_encoder_write_dword(ctx->cbuf, state->u.buf.last_element);

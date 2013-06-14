@@ -292,6 +292,18 @@ static void graw_decode_create_surface(struct grend_decode_ctx *ctx, uint32_t ha
    grend_create_surface(ctx->grctx, handle, res_handle, format, val0, val1);
 }
 
+static void graw_decode_create_sampler_view(struct grend_decode_ctx *ctx, uint32_t handle)
+{
+   uint32_t res_handle, format, val0, val1, swizzle_packed;
+
+   res_handle = ctx->ds->buf[ctx->ds->buf_offset + 2];
+   format = ctx->ds->buf[ctx->ds->buf_offset + 3];
+   val0 = ctx->ds->buf[ctx->ds->buf_offset + 4];
+   val1 = ctx->ds->buf[ctx->ds->buf_offset + 5];
+   swizzle_packed = ctx->ds->buf[ctx->ds->buf_offset + 6];
+   grend_create_sampler_view(ctx->grctx, handle, res_handle, format, val0, val1,swizzle_packed);
+}
+
 static void graw_decode_create_sampler_state(struct grend_decode_ctx *ctx, uint32_t handle, uint16_t length)
 {
    struct pipe_sampler_state *state = CALLOC_STRUCT(pipe_sampler_state);
@@ -370,6 +382,7 @@ static void graw_decode_create_object(struct grend_decode_ctx *ctx)
       graw_decode_create_surface(ctx, handle);
       break;
    case GRAW_OBJECT_SAMPLER_VIEW:
+      graw_decode_create_sampler_view(ctx, handle);
       break;
    case GRAW_OBJECT_SAMPLER_STATE:
       graw_decode_create_sampler_state(ctx, handle, length);

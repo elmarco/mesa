@@ -91,6 +91,14 @@ struct grend_sampler {
 };
 
 struct grend_sampler_view {
+   GLuint id;
+   GLuint res_handle;
+   GLuint format;
+   GLuint val0, val1;
+   GLuint swizzle_r:3;
+   GLuint swizzle_g:3;
+   GLuint swizzle_b:3;
+   GLuint swizzle_a:3;
    struct grend_resource *texture;
 };
 
@@ -330,6 +338,27 @@ void grend_create_surface(struct grend_context *ctx,
    surf->texture = graw_object_lookup(res_handle, GRAW_RESOURCE);
 
    graw_object_insert(surf, sizeof(*surf), handle, GRAW_SURFACE);
+}
+
+void grend_create_sampler_view(struct grend_context *ctx,
+                               uint32_t handle,
+                               uint32_t res_handle, uint32_t format,
+                               uint32_t val0, uint32_t val1, uint32_t swizzle_packed)
+{
+   struct grend_sampler_view *view;
+
+   view = CALLOC_STRUCT(grend_sampler_view);
+   view->res_handle = res_handle;
+   view->format = format;
+   view->val0 = val0;
+   view->val1 = val1;
+   view->swizzle_r = swizzle_packed & 0x7;
+   view->swizzle_g = (swizzle_packed >> 3) & 0x7;
+   view->swizzle_b = (swizzle_packed >> 6) & 0x7;
+   view->swizzle_a = (swizzle_packed >> 9) & 0x7;
+   view->texture = graw_object_lookup(res_handle, GRAW_RESOURCE);
+
+   graw_object_insert(view, sizeof(*view), handle, GRAW_OBJECT_SAMPLER_VIEW);
 }
 
 void grend_set_framebuffer_state(struct grend_context *ctx,

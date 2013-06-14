@@ -116,12 +116,11 @@ int graw_encode_sampler_view(struct graw_context *ctx,
                              struct graw_resource *res,
                              const struct pipe_sampler_view *state);
 
-int graw_encode_set_fragment_sampler_views(struct graw_context *ctx,
-                                           uint32_t num_res,
-                                           struct graw_resource **res);
-int graw_encode_set_vertex_sampler_views(struct graw_context *ctx,
-                                           uint32_t num_res,
-                                         struct graw_resource **res);
+int graw_encode_set_sampler_views(struct graw_context *ctx,
+                                  uint32_t shader_type,
+                                  uint32_t num_res,
+                                  struct graw_resource **res);
+
 int graw_encode_bind_fragment_sampler_states(struct graw_context *ctx,
                                              uint32_t num_handles,
                                              uint32_t *handles);

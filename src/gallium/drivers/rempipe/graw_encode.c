@@ -370,24 +370,14 @@ int graw_encode_sampler_view(struct graw_context *ctx,
    graw_encoder_write_dword(ctx->cbuf, state->swizzle_r | (state->swizzle_g << 3) | (state->swizzle_b << 6) | (state->swizzle_a << 9));
 }
 
-int graw_encode_set_fragment_sampler_views(struct graw_context *ctx,
-                                           uint32_t num_handles,
-                                           struct graw_resource **res)
+int graw_encode_set_sampler_views(struct graw_context *ctx,
+                                  uint32_t shader_type,
+                                  uint32_t num_handles,
+                                  struct graw_resource **res)
 {
    int i;
-   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_SET_FRAGMENT_SAMPLER_VIEWS, 0, num_handles));
-   for (i = 0; i < num_handles; i++)
-      graw_encoder_write_res(ctx, res[i]);
-   return 0;
-}
-
-
-int graw_encode_set_vertex_sampler_views(struct graw_context *ctx,
-                                           uint32_t num_handles,
-                                           struct graw_resource **res)
-{
-   int i;
-   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_SET_VERTEX_SAMPLER_VIEWS, 0, num_handles));
+   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_SET_SAMPLER_VIEWS, 0, num_handles + 1));
+   graw_encoder_write_dword(ctx->cbuf, shader_type);
    for (i = 0; i < num_handles; i++)
       graw_encoder_write_res(ctx, res[i]);
    return 0;

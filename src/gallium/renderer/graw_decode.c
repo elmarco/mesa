@@ -142,28 +142,18 @@ static void graw_decode_set_vertex_buffers(struct grend_decode_ctx *ctx, uint16_
    grend_set_num_vbo(ctx->grctx, num_vbo);
 }
 
-static void graw_decode_set_fragment_sampler_views(struct grend_decode_ctx *ctx, uint16_t length)
+static void graw_decode_set_sampler_views(struct grend_decode_ctx *ctx, uint16_t length)
 {
    int num_samps;
    int i;
-   num_samps = length;
+   uint32_t shader_type;
+   num_samps = length - 1;
+   shader_type = ctx->ds->buf[ctx->ds->buf_offset + 1];
    for (i = 0; i < num_samps; i++) {
-      uint32_t handle = ctx->ds->buf[ctx->ds->buf_offset + 1 + i];
-      grend_set_single_sampler_view(ctx->grctx, PIPE_SHADER_FRAGMENT, i, handle);
+      uint32_t handle = ctx->ds->buf[ctx->ds->buf_offset + 2 + i];
+      grend_set_single_sampler_view(ctx->grctx, shader_type, i, handle);
    }
-   grend_set_num_sampler_views(ctx->grctx, PIPE_SHADER_FRAGMENT, num_samps);
-}
-
-static void graw_decode_set_vertex_sampler_views(struct grend_decode_ctx *ctx, uint16_t length)
-{
-   int num_samps;
-   int i;
-   num_samps = length;
-   for (i = 0; i < num_samps; i++) {
-      uint32_t handle = ctx->ds->buf[ctx->ds->buf_offset + 1 + i];
-      grend_set_single_sampler_view(ctx->grctx, PIPE_SHADER_VERTEX, i, handle);
-   }
-   grend_set_num_sampler_views(ctx->grctx, PIPE_SHADER_VERTEX, num_samps);
+   grend_set_num_sampler_views(ctx->grctx, shader_type, num_samps);
 }
 
 static void graw_decode_resource_inline_write(struct grend_decode_ctx *ctx, uint16_t length)
@@ -583,17 +573,14 @@ static void graw_decode_block(uint32_t *block, int ndw)
       case GRAW_SET_VIEWPORT_STATE:
          graw_decode_set_viewport_state(gdctx);
          break;
-      case GRAW_SET_FRAGMENT_SAMPLER_VIEWS:
-         graw_decode_set_fragment_sampler_views(gdctx, header >> 16);
+      case GRAW_SET_SAMPLER_VIEWS:
+         graw_decode_set_sampler_views(gdctx, header >> 16);
          break;
       case GRAW_SET_INDEX_BUFFER:
          graw_decode_set_index_buffer(gdctx);
          break;
       case GRAW_SET_CONSTANT_BUFFER:
          graw_decode_set_constant_buffer(gdctx, header >> 16);
-         break;
-      case GRAW_SET_VERTEX_SAMPLER_VIEWS:
-         graw_decode_set_vertex_sampler_views(gdctx, header >> 16);
          break;
       case GRAW_SET_STENCIL_REF:
          graw_decode_set_stencil_ref(gdctx);

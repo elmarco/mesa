@@ -139,9 +139,8 @@ struct grend_context {
    struct pipe_index_buffer ib;
    uint32_t index_buffer_res_id;
 
-   struct grend_constants vs_consts;
-   struct grend_constants fs_consts;
-   bool vs_const_dirty, fs_const_dirty;
+   struct grend_constants consts[PIPE_SHADER_TYPES];
+   bool const_dirty[PIPE_SHADER_TYPES];
    struct pipe_sampler_state *sampler_state[PIPE_MAX_SAMPLERS];
    struct pipe_sampler_state cur_sampler_states[PIPE_MAX_SAMPLERS];
 
@@ -495,13 +494,10 @@ void grend_set_constants(struct grend_context *ctx,
 {
    struct grend_constants *consts;
    int i;
-   if (shader == 0) {
-      consts = &ctx->vs_consts;
-      ctx->vs_const_dirty = TRUE;
-   } else {
-      consts = &ctx->fs_consts;
-      ctx->fs_const_dirty = TRUE;
-   }
+
+   consts = &ctx->consts[shader];
+   ctx->const_dirty[shader] = TRUE;
+
    consts->num_consts = num_constant;
    for (i = 0; i < num_constant; i++)
       consts->consts[i] = data[i];
@@ -753,20 +749,20 @@ void grend_draw_vbo(struct grend_context *ctx,
 
    glBindVertexArray(ctx->vaoid);
 
-   if (ctx->prog->const_locs[PIPE_SHADER_VERTEX] && (ctx->vs_const_dirty || new_program)) {
-     for (i = 0; i < ctx->vs_consts.num_consts / 4; i++) {
+   if (ctx->prog->const_locs[PIPE_SHADER_VERTEX] && (ctx->const_dirty[PIPE_SHADER_VERTEX] || new_program)) {
+     for (i = 0; i < ctx->consts[PIPE_SHADER_VERTEX].num_consts / 4; i++) {
        if (ctx->prog->const_locs[PIPE_SHADER_VERTEX][i] != -1)
-	 glUniform4fv(ctx->prog->const_locs[PIPE_SHADER_VERTEX][i], 1, &ctx->vs_consts.consts[i * 4]);
+	 glUniform4fv(ctx->prog->const_locs[PIPE_SHADER_VERTEX][i], 1, &ctx->consts[PIPE_SHADER_VERTEX].consts[i * 4]);
      }
-     ctx->vs_const_dirty = FALSE;
+     ctx->const_dirty[PIPE_SHADER_VERTEX] = FALSE;
    }
 
-   if (ctx->prog->const_locs[PIPE_SHADER_FRAGMENT] && (ctx->fs_const_dirty || new_program)) {
-     for (i = 0; i < ctx->fs_consts.num_consts / 4; i++) {
+   if (ctx->prog->const_locs[PIPE_SHADER_FRAGMENT] && (ctx->const_dirty[PIPE_SHADER_VERTEX] || new_program)) {
+     for (i = 0; i < ctx->consts[PIPE_SHADER_FRAGMENT].num_consts / 4; i++) {
        if (ctx->prog->const_locs[PIPE_SHADER_FRAGMENT][i] != -1)
-	 glUniform4fv(ctx->prog->const_locs[PIPE_SHADER_FRAGMENT][i], 1, &ctx->fs_consts.consts[i * 4]);
+	 glUniform4fv(ctx->prog->const_locs[PIPE_SHADER_FRAGMENT][i], 1, &ctx->consts[PIPE_SHADER_FRAGMENT].consts[i * 4]);
      }
-     ctx->fs_const_dirty = FALSE;
+     ctx->const_dirty[PIPE_SHADER_FRAGMENT] = FALSE;
    }
 
    sampler_id = 0;

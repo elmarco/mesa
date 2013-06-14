@@ -120,7 +120,7 @@ struct grend_context {
    struct grend_vertex_element_array *ve;
    int num_vbos;
    struct pipe_vertex_buffer vbo[PIPE_MAX_ATTRIBS];
-
+   uint32_t vbo_res_ids[PIPE_MAX_ATTRIBS];
    struct grend_shader_state *vs;
    struct grend_shader_state *fs;
 
@@ -526,11 +526,13 @@ void grend_set_single_vbo(struct grend_context *ctx,
    ctx->vbo[index].stride = stride;
    ctx->vbo[index].buffer_offset = buffer_offset;
 
-   if (res_handle == 0)
+   if (res_handle == 0) {
       ctx->vbo[index].buffer = NULL;
-   else {
+      ctx->vbo_res_ids[index] = 0;
+   } else if (ctx->vbo_res_ids[index] != res_handle) {
       res = graw_object_lookup(res_handle, GRAW_RESOURCE);
       ctx->vbo[index].buffer = &res->base;
+      ctx->vbo_res_ids[index] = res_handle;
    }
 }
 

@@ -721,10 +721,8 @@ void grend_clear(struct grend_context *ctx,
 void grend_draw_vbo(struct grend_context *ctx,
                     const struct pipe_draw_info *info)
 {
-   GLuint vaoid;
    int i;
    int sampler_id;
-   GLuint prog_id;
    bool new_program = FALSE;
   
    if (ctx->stencil_state_dirty)
@@ -776,7 +774,7 @@ void grend_draw_vbo(struct grend_context *ctx,
    for (i = 0; i < ctx->num_vs_views; i++) {
      if (ctx->prog->vs_samp_locs)
          glUniform1i(ctx->prog->vs_samp_locs[i], sampler_id);
-      glUniform1i(ctx->prog->vs_samp_locs[i], sampler_id);
+   
       glActiveTexture(GL_TEXTURE0 + sampler_id);
       glBindTexture(ctx->vs_views[i].texture->target, ctx->vs_views[i].texture->id);
       glEnable(ctx->vs_views[i].texture->target);

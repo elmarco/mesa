@@ -166,6 +166,8 @@ struct grend_context {
    GLint view_cur_x, view_cur_y;
    GLsizei view_width, view_height;
    GLclampd view_near_val, view_far_val;
+
+   GLenum old_targets[PIPE_MAX_SAMPLERS];
 };
 
 static struct grend_resource *frontbuffer;
@@ -588,7 +590,9 @@ void grend_set_single_sampler_view(struct grend_context *ctx,
 {
    struct grend_sampler_view *view = NULL;
 
-   view = graw_object_lookup(handle, GRAW_OBJECT_SAMPLER_VIEW);
+   if (handle)
+      view = graw_object_lookup(handle, GRAW_OBJECT_SAMPLER_VIEW);
+
    ctx->views[shader_type].views[index] = view;
 }
 
@@ -768,13 +772,13 @@ void grend_draw_vbo(struct grend_context *ctx,
          struct grend_resource *texture = NULL;
 
          if (ctx->views[shader_type].views[i]) {
-            fprintf(stderr,"got illegal number of views %d %d\n", shader_type, ctx->views[shader_type].num_views);
             texture = ctx->views[shader_type].views[i]->texture;
          }
          if (ctx->prog->samp_locs[shader_type])
             glUniform1i(ctx->prog->samp_locs[shader_type][i], sampler_id);
+         glActiveTexture(GL_TEXTURE0 + sampler_id);
          if (texture) {
-            glActiveTexture(GL_TEXTURE0 + sampler_id);
+            ctx->old_targets[sampler_id] = texture->target;
             glBindTexture(texture->target, texture->id);
             glEnable(texture->target);
             if (ctx->views[shader_type].old_ids[i] != texture->id) {
@@ -787,6 +791,9 @@ void grend_draw_vbo(struct grend_context *ctx,
                else
                   glTexEnvi(GL_POINT_SPRITE_ARB, GL_COORD_REPLACE_ARB, GL_FALSE);
             }
+         } else {
+            if (ctx->old_targets[sampler_id])
+               glDisable(ctx->old_targets[sampler_id]);
          }
          sampler_id++;
       }

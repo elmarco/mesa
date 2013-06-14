@@ -719,7 +719,7 @@ void grend_draw_vbo(struct grend_context *ctx,
    int i;
    int sampler_id;
    bool new_program = FALSE;
-  
+   uint32_t shader_type;
    if (ctx->stencil_state_dirty)
       grend_update_stencil_state(ctx);
 
@@ -749,54 +749,39 @@ void grend_draw_vbo(struct grend_context *ctx,
 
    glBindVertexArray(ctx->vaoid);
 
-   if (ctx->prog->const_locs[PIPE_SHADER_VERTEX] && (ctx->const_dirty[PIPE_SHADER_VERTEX] || new_program)) {
-     for (i = 0; i < ctx->consts[PIPE_SHADER_VERTEX].num_consts / 4; i++) {
-       if (ctx->prog->const_locs[PIPE_SHADER_VERTEX][i] != -1)
-	 glUniform4fv(ctx->prog->const_locs[PIPE_SHADER_VERTEX][i], 1, &ctx->consts[PIPE_SHADER_VERTEX].consts[i * 4]);
-     }
-     ctx->const_dirty[PIPE_SHADER_VERTEX] = FALSE;
-   }
-
-   if (ctx->prog->const_locs[PIPE_SHADER_FRAGMENT] && (ctx->const_dirty[PIPE_SHADER_VERTEX] || new_program)) {
-     for (i = 0; i < ctx->consts[PIPE_SHADER_FRAGMENT].num_consts / 4; i++) {
-       if (ctx->prog->const_locs[PIPE_SHADER_FRAGMENT][i] != -1)
-	 glUniform4fv(ctx->prog->const_locs[PIPE_SHADER_FRAGMENT][i], 1, &ctx->consts[PIPE_SHADER_FRAGMENT].consts[i * 4]);
-     }
-     ctx->const_dirty[PIPE_SHADER_FRAGMENT] = FALSE;
+   for (shader_type = PIPE_SHADER_VERTEX; shader_type <= PIPE_SHADER_FRAGMENT; shader_type++) {
+      if (ctx->prog->const_locs[shader_type] && (ctx->const_dirty[shader_type] || new_program)) {
+         for (i = 0; i < ctx->consts[shader_type].num_consts / 4; i++) {
+            if (ctx->prog->const_locs[shader_type][i] != -1)
+               glUniform4fv(ctx->prog->const_locs[shader_type][i], 1, &ctx->consts[shader_type].consts[i * 4]);
+         }
+         ctx->const_dirty[shader_type] = FALSE;
+      }
    }
 
    sampler_id = 0;
-   for (i = 0; i < ctx->views[PIPE_SHADER_VERTEX].num_views; i++) {
-     if (ctx->prog->samp_locs[PIPE_SHADER_VERTEX])
-         glUniform1i(ctx->prog->samp_locs[PIPE_SHADER_VERTEX][i], sampler_id);
-   
-      glActiveTexture(GL_TEXTURE0 + sampler_id);
-      glBindTexture(ctx->views[PIPE_SHADER_VERTEX].views[i].texture->target, ctx->views[PIPE_SHADER_VERTEX].views[i].texture->id);
-      glEnable(ctx->views[PIPE_SHADER_VERTEX].views[i].texture->target);
-      grend_apply_sampler_state(ctx, sampler_id, ctx->views[PIPE_SHADER_VERTEX].views[i].texture->target);
-      sampler_id++;
-   } 
-
-   for (i = 0; i < ctx->views[PIPE_SHADER_FRAGMENT].num_views; i++) {
-      struct grend_resource *texture = ctx->views[PIPE_SHADER_FRAGMENT].views[i].texture;
-      if (ctx->prog->samp_locs[PIPE_SHADER_FRAGMENT])
-         glUniform1i(ctx->prog->samp_locs[PIPE_SHADER_FRAGMENT][i], sampler_id);
-      if (texture) {
-         glActiveTexture(GL_TEXTURE0 + sampler_id);
-         glBindTexture(texture->target, texture->id);
-         glEnable(texture->target);
-         if (ctx->views[PIPE_SHADER_FRAGMENT].old_ids[i] != texture->id) {
-            grend_apply_sampler_state(ctx, sampler_id, texture->target);
-            ctx->views[PIPE_SHADER_FRAGMENT].old_ids[i] = texture->id;
+   for (shader_type = PIPE_SHADER_VERTEX; shader_type <= PIPE_SHADER_FRAGMENT; shader_type++) {
+      for (i = 0; i < ctx->views[shader_type].num_views; i++) {
+         struct grend_resource *texture = ctx->views[shader_type].views[i].texture;
+         if (ctx->prog->samp_locs[shader_type])
+            glUniform1i(ctx->prog->samp_locs[shader_type][i], sampler_id);
+         if (texture) {
+            glActiveTexture(GL_TEXTURE0 + sampler_id);
+            glBindTexture(texture->target, texture->id);
+            glEnable(texture->target);
+            if (ctx->views[shader_type].old_ids[i] != texture->id) {
+               grend_apply_sampler_state(ctx, sampler_id, texture->target);
+               ctx->views[shader_type].old_ids[i] = texture->id;
+            }
+            if (ctx->rs_state->point_quad_rasterization) {
+               if (ctx->rs_state->sprite_coord_enable & (1 << i))
+                  glTexEnvi(GL_POINT_SPRITE_ARB, GL_COORD_REPLACE_ARB, GL_TRUE);
+               else
+                  glTexEnvi(GL_POINT_SPRITE_ARB, GL_COORD_REPLACE_ARB, GL_FALSE);
+            }
          }
-         if (ctx->rs_state->point_quad_rasterization) {
-            if (ctx->rs_state->sprite_coord_enable & (1 << i))
-               glTexEnvi(GL_POINT_SPRITE_ARB, GL_COORD_REPLACE_ARB, GL_TRUE);
-            else
-               glTexEnvi(GL_POINT_SPRITE_ARB, GL_COORD_REPLACE_ARB, GL_FALSE);
-         }
+         sampler_id++;
       }
-      sampler_id++;
    } 
 
    for (i = 0; i < ctx->ve->count; i++) {

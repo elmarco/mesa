@@ -139,6 +139,7 @@ struct grend_context {
    struct pipe_rasterizer_state *rs_state;
 
    struct pipe_index_buffer ib;
+   uint32_t index_buffer_res_id;
 
    struct grend_constants vs_consts;
    struct grend_constants fs_consts;
@@ -516,8 +517,16 @@ void grend_set_index_buffer(struct grend_context *ctx,
 
    ctx->ib.index_size = index_size;
    ctx->ib.offset = offset;
-   res = graw_object_lookup(res_handle, GRAW_RESOURCE);
-   ctx->ib.buffer = &res->base;
+   if (res_handle) {
+      if (ctx->index_buffer_res_id != res_handle) {
+         res = graw_object_lookup(res_handle, GRAW_RESOURCE);
+         ctx->ib.buffer = &res->base;
+         ctx->index_buffer_res_id = res_handle;
+      }
+   } else {
+      ctx->ib.buffer = NULL;
+      ctx->index_buffer_res_id = 0;
+   }
 }
 
 void grend_set_single_vbo(struct grend_context *ctx,

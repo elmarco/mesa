@@ -99,6 +99,7 @@ struct grend_sampler_view {
    GLuint swizzle_g:3;
    GLuint swizzle_b:3;
    GLuint swizzle_a:3;
+   GLuint cur_base, cur_max;
    struct grend_resource *texture;
 };
 
@@ -358,6 +359,9 @@ void grend_create_sampler_view(struct grend_context *ctx,
    view->swizzle_g = (swizzle_packed >> 3) & 0x7;
    view->swizzle_b = (swizzle_packed >> 6) & 0x7;
    view->swizzle_a = (swizzle_packed >> 9) & 0x7;
+   view->cur_base = 0;
+   view->cur_max = 1000;
+
    view->texture = graw_object_lookup(res_handle, GRAW_RESOURCE);
 
    graw_object_insert(view, sizeof(*view), handle, GRAW_OBJECT_SAMPLER_VIEW);
@@ -590,8 +594,21 @@ void grend_set_single_sampler_view(struct grend_context *ctx,
 {
    struct grend_sampler_view *view = NULL;
 
-   if (handle)
+   if (handle) {
       view = graw_object_lookup(handle, GRAW_OBJECT_SAMPLER_VIEW);
+      
+      glBindTexture(view->texture->target, view->texture->id);
+      if (view->texture->target != PIPE_BUFFER) {
+         if (view->cur_base != (view->val1 & 0xff)) {
+            glTexParameteri(view->texture->target, GL_TEXTURE_BASE_LEVEL, (view->val1) & 0xff);
+            view->cur_base = view->val1 & 0xff;
+         }
+         if (view->cur_max != ((view->val1 >> 8) & 0xff)) {
+            glTexParameteri(view->texture->target, GL_TEXTURE_MAX_LEVEL, (view->val1 >> 8) & 0xff);
+            view->cur_max = (view->val1 >> 8) & 0xff;
+         }
+      }
+   }
 
    ctx->views[shader_type].views[index] = view;
 }

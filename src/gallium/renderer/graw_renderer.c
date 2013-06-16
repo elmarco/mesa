@@ -1377,7 +1377,6 @@ void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target tar
       gltype = tex_conv_table[format].gltype;
       if (internalformat == 0) {
          fprintf(stderr,"unknown format is %d\n", format);
-         assert(0);
          internalformat = GL_RGBA;
          glformat = GL_RGBA;
          gltype = GL_UNSIGNED_BYTE;

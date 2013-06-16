@@ -364,6 +364,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_MUL:
+   case TGSI_OPCODE_UMUL:
       snprintf(buf, 255, "%s = %s(%s * %s);\n", dsts[0], dstconv, srcs[0], srcs[1]);
       strcat(ctx->glsl_main, buf);
       break;
@@ -390,12 +391,25 @@ iter_instruction(struct tgsi_iterate_context *iter,
 
       strcat(ctx->glsl_main, buf);
       break;
+   case TGSI_OPCODE_TXB:
+      ctx->samplers[sreg_index].tgsi_sampler_type = inst->Texture.Texture;
+      snprintf(buf, 255, "%s = texture(%s, %s.xyz, %s.z)%s;\n", dsts[0], srcs[1], srcs[0], srcs[0], writemask);
+      strcat(ctx->glsl_main, buf);
+      break;
    case TGSI_OPCODE_F2I:
       snprintf(buf, 255, "%s = int(%s);\n", dsts[0], srcs[0]);      
       strcat(ctx->glsl_main, buf);
       break;
+   case TGSI_OPCODE_USEQ:
+      snprintf(buf, 255, "%s = %s(equal(%s, %s));\n", dsts[0], dstconv, srcs[0], srcs[1]);      
+      strcat(ctx->glsl_main, buf);
+      break;
    case TGSI_OPCODE_SLT:
       snprintf(buf, 255, "%s = %s(lessThan(%s, %s));\n", dsts[0], dstconv, srcs[0], srcs[1]);      
+      strcat(ctx->glsl_main, buf);
+      break;
+   case TGSI_OPCODE_SNE:
+      snprintf(buf, 255, "%s = %s(notEqual(%s, %s));\n", dsts[0], dstconv, srcs[0], srcs[1]);      
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_SGE:
@@ -406,12 +420,14 @@ iter_instruction(struct tgsi_iterate_context *iter,
       snprintf(buf, 255, "%s = %s(pow(%s, %s));\n", dsts[0], dstconv, srcs[0], srcs[1]);
       strcat(ctx->glsl_main, buf);
       break;
+   case TGSI_OPCODE_CMP:
+      snprintf(buf, 255, "%s = %s >= 0 ? %s : %s\n", dsts[0], srcs[0], srcs[1], srcs[2]);
+      break;
    case TGSI_OPCODE_END:
       strcat(ctx->glsl_main, "}\n");
       break;
    default:
-      assert(0);
-      return FALSE;
+      fprintf(stderr,"failed to convert opcode %d\n", inst->Instruction.Opcode);
       break;
    }
    return TRUE;

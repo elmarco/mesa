@@ -1044,13 +1044,21 @@ void grend_object_bind_blend(struct grend_context *ctx,
       exit(-1);
    } else {
       if (state->rt[0].blend_enable) {
-         glBlendFunc(translate_blend_factor(state->rt[0].rgb_src_factor),
-                     translate_blend_factor(state->rt[0].rgb_dst_factor));
-         glBlendEquation(translate_blend_func(state->rt[0].rgb_func));
+         glBlendFuncSeparate(translate_blend_factor(state->rt[0].rgb_src_factor),
+                             translate_blend_factor(state->rt[0].rgb_dst_factor),
+                             translate_blend_factor(state->rt[0].alpha_src_factor),
+                             translate_blend_factor(state->rt[0].alpha_dst_factor));
+         glBlendEquationSeparate(translate_blend_func(state->rt[0].rgb_func),
+                                 translate_blend_func(state->rt[0].alpha_func));
          glEnable(GL_BLEND);
       } 
       else
          glDisable(GL_BLEND);
+
+      glColorMask(state->rt[0].colormask & PIPE_MASK_R ? GL_TRUE : GL_FALSE,
+                  state->rt[0].colormask & PIPE_MASK_G ? GL_TRUE : GL_FALSE,
+                  state->rt[0].colormask & PIPE_MASK_B ? GL_TRUE : GL_FALSE,
+                  state->rt[0].colormask & PIPE_MASK_A ? GL_TRUE : GL_FALSE);
    }
 }
 

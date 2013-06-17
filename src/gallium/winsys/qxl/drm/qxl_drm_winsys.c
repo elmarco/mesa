@@ -337,9 +337,10 @@ static void qxl_drm_resource_reference(struct qxl_drm_winsys *qdws,
    struct qxl_hw_res *old = *dres;
    struct drm_virgl_3d_resource_unref unrefcmd;
    if (pipe_reference(&(*dres)->reference, &sres->reference)) {
-      unrefcmd.res_handle = old->res_handle;
-      drmIoctl(qdws->fd, DRM_IOCTL_VIRGL_RESOURCE_UNREF, &unrefcmd);
-      
+      if (old->do_del) {
+         unrefcmd.res_handle = old->res_handle;
+         drmIoctl(qdws->fd, DRM_IOCTL_VIRGL_RESOURCE_UNREF, &unrefcmd);
+      }
       FREE(old);
    }
    *dres = sres;
@@ -381,7 +382,8 @@ static struct qxl_hw_res *qxl_drm_winsys_resource_create(struct qxl_winsys *qws,
       FREE(res);
       return NULL;
    }
-
+   
+   res->do_del = 1;
    res->res_handle = createcmd.res_handle;
    pipe_reference_init(&res->reference, 1);
    res->num_cs_references = 0;
@@ -398,6 +400,7 @@ static struct qxl_hw_res *qxl_drm_winsys_resource_create_handle(struct qxl_winsy
    if (!res)
       return NULL;
 
+   res->do_del = 0;
    res->res_handle = whandle->handle;
    pipe_reference_init(&res->reference, 1);
    res->num_cs_references = 0;

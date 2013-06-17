@@ -28,10 +28,6 @@ struct graw_buffer {
 
 struct graw_texture {
    struct graw_resource base;
-
-   struct sw_displaytarget *dt; 
-   uint32_t stride;
-
 };
 
 

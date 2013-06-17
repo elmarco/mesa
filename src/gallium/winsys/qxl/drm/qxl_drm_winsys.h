@@ -24,6 +24,7 @@ struct qxl_hw_res {
    struct pipe_reference reference;
    uint32_t res_handle;
    int num_cs_references;
+   uint32_t do_del;
 };
   
 struct qxl_drm_winsys

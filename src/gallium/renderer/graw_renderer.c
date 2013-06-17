@@ -172,6 +172,7 @@ struct grend_context {
 
    struct pipe_scissor_state ss;
    boolean scissor_state_dirty;
+   boolean viewport_state_dirty;
    uint32_t fb_height;
 
 };
@@ -426,6 +427,7 @@ void grend_set_framebuffer_state(struct grend_context *ctx,
       if (i == 0 && tex->base.height0 != ctx->fb_height) {
          ctx->fb_height = tex->base.height0;
          ctx->scissor_state_dirty = TRUE;
+         ctx->viewport_state_dirty = TRUE;
       }
 
    }
@@ -445,15 +447,15 @@ void grend_set_viewport_state(struct grend_context *ctx,
    height = abs(state->scale[1]) * 2.0f;
    x = state->translate[0] - state->scale[0];
    y = state->translate[1] - abs(state->scale[1]);
-   near_val = state->translate[2] - state->scale[2];
 
+   near_val = state->translate[2] - state->scale[2];
    far_val = near_val + (state->scale[2] * 2.0f);
 
    if (ctx->view_cur_x != x ||
        ctx->view_cur_y != y ||
        ctx->view_width != width ||
        ctx->view_height != height) {
-      glViewport(x, y, width, height);
+      ctx->viewport_state_dirty = TRUE;
       ctx->view_cur_x = x;
       ctx->view_cur_y = y;
       ctx->view_width = width;
@@ -760,6 +762,13 @@ static void grend_update_scissor_state(struct grend_context *ctx)
    struct pipe_scissor_state *ss = &ctx->ss;
    
    glScissor(ss->minx, ctx->fb_height - ss->maxy, ss->maxx - ss->minx, ss->maxy - ss->miny);
+   ctx->scissor_state_dirty = FALSE;
+}
+
+static void grend_update_viewport_state(struct grend_context *ctx)
+{
+   glViewport(ctx->view_cur_x, ctx->fb_height - ctx->view_height - ctx->view_cur_y, ctx->view_width, ctx->view_height);
+   ctx->viewport_state_dirty = FALSE;
 }
 
 void grend_draw_vbo(struct grend_context *ctx,
@@ -773,6 +782,9 @@ void grend_draw_vbo(struct grend_context *ctx,
       grend_update_stencil_state(ctx);
    if (ctx->scissor_state_dirty)
       grend_update_scissor_state(ctx);
+
+   if (ctx->viewport_state_dirty)
+      grend_update_viewport_state(ctx);
 
    if (ctx->shader_dirty) {
      struct grend_linked_shader_program *prog;

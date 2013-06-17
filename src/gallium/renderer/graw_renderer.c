@@ -724,7 +724,9 @@ void grend_clear(struct grend_context *ctx,
    glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, ctx->fb_id);
    glUseProgram(0);
    ctx->need_prog_rebind = TRUE;
-   glClearColor(color->f[0], color->f[1], color->f[2], color->f[3]);
+
+   if (buffers & PIPE_CLEAR_COLOR)
+      glClearColor(color->f[0], color->f[1], color->f[2], color->f[3]);
 
    if (buffers & PIPE_CLEAR_DEPTH)
       glClearDepth(depth);
@@ -1038,6 +1040,10 @@ void grend_object_bind_dsa(struct grend_context *ctx,
    if (state->depth.enabled) {
       glEnable(GL_DEPTH_TEST);
       glDepthFunc(GL_NEVER + state->depth.func);
+      if (state->depth.writemask)
+         glDepthMask(GL_TRUE);
+      else
+         glDepthMask(GL_FALSE);
    } else
       glDisable(GL_DEPTH_TEST);
  

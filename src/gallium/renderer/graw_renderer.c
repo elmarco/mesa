@@ -1432,12 +1432,12 @@ void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target tar
       gr->target = GL_ELEMENT_ARRAY_BUFFER_ARB;
       glGenBuffersARB(1, &gr->id);
       glBindBufferARB(gr->target, gr->id);
-      glBufferData(gr->target, width, NULL, GL_STATIC_DRAW);
+      glBufferData(gr->target, width, NULL, GL_STREAM_DRAW);
    } else if (target == PIPE_BUFFER) {
       gr->target = GL_ARRAY_BUFFER_ARB;
       glGenBuffersARB(1, &gr->id);
       glBindBufferARB(gr->target, gr->id);
-      glBufferData(gr->target, width, NULL, GL_STATIC_DRAW);
+      glBufferData(gr->target, width, NULL, GL_STREAM_DRAW);
    } else {
       struct grend_texture *gt = (struct grend_texture *)gr;
       GLenum internalformat, glformat, gltype;

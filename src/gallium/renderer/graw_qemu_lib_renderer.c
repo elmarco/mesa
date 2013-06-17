@@ -131,23 +131,20 @@ void graw_transfer_write_tex_return(struct pipe_resource *res,
                                     uint64_t offset,
                                     struct graw_iovec *iov,
                                     int num_iovs,
-				    void *myptr, int size)
+				    void *myptr, int size, int invert)
 {
-#if 0
-   int h;
-   int elsize = util_format_get_blocksize(res->format);
-   void *dptr = myptr;
-   int w = u_minify(res->width0, level);
-   int resh = u_minify(res->height0, level);
 
-   graw_iob_
-   for (h = resh - box->y - 1; h >= resh - box->y - box->height; h--) {
-      void *sptr = data + (h * elsize * w) + box->x * elsize;
-      memcpy(dptr, sptr, box->width * elsize);
-      dptr += box->width * elsize;
-   }
-#endif
-   graw_iov_from_buf(iov, num_iovs, offset, myptr, size);
+   if (invert) {
+      int h;
+      int elsize = util_format_get_blocksize(res->format);
+      uint32_t myoffset = offset;
+      for (h = box->height - 1; h >= 0; h--) {
+         void *sptr = myptr + (h * elsize * box->width);
+         graw_iov_from_buf(iov, num_iovs, myoffset, sptr, box->width * elsize);
+         myoffset += box->width * elsize;
+      }
+   } else
+      graw_iov_from_buf(iov, num_iovs, offset, myptr, size);
 }
 
 void graw_write_fence(unsigned fence_id)

@@ -137,7 +137,7 @@ void graw_transfer_write_tex_return(struct pipe_resource *res,
                                     uint64_t offset,
                                     struct graw_iovec *iov,
                                     int num_iovs,
-				    void *myptr, int size);
+				    void *myptr, int size, int invert);
 
 int graw_renderer_set_scanout(uint32_t res_handle,
                               struct pipe_box *box);

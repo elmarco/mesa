@@ -27,7 +27,7 @@
 
 extern int graw_shader_use_explicit;
 int localrender;
-
+static int have_invert_mesa = 0;
 struct grend_screen;
 
 struct grend_fence {
@@ -861,6 +861,10 @@ void grend_draw_vbo(struct grend_context *ctx,
       struct grend_buffer *buf;
       GLint loc;
 
+      if (i >= ctx->prog->vs->num_inputs) {
+         /* XYZZY: debug this? */
+         continue;
+      }
       buf = (struct grend_buffer *)ctx->vbo[vbo_index].buffer;
       glBindBuffer(GL_ARRAY_BUFFER, buf->base.id);
 
@@ -1631,8 +1635,6 @@ void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t level, struct
    void *myptr = iov[0].iov_base + offset;
    int need_temp = 0;
 
-   if (num_iovs > 1)
-      need_temp = 1;
    res = graw_object_lookup(res_handle, GRAW_RESOURCE);
 
    if (res->target == GL_ELEMENT_ARRAY_BUFFER_ARB) {
@@ -1656,6 +1658,10 @@ void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t level, struct
       GLint  y1;
       uint32_t send_size = 0;
       void *data;
+
+      if (num_iovs > 1 || (!res->is_front && !have_invert_mesa))
+         need_temp = 1;
+
       if (need_temp) {
          send_size = box->width * box->height * box->depth * util_format_get_blocksize(res->base.format);      
          data = malloc(send_size);
@@ -1680,15 +1686,15 @@ void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t level, struct
          } else {
             glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, res->readback_fb_id);
          }
-         glPixelStorei(GL_PACK_INVERT_MESA, 1);
-      
+         if (have_invert_mesa)
+            glPixelStorei(GL_PACK_INVERT_MESA, 1);
+         glReadBuffer(GL_COLOR_ATTACHMENT0_EXT);      
       } else {
          glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
          y1 = box->y;
+         glReadBuffer(GL_BACK);
       }
             
-      glReadBuffer(GL_COLOR_ATTACHMENT0_EXT);
-
       switch (res->base.format) {
       case PIPE_FORMAT_B8G8R8A8_UNORM:
       default:
@@ -1699,9 +1705,10 @@ void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t level, struct
 
       glReadPixels(box->x, y1, box->width, box->height, format, type, data);
 
-      glPixelStorei(GL_PACK_INVERT_MESA, 0);
+      if (have_invert_mesa)
+         glPixelStorei(GL_PACK_INVERT_MESA, 0);
       if (need_temp) {
-         graw_transfer_write_tex_return(&res->base, box, level, offset, iov, num_iovs, data, send_size);
+         graw_transfer_write_tex_return(&res->base, box, level, offset, iov, num_iovs, data, send_size, have_invert_mesa ? 0 : 1);
          free(data);
       }
    }

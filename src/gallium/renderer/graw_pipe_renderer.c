@@ -189,7 +189,7 @@ void graw_transfer_write_tex_return(struct pipe_resource *res,
                                        uint32_t level,
                                        uint64_t offset,
                                        struct graw_iovec *iov,
-                                       int num_iovs, void *myptr, int size)
+                                    int num_iovs, void *myptr, int size, int invert)
 {
   fprintf(stderr,"TODO\n");
 }

@@ -1757,8 +1757,6 @@ void graw_renderer_resource_copy_region(struct grend_context *ctx,
    glBindFramebuffer(GL_FRAMEBUFFER_EXT, fb_ids[0]);
    glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
                              src_res->target, src_res->id, src_level);
-
-   glBindFramebuffer(GL_READ_FRAMEBUFFER, fb_ids[0]);
       
    if (!dst_res->is_front) {
       glBindFramebuffer(GL_FRAMEBUFFER_EXT, fb_ids[1]);
@@ -1768,12 +1766,14 @@ void graw_renderer_resource_copy_region(struct grend_context *ctx,
    } else
       glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 
+   glBindFramebuffer(GL_READ_FRAMEBUFFER, fb_ids[0]);
+
    glmask = GL_COLOR_BUFFER_BIT;
 
-   sy1 = src_box->y;
-   sy2 = sy1 + src_box->height;
-   dy1 = dsty;
-   dy2 = dy1 + src_box->height;
+   sy1 = src_res->base.height0 - (src_box->y + src_box->height);
+   sy2 = src_res->base.height0 - src_box->y;
+   dy1 = dst_res->base.height0 - (dsty + src_box->height);
+   dy2 = dst_res->base.height0 - src_box->y;
 
    glBlitFramebuffer(src_box->x, sy1,
                      src_box->x + src_box->width,

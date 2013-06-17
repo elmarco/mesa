@@ -169,6 +169,11 @@ struct grend_context {
    GLclampd view_near_val, view_far_val;
 
    GLenum old_targets[PIPE_MAX_SAMPLERS];
+
+   struct pipe_scissor_state ss;
+   boolean scissor_state_dirty;
+   uint32_t fb_height;
+
 };
 
 static struct grend_resource *frontbuffer;
@@ -417,6 +422,12 @@ void grend_set_framebuffer_state(struct grend_context *ctx,
       } else
          glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, buffers[i],
                                    tex->target, tex->id, surf->val0);
+
+      if (i == 0 && tex->base.height0 != ctx->fb_height) {
+         ctx->fb_height = tex->base.height0;
+         ctx->scissor_state_dirty = TRUE;
+      }
+
    }
 
    glDrawBuffers(nr_cbufs, buffers);
@@ -744,6 +755,13 @@ void grend_clear(struct grend_context *ctx,
 
 }
 
+static void grend_update_scissor_state(struct grend_context *ctx)
+{
+   struct pipe_scissor_state *ss = &ctx->ss;
+   
+   glScissor(ss->minx, ctx->fb_height - ss->maxy, ss->maxx - ss->minx, ss->maxy - ss->miny);
+}
+
 void grend_draw_vbo(struct grend_context *ctx,
                     const struct pipe_draw_info *info)
 {
@@ -753,6 +771,8 @@ void grend_draw_vbo(struct grend_context *ctx,
    uint32_t shader_type;
    if (ctx->stencil_state_dirty)
       grend_update_stencil_state(ctx);
+   if (ctx->scissor_state_dirty)
+      grend_update_scissor_state(ctx);
 
    if (ctx->shader_dirty) {
      struct grend_linked_shader_program *prog;
@@ -1676,7 +1696,8 @@ void grend_set_blend_color(struct grend_context *ctx,
 void grend_set_scissor_state(struct grend_context *ctx,
                              struct pipe_scissor_state *ss)
 {
-   glScissor(ss->minx, ss->miny, ss->maxx - ss->minx, ss->maxy - ss->miny);
+   ctx->ss = *ss;
+   ctx->scissor_state_dirty = TRUE;
 }
 
 void graw_renderer_resource_copy_region(struct grend_context *ctx,

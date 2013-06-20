@@ -77,6 +77,7 @@ struct grend_buffer {
 struct grend_texture {
    struct grend_resource base;
    struct pipe_sampler_state state;
+   GLenum cur_swizzle_a;
 };
 
 struct grend_surface {
@@ -100,6 +101,7 @@ struct grend_sampler_view {
    GLuint swizzle_g:3;
    GLuint swizzle_b:3;
    GLuint swizzle_a:3;
+   GLuint gl_swizzle_a;
    GLuint cur_base, cur_max;
    struct grend_resource *texture;
 };
@@ -373,6 +375,11 @@ void grend_create_sampler_view(struct grend_context *ctx,
 
    view->texture = graw_object_lookup(res_handle, GRAW_RESOURCE);
 
+   if (view->format != view->texture->base.format) {
+      /* hack to make tfp work for now */
+      view->gl_swizzle_a = GL_ONE;
+   } else
+      view->gl_swizzle_a = GL_ALPHA;
    graw_object_insert(view, sizeof(*view), handle, GRAW_OBJECT_SAMPLER_VIEW);
 }
 
@@ -609,12 +616,13 @@ void grend_set_single_sampler_view(struct grend_context *ctx,
                                    uint32_t handle)
 {
    struct grend_sampler_view *view = NULL;
-
+   struct grend_texture *tex;
    if (handle) {
       view = graw_object_lookup(handle, GRAW_OBJECT_SAMPLER_VIEW);
       
       glBindTexture(view->texture->target, view->texture->id);
       if (view->texture->target != PIPE_BUFFER) {
+         tex = (struct grend_texture *)view->texture;
          if (view->cur_base != (view->val1 & 0xff)) {
             glTexParameteri(view->texture->target, GL_TEXTURE_BASE_LEVEL, (view->val1) & 0xff);
             view->cur_base = view->val1 & 0xff;
@@ -622,6 +630,10 @@ void grend_set_single_sampler_view(struct grend_context *ctx,
          if (view->cur_max != ((view->val1 >> 8) & 0xff)) {
             glTexParameteri(view->texture->target, GL_TEXTURE_MAX_LEVEL, (view->val1 >> 8) & 0xff);
             view->cur_max = (view->val1 >> 8) & 0xff;
+         }
+         if (tex->cur_swizzle_a != view->gl_swizzle_a) {
+            glTexParameteri(view->texture->target, GL_TEXTURE_SWIZZLE_A, view->gl_swizzle_a);
+            tex->cur_swizzle_a = view->gl_swizzle_a;
          }
       }
    }

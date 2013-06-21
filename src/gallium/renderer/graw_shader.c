@@ -343,8 +343,32 @@ iter_instruction(struct tgsi_iterate_context *iter,
       snprintf(buf, 255, "%s = %s(exp2(%s));\n", dsts[0], dstconv, srcs[0]);
       strcat(ctx->glsl_main, buf);
       break;
+   case TGSI_OPCODE_LG2:
+      snprintf(buf, 255, "%s = %s(log2(%s));\n", dsts[0], dstconv, srcs[0]);
+      strcat(ctx->glsl_main, buf);
+      break;
+   case TGSI_OPCODE_COS:
+      snprintf(buf, 255, "%s = %s(cos(%s));\n", dsts[0], dstconv, srcs[0]);
+      strcat(ctx->glsl_main, buf);
+      break;
    case TGSI_OPCODE_RCP:
       snprintf(buf, 255, "%s = %s(1.0/(%s));\n", dsts[0], dstconv, srcs[0]);
+      strcat(ctx->glsl_main, buf);
+      break;
+   case TGSI_OPCODE_FLR:
+      snprintf(buf, 255, "%s = %s(floor(%s));\n", dsts[0], dstconv, srcs[0]);
+      strcat(ctx->glsl_main, buf);
+      break;
+   case TGSI_OPCODE_CEIL:
+      snprintf(buf, 255, "%s = %s(ceil(%s));\n", dsts[0], dstconv, srcs[0]);
+      strcat(ctx->glsl_main, buf);
+      break;
+   case TGSI_OPCODE_TRUNC:
+      snprintf(buf, 255, "%s = %s(trunc(%s));\n", dsts[0], dstconv, srcs[0]);
+      strcat(ctx->glsl_main, buf);
+      break;
+   case TGSI_OPCODE_SSG:
+      snprintf(buf, 255, "%s = %s(sign(%s));\n", dsts[0], dstconv, srcs[0]);
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_RSQ:
@@ -401,6 +425,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_USEQ:
+   case TGSI_OPCODE_SEQ:
       snprintf(buf, 255, "%s = %s(equal(%s, %s));\n", dsts[0], dstconv, srcs[0], srcs[1]);      
       strcat(ctx->glsl_main, buf);
       break;

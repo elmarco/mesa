@@ -54,6 +54,8 @@ struct dump_ctx {
    int num_imm;
    struct immed imm[32];
    unsigned fragcoord_input;
+
+   int num_address;
 };
 
 static boolean
@@ -131,6 +133,8 @@ iter_declaration(struct tgsi_iterate_context *iter,
       ctx->num_consts+=decl->Range.Last + 1;
       break;
    case TGSI_FILE_ADDRESS:
+      ctx->num_address = 1;
+      break;
    case TGSI_FILE_SYSTEM_VALUE:
    default:
       fprintf(stderr,"unsupported file %d declaration\n", decl->Declaration.File);
@@ -247,11 +251,14 @@ iter_instruction(struct tgsi_iterate_context *iter,
                break;
             }
       }
-      else if (src->Register.File == TGSI_FILE_TEMPORARY)
+      else if (src->Register.File == TGSI_FILE_TEMPORARY) {
           snprintf(srcs[i], 255, "%ctemp%d%s", negate, src->Register.Index, swizzle);
-      else if (src->Register.File == TGSI_FILE_CONSTANT) {
+      } else if (src->Register.File == TGSI_FILE_CONSTANT) {
 	  const char *cname = ctx->prog_type == TGSI_PROCESSOR_VERTEX ? "vsconst" : "fsconst";
-          snprintf(srcs[i], 255, "%c%s%d%s", negate, cname, src->Register.Index, swizzle);
+          if (src->Register.Indirect) {
+             snprintf(srcs[i], 255, "%c%s[addr0 + %d]%s", negate, cname, src->Register.Index, swizzle);
+          } else
+             snprintf(srcs[i], 255, "%c%s[%d]%s", negate, cname, src->Register.Index, swizzle);
       } else if (src->Register.File == TGSI_FILE_SAMPLER) {
 	  const char *cname = ctx->prog_type == TGSI_PROCESSOR_VERTEX ? "vssamp" : "fssamp";
           snprintf(srcs[i], 255, "%s%d%s", cname, src->Register.Index, swizzle);
@@ -465,7 +472,9 @@ iter_instruction(struct tgsi_iterate_context *iter,
       strcat(ctx->glsl_main, "}\n");
       break;
    case TGSI_OPCODE_ARL:
-      fprintf(stderr,"TODO ARL\n");
+      snprintf(buf, 255, "addr0 = int(floor(%s)%s);\n", srcs[0], writemask);
+      strcat(ctx->glsl_main, buf);
+      break;
       break;
    case TGSI_OPCODE_BGNLOOP:
    case TGSI_OPCODE_ENDLOOP:
@@ -530,11 +539,15 @@ static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
       snprintf(buf, 255, "vec4 temp%d;\n", i);
       strcat(glsl_final, buf);
    }
-   for (i = 0; i < ctx->num_consts; i++) {
+   for (i = 0; i < ctx->num_address; i++) {
+      snprintf(buf, 255, "int addr%d;\n", i);
+      strcat(glsl_final, buf);
+   }
+   if (ctx->num_consts) {
       if (ctx->prog_type == TGSI_PROCESSOR_VERTEX)
-	  snprintf(buf, 255, "uniform vec4 vsconst%d;\n", i);
+         snprintf(buf, 255, "uniform vec4 vsconst[%d];\n", ctx->num_consts);
       else
-	  snprintf(buf, 255, "uniform vec4 fsconst%d;\n", i);
+         snprintf(buf, 255, "uniform vec4 fsconst[%d];\n", ctx->num_consts);
       strcat(glsl_final, buf);
    }
    for (i = 0; i < ctx->num_samps; i++) {

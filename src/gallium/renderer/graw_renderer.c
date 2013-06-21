@@ -269,7 +269,7 @@ static struct grend_linked_shader_program *add_shader_program(struct grend_conte
 							       struct grend_shader_state *vs,
 							       struct grend_shader_state *fs) {
   struct grend_linked_shader_program *sprog = malloc(sizeof(struct grend_linked_shader_program));
-  char name[10];
+  char name[16];
   int i;
   GLuint prog_id;
 
@@ -310,7 +310,7 @@ static struct grend_linked_shader_program *add_shader_program(struct grend_conte
     sprog->const_locs[PIPE_SHADER_VERTEX] = calloc(vs->num_consts, sizeof(uint32_t));
     if (sprog->const_locs[PIPE_SHADER_VERTEX]) {
       for (i = 0; i < vs->num_consts; i++) {
-	snprintf(name, 10, "vsconst%d", i);
+	snprintf(name, 16, "vsconst[%d]", i);
 	sprog->const_locs[PIPE_SHADER_VERTEX][i] = glGetUniformLocation(prog_id, name);
       }
     }
@@ -321,7 +321,7 @@ static struct grend_linked_shader_program *add_shader_program(struct grend_conte
     sprog->const_locs[PIPE_SHADER_FRAGMENT] = calloc(fs->num_consts, sizeof(uint32_t));
     if (sprog->const_locs[PIPE_SHADER_FRAGMENT]) {
       for (i = 0; i < fs->num_consts; i++) {
-	snprintf(name, 10, "fsconst%d", i);
+	snprintf(name, 16, "fsconst[%d]", i);
 	sprog->const_locs[PIPE_SHADER_FRAGMENT][i] = glGetUniformLocation(prog_id, name);
       }
     }

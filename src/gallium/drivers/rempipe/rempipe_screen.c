@@ -140,8 +140,19 @@ rempipe_get_param(struct pipe_screen *screen, enum pipe_cap param)
    case PIPE_CAP_PREFER_BLIT_BASED_TEXTURE_TRANSFER:
       return 0;
    case PIPE_CAP_QUERY_TIMESTAMP:
-
       return 1;
+   case PIPE_CAP_QUERY_TIME_ELAPSED:
+      return 0;
+   case PIPE_CAP_TGSI_TEXCOORD:
+      return 0;
+   case PIPE_CAP_MIN_MAP_BUFFER_ALIGNMENT:
+      return 1;
+   case PIPE_CAP_TEXTURE_BUFFER_OBJECTS:
+   case PIPE_CAP_TEXTURE_BUFFER_OFFSET_ALIGNMENT:
+      return 0;
+   case PIPE_CAP_CUBE_MAP_ARRAY:
+   case PIPE_CAP_TEXTURE_MULTISAMPLE:
+      return 0;
    }
    /* should only get here on unhandled cases */
    debug_printf("Unexpected PIPE_CAP %d query\n", param);

@@ -351,6 +351,10 @@ iter_instruction(struct tgsi_iterate_context *iter,
       snprintf(buf, 255, "%s = %s(cos(%s));\n", dsts[0], dstconv, srcs[0]);
       strcat(ctx->glsl_main, buf);
       break;
+   case TGSI_OPCODE_SIN:
+      snprintf(buf, 255, "%s = %s(sin(%s));\n", dsts[0], dstconv, srcs[0]);
+      strcat(ctx->glsl_main, buf);
+      break;
    case TGSI_OPCODE_RCP:
       snprintf(buf, 255, "%s = %s(1.0/(%s));\n", dsts[0], dstconv, srcs[0]);
       strcat(ctx->glsl_main, buf);
@@ -424,6 +428,11 @@ iter_instruction(struct tgsi_iterate_context *iter,
       snprintf(buf, 255, "%s = texture(%s, %s.xyz, %s.z)%s;\n", dsts[0], srcs[1], srcs[0], srcs[0], writemask);
       strcat(ctx->glsl_main, buf);
       break;
+   case TGSI_OPCODE_TXL:
+      ctx->samplers[sreg_index].tgsi_sampler_type = inst->Texture.Texture;
+      snprintf(buf, 255, "%s = textureLod(%s, %s, %s.z)%s;\n", dsts[0], srcs[1], srcs[0], srcs[0], writemask);
+      strcat(ctx->glsl_main, buf);
+      break;
    case TGSI_OPCODE_F2I:
       snprintf(buf, 255, "%s = int(%s);\n", dsts[0], srcs[0]);      
       strcat(ctx->glsl_main, buf);
@@ -454,6 +463,14 @@ iter_instruction(struct tgsi_iterate_context *iter,
       break;
    case TGSI_OPCODE_END:
       strcat(ctx->glsl_main, "}\n");
+      break;
+   case TGSI_OPCODE_ARL:
+      fprintf(stderr,"TODO ARL\n");
+      break;
+   case TGSI_OPCODE_BGNLOOP:
+   case TGSI_OPCODE_ENDLOOP:
+   case TGSI_OPCODE_BRK:
+      fprintf(stderr,"TODO LOOPS\n");
       break;
    default:
       fprintf(stderr,"failed to convert opcode %d\n", inst->Instruction.Opcode);

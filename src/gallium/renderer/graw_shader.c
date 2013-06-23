@@ -380,6 +380,10 @@ iter_instruction(struct tgsi_iterate_context *iter,
       snprintf(buf, 255, "%s = %s(log2(%s));\n", dsts[0], dstconv, srcs[0]);
       strcat(ctx->glsl_main, buf);
       break;
+   case TGSI_OPCODE_LOG:
+      snprintf(buf, 255, "%s = %s(log(%s));\n", dsts[0], dstconv, srcs[0]);
+      strcat(ctx->glsl_main, buf);
+      break;
    case TGSI_OPCODE_COS:
       snprintf(buf, 255, "%s = %s(cos(%s));\n", dsts[0], dstconv, srcs[0]);
       strcat(ctx->glsl_main, buf);
@@ -492,7 +496,8 @@ iter_instruction(struct tgsi_iterate_context *iter,
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_CMP:
-      snprintf(buf, 255, "%s = %s >= 0 ? %s : %s\n", dsts[0], srcs[0], srcs[1], srcs[2]);
+      snprintf(buf, 255, "%s = float(%s) >= 0 ? %s : %s;\n", dsts[0], srcs[0], srcs[1], srcs[2]);
+      strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_END:
       strcat(ctx->glsl_main, "}\n");

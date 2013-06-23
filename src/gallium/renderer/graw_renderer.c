@@ -2071,7 +2071,7 @@ int graw_renderer_flush_buffer(uint32_t res_handle,
       glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
       
       glBlitFramebuffer(0, 0, res->base.width0, res->base.height0,
-                        0, res->base.height0, res->base.width0, 0,
+                        0, 0, res->base.width0, res->base.height0,
                         GL_COLOR_BUFFER_BIT, GL_NEAREST);
       glDeleteFramebuffers(1, &fb_id);
    } else {

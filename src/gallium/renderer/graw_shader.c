@@ -3,6 +3,14 @@
 #include <string.h>
 #include <stdio.h>
 #include "graw_shader.h"
+
+/*
+ * TODO list
+ * loops
+ * DDX/DDY/TXD
+ * missing opcodes
+ */
+
 /* start convert of tgsi to glsl */
 
 int graw_shader_use_explicit = 0;
@@ -266,16 +274,34 @@ iter_instruction(struct tgsi_iterate_context *iter,
       } else if (src->Register.File == TGSI_FILE_IMMEDIATE) {
          struct immed *imd = &ctx->imm[(src->Register.Index)];
          int idx = src->Register.SwizzleX;
-         switch (imd->type) {
-         case TGSI_IMM_FLOAT32:
-            snprintf(srcs[i], 255, "%.4f", imd->val[idx].f);
-            break;
-         case TGSI_IMM_UINT32:
-            snprintf(srcs[i], 255, "%u", imd->val[idx].ui);
-            break;
-         case TGSI_IMM_INT32:
-            snprintf(srcs[i], 255, "%d", imd->val[idx].i);
-            break;
+         char temp[25];
+         /* build up a vec4 of immediates */
+         snprintf(srcs[i], 255, "vec4(");
+         for (j = 0; j < 4; j++) {
+            if (j == 0)
+               idx = src->Register.SwizzleX;
+            else if (j == 1)
+               idx = src->Register.SwizzleY;
+            else if (j == 2)
+               idx = src->Register.SwizzleZ;
+            else if (j == 3)
+               idx = src->Register.SwizzleW;
+            switch (imd->type) {
+            case TGSI_IMM_FLOAT32:
+               snprintf(temp, 25, "%.4f", imd->val[idx].f);
+               break;
+            case TGSI_IMM_UINT32:
+               snprintf(temp, 25, "%u", imd->val[idx].ui);
+               break;
+            case TGSI_IMM_INT32:
+               snprintf(temp, 25, "%d", imd->val[idx].i);
+               break;
+            }
+            strncat(srcs[i], temp, 255);
+            if (j < 3)
+               strcat(srcs[i], ",");
+            else
+               strcat(srcs[i], ")");
          }
       }
    }

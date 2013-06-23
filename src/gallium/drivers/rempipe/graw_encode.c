@@ -153,10 +153,10 @@ int graw_encode_shader_state(struct graw_context *ctx,
 			     uint32_t type,
                              const struct pipe_shader_state *shader)
 {
-   static char str[8192];
+   static char str[65536];
    uint32_t len;
 
-   memset(str, 0, 8192);
+   memset(str, 0, 65536);
    tgsi_dump_str(shader->tokens, 0, str, sizeof(str));
 
    len = strlen(str) + 1;

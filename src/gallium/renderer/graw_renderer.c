@@ -1626,6 +1626,7 @@ static void iov_vertex_upload(void *cookie, uint32_t doff, void *src, int len)
 void graw_renderer_transfer_write_iov(uint32_t res_handle,
                                       int level,
                                       uint32_t src_stride,
+                                      uint32_t flags,
                                       struct pipe_box *dst_box,
                                       uint64_t offset,
                                       struct graw_iovec *iov,
@@ -1673,6 +1674,7 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
       GLenum glformat;
       GLenum gltype;
       int old_stride = 0;
+      int invert = flags & (1 << 0);
 
       if (num_iovs > 1) {
          GLuint size = graw_iov_size(iov, num_iovs);
@@ -1686,11 +1688,29 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
          glPixelStorei(GL_UNPACK_ROW_LENGTH, src_stride / 4);
       }
 
-      if (res->is_front) {
-         glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
-         glPixelZoom(1.0f, -1.0f);
-         glWindowPos2i(dst_box->x, res->base.height0 - dst_box->y);
-//         glRasterPos2i(dst_box->x, res->base.height0 - dst_box->y - dst_box->height);
+      if (res->is_front || invert) {
+         if (!res->is_front) {
+            if (res->readback_fb_id == 0 || res->readback_fb_level != level) {
+               GLuint fb_id;
+               if (res->readback_fb_id)
+                  glDeleteFramebuffers(1, &res->readback_fb_id);
+            
+               glGenFramebuffers(1, &fb_id);
+               glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fb_id);
+               glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
+                                         res->target, res->id, level);
+               res->readback_fb_id = fb_id;
+               res->readback_fb_level = level;
+            } else {
+               glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, res->readback_fb_id);
+            }
+            glReadBuffer(GL_COLOR_ATTACHMENT0_EXT);
+         } else {
+            glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
+            glReadBuffer(GL_BACK);
+         }
+         glPixelZoom(1.0f, invert ? 1.0f : -1.0f);
+         glWindowPos2i(dst_box->x, invert ? dst_box->y : res->base.height0 - dst_box->y);
          glDrawPixels(dst_box->width, dst_box->height, GL_BGRA,
                       GL_UNSIGNED_BYTE, data);
       } else {
@@ -1730,7 +1750,7 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
 
 }
 
-void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t level, struct pipe_box *box, uint64_t offset, struct graw_iovec *iov, int num_iovs)
+void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t level, uint32_t flags, struct pipe_box *box, uint64_t offset, struct graw_iovec *iov, int num_iovs)
 {
    struct grend_resource *res;
    void *myptr = iov[0].iov_base + offset;
@@ -1763,8 +1783,19 @@ void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t level, struct
       GLint  y1;
       uint32_t send_size = 0;
       void *data;
+      int invert = flags & (1 << 0);
+      boolean actually_invert, separate_invert = FALSE;
 
-      if (num_iovs > 1 || (!res->is_front && !have_invert_mesa))
+      /* if we are asked to invert and reading from a front then don't */
+      if (invert && res->is_front)
+         actually_invert = FALSE;
+      else
+         actually_invert = invert ? TRUE : FALSE;
+
+      if (actually_invert && !have_invert_mesa)
+         separate_invert = TRUE;
+
+      if (num_iovs > 1 || separate_invert)
          need_temp = 1;
 
       if (need_temp) {
@@ -1791,7 +1822,7 @@ void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t level, struct
          } else {
             glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, res->readback_fb_id);
          }
-         if (have_invert_mesa)
+         if (have_invert_mesa && actually_invert)
             glPixelStorei(GL_PACK_INVERT_MESA, 1);
          glReadBuffer(GL_COLOR_ATTACHMENT0_EXT);      
       } else {
@@ -1803,17 +1834,19 @@ void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t level, struct
       switch (res->base.format) {
       case PIPE_FORMAT_B8G8R8A8_UNORM:
       default:
-         format = GL_BGRA;
-         type = GL_UNSIGNED_BYTE;
+         format = tex_conv_table[res->base.format].glformat;
+         type = tex_conv_table[res->base.format].gltype; 
+//         format = GL_BGRA;
+//         type = GL_UNSIGNED_BYTE;
          break;
       }
 
       glReadPixels(box->x, y1, box->width, box->height, format, type, data);
 
-      if (have_invert_mesa)
+      if (have_invert_mesa && actually_invert)
          glPixelStorei(GL_PACK_INVERT_MESA, 0);
       if (need_temp) {
-         graw_transfer_write_tex_return(&res->base, box, level, offset, iov, num_iovs, data, send_size, have_invert_mesa ? 0 : 1);
+         graw_transfer_write_tex_return(&res->base, box, level, offset, iov, num_iovs, data, send_size, separate_invert);
          free(data);
       }
    }

@@ -78,6 +78,7 @@ static void graw_process_cmd(QXL3DCommand *cmd, struct graw_iovec *iov,
 //         fprintf(stderr,"got transfer get %d\n", cmd->u.transfer_get.res_handle);
       graw_renderer_transfer_send_iov(cmd->u.transfer_get.res_handle,
                                       cmd->u.transfer_get.level,
+                                      cmd->u.transfer_get.transfer_flags,
                                       (struct pipe_box *)&cmd->u.transfer_get.box,
                                       cmd->u.transfer_get.phy_addr, iov,
                                       niovs);
@@ -86,6 +87,7 @@ static void graw_process_cmd(QXL3DCommand *cmd, struct graw_iovec *iov,
       graw_renderer_transfer_write_iov(cmd->u.transfer_put.res_handle,
                                    cmd->u.transfer_put.dst_level,
                                    cmd->u.transfer_put.src_stride,
+                                   cmd->u.transfer_put.transfer_flags,
                                    (struct pipe_box *)&cmd->u.transfer_put.dst_box,
                                    cmd->u.transfer_put.phy_addr, iov,
                                    niovs);

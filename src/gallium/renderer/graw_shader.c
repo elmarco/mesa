@@ -347,7 +347,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_IF:
-      snprintf(buf, 255, "if (any(%s)) {\n", srcs[0]);
+      snprintf(buf, 255, "if (any(bvec4(%s))) {\n", srcs[0]);
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_ELSE:
@@ -496,7 +496,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_CMP:
-      snprintf(buf, 255, "%s = float(%s) >= 0 ? %s : %s;\n", dsts[0], srcs[0], srcs[1], srcs[2]);
+      snprintf(buf, 255, "%s = (float(%s) >= 0) ? %s : %s;\n", dsts[0], srcs[0], srcs[2], srcs[1]);
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_END:

@@ -272,11 +272,17 @@ static struct grend_linked_shader_program *add_shader_program(struct grend_conte
   char name[16];
   int i;
   GLuint prog_id;
+  GLenum ret;
 
   prog_id = glCreateProgram();
   glAttachShader(prog_id, vs->id);
   glAttachShader(prog_id, fs->id);
+  ret = glGetError();
   glLinkProgram(prog_id);
+  ret = glGetError();
+  if (ret) {
+     fprintf(stderr,"got error linking %d\n", ret);
+  }
 
   sprog->vs = vs;
   sprog->fs = fs;
@@ -376,6 +382,11 @@ void grend_create_surface(struct grend_context *ctx,
    surf->val1 = val1;
    surf->texture = graw_object_lookup(res_handle, GRAW_RESOURCE);
 
+   if (!surf->texture) {
+      fprintf(stderr,"%s: failed to find resource for surface %d\n", __func__, res_handle);
+      free(surf);
+      return;
+   }
    graw_object_insert(surf, sizeof(*surf), handle, GRAW_SURFACE);
 }
 
@@ -400,7 +411,14 @@ void grend_create_sampler_view(struct grend_context *ctx,
 
    view->texture = graw_object_lookup(res_handle, GRAW_RESOURCE);
 
+   if (!view->texture) {
+      fprintf(stderr,"%s: failed to find resource %d\n", __func__, res_handle);
+      FREE(view);
+      return;
+   }
+      
    if (view->format != view->texture->base.format) {
+      fprintf(stderr,"%d %d swizzles %d %d %d %d\n", view->format, view->texture->base.format, view->swizzle_r, view->swizzle_g, view->swizzle_b, view->swizzle_a);
       /* hack to make tfp work for now */
       view->gl_swizzle_a = GL_ONE;
    } else
@@ -435,9 +453,13 @@ void grend_set_framebuffer_state(struct grend_context *ctx,
    if (zsurf_handle) {
       GLuint attachment;
       zsurf = graw_object_lookup(zsurf_handle, GRAW_SURFACE);
-
+      if (!zsurf) {
+         fprintf(stderr,"%s: can't find surface for Z %d\n", __func__, zsurf_handle);
+         return;
+      }
       tex = zsurf->texture;
-  
+      if (!tex)
+         return;
       if (tex->base.format == PIPE_FORMAT_S8_UINT)
          attachment = GL_STENCIL_ATTACHMENT;
       else if (tex->base.format == PIPE_FORMAT_Z24X8_UNORM || tex->base.format == PIPE_FORMAT_Z32_UNORM)
@@ -450,6 +472,10 @@ void grend_set_framebuffer_state(struct grend_context *ctx,
 
    for (i = 0; i < nr_cbufs; i++) {
       surf = graw_object_lookup(surf_handle[i], GRAW_SURFACE);
+      if (!surf) {
+         fprintf(stderr,"%s: can't find surface for cbuf %d %d\n", __func__, i, surf_handle[i]);
+         return;
+      }
       tex = surf->texture;
 
       if (tex->target == GL_TEXTURE_CUBE_MAP) {
@@ -644,7 +670,10 @@ void grend_set_single_sampler_view(struct grend_context *ctx,
    struct grend_texture *tex;
    if (handle) {
       view = graw_object_lookup(handle, GRAW_OBJECT_SAMPLER_VIEW);
-      
+      if (!view) {
+         fprintf(stderr,"%s: failed to find view %d\n", __func__, handle);
+         return;
+      }
       glBindTexture(view->texture->target, view->texture->id);
       if (view->texture->target != PIPE_BUFFER) {
          tex = (struct grend_texture *)view->texture;
@@ -709,13 +738,18 @@ void grend_create_vs(struct grend_context *ctx,
 {
    struct grend_shader_state *state = CALLOC_STRUCT(grend_shader_state);
    const GLchar *glsl_prog;
-
+   GLenum ret;
    state->id = glCreateShader(GL_VERTEX_SHADER);
    glsl_prog = tgsi_convert(vs->tokens, 0, &state->num_samplers, &state->num_consts, &state->num_inputs);
    if (glsl_prog) {
       glShaderSource(state->id, 1, &glsl_prog, NULL);
+      ret = glGetError();
       glCompileShader(state->id);
-      //      fprintf(stderr,"VS:\n%s\n", glsl_prog);
+      ret = glGetError();
+      if (ret) {
+         fprintf(stderr,"got error compiling %d\n", ret);
+         fprintf(stderr,"VS:\n%s\n", glsl_prog);
+      }
    } else
      fprintf(stderr,"failed to convert VS prog\n");
    graw_object_insert(state, sizeof(*state), handle, GRAW_OBJECT_VS);
@@ -729,12 +763,18 @@ void grend_create_fs(struct grend_context *ctx,
 {
    struct grend_shader_state *state = CALLOC_STRUCT(grend_shader_state);
    GLchar *glsl_prog;
-
+   GLenum ret;
    state->id = glCreateShader(GL_FRAGMENT_SHADER);
    glsl_prog = tgsi_convert(fs->tokens, 0, &state->num_samplers, &state->num_consts, &state->num_inputs);
    if (glsl_prog) {
       glShaderSource(state->id, 1, (const char **)&glsl_prog, NULL);
+      ret = glGetError();
       glCompileShader(state->id);
+      ret = glGetError();
+      if (ret) {
+         fprintf(stderr,"got error compiling %d\n", ret);
+         fprintf(stderr,"VS:\n%s\n", glsl_prog);
+      }
       //      fprintf(stderr,"FS:\n%s\n", glsl_prog);
    } else
      fprintf(stderr,"failed to convert FS prog\n");
@@ -828,6 +868,11 @@ void grend_draw_vbo(struct grend_context *ctx,
 
    if (ctx->shader_dirty) {
      struct grend_linked_shader_program *prog;
+
+     if (!ctx->vs || !ctx->fs) {
+        fprintf(stderr,"dropping rendering due to missing shaders\n");
+        return;
+     }
      prog = lookup_shader_program(ctx, ctx->vs->id, ctx->fs->id);
      if (!prog) {
        prog = add_shader_program(ctx, ctx->vs, ctx->fs);
@@ -849,6 +894,18 @@ void grend_draw_vbo(struct grend_context *ctx,
 
    for (shader_type = PIPE_SHADER_VERTEX; shader_type <= PIPE_SHADER_FRAGMENT; shader_type++) {
       if (ctx->prog->const_locs[shader_type] && (ctx->const_dirty[shader_type] || new_program)) {
+         int mval;
+         if (shader_type == 0) {
+            if (ctx->consts[shader_type].num_consts / 4 > ctx->vs->num_consts + 10) {
+               fprintf(stderr,"possible memory corruption vs consts TODO %d %d\n", ctx->consts[0].num_consts, ctx->vs->num_consts);
+               return;
+            }
+         } else if (shader_type == 1) {
+            if (ctx->consts[shader_type].num_consts / 4 > ctx->fs->num_consts + 10) {
+               fprintf(stderr,"possible memory corruption fs consts TODO\n");
+               return;
+            }
+         }
          for (i = 0; i < ctx->consts[shader_type].num_consts / 4; i++) {
             if (ctx->prog->const_locs[shader_type][i] != -1)
                glUniform4fv(ctx->prog->const_locs[shader_type][i], 1, &ctx->consts[shader_type].consts[i * 4]);
@@ -1081,7 +1138,10 @@ void grend_object_bind_blend(struct grend_context *ctx,
       return;
    }
    state = graw_object_lookup(handle, GRAW_OBJECT_BLEND);
-
+   if (!state) {
+      fprintf(stderr,"%s: got illegal handle %d\n", __func__, handle);
+      return;
+   }
    if (state->logicop_enable) {
       glEnable(GL_COLOR_LOGIC_OP);
       glLogicOp(translate_logicop(state->logicop_func));
@@ -1089,8 +1149,7 @@ void grend_object_bind_blend(struct grend_context *ctx,
       glDisable(GL_COLOR_LOGIC_OP);
 
    if (state->independent_blend_enable) {
-      assert(0);
-      exit(-1);
+      fprintf(stderr,"TODO bind independendt blend state\n");
    } else {
       if (state->rt[0].blend_enable) {
          glBlendFuncSeparate(translate_blend_factor(state->rt[0].rgb_src_factor),
@@ -1206,6 +1265,11 @@ void grend_object_bind_rasterizer(struct grend_context *ctx,
       return;
    state = graw_object_lookup(handle, GRAW_OBJECT_RASTERIZER);
    
+   if (!state) {
+      fprintf(stderr,"%s: cannot find object %d\n", __func__, handle);
+      return;
+   }
+
 #if 0
    if (state->depth_clip) {
       glEnable(GL_DEPTH_CLAMP);
@@ -1486,7 +1550,6 @@ void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target tar
       glGenTextures(1, &gr->id);
       glBindTexture(gr->target, gr->id);
 
-      fprintf(stderr,"format is %d\n", format);
       internalformat = tex_conv_table[format].internalformat;
       glformat = tex_conv_table[format].glformat;
       gltype = tex_conv_table[format].gltype;
@@ -1571,9 +1634,10 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
    struct grend_resource *res;
    void *data;
    int need_temp;
+
    res = graw_object_lookup(res_handle, GRAW_RESOURCE);
    if (res == NULL) {
-      assert(0);
+      fprintf(stderr,"transfer for non-existant res %d\n", res_handle);
       return;
    }
    if (res->target == GL_ELEMENT_ARRAY_BUFFER_ARB) {
@@ -1673,6 +1737,10 @@ void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t level, struct
    int need_temp = 0;
 
    res = graw_object_lookup(res_handle, GRAW_RESOURCE);
+   if (!res) {
+      fprintf(stderr,"transfer for non-existant res %d\n", res_handle);
+      return;
+   }
 
    if (res->target == GL_ELEMENT_ARRAY_BUFFER_ARB) {
       uint32_t send_size = box->width * util_format_get_blocksize(res->base.format);      
@@ -1706,7 +1774,7 @@ void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t level, struct
             fprintf(stderr,"malloc failed %d\n", send_size);
       } else
          data = myptr;
-      fprintf(stderr,"TEXTURE TRANSFER %d %d %d %d %d, temp:%d\n", res_handle, res->readback_fb_id, box->width, box->height, level, need_temp);
+//      fprintf(stderr,"TEXTURE TRANSFER %d %d %d %d %d, temp:%d\n", res_handle, res->readback_fb_id, box->width, box->height, level, need_temp);
 
       if (!res->is_front) {
          if (res->readback_fb_id == 0 || res->readback_fb_level != level) {

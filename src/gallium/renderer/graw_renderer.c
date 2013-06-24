@@ -1493,7 +1493,7 @@ static void grend_apply_sampler_state(struct grend_context *ctx,
    GLenum target = tex->base.target;
 
    if (!state) {
-      fprintf("cannot find sampler state for %d %d\n", shader_type, id);
+      fprintf(stderr, "cannot find sampler state for %d %d\n", shader_type, id);
       return;
    }
    if (tex->state.max_lod == -1)
@@ -1659,6 +1659,7 @@ void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target tar
       gltype = tex_conv_table[format].gltype;
       if (internalformat == 0) {
          fprintf(stderr,"unknown format is %d\n", format);
+         return 0;
          internalformat = GL_RGBA;
          glformat = GL_RGBA;
          gltype = GL_UNSIGNED_BYTE;
@@ -1703,6 +1704,9 @@ void graw_renderer_resource_unref(uint32_t res_handle)
    struct grend_resource *res;
 
    res = graw_object_lookup(res_handle, GRAW_RESOURCE);
+
+   if (!res)
+      return;
 
    if (res->target == GL_ELEMENT_ARRAY_BUFFER_ARB) {
       glDeleteBuffers(1, &res->id);
@@ -1995,6 +1999,11 @@ void graw_renderer_resource_copy_region(struct grend_context *ctx,
    src_res = graw_object_lookup(src_handle, GRAW_RESOURCE);
    dst_res = graw_object_lookup(dst_handle, GRAW_RESOURCE);
 
+   if (!src_res || !dst_res) {
+      fprintf(stderr,"illegal handle in copy region %d %d\n", src_handle, dst_handle);
+      return;
+   }
+
    glGenFramebuffers(2, fb_ids);
    glBindFramebuffer(GL_FRAMEBUFFER_EXT, fb_ids[0]);
    glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
@@ -2039,6 +2048,10 @@ static void graw_renderer_blit_int(uint32_t dst_handle, uint32_t src_handle,
    src_res = graw_object_lookup(src_handle, GRAW_RESOURCE);
    dst_res = graw_object_lookup(dst_handle, GRAW_RESOURCE);
 
+   if (!src_res || !dst_res) {
+      fprintf(stderr,"illegal handle in blit %d %d\n", src_handle, dst_handle);
+      return;
+   }
    glGenFramebuffers(2, fb_ids);
    glBindFramebuffer(GL_FRAMEBUFFER_EXT, fb_ids[0]);
 

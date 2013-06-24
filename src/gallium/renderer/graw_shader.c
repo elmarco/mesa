@@ -331,11 +331,11 @@ iter_instruction(struct tgsi_iterate_context *iter,
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_MAX:
-      snprintf(buf, 255, "%s = %s(max(%s));\n", dsts[0], dstconv, srcs[0]);
+      snprintf(buf, 255, "%s = %s(max(%s, %s));\n", dsts[0], dstconv, srcs[0], srcs[1]);
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_MIN:
-      snprintf(buf, 255, "%s = %s(min(%s));\n", dsts[0], dstconv, srcs[0]);
+      snprintf(buf, 255, "%s = %s(min(%s, %s));\n", dsts[0], dstconv, srcs[0], srcs[1]);
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_ABS:

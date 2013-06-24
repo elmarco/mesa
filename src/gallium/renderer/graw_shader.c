@@ -255,7 +255,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
       if (src->Register.File == TGSI_FILE_INPUT) {
          for (j = 0; j < ctx->num_inputs; j++)
             if (ctx->inputs[j].first == src->Register.Index) {
-               snprintf(srcs[i], 255, "%s%s", ctx->inputs[j].glsl_name, swizzle);
+               snprintf(srcs[i], 255, "%c%s%s", negate, ctx->inputs[j].glsl_name, swizzle);
                break;
             }
       }

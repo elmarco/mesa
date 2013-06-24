@@ -92,9 +92,10 @@ void grend_object_bind_dsa(struct grend_context *ctx,
 void grend_object_bind_rasterizer(struct grend_context *ctx,
                                   uint32_t handle);
 
-void grend_object_bind_sampler_states(struct grend_context *ctx,
-                                      uint32_t num_states,
-                                      uint32_t *handles);
+void grend_bind_sampler_states(struct grend_context *ctx,
+                               uint32_t shader_type,
+                               uint32_t num_states,
+                               uint32_t *handles);
 void grend_set_index_buffer(struct grend_context *ctx,
                             uint32_t res_handle,
                             uint32_t index_size,

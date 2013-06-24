@@ -154,10 +154,9 @@ struct grend_context {
 
    struct grend_constants consts[PIPE_SHADER_TYPES];
    bool const_dirty[PIPE_SHADER_TYPES];
-   struct pipe_sampler_state *sampler_state[PIPE_MAX_SAMPLERS];
-   struct pipe_sampler_state cur_sampler_states[PIPE_MAX_SAMPLERS];
+   struct pipe_sampler_state *sampler_state[PIPE_SHADER_TYPES][PIPE_MAX_SAMPLERS];
 
-   int num_sampler_states;
+   int num_sampler_states[PIPE_SHADER_TYPES];
    uint32_t fb_id;
 
    uint8_t stencil_refs[2];
@@ -363,6 +362,7 @@ static struct grend_linked_shader_program *lookup_shader_program(struct grend_co
 
 static void grend_apply_sampler_state(struct grend_context *ctx,
                                       struct grend_resource *res,
+                                      uint32_t shader_type,
                                       int id);
 
 void grend_update_stencil_state(struct grend_context *ctx);
@@ -931,7 +931,7 @@ void grend_draw_vbo(struct grend_context *ctx,
             glBindTexture(texture->target, texture->id);
             glEnable(texture->target);
             if (ctx->views[shader_type].old_ids[i] != texture->id) {
-               grend_apply_sampler_state(ctx, texture, sampler_id);
+               grend_apply_sampler_state(ctx, texture, shader_type, sampler_id);
                ctx->views[shader_type].old_ids[i] = texture->id;
             }
             if (ctx->rs_state->point_quad_rasterization) {
@@ -940,13 +940,14 @@ void grend_draw_vbo(struct grend_context *ctx,
                else
                   glTexEnvi(GL_POINT_SPRITE_ARB, GL_COORD_REPLACE_ARB, GL_FALSE);
             }
+            sampler_id++;
+         
          } else {
             if (ctx->old_targets[sampler_id]) {
                glDisable(ctx->old_targets[sampler_id]);
                ctx->old_targets[sampler_id] = 0;
             }
          }
-         sampler_id++;
       }
    } 
 
@@ -1342,19 +1343,23 @@ static GLuint convert_wrap(int wrap)
    }
 } 
 
-void grend_object_bind_sampler_states(struct grend_context *ctx,
-                                      uint32_t num_states,
-                                      uint32_t *handles)
+void grend_bind_sampler_states(struct grend_context *ctx,
+                               uint32_t shader_type,
+                               uint32_t num_states,
+                               uint32_t *handles)
 {
    int i;
    struct pipe_sampler_state *state;
 
-   ctx->num_sampler_states = num_states;
+   ctx->num_sampler_states[shader_type] = num_states;
 
    for (i = 0; i < num_states; i++) {
-      state = graw_object_lookup(handles[i], GRAW_OBJECT_SAMPLER_STATE);
-
-      ctx->sampler_state[i] = state;
+      if (handles[i] == 0)
+         state = NULL;
+      else
+         state = graw_object_lookup(handles[i], GRAW_OBJECT_SAMPLER_STATE);
+      
+      ctx->sampler_state[shader_type][i] = state;
    }
 }
 
@@ -1386,13 +1391,18 @@ static inline GLenum convert_min_filter(unsigned int filter, unsigned int mip_fi
 
 static void grend_apply_sampler_state(struct grend_context *ctx, 
                                       struct grend_resource *res,
+                                      uint32_t shader_type,
                                       int id)
 {
    struct grend_texture *tex = (struct grend_texture *)res;
-   struct pipe_sampler_state *state = ctx->sampler_state[id];
+   struct pipe_sampler_state *state = ctx->sampler_state[shader_type][id];
    bool set_all = FALSE;
    GLenum target = tex->base.target;
 
+   if (!state) {
+      fprintf("cannot find sampler state for %d %d\n", shader_type, id);
+      return;
+   }
    if (tex->state.max_lod == -1)
       set_all = TRUE;
 

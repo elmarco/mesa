@@ -569,7 +569,7 @@ static void graw_bind_fragment_sampler_states(struct pipe_context *ctx,
    for (i = 0; i < num_samplers; i++) {
       handles[i] = (unsigned long)(samplers[i]);
    }
-   graw_encode_bind_fragment_sampler_states(grctx, num_samplers, handles);
+   graw_encode_bind_sampler_states(grctx, PIPE_SHADER_FRAGMENT, num_samplers, handles);
 }
 
 static void graw_bind_vertex_sampler_states(struct pipe_context *ctx,
@@ -582,7 +582,7 @@ static void graw_bind_vertex_sampler_states(struct pipe_context *ctx,
    for (i = 0; i < num_samplers; i++) {
       handles[i] = (unsigned long)(samplers[i]);
    }
-   graw_encode_bind_fragment_sampler_states(grctx, num_samplers, handles);
+   graw_encode_bind_sampler_states(grctx, PIPE_SHADER_VERTEX, num_samplers, handles);
 }
 
 static void graw_set_polygon_stipple(struct pipe_context *ctx,

@@ -418,11 +418,6 @@ static void graw_decode_bind_object(struct grend_decode_ctx *ctx)
    case GRAW_OBJECT_VERTEX_ELEMENTS:
       grend_bind_vertex_elements_state(ctx->grctx, handle);
       break;
-   case GRAW_OBJECT_SAMPLER_STATE: {
-      grend_object_bind_sampler_states(ctx->grctx, length, &ctx->ds->buf[ctx->ds->buf_offset + 1]);
-
-   }
-      break;
    }
 }
 
@@ -540,6 +535,15 @@ static void graw_decode_blit(struct grend_decode_ctx *ctx)
    graw_renderer_blit(gdctx->grctx, dst_handle, src_handle, &info);
 }
 
+static void graw_decode_bind_sampler_states(struct grend_decode_ctx *ctx, int length)
+{
+   uint32_t shader_type = ctx->ds->buf[ctx->ds->buf_offset + 1];
+   uint32_t num_states = length - 1;
+
+   grend_bind_sampler_states(gdctx->grctx, shader_type, num_states,
+                                    &ctx->ds->buf[ctx->ds->buf_offset + 2]);
+}
+
 static void graw_decode_block(uint32_t *block, int ndw)
 {
    struct graw_decoder_state ds;
@@ -609,6 +613,9 @@ static void graw_decode_block(uint32_t *block, int ndw)
          break;
       case GRAW_RESOURCE_COPY_REGION:
          graw_decode_resource_copy_region(gdctx);
+         break;
+      case GRAW_BIND_SAMPLER_STATES:
+         graw_decode_bind_sampler_states(gdctx, header >> 16);
          break;
       }
       gdctx->ds->buf_offset += (header >> 16) + 1;

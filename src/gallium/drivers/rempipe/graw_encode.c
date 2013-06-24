@@ -384,12 +384,14 @@ int graw_encode_set_sampler_views(struct graw_context *ctx,
    return 0;
 }
 
-int graw_encode_bind_fragment_sampler_states(struct graw_context *ctx,
-                                             uint32_t num_handles,
-                                             uint32_t *handles)
+int graw_encode_bind_sampler_states(struct graw_context *ctx,
+                                    uint32_t shader_type,
+                                    uint32_t num_handles,
+                                    uint32_t *handles)
 {
    int i;
-   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_BIND_OBJECT, GRAW_OBJECT_SAMPLER_STATE, num_handles));
+   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_BIND_SAMPLER_STATES, 0, num_handles + 1));
+   graw_encoder_write_dword(ctx->cbuf, shader_type);
    for (i = 0; i < num_handles; i++)
       graw_encoder_write_dword(ctx->cbuf, handles[i]);
    return 0;

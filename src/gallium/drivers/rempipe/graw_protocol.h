@@ -35,6 +35,7 @@ enum graw_cmd {
    GRAW_SET_SCISSOR_STATE,
    GRAW_BLIT,
    GRAW_RESOURCE_COPY_REGION,
+   GRAW_BIND_SAMPLER_STATES
 };
 
 enum graw_scrn_cmd {

@@ -294,6 +294,7 @@ rempipe_qxl_is_format_supported( struct pipe_screen *screen,
                                  unsigned bind)
 {
    const struct util_format_description *format_desc;
+   int i;
 
    assert(target == PIPE_BUFFER ||
           target == PIPE_TEXTURE_1D ||
@@ -339,6 +340,20 @@ rempipe_qxl_is_format_supported( struct pipe_screen *screen,
    if (format_desc->layout == UTIL_FORMAT_LAYOUT_S3TC) {
       return util_format_s3tc_enabled;
    }
+
+   /* Find the first non-VOID channel. */
+   for (i = 0; i < 4; i++) {
+      if (format_desc->channel[i].type != UTIL_FORMAT_TYPE_VOID) {
+         break;
+      }
+   }
+
+   if (i == 4)
+      return FALSE;
+
+   /* no L4A4 */
+   if (format_desc->nr_channels < 4 && format_desc->channel[i].size == 4)
+      return FALSE;
 
    /*
     * Everything else should be supported by u_format.

@@ -392,6 +392,14 @@ iter_instruction(struct tgsi_iterate_context *iter,
       snprintf(buf, 255, "%s = %s(sin(%s));\n", dsts[0], dstconv, srcs[0]);
       strcat(ctx->glsl_main, buf);
       break;
+   case TGSI_OPCODE_DDX:
+      snprintf(buf, 255, "%s = %s(dFdx(%s));\n", dsts[0], dstconv, srcs[0]);
+      strcat(ctx->glsl_main, buf);
+      break;
+   case TGSI_OPCODE_DDY:
+      snprintf(buf, 255, "%s = %s(dFdy(%s));\n", dsts[0], dstconv, srcs[0]);
+      strcat(ctx->glsl_main, buf);
+      break;
    case TGSI_OPCODE_RCP:
       snprintf(buf, 255, "%s = %s(1.0/(%s));\n", dsts[0], dstconv, srcs[0]);
       strcat(ctx->glsl_main, buf);

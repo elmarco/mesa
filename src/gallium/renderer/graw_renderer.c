@@ -919,6 +919,7 @@ void grend_draw_vbo(struct grend_context *ctx,
    int sampler_id;
    bool new_program = FALSE;
    uint32_t shader_type;
+   uint32_t num_enable;
    if (ctx->stencil_state_dirty)
       grend_update_stencil_state(ctx);
    if (ctx->scissor_state_dirty)
@@ -1011,6 +1012,7 @@ void grend_draw_vbo(struct grend_context *ctx,
       }
    } 
 
+   num_enable = ctx->ve->count;
    for (i = 0; i < ctx->ve->count; i++) {
       struct grend_vertex_element *ve = &ctx->ve->elements[i];
       int vbo_index = ctx->ve->elements[i].base.vertex_buffer_index;
@@ -1019,7 +1021,8 @@ void grend_draw_vbo(struct grend_context *ctx,
 
       if (i >= ctx->prog->vs->num_inputs) {
          /* XYZZY: debug this? */
-         continue;
+         num_enable = ctx->prog->vs->num_inputs;
+         break;
       }
       buf = (struct grend_buffer *)ctx->vbo[vbo_index].buffer;
       glBindBuffer(GL_ARRAY_BUFFER, buf->base.id);
@@ -1031,24 +1034,29 @@ void grend_draw_vbo(struct grend_context *ctx,
 	  loc = ctx->prog->attrib_locs[i];
 	} else loc = -1;
 
-	if (loc == -1)
-	  fprintf(stderr,"cannot find loc %d\n", i);
+	if (loc == -1) {
+           fprintf(stderr,"cannot find loc %d %d %d\n", i, ctx->ve->count, ctx->prog->vs->num_inputs);
+          fprintf(stderr,"shader probably didn't compile - skipping rendering\n");
+          num_enable--;
+          if (i == 0)
+             return;
+          continue;
+        }
       }
       glVertexAttribPointer(loc, ve->nr_chan, ve->type, ve->norm, ctx->vbo[vbo_index].stride, (void *)(unsigned long)(ctx->ve->elements[i].base.src_offset + ctx->vbo[vbo_index].buffer_offset));
       glVertexAttribDivisorARB(i, ctx->ve->elements[i].base.instance_divisor);
-
    }
 
 
-   if (ctx->num_enabled_attribs != ctx->ve->count) {
-      if (ctx->ve->count > ctx->num_enabled_attribs) {
-         for (i = ctx->num_enabled_attribs; i < ctx->ve->count; i++)
+   if (ctx->num_enabled_attribs != num_enable) {
+      if (num_enable > ctx->num_enabled_attribs) {
+         for (i = ctx->num_enabled_attribs; i < num_enable; i++)
             glEnableVertexAttribArray(i);
-      } else if (ctx->ve->count < ctx->num_enabled_attribs) {
-         for (i = ctx->ve->count; i < ctx->num_enabled_attribs; i++)
+      } else if (num_enable < ctx->num_enabled_attribs) {
+         for (i = num_enable; i < ctx->num_enabled_attribs; i++)
             glDisableVertexAttribArray(i);
       }
-      ctx->num_enabled_attribs = ctx->ve->count;
+      ctx->num_enabled_attribs = num_enable;
    }
 
    if (info->indexed) {

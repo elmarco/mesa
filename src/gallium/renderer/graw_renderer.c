@@ -119,7 +119,7 @@ struct grend_vertex_element_array {
 };
 
 struct grend_constants {
-   float consts[128];
+   float *consts;
    uint32_t num_consts;
 };
 
@@ -665,6 +665,10 @@ void grend_set_constants(struct grend_context *ctx,
 
    consts = &ctx->consts[shader];
    ctx->const_dirty[shader] = TRUE;
+
+   consts->consts = realloc(consts->consts, num_constant * sizeof(float));
+   if (!consts->consts)
+      return;
 
    consts->num_consts = num_constant;
    for (i = 0; i < num_constant; i++)

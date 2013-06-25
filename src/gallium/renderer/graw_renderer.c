@@ -1981,7 +1981,7 @@ void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t level, uint32
       GLint  y1;
       uint32_t send_size = 0;
       void *data;
-      int invert = flags & (1 << 0);
+      boolean invert = flags & (1 << 0) ? TRUE : FALSE;
       boolean actually_invert, separate_invert = FALSE;
 
       grend_use_program(0);
@@ -1990,7 +1990,7 @@ void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t level, uint32
       if (invert && res->is_front)
          actually_invert = FALSE;
       else
-         actually_invert = invert ? FALSE : TRUE;
+         actually_invert = res->renderer_flipped ^ invert;
 
       if (actually_invert && !have_invert_mesa)
          separate_invert = TRUE;

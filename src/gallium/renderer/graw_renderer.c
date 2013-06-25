@@ -2292,9 +2292,9 @@ int graw_renderer_flush_buffer(uint32_t res_handle,
       glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
       
       /* force full scissor and viewport - should probably use supplied box */
-      fprintf(stderr,"flush box %d %d %d %d\n", box->x, box->y, box->width, box->height);
-      glScissor(box->x, box->y, box->width, box->height);
       glViewport(0, 0, res->base.width0, res->base.height0);
+      glScissor(box->x, box->y, box->width, box->height);
+
       grend_state.viewport_dirty = TRUE;
       grend_state.scissor_dirty = TRUE;
       /* justification for inversion here required */

@@ -66,6 +66,7 @@ static struct pipe_surface *graw_create_surface(struct pipe_context *ctx,
    if (surf == NULL)
       return NULL;
 
+   res->clean = FALSE;
    handle = graw_object_assign_handle();
    pipe_reference_init(&surf->base.reference, 1);
    pipe_resource_reference(&surf->base.texture, resource);

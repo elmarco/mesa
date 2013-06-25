@@ -767,7 +767,7 @@ void graw_flush_frontbuffer(struct pipe_screen *screen,
    graw_transfer_get_block(gres->base.res_handle, 0, &box, alloced, size / 4);
 
    for (i = 0; i < res->height0; i++) {
-      int offsrc = res->width0 * util_format_get_blocksize(res->format) * i;//(res->height0 - i - 1);
+      int offsrc = res->width0 * util_format_get_blocksize(res->format) * i;
       int offdst = gres->stride * i;
       memcpy(map + offdst, alloced + offsrc, res->width0 * util_format_get_blocksize(res->format));
    }

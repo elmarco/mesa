@@ -2183,35 +2183,20 @@ static void graw_renderer_blit_int(uint32_t dst_handle, uint32_t src_handle,
    if (info->mask & PIPE_MASK_RGBA)
       glmask |= GL_COLOR_BUFFER_BIT;
 
-#if 0
-   if (!dst_res->is_front) {
-      y1 = info->src.box.y;
-      y2 = (info->src.box.y + info->src.box.height);
-      dst_y1 = info->dst.box.y;
-      dst_y2 = info->dst.box.y + info->dst.box.height;
-   } else {
-      y1 = (info->src.box.y + info->src.box.height);
-      y2 = info->src.box.y;
-      dst_y1 = dst_res->base.height0 - (info->dst.box.y + info->dst.box.height);
-      dst_y2 = dst_res->base.height0 - info->dst.box.y;
-
-   }
-#endif
-
    if (!dst_res->is_front && !dst_res->renderer_flipped) {
       dst_y1 = info->dst.box.y + info->dst.box.height;
       dst_y2 = info->dst.box.y;
    } else {
-      dst_y1 = info->dst.box.y;
-      dst_y2 = info->dst.box.y + info->dst.box.height;
+      dst_y1 = dst_res->base.height0 - info->dst.box.y - info->dst.box.height;
+      dst_y2 = dst_res->base.height0 - info->dst.box.y;
    }
 
    if (!src_res->is_front && !src_res->renderer_flipped) {
       src_y1 = info->src.box.y + info->src.box.height;
       src_y2 = info->src.box.y;
    } else {
-      src_y1 = info->src.box.y;
-      src_y2 = info->src.box.y + info->src.box.height;
+      src_y1 = src_res->base.height0 - info->src.box.y - info->src.box.height;
+      src_y2 = src_res->base.height0 - info->src.box.y;
    }
 
    if (info->scissor_enable)

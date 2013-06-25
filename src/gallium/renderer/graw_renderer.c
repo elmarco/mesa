@@ -25,10 +25,14 @@
 #include "graw_renderer_glx.h"
 #include "graw_decode.h"
 
+/* transfer boxes from the guest POV are in y = 0 = top orientation */
+/* blit/copy operations from the guest POV are in y = 0 = top orientation */
+
+/* since we are storing things in OpenGL FBOs we need to flip transfer operations by default */
+
 extern int graw_shader_use_explicit;
 int localrender;
 static int have_invert_mesa = 0;
-struct grend_screen;
 
 struct grend_fence {
    uint32_t fence_id;
@@ -36,7 +40,18 @@ struct grend_fence {
    struct list_head fences;
 };
 
-struct list_head fence_list;
+struct global_renderer_state {
+   bool viewport_dirty;
+   bool scissor_dirty;
+   GLboolean blend_enabled;
+   GLboolean depth_test_enabled;
+   GLboolean alpha_test_enabled;
+   GLboolean stencil_test_enabled;
+   GLuint program_id;
+   struct list_head fence_list;
+};
+
+static struct global_renderer_state grend_state;
 
 struct grend_linked_shader_program {
   struct list_head head;
@@ -66,8 +81,9 @@ struct grend_resource {
    GLenum target;
    /* fb id if we need to readback this resource */
    GLuint readback_fb_id;
-  GLuint readback_fb_level;
+   GLuint readback_fb_level;
    int is_front;
+   GLboolean renderer_flipped;
 };
 
 struct grend_buffer {
@@ -164,11 +180,11 @@ struct grend_context {
    struct pipe_depth_stencil_alpha_state *dsa;
    boolean stencil_state_dirty;
    struct list_head programs;
-   boolean need_prog_rebind;
 
    GLint view_cur_x, view_cur_y;
    GLsizei view_width, view_height;
    GLclampd view_near_val, view_far_val;
+   GLboolean view_flipped;
 
    GLenum old_targets[PIPE_MAX_SAMPLERS];
 
@@ -177,6 +193,9 @@ struct grend_context {
    boolean viewport_state_dirty;
    uint32_t fb_height;
 
+   int nr_cbufs;
+   struct grend_surface *zsurf;
+   struct grend_surface *surf[8];
 };
 
 static struct grend_resource *frontbuffer;
@@ -344,7 +363,56 @@ static struct {
       [PIPE_FORMAT_L32A32_SINT] = {GL_LUMINANCE_ALPHA32I_EXT, GL_LUMINANCE_ALPHA_INTEGER_EXT, GL_INT},
    };
 
+static void grend_use_program(GLuint program_id)
+{
+   if (grend_state.program_id != program_id) {
+      glUseProgram(program_id);
+      grend_state.program_id = program_id;
+   }
+}
 
+static void grend_blend_enable(GLboolean blend_enable)
+{
+   if (grend_state.blend_enabled != blend_enable) {
+      grend_state.blend_enabled = blend_enable;
+      if (blend_enable)
+         glEnable(GL_BLEND);
+      else
+         glDisable(GL_BLEND);
+   }
+}
+
+static void grend_depth_test_enable(GLboolean depth_test_enable)
+{
+   if (grend_state.depth_test_enabled != depth_test_enable) {
+      grend_state.depth_test_enabled = depth_test_enable;
+      if (depth_test_enable)
+         glEnable(GL_DEPTH_TEST);
+      else
+         glDisable(GL_DEPTH_TEST);
+   }
+}
+
+static void grend_alpha_test_enable(GLboolean alpha_test_enable)
+{
+   if (grend_state.alpha_test_enabled != alpha_test_enable) {
+      grend_state.alpha_test_enabled = alpha_test_enable;
+      if (alpha_test_enable)
+         glEnable(GL_ALPHA_TEST);
+      else
+         glDisable(GL_ALPHA_TEST);
+   }
+}
+static void grend_stencil_test_enable(GLboolean stencil_test_enable)
+{
+   if (grend_state.stencil_test_enabled != stencil_test_enable) {
+      grend_state.stencil_test_enabled = stencil_test_enable;
+      if (stencil_test_enable)
+         glEnable(GL_STENCIL_TEST);
+      else
+         glDisable(GL_STENCIL_TEST);
+   }
+}
 
 static struct grend_linked_shader_program *add_shader_program(struct grend_context *ctx,
 							       struct grend_shader_state *vs,
@@ -509,8 +577,8 @@ void grend_create_sampler_view(struct grend_context *ctx,
 }
 
 void grend_set_framebuffer_state(struct grend_context *ctx,
-                                    uint32_t nr_cbufs, uint32_t surf_handle[8],
-                                    uint32_t zsurf_handle)
+                                 uint32_t nr_cbufs, uint32_t surf_handle[8],
+                                 uint32_t zsurf_handle)
 {
    struct grend_surface *surf, *zsurf;
    struct grend_resource *tex;
@@ -550,8 +618,10 @@ void grend_set_framebuffer_state(struct grend_context *ctx,
          attachment = GL_DEPTH_STENCIL_ATTACHMENT;
       glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, attachment,
                                 tex->target, tex->id, zsurf->val0);
+      ctx->zsurf = zsurf;
    }
 
+   ctx->nr_cbufs = nr_cbufs;
    for (i = 0; i < nr_cbufs; i++) {
       surf = graw_object_lookup(surf_handle[i], GRAW_SURFACE);
       if (!surf) {
@@ -560,6 +630,7 @@ void grend_set_framebuffer_state(struct grend_context *ctx,
       }
       tex = surf->texture;
 
+      ctx->surf[i] = surf;
       if (tex->target == GL_TEXTURE_CUBE_MAP) {
          glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, buffers[i],
                                    GL_TEXTURE_CUBE_MAP_POSITIVE_X + (surf->val1 & 0xffff), tex->id, surf->val0);
@@ -585,7 +656,8 @@ void grend_set_viewport_state(struct grend_context *ctx,
    GLint x, y;
    GLsizei width, height;
    GLclampd near_val, far_val;
-
+   GLboolean view_flipped = state->scale[1] < 0 ? GL_TRUE : GL_FALSE;
+   
    width = state->scale[0] * 2.0f;
    height = abs(state->scale[1]) * 2.0f;
    x = state->translate[0] - state->scale[0];
@@ -597,12 +669,14 @@ void grend_set_viewport_state(struct grend_context *ctx,
    if (ctx->view_cur_x != x ||
        ctx->view_cur_y != y ||
        ctx->view_width != width ||
-       ctx->view_height != height) {
+       ctx->view_height != height ||
+      ctx->view_flipped != view_flipped) {
       ctx->viewport_state_dirty = TRUE;
       ctx->view_cur_x = x;
       ctx->view_cur_y = y;
       ctx->view_width = width;
       ctx->view_height = height;
+      ctx->view_flipped = view_flipped;
    }
 
    if (ctx->view_near_val != near_val ||
@@ -901,8 +975,8 @@ void grend_clear(struct grend_context *ctx,
 {
    GLbitfield bits = 0;
    glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, ctx->fb_id);
-   glUseProgram(0);
-   ctx->need_prog_rebind = TRUE;
+
+   grend_use_program(0);
 
    if (buffers & PIPE_CLEAR_COLOR)
       glClearColor(color->f[0], color->f[1], color->f[2], color->f[3]);
@@ -929,12 +1003,22 @@ static void grend_update_scissor_state(struct grend_context *ctx)
    
    glScissor(ss->minx, ctx->fb_height - ss->maxy, ss->maxx - ss->minx, ss->maxy - ss->miny);
    ctx->scissor_state_dirty = FALSE;
+   grend_state.scissor_dirty = FALSE;
 }
 
 static void grend_update_viewport_state(struct grend_context *ctx)
 {
+   int i;
    glViewport(ctx->view_cur_x, ctx->fb_height - ctx->view_height - ctx->view_cur_y, ctx->view_width, ctx->view_height);
+
+   for (i = 0; i < ctx->nr_cbufs; i++) {
+      if (ctx->surf[i])
+         ctx->surf[i]->texture->renderer_flipped = ctx->view_flipped;
+   }
+   if (ctx->zsurf)
+      ctx->zsurf->texture->renderer_flipped = ctx->view_flipped;
    ctx->viewport_state_dirty = FALSE;
+   grend_state.viewport_dirty = FALSE;
 }
 
 void grend_draw_vbo(struct grend_context *ctx,
@@ -945,12 +1029,13 @@ void grend_draw_vbo(struct grend_context *ctx,
    bool new_program = FALSE;
    uint32_t shader_type;
    uint32_t num_enable;
+
    if (ctx->stencil_state_dirty)
       grend_update_stencil_state(ctx);
-   if (ctx->scissor_state_dirty)
+   if (ctx->scissor_state_dirty || grend_state.scissor_dirty)
       grend_update_scissor_state(ctx);
 
-   if (ctx->viewport_state_dirty)
+   if (ctx->viewport_state_dirty || grend_state.viewport_dirty)
       grend_update_viewport_state(ctx);
 
    if (ctx->shader_dirty) {
@@ -972,10 +1057,7 @@ void grend_draw_vbo(struct grend_context *ctx,
 
    glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, ctx->fb_id);
    
-   if (ctx->need_prog_rebind || new_program) {
-      glUseProgram(ctx->prog->id);
-      ctx->need_prog_rebind = FALSE;
-   }
+   grend_use_program(ctx->prog->id);
 
    glBindVertexArray(ctx->vaoid);
 
@@ -1229,7 +1311,7 @@ void grend_object_bind_blend(struct grend_context *ctx,
    struct pipe_blend_state *state;
 
    if (handle == 0) {
-      glDisable(GL_BLEND);
+      grend_blend_enable(GL_FALSE);
       return;
    }
    state = graw_object_lookup(handle, GRAW_OBJECT_BLEND);
@@ -1253,10 +1335,10 @@ void grend_object_bind_blend(struct grend_context *ctx,
                              translate_blend_factor(state->rt[0].alpha_dst_factor));
          glBlendEquationSeparate(translate_blend_func(state->rt[0].rgb_func),
                                  translate_blend_func(state->rt[0].alpha_func));
-         glEnable(GL_BLEND);
+         grend_blend_enable(GL_TRUE);
       } 
       else
-         glDisable(GL_BLEND);
+         grend_blend_enable(GL_FALSE);
 
       glColorMask(state->rt[0].colormask & PIPE_MASK_R ? GL_TRUE : GL_FALSE,
                   state->rt[0].colormask & PIPE_MASK_G ? GL_TRUE : GL_FALSE,
@@ -1271,9 +1353,9 @@ void grend_object_bind_dsa(struct grend_context *ctx,
    struct pipe_depth_stencil_alpha_state *state;
 
    if (handle == 0) {
-      glDisable(GL_DEPTH_TEST);
-      glDisable(GL_ALPHA_TEST);
-      glDisable(GL_STENCIL_TEST);
+      grend_depth_test_enable(GL_FALSE);
+      grend_alpha_test_enable(GL_FALSE);
+      grend_stencil_test_enable(GL_FALSE);
       ctx->dsa = NULL;
       return;
    }
@@ -1281,20 +1363,20 @@ void grend_object_bind_dsa(struct grend_context *ctx,
    state = graw_object_lookup(handle, GRAW_OBJECT_DSA);
 
    if (state->depth.enabled) {
-      glEnable(GL_DEPTH_TEST);
+      grend_depth_test_enable(GL_TRUE);
       glDepthFunc(GL_NEVER + state->depth.func);
       if (state->depth.writemask)
          glDepthMask(GL_TRUE);
       else
          glDepthMask(GL_FALSE);
    } else
-      glDisable(GL_DEPTH_TEST);
+      grend_depth_test_enable(GL_FALSE);
  
    if (state->alpha.enabled) {
-      glEnable(GL_ALPHA_TEST);
+      grend_alpha_test_enable(GL_TRUE);
       glAlphaFunc(GL_NEVER + state->alpha.func, state->alpha.ref_value);
    } else
-      glDisable(GL_ALPHA_TEST);
+      grend_alpha_test_enable(GL_FALSE);
 
    if (ctx->dsa != state)
       ctx->stencil_state_dirty = TRUE;
@@ -1310,7 +1392,7 @@ void grend_update_stencil_state(struct grend_context *ctx)
 
    if (!state->stencil[1].enabled) {
       if (state->stencil[0].enabled) {
-         glEnable(GL_STENCIL_TEST);
+         grend_stencil_test_enable(GL_TRUE);
 
          glStencilOp(translate_stencil_op(state->stencil[0].fail_op), 
                      translate_stencil_op(state->stencil[0].zpass_op),
@@ -1320,9 +1402,9 @@ void grend_update_stencil_state(struct grend_context *ctx)
                        state->stencil[0].valuemask);
          glStencilMask(state->stencil[0].writemask);
       } else
-         glDisable(GL_STENCIL_TEST);
+         grend_stencil_test_enable(GL_FALSE);
    } else {
-      glEnable(GL_STENCIL_TEST);
+      grend_stencil_test_enable(GL_TRUE);
 
       for (i = 0; i < 2; i++) {
          GLenum face = (i == 1) ? GL_BACK : GL_FRONT;
@@ -1536,7 +1618,7 @@ void grend_flush_frontbuffer(uint32_t res_handle)
    res = graw_object_lookup(res_handle, GRAW_RESOURCE);
 
    glDrawBuffer(GL_NONE);
-   glUseProgram(0);
+   grend_use_program(0);
    
    glMatrixMode(GL_PROJECTION);
    glLoadIdentity();
@@ -1602,7 +1684,9 @@ graw_renderer_init(void)
       graw_object_init_hash();
    }
    
-   list_inithead(&fence_list);
+   grend_state.viewport_dirty = grend_state.scissor_dirty = TRUE;
+   grend_state.program_id = (GLuint)-1;
+   list_inithead(&grend_state.fence_list);
 }
 
 void
@@ -1784,6 +1868,8 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
       int old_stride = 0;
       int invert = flags & (1 << 0);
 
+      grend_use_program(0);
+
       if (num_iovs > 1) {
          GLuint size = graw_iov_size(iov, num_iovs);
          data = malloc(size);
@@ -1812,13 +1898,17 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
             } else {
                glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, res->readback_fb_id);
             }
-            glReadBuffer(GL_COLOR_ATTACHMENT0_EXT);
+            glDrawBuffer(GL_COLOR_ATTACHMENT0_EXT);
          } else {
             glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
-            glReadBuffer(GL_BACK);
+            glDrawBuffer(GL_BACK);
          }
-         glPixelZoom(1.0f, invert ? 1.0f : -1.0f);
-         glWindowPos2i(dst_box->x, invert ? dst_box->y : res->base.height0 - dst_box->y);
+         grend_blend_enable(GL_FALSE);
+         grend_depth_test_enable(GL_FALSE);
+         grend_alpha_test_enable(GL_FALSE);
+         grend_stencil_test_enable(GL_FALSE);
+         glPixelZoom(1.0f, (!invert) ? 1.0f : -1.0f);
+         glWindowPos2i(dst_box->x, (!invert) ? dst_box->y : res->base.height0 - dst_box->y);
          glDrawPixels(dst_box->width, dst_box->height, GL_BGRA,
                       GL_UNSIGNED_BYTE, data);
       } else {
@@ -1894,11 +1984,13 @@ void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t level, uint32
       int invert = flags & (1 << 0);
       boolean actually_invert, separate_invert = FALSE;
 
+      grend_use_program(0);
+
       /* if we are asked to invert and reading from a front then don't */
       if (invert && res->is_front)
          actually_invert = FALSE;
       else
-         actually_invert = invert ? TRUE : FALSE;
+         actually_invert = invert ? FALSE : TRUE;
 
       if (actually_invert && !have_invert_mesa)
          separate_invert = TRUE;
@@ -1926,10 +2018,10 @@ void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t level, uint32
                                       res->target, res->id, level);
             res->readback_fb_id = fb_id;
             res->readback_fb_level = level;
-            y1 = h - box->y - box->height;
          } else {
             glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, res->readback_fb_id);
          }
+         y1 = h - box->y - box->height;
          if (have_invert_mesa && actually_invert)
             glPixelStorei(GL_PACK_INVERT_MESA, 1);
          glReadBuffer(GL_COLOR_ATTACHMENT0_EXT);      
@@ -1944,8 +2036,6 @@ void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t level, uint32
       default:
          format = tex_conv_table[res->base.format].glformat;
          type = tex_conv_table[res->base.format].gltype; 
-//         format = GL_BGRA;
-//         type = GL_UNSIGNED_BYTE;
          break;
       }
 
@@ -2020,11 +2110,23 @@ void graw_renderer_resource_copy_region(struct grend_context *ctx,
    glBindFramebuffer(GL_READ_FRAMEBUFFER, fb_ids[0]);
 
    glmask = GL_COLOR_BUFFER_BIT;
+   glDisable(GL_SCISSOR_TEST);
 
-   sy1 = src_res->base.height0 - (src_box->y + src_box->height);
-   sy2 = src_res->base.height0 - src_box->y;
-   dy1 = dst_res->base.height0 - (dsty + src_box->height);
-   dy2 = dst_res->base.height0 - src_box->y;
+   if (!src_res->is_front && !src_res->renderer_flipped) {
+      sy1 = src_box->y;
+      sy2 = src_box->y + src_box->height;
+   } else {
+      sy1 = src_res->base.height0 - src_box->y - src_box->height;
+      sy2 = src_res->base.height0 - src_box->y;
+   }
+
+   if (!dst_res->is_front && !dst_res->renderer_flipped) {
+      dy1 = dsty + src_box->height;
+      dy2 = dsty;
+   } else {
+      dy1 = dst_res->base.height0 - dsty - src_box->height;
+      dy2 = dst_res->base.height0 - dsty;
+   }
 
    glBlitFramebuffer(src_box->x, sy1,
                      src_box->x + src_box->width,
@@ -2043,7 +2145,7 @@ static void graw_renderer_blit_int(uint32_t dst_handle, uint32_t src_handle,
    struct grend_resource *src_res, *dst_res;
    GLuint fb_ids[2];
    GLbitfield glmask = 0;
-   int y1, y2, dst_y1, dst_y2;
+   int src_y1, src_y2, dst_y1, dst_y2;
 
    src_res = graw_object_lookup(src_handle, GRAW_RESOURCE);
    dst_res = graw_object_lookup(dst_handle, GRAW_RESOURCE);
@@ -2081,7 +2183,7 @@ static void graw_renderer_blit_int(uint32_t dst_handle, uint32_t src_handle,
    if (info->mask & PIPE_MASK_RGBA)
       glmask |= GL_COLOR_BUFFER_BIT;
 
-
+#if 0
    if (!dst_res->is_front) {
       y1 = info->src.box.y;
       y2 = (info->src.box.y + info->src.box.height);
@@ -2094,6 +2196,23 @@ static void graw_renderer_blit_int(uint32_t dst_handle, uint32_t src_handle,
       dst_y2 = dst_res->base.height0 - info->dst.box.y;
 
    }
+#endif
+
+   if (!dst_res->is_front && !dst_res->renderer_flipped) {
+      dst_y1 = info->dst.box.y + info->dst.box.height;
+      dst_y2 = info->dst.box.y;
+   } else {
+      dst_y1 = info->dst.box.y;
+      dst_y2 = info->dst.box.y + info->dst.box.height;
+   }
+
+   if (!src_res->is_front && !src_res->renderer_flipped) {
+      src_y1 = info->src.box.y + info->src.box.height;
+      src_y2 = info->src.box.y;
+   } else {
+      src_y1 = info->src.box.y;
+      src_y2 = info->src.box.y + info->src.box.height;
+   }
 
    if (info->scissor_enable)
       glEnable(GL_SCISSOR_TEST);
@@ -2101,9 +2220,9 @@ static void graw_renderer_blit_int(uint32_t dst_handle, uint32_t src_handle,
       glDisable(GL_SCISSOR_TEST);
       
    glBlitFramebuffer(info->src.box.x,
-                     y1,
+                     src_y1,
                      info->src.box.x + info->src.box.width,
-                     y2,
+                     src_y2,
                      info->dst.box.x,
                      dst_y1,
                      info->dst.box.x + info->dst.box.width,
@@ -2187,8 +2306,15 @@ int graw_renderer_flush_buffer(uint32_t res_handle,
       glBindFramebuffer(GL_READ_FRAMEBUFFER, fb_id);
       glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
       
+      /* force full scissor and viewport - should probably use supplied box */
+      fprintf(stderr,"flush box %d %d %d %d\n", box->x, box->y, box->width, box->height);
+      glScissor(box->x, box->y, box->width, box->height);
+      glViewport(0, 0, res->base.width0, res->base.height0);
+      grend_state.viewport_dirty = TRUE;
+      grend_state.scissor_dirty = TRUE;
+      /* justification for inversion here required */
       glBlitFramebuffer(0, 0, res->base.width0, res->base.height0,
-                        0, 0, res->base.width0, res->base.height0,
+                        0, res->base.height0, res->base.width0, 0,
                         GL_COLOR_BUFFER_BIT, GL_NEAREST);
       glDeleteFramebuffers(1, &fb_id);
    } else {
@@ -2209,7 +2335,7 @@ int graw_renderer_create_fence(int client_fence_id)
 
    fence->fence_id = client_fence_id;
    fence->syncobj = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
-   list_addtail(&fence->fences, &fence_list);
+   list_addtail(&fence->fences, &grend_state.fence_list);
    return 0;
 }
 
@@ -2222,7 +2348,7 @@ void graw_renderer_check_fences(void)
    if (!inited)
       return;
 
-   LIST_FOR_EACH_ENTRY_SAFE(fence, stor, &fence_list, fences) {
+   LIST_FOR_EACH_ENTRY_SAFE(fence, stor, &grend_state.fence_list, fences) {
       glret = glClientWaitSync(fence->syncobj, 0, 0);
       if (glret == GL_ALREADY_SIGNALED){
          latest_id = fence->fence_id;

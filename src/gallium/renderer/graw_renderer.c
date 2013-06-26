@@ -60,6 +60,7 @@ struct grend_linked_shader_program {
   struct grend_shader_state *vs;
   struct grend_shader_state *fs;
 
+  GLuint num_samplers[PIPE_SHADER_TYPES];
   GLuint *samp_locs[PIPE_SHADER_TYPES];
 
   GLuint *const_locs[PIPE_SHADER_TYPES];
@@ -448,7 +449,7 @@ static struct grend_linked_shader_program *add_shader_program(struct grend_conte
     }
   } else
     sprog->samp_locs[PIPE_SHADER_VERTEX] = NULL;
-
+  sprog->num_samplers[PIPE_SHADER_VERTEX] = vs->num_samplers;
   if (fs->num_samplers) {
     sprog->samp_locs[PIPE_SHADER_FRAGMENT] = calloc(fs->num_samplers, sizeof(uint32_t));
     if (sprog->samp_locs[PIPE_SHADER_FRAGMENT]) {
@@ -459,7 +460,7 @@ static struct grend_linked_shader_program *add_shader_program(struct grend_conte
     }
   } else
     sprog->samp_locs[PIPE_SHADER_FRAGMENT] = NULL;
-
+  sprog->num_samplers[PIPE_SHADER_FRAGMENT] = fs->num_samplers;
   
   if (vs->num_consts) {
     sprog->const_locs[PIPE_SHADER_VERTEX] = calloc(vs->num_consts, sizeof(uint32_t));
@@ -1091,13 +1092,14 @@ void grend_draw_vbo(struct grend_context *ctx,
          if (ctx->views[shader_type].views[i]) {
             texture = ctx->views[shader_type].views[i]->texture;
          }
+         if (i >= ctx->prog->num_samplers[shader_type])
+             break;
          if (ctx->prog->samp_locs[shader_type])
             glUniform1i(ctx->prog->samp_locs[shader_type][i], sampler_id);
          glActiveTexture(GL_TEXTURE0 + sampler_id);
          if (texture) {
             ctx->old_targets[sampler_id] = texture->target;
             glBindTexture(texture->target, texture->id);
-            glEnable(texture->target);
             if (ctx->views[shader_type].old_ids[i] != texture->id) {
                grend_apply_sampler_state(ctx, texture, shader_type, sampler_id);
                ctx->views[shader_type].old_ids[i] = texture->id;
@@ -1628,7 +1630,6 @@ void grend_flush_frontbuffer(uint32_t res_handle)
    glDisable(GL_BLEND);
    glBindTexture(res->target, res->id);
    glBindFramebuffer(GL_FRAMEBUFFER_EXT, 0);
-   glEnable(res->target);
    glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
    glTexParameteri(res->target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
    glTexParameteri(res->target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);

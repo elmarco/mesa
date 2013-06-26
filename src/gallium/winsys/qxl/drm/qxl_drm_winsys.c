@@ -242,7 +242,7 @@ qxl_bo_transfer_put(struct pb_buffer *_buf,
    putcmd.src_stride = src_stride;
    putcmd.src_offset = buf_offset;
    putcmd.dst_level = level;
-
+   putcmd.transfer_flags = 0;
    ret = drmIoctl(bo->qws->fd, DRM_IOCTL_VIRGL_TRANSFER_PUT, &putcmd);
    return ret;
 }
@@ -263,6 +263,7 @@ qxl_bo_transfer_get(struct pb_buffer *_buf,
    getcmd.level = level;
    getcmd.dst_offset = buf_offset;
    getcmd.box = *(struct drm_virgl_3d_box *)box;
+   getcmd.transfer_flags = 0;
    ret = drmIoctl(bo->qws->fd, DRM_IOCTL_VIRGL_TRANSFER_GET, &getcmd);
    return ret;
 }

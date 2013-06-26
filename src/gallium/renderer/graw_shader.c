@@ -457,7 +457,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
          snprintf(buf, 255, "%s = shadow2DRect(%s, %s.xyz)%s;\n", dsts[0], srcs[1], srcs[0], writemask);
       else if (inst->Texture.Texture == TGSI_TEXTURE_CUBE)
          snprintf(buf, 255, "%s = texture(%s, %s.xyz)%s;\n", dsts[0], srcs[1], srcs[0], writemask);
-      else if (inst->Texture.Texture == TGSI_TEXTURE_SHADOW2D)
+      else if (inst->Texture.Texture == TGSI_TEXTURE_SHADOW2D || inst->Texture.Texture == TGSI_TEXTURE_2D_ARRAY)
          snprintf(buf, 255, "%s = %s(texture(%s, %s.xyz));\n", dsts[0], dstconv, srcs[1], srcs[0]);
       else if (inst->Texture.Texture == TGSI_TEXTURE_SHADOW1D)
          snprintf(buf, 255, "%s = %s(texture(%s, %s.xyz));\n", dsts[0], dstconv, srcs[1], srcs[0]);
@@ -471,8 +471,10 @@ iter_instruction(struct tgsi_iterate_context *iter,
          snprintf(buf, 255, "%s = texture2DRectProj(%s, %s.xyz)%s;\n", dsts[0], srcs[1], srcs[0], writemask);
       else if (inst->Texture.Texture == TGSI_TEXTURE_SHADOWRECT)
          snprintf(buf, 255, "%s = shadow2DRectProj(%s, %s)%s;\n", dsts[0], srcs[1], srcs[0], writemask);
-      else if (inst->Texture.Texture == TGSI_TEXTURE_CUBE)
+      else if (inst->Texture.Texture == TGSI_TEXTURE_CUBE || inst->Texture.Texture == TGSI_TEXTURE_2D_ARRAY)
          snprintf(buf, 255, "%s = texture(%s, %s.xyz)%s;\n", dsts[0], srcs[1], srcs[0], writemask);
+      else if (inst->Texture.Texture == TGSI_TEXTURE_1D_ARRAY)
+         snprintf(buf, 255, "%s = texture(%s, %s.xy)%s;\n", dsts[0], srcs[1], srcs[0], writemask);
       else
          snprintf(buf, 255, "%s = textureProj(%s, %s)%s;\n", dsts[0], srcs[1], srcs[0], writemask);
 
@@ -480,7 +482,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
       break;
    case TGSI_OPCODE_TXB:
       ctx->samplers[sreg_index].tgsi_sampler_type = inst->Texture.Texture;
-      snprintf(buf, 255, "%s = texture(%s, %s.xyz, %s.z)%s;\n", dsts[0], srcs[1], srcs[0], srcs[0], writemask);
+      snprintf(buf, 255, "%s = texture(%s, %s.xy, %s.z)%s;\n", dsts[0], srcs[1], srcs[0], srcs[0], writemask);
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_TXL:
@@ -564,6 +566,10 @@ static const char *samplertypeconv(int sampler_type)
 	case TGSI_TEXTURE_SHADOW1D: return "1DShadow";
 	case TGSI_TEXTURE_SHADOW2D: return "2DShadow";
 	case TGSI_TEXTURE_SHADOWRECT: return "2DRectShadow";
+        case TGSI_TEXTURE_1D_ARRAY: return "1DArray";
+        case TGSI_TEXTURE_2D_ARRAY: return "2DArray";
+        case TGSI_TEXTURE_SHADOW1D_ARRAY: return "1DArrayShadow";
+        case TGSI_TEXTURE_SHADOW2D_ARRAY: return "2DArrayShadow";
 	default: return "UNK";
         }
 }

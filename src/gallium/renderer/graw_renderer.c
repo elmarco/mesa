@@ -1664,10 +1664,14 @@ static GLenum tgsitargettogltarget(const enum pipe_texture_target target)
       return GL_TEXTURE_RECTANGLE_NV;
    case PIPE_TEXTURE_CUBE:
       return GL_TEXTURE_CUBE_MAP;
-   case PIPE_BUFFER:
+
    case PIPE_TEXTURE_1D_ARRAY:
+      return GL_TEXTURE_1D_ARRAY;
    case PIPE_TEXTURE_2D_ARRAY:
+      return GL_TEXTURE_2D_ARRAY;
    case PIPE_TEXTURE_CUBE_ARRAY:
+      return GL_TEXTURE_CUBE_MAP_ARRAY;
+   case PIPE_BUFFER:
    default:
       return PIPE_BUFFER;
    }
@@ -1760,8 +1764,8 @@ void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target tar
                             gltype, NULL);
             }
          }
-      } else if (gr->target == GL_TEXTURE_3D) {
-         glTexImage3D(gr->target, 0, internalformat, width, height, depth, 0,
+      } else if (gr->target == GL_TEXTURE_3D || gr->target == GL_TEXTURE_2D_ARRAY) {
+         glTexImage3D(gr->target, 0, internalformat, width, height, gr->target == GL_TEXTURE_2D_ARRAY ? array_size : depth, 0,
                       glformat,
                       gltype, NULL);
       } else if (gr->target == GL_TEXTURE_1D) {
@@ -1772,7 +1776,7 @@ void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target tar
          for (level = 0; level <= last_level; level++) {
             unsigned mwidth = u_minify(width, level);
             unsigned mheight = u_minify(height, level);
-            glTexImage2D(gr->target, level, internalformat, mwidth, mheight, 0, glformat,
+            glTexImage2D(gr->target, level, internalformat, mwidth, gr->target == GL_TEXTURE_1D_ARRAY ? array_size : mheight, 0, glformat,
                          gltype, NULL);
          }
       }
@@ -1926,7 +1930,7 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
             
             glTexSubImage2D(ctarget, level, dst_box->x, dst_box->y, dst_box->width, dst_box->height,
                             glformat, gltype, data);
-         } else if (res->target == GL_TEXTURE_3D) {
+         } else if (res->target == GL_TEXTURE_3D || res->target == GL_TEXTURE_2D_ARRAY) {
             glTexSubImage3D(res->target, level, dst_box->x, dst_box->y, dst_box->z,
                             dst_box->width, dst_box->height, dst_box->depth,
                             glformat, gltype, data);
@@ -1934,7 +1938,7 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
             glTexSubImage1D(res->target, level, dst_box->x, dst_box->width,
                             glformat, gltype, data);
          } else {
-            glTexSubImage2D(res->target, level, dst_box->x, dst_box->y,
+            glTexSubImage2D(res->target, level, dst_box->x, res->target == GL_TEXTURE_1D_ARRAY ? dst_box->z : dst_box->y,
                             dst_box->width, dst_box->height,
                             glformat, gltype, data);
          }

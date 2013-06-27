@@ -29,6 +29,7 @@
 /* blit/copy operations from the guest POV are in y = 0 = top orientation */
 
 /* since we are storing things in OpenGL FBOs we need to flip transfer operations by default */
+static void grend_update_viewport_state(struct grend_context *ctx);
 
 extern int graw_shader_use_explicit;
 int localrender;
@@ -976,6 +977,9 @@ void grend_clear(struct grend_context *ctx,
 {
    GLbitfield bits = 0;
    glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, ctx->fb_id);
+
+   if (ctx->viewport_state_dirty || grend_state.viewport_dirty)
+      grend_update_viewport_state(ctx);
 
    grend_use_program(0);
 

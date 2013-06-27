@@ -548,6 +548,7 @@ void grend_create_sampler_view(struct grend_context *ctx,
                                uint32_t val0, uint32_t val1, uint32_t swizzle_packed)
 {
    struct grend_sampler_view *view;
+   const struct util_format_description *desc;
 
    view = CALLOC_STRUCT(grend_sampler_view);
    view->res_handle = res_handle;
@@ -568,13 +569,17 @@ void grend_create_sampler_view(struct grend_context *ctx,
       FREE(view);
       return;
    }
-      
+   
    if (view->format != view->texture->base.format) {
       fprintf(stderr,"%d %d swizzles %d %d %d %d\n", view->format, view->texture->base.format, view->swizzle_r, view->swizzle_g, view->swizzle_b, view->swizzle_a);
       /* hack to make tfp work for now */
       view->gl_swizzle_a = GL_ONE;
-   } else
-      view->gl_swizzle_a = GL_ALPHA;
+   } else {
+      if (util_format_has_alpha(format))
+         view->gl_swizzle_a = GL_ALPHA;
+      else
+         view->gl_swizzle_a = GL_ONE;
+   }
    graw_object_insert(view, sizeof(*view), handle, GRAW_OBJECT_SAMPLER_VIEW);
 }
 

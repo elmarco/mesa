@@ -2045,13 +2045,8 @@ void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t level, uint32
          glReadBuffer(GL_BACK);
       }
             
-      switch (res->base.format) {
-      case PIPE_FORMAT_B8G8R8A8_UNORM:
-      default:
-         format = tex_conv_table[res->base.format].glformat;
-         type = tex_conv_table[res->base.format].gltype; 
-         break;
-      }
+      format = tex_conv_table[res->base.format].glformat;
+      type = tex_conv_table[res->base.format].gltype; 
 
       glReadPixels(box->x, y1, box->width, box->height, format, type, data);
 

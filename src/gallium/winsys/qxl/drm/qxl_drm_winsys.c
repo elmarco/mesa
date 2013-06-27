@@ -482,14 +482,15 @@ static void qxl_drm_release_all_res(struct qxl_drm_winsys *qdws,
 }
 
 static void qxl_drm_emit_res(struct qxl_winsys *qws,
-                             struct qxl_cmd_buf *_cbuf, struct qxl_hw_res *res)
+                             struct qxl_cmd_buf *_cbuf, struct qxl_hw_res *res, boolean write_buf)
 {
    struct qxl_drm_winsys *qdws = qxl_drm_winsys(qws);
    struct qxl_drm_cmd_buf *cbuf = (struct qxl_drm_cmd_buf *)_cbuf;
    int i;
    boolean already_in_list = qxl_drm_lookup_res(cbuf, res);
    
-   cbuf->base.buf[cbuf->base.cdw++] = res->res_handle;
+   if (write_buf)
+      cbuf->base.buf[cbuf->base.cdw++] = res->res_handle;
 
    if (!already_in_list)
       qxl_drm_add_res(qdws, cbuf, res);

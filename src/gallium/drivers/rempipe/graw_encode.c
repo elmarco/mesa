@@ -33,7 +33,7 @@ static void graw_encoder_write_res(struct graw_context *ctx,
    struct qxl_winsys *qws = rempipe_screen(ctx->base.screen)->qws;
 
    if (res && res->hw_res)
-      qws->emit_res(qws, ctx->cbuf, res->hw_res);
+      qws->emit_res(qws, ctx->cbuf, res->hw_res, TRUE);
    else {
       graw_encoder_write_dword(ctx->cbuf, 0);
    }

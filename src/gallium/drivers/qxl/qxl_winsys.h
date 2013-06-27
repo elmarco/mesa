@@ -71,7 +71,7 @@ struct qxl_winsys {
    struct qxl_cmd_buf *(*cmd_buf_create)(struct qxl_winsys *ws);
    void (*cmd_buf_destroy)(struct qxl_cmd_buf *buf);
 
-   void (*emit_res)(struct qxl_winsys *qws, struct qxl_cmd_buf *buf, struct qxl_hw_res *res);
+   void (*emit_res)(struct qxl_winsys *qws, struct qxl_cmd_buf *buf, struct qxl_hw_res *res, boolean write_buffer);
    int (*submit_cmd)(struct qxl_winsys *qws, struct qxl_cmd_buf *buf);
 
    boolean (*res_is_referenced)(struct qxl_winsys *qws,

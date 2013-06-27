@@ -443,11 +443,31 @@ static void graw_draw_vbo(struct pipe_context *ctx,
 static void graw_flush_eq(struct graw_context *ctx, void *closure)
 {
    struct rempipe_screen *rs = rempipe_screen(ctx->base.screen);
+   int i;
    /* send the buffer to the remote side for decoding - for now jdi */
    
 //   fprintf(stderr,"flush transfers: %d draws %d\n", ctx->num_transfers, ctx->num_draws);
    ctx->num_transfers = ctx->num_draws = 0;
    rs->qws->submit_cmd(rs->qws, ctx->cbuf);
+
+   /* add back current framebuffer resources to reference list? */
+   {
+      struct qxl_winsys *qws = rempipe_screen(ctx->base.screen)->qws;
+      struct pipe_surface *surf;
+      struct graw_resource *res;
+      surf = ctx->framebuffer.zsbuf;
+      if (surf) {
+         res = (struct graw_resource *)surf->texture;
+         qws->emit_res(qws, ctx->cbuf, res->hw_res, FALSE);
+      }
+      for (i = 0; i < ctx->framebuffer.nr_cbufs; i++) {
+         surf = ctx->framebuffer.cbufs[i];
+         if (surf) {
+            res = (struct graw_resource *)surf->texture;
+            qws->emit_res(qws, ctx->cbuf, res->hw_res, FALSE);
+         }
+      }
+   }
 }
 
 static void graw_flush(struct pipe_context *ctx,

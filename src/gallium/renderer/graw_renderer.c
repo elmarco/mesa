@@ -2130,8 +2130,8 @@ void graw_renderer_resource_copy_region(struct grend_context *ctx,
    }
 
    if (!dst_res->is_front && !dst_res->renderer_flipped) {
-      dy1 = dsty + src_box->height;
-      dy2 = dsty;
+      dy1 = dsty;
+      dy2 = dsty + src_box->height;
    } else {
       dy1 = dst_res->base.height0 - dsty - src_box->height;
       dy2 = dst_res->base.height0 - dsty;

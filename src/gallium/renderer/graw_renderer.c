@@ -149,7 +149,6 @@ struct grend_shader_view {
 };
 
 struct grend_context {
-   struct pipe_context base;
    GLuint vaoid;
    GLuint num_enabled_attribs;
 

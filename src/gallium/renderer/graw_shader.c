@@ -533,9 +533,16 @@ iter_instruction(struct tgsi_iterate_context *iter,
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_BGNLOOP:
+      snprintf(buf, 255, "do {\n");
+      strcat(ctx->glsl_main, buf);
+      break;
    case TGSI_OPCODE_ENDLOOP:
+      snprintf(buf, 255, "} while(true);\n");
+      strcat(ctx->glsl_main, buf);
+      break;
    case TGSI_OPCODE_BRK:
-      fprintf(stderr,"TODO LOOPS\n");
+      snprintf(buf, 255, "break;\n");
+      strcat(ctx->glsl_main, buf);
       break;
    default:
       fprintf(stderr,"failed to convert opcode %d\n", inst->Instruction.Opcode);

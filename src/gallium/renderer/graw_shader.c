@@ -468,7 +468,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
    case TGSI_OPCODE_TXP:
       ctx->samplers[sreg_index].tgsi_sampler_type = inst->Texture.Texture;
       if (inst->Texture.Texture == TGSI_TEXTURE_RECT)
-         snprintf(buf, 255, "%s = texture2DRectProj(%s, %s.xyz)%s;\n", dsts[0], srcs[1], srcs[0], writemask);
+         snprintf(buf, 255, "%s = texture2DRectProj(%s, %s)%s;\n", dsts[0], srcs[1], srcs[0], writemask);
       else if (inst->Texture.Texture == TGSI_TEXTURE_SHADOWRECT)
          snprintf(buf, 255, "%s = shadow2DRectProj(%s, %s)%s;\n", dsts[0], srcs[1], srcs[0], writemask);
       else if (inst->Texture.Texture == TGSI_TEXTURE_CUBE || inst->Texture.Texture == TGSI_TEXTURE_2D_ARRAY)

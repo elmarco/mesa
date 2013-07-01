@@ -1603,12 +1603,14 @@ static void grend_apply_sampler_state(struct grend_context *ctx,
       glTexParameterf(target, GL_TEXTURE_MIN_FILTER, convert_min_filter(state->min_img_filter, state->min_mip_filter));
    if (tex->state.min_img_filter != state->mag_img_filter || set_all)
       glTexParameterf(target, GL_TEXTURE_MAG_FILTER, convert_mag_filter(state->mag_img_filter));
-   if (tex->state.min_lod != state->min_lod || set_all)
-      glTexParameterf(target, GL_TEXTURE_MIN_LOD, state->min_lod);
-   if (tex->state.max_lod != state->max_lod || set_all)
-      glTexParameterf(target, GL_TEXTURE_MAX_LOD, state->max_lod);
-   if (tex->state.lod_bias != state->lod_bias || set_all)
-      glTexParameterf(target, GL_TEXTURE_LOD_BIAS, state->lod_bias);
+   if (res->target != GL_TEXTURE_RECTANGLE) {
+      if (tex->state.min_lod != state->min_lod || set_all)
+         glTexParameterf(target, GL_TEXTURE_MIN_LOD, state->min_lod);
+      if (tex->state.max_lod != state->max_lod || set_all)
+         glTexParameterf(target, GL_TEXTURE_MAX_LOD, state->max_lod);
+      if (tex->state.lod_bias != state->lod_bias || set_all)
+         glTexParameterf(target, GL_TEXTURE_LOD_BIAS, state->lod_bias);
+   }
 
    tex->state = *state;
 }

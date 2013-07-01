@@ -315,19 +315,19 @@ iter_instruction(struct tgsi_iterate_context *iter,
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_DP2:
-      snprintf(buf, 255, "%s = dot(vec2(%s), vec2(%s));\n", dsts[0], srcs[0], srcs[1]);
+      snprintf(buf, 255, "%s = %s(dot(vec2(%s), vec2(%s)));\n", dsts[0], dstconv, srcs[0], srcs[1]);
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_DP3:
-      snprintf(buf, 255, "%s = dot(vec3(%s), vec3(%s));\n", dsts[0], srcs[0], srcs[1]);
+      snprintf(buf, 255, "%s = %s(dot(vec3(%s), vec3(%s)));\n", dsts[0], dstconv, srcs[0], srcs[1]);
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_DP4:
-      snprintf(buf, 255, "%s = dot(vec4(%s), vec4(%s));\n", dsts[0], srcs[0], srcs[1]);
+      snprintf(buf, 255, "%s = %s(dot(vec4(%s), vec4(%s)));\n", dsts[0], dstconv, srcs[0], srcs[1]);
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_DPH:
-      snprintf(buf, 255, "%s = dot(vec4(%s), vec4(vec3(%s), 1.0))%s;\n", dsts[0], srcs[0], srcs[1], writemask);
+      snprintf(buf, 255, "%s = %s(dot(vec4(%s), vec4(vec3(%s), 1.0)));\n", dsts[0], dstconv, srcs[0], srcs[1]);
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_MAX:
@@ -459,8 +459,10 @@ iter_instruction(struct tgsi_iterate_context *iter,
          snprintf(buf, 255, "%s = texture(%s, %s.xyz)%s;\n", dsts[0], srcs[1], srcs[0], writemask);
       else if (inst->Texture.Texture == TGSI_TEXTURE_SHADOW2D || inst->Texture.Texture == TGSI_TEXTURE_2D_ARRAY)
          snprintf(buf, 255, "%s = %s(texture(%s, %s.xyz));\n", dsts[0], dstconv, srcs[1], srcs[0]);
-      else if (inst->Texture.Texture == TGSI_TEXTURE_SHADOW1D)
+      else if (inst->Texture.Texture == TGSI_TEXTURE_SHADOW1D || inst->Texture.Texture == TGSI_TEXTURE_3D)
          snprintf(buf, 255, "%s = %s(texture(%s, %s.xyz));\n", dsts[0], dstconv, srcs[1], srcs[0]);
+      else if (inst->Texture.Texture == TGSI_TEXTURE_1D)
+         snprintf(buf, 255, "%s = %s(texture(%s, %s.x));\n", dsts[0], dstconv, srcs[1], srcs[0]);
       else
          snprintf(buf, 255, "%s = texture(%s, %s.xy)%s;\n", dsts[0], srcs[1], srcs[0], writemask);
       strcat(ctx->glsl_main, buf);
@@ -526,6 +528,9 @@ iter_instruction(struct tgsi_iterate_context *iter,
       snprintf(buf, 255, "addr0 = int(floor(%s)%s);\n", srcs[0], writemask);
       strcat(ctx->glsl_main, buf);
       break;
+   case TGSI_OPCODE_XPD:
+      snprintf(buf, 255, "%s = %s(cross(vec3(%s), vec3(%s)));\n", dsts[0], dstconv, srcs[0], srcs[1]);
+      strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_BGNLOOP:
    case TGSI_OPCODE_ENDLOOP:

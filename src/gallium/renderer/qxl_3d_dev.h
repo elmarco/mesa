@@ -52,6 +52,11 @@ struct qxl_3d_set_scanout {
 	struct drm_qxl_3d_box box;
 };
 
+struct qxl_3d_context {
+        uint32_t handle;
+        uint32_t pad;
+};
+
 struct qxl_3d_resource_create {
 	uint32_t handle;
 	uint32_t target;
@@ -81,13 +86,14 @@ typedef struct QXL3DCommand {
    uint32_t flags;
    uint64_t fence_id;
    union qxl_3d_cmds {
-      struct qxl_3d_resource_create res_create;
-      struct qxl_3d_transfer_put transfer_put;
-      struct qxl_3d_transfer_get transfer_get;
-      struct qxl_3d_cmd_submit cmd_submit;
-      struct qxl_3d_set_scanout set_scanout;
-      struct qxl_3d_flush_buffer flush_buffer;
-      struct qxl_3d_resource_unref res_unref;
+           struct qxl_3d_context ctx;
+           struct qxl_3d_resource_create res_create;
+           struct qxl_3d_transfer_put transfer_put;
+           struct qxl_3d_transfer_get transfer_get;
+           struct qxl_3d_cmd_submit cmd_submit;
+           struct qxl_3d_set_scanout set_scanout;
+           struct qxl_3d_flush_buffer flush_buffer;
+           struct qxl_3d_resource_unref res_unref;
    } u;
 } QXL3DCommand;
 

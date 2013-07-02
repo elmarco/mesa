@@ -38,6 +38,9 @@ void grend_flush(struct grend_context *ctx);
 
 void grend_flush_frontbuffer(uint32_t res_handle);
 struct grend_context *grend_create_context(void);
+void grend_destroy_context(struct grend_context *ctx);
+void graw_renderer_context_create(uint32_t handle);
+void graw_renderer_context_destroy(uint32_t handle);
 
 void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target target, uint32_t format, uint32_t bind, uint32_t width, uint32_t height, uint32_t depth, uint32_t array_size, uint32_t last_level, uint32_t nr_samples);
 void graw_renderer_resource_unref(uint32_t handle);

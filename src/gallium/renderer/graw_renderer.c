@@ -1714,6 +1714,11 @@ graw_renderer_fini(void)
    inited = 0;
 }
 
+void grend_destroy_context(struct grend_context *ctx)
+{
+   glDeleteVertexArrays(1, &ctx->vaoid);
+   FREE(ctx);
+}
 
 struct grend_context *grend_create_context(void)
 {

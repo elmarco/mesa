@@ -15,13 +15,12 @@
 #define DECODE_MAX_TOKENS 300
 
 struct grend_decode_ctx {
-   struct graw_decoder_state *ds;
+   struct graw_decoder_state ids, *ds;
    struct grend_context *grctx;
 };
 
-static struct grend_decode_ctx dec_ctx;
-
-struct grend_decode_ctx *gdctx = &dec_ctx;
+#define GRAW_MAX_CTX 16
+static struct grend_decode_ctx *dec_ctx[GRAW_MAX_CTX];
 
 static int graw_decode_create_shader(struct grend_decode_ctx *ctx, uint32_t type,
                               uint32_t handle,
@@ -191,7 +190,7 @@ static void graw_decode_draw_vbo(struct grend_decode_ctx *ctx)
    info.mode = ctx->ds->buf[ctx->ds->buf_offset + 3];
    info.indexed = ctx->ds->buf[ctx->ds->buf_offset + 4];
    info.instance_count = ctx->ds->buf[ctx->ds->buf_offset + 5];
-   grend_draw_vbo(gdctx->grctx, &info);
+   grend_draw_vbo(ctx->grctx, &info);
 }
 
 static void graw_decode_create_blend(struct grend_decode_ctx *ctx, uint32_t handle, uint16_t length)
@@ -429,9 +428,9 @@ static void graw_decode_destroy_object(struct grend_decode_ctx *ctx)
 
 void graw_reset_decode(void)
 {
-   free(gdctx->grctx);
-   gdctx->grctx = NULL;
-   gdctx->ds = NULL;
+   // free(gdctx->grctx);
+   // gdctx->grctx = NULL;
+   //gdctx->ds = NULL;
 }
 
 static void graw_decode_set_stencil_ref(struct grend_decode_ctx *ctx)
@@ -440,7 +439,7 @@ static void graw_decode_set_stencil_ref(struct grend_decode_ctx *ctx)
    uint32_t val = ctx->ds->buf[ctx->ds->buf_offset + 1];
    ref.ref_value[0] = val & 0xff;
    ref.ref_value[1] = (val >> 8) & 0xff;
-   grend_set_stencil_ref(gdctx->grctx, &ref);
+   grend_set_stencil_ref(ctx->grctx, &ref);
 }
 
 static void graw_decode_set_blend_color(struct grend_decode_ctx *ctx)
@@ -451,7 +450,7 @@ static void graw_decode_set_blend_color(struct grend_decode_ctx *ctx)
    for (i = 0; i < 4; i++)
       color.color[i] = fui(ctx->ds->buf[ctx->ds->buf_offset + 1 + i]);
 
-   grend_set_blend_color(gdctx->grctx, &color);
+   grend_set_blend_color(ctx->grctx, &color);
 }
 
 static void graw_decode_set_scissor_state(struct grend_decode_ctx *ctx)
@@ -467,7 +466,7 @@ static void graw_decode_set_scissor_state(struct grend_decode_ctx *ctx)
    ss.maxx = temp & 0xffff;
    ss.maxy = (temp >> 16) & 0xffff;
 
-   grend_set_scissor_state(gdctx->grctx, &ss);
+   grend_set_scissor_state(ctx->grctx, &ss);
 }
 
 static void graw_decode_resource_copy_region(struct grend_decode_ctx *ctx)
@@ -491,7 +490,7 @@ static void graw_decode_resource_copy_region(struct grend_decode_ctx *ctx)
    box.height = ctx->ds->buf[ctx->ds->buf_offset + 12];
    box.depth = ctx->ds->buf[ctx->ds->buf_offset + 13];
 
-   graw_renderer_resource_copy_region(gdctx->grctx, dst_handle,
+   graw_renderer_resource_copy_region(ctx->grctx, dst_handle,
                                       dst_level, dstx, dsty, dstz,
                                       src_handle, src_level,
                                       &box);
@@ -532,7 +531,7 @@ static void graw_decode_blit(struct grend_decode_ctx *ctx)
    info.src.box.height = ctx->ds->buf[ctx->ds->buf_offset + 22];
    info.src.box.depth = ctx->ds->buf[ctx->ds->buf_offset + 23]; 
 
-   graw_renderer_blit(gdctx->grctx, dst_handle, src_handle, &info);
+   graw_renderer_blit(ctx->grctx, dst_handle, src_handle, &info);
 }
 
 static void graw_decode_bind_sampler_states(struct grend_decode_ctx *ctx, int length)
@@ -540,22 +539,62 @@ static void graw_decode_bind_sampler_states(struct grend_decode_ctx *ctx, int le
    uint32_t shader_type = ctx->ds->buf[ctx->ds->buf_offset + 1];
    uint32_t num_states = length - 1;
 
-   grend_bind_sampler_states(gdctx->grctx, shader_type, num_states,
+   grend_bind_sampler_states(ctx->grctx, shader_type, num_states,
                                     &ctx->ds->buf[ctx->ds->buf_offset + 2]);
+}
+
+void graw_renderer_context_create(uint32_t handle)
+{
+   struct grend_decode_ctx *dctx;
+
+   if (handle > GRAW_MAX_CTX)
+      return;
+   
+   dctx = malloc(sizeof(struct grend_decode_ctx));
+   if (!dctx)
+       return;
+   
+   dctx->grctx = grend_create_context();
+   if (!dctx->grctx) {
+      free(dctx);
+      return;
+   }
+
+   dctx->ds = &dctx->ids;
+   
+   dec_ctx[handle] = dctx;
+}
+
+void graw_renderer_context_destroy(uint32_t handle)
+{
+   struct grend_decode_ctx *ctx;
+
+   if (handle > GRAW_MAX_CTX)
+      return;
+
+   ctx = dec_ctx[handle];
+   dec_ctx[handle] = NULL;
+   grend_destroy_context(ctx->grctx);
+   free(ctx);
 }
 
 static void graw_decode_block(uint32_t *block, int ndw)
 {
-   struct graw_decoder_state ds;
    int i = 0;
+   int ctx_id = block[0];
+   struct grend_decode_ctx *gdctx;
+ 
+   if (ctx_id > GRAW_MAX_CTX)
+      return;
 
-   gdctx->ds = &ds;
-   if (!gdctx->grctx) {
-      gdctx->grctx = grend_create_context();
-   }
+   if (dec_ctx[ctx_id] == NULL)
+      return;
+
+   gdctx = dec_ctx[ctx_id];
+
    gdctx->ds->buf = block;
    gdctx->ds->buf_total = ndw;
-   gdctx->ds->buf_offset = 0;
+   gdctx->ds->buf_offset = 1;
 
    while (gdctx->ds->buf_offset < gdctx->ds->buf_total) {
       uint32_t header = gdctx->ds->buf[gdctx->ds->buf_offset];

@@ -1369,7 +1369,26 @@ static void grend_hw_emit_blend(struct grend_context *ctx)
       glDisable(GL_COLOR_LOGIC_OP);
 
    if (state->independent_blend_enable) {
-      fprintf(stderr,"TODO bind independendt blend state\n");
+      /* ARB_draw_buffers_blend is required for this */
+      int i;
+
+      for (i = 0; i < PIPE_MAX_COLOR_BUFS; i++) {
+         if (state->rt[i].blend_enable) {
+            glBlendFuncSeparatei(i, translate_blend_factor(state->rt[i].rgb_src_factor),
+                                 translate_blend_factor(state->rt[i].rgb_dst_factor),
+                                 translate_blend_factor(state->rt[i].alpha_src_factor),
+                                 translate_blend_factor(state->rt[i].alpha_dst_factor));
+            glBlendEquationSeparatei(i, translate_blend_func(state->rt[0].rgb_func),
+                                     translate_blend_func(state->rt[0].alpha_func));
+            glEnableIndexedEXT(GL_BLEND, i);
+         } else
+            glDisableIndexedEXT(GL_BLEND, i);
+
+         glColorMaskIndexedEXT(i, state->rt[i].colormask & PIPE_MASK_R ? GL_TRUE : GL_FALSE,
+                            state->rt[i].colormask & PIPE_MASK_G ? GL_TRUE : GL_FALSE,
+                            state->rt[i].colormask & PIPE_MASK_B ? GL_TRUE : GL_FALSE,
+                            state->rt[i].colormask & PIPE_MASK_A ? GL_TRUE : GL_FALSE);
+      }
    } else {
       if (state->rt[0].blend_enable) {
          glBlendFuncSeparate(translate_blend_factor(state->rt[0].rgb_src_factor),

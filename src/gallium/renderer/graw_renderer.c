@@ -1783,8 +1783,10 @@ graw_renderer_fini(void)
    inited = 0;
 }
 
-void grend_destroy_context(struct grend_context *ctx)
+bool grend_destroy_context(struct grend_context *ctx)
 {
+   bool switch_0 = (ctx->ctx_id == grend_state.current_ctx_id);
+
    if (ctx->fb_id)
       glDeleteFramebuffers(1, &ctx->fb_id);
 
@@ -1792,6 +1794,7 @@ void grend_destroy_context(struct grend_context *ctx)
 
 //   glDeleteVertexArrays(1, &ctx->vaoid);
    FREE(ctx);
+   return switch_0;
 }
 
 struct grend_context *grend_create_context(int id)

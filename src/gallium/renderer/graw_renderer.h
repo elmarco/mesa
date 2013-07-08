@@ -38,7 +38,7 @@ void grend_flush(struct grend_context *ctx);
 
 void grend_flush_frontbuffer(uint32_t res_handle);
 struct grend_context *grend_create_context(int id);
-void grend_destroy_context(struct grend_context *ctx);
+bool grend_destroy_context(struct grend_context *ctx);
 void graw_renderer_context_create(uint32_t handle);
 void graw_renderer_context_create_internal(uint32_t handle);
 void graw_renderer_context_destroy(uint32_t handle);

@@ -579,14 +579,17 @@ void graw_renderer_context_create(uint32_t handle)
 void graw_renderer_context_destroy(uint32_t handle)
 {
    struct grend_decode_ctx *ctx;
-
+   bool ret;
    if (handle > GRAW_MAX_CTX)
       return;
 
    ctx = dec_ctx[handle];
    dec_ctx[handle] = NULL;
-   grend_destroy_context(ctx->grctx);
+   ret = grend_destroy_context(ctx->grctx);
    free(ctx);
+   /* switch to ctx 0 */
+   if (ret)
+      grend_hw_switch_context(dec_ctx[0]->grctx);      
 }
 
 static void graw_decode_block(uint32_t *block, int ndw)

@@ -13,6 +13,7 @@ enum graw_object_type {
    GRAW_OBJECT_SAMPLER_STATE,
    GRAW_RESOURCE,
    GRAW_SURFACE,
+   GRAW_QUERY,
 };
 
 /* context cmds to be encoded in the command stream */
@@ -35,7 +36,12 @@ enum graw_cmd {
    GRAW_SET_SCISSOR_STATE,
    GRAW_BLIT,
    GRAW_RESOURCE_COPY_REGION,
-   GRAW_BIND_SAMPLER_STATES
+   GRAW_BIND_SAMPLER_STATES,
+   GRAW_CREATE_QUERY,
+   GRAW_DESTROY_QUERY,
+   GRAW_BEGIN_QUERY,
+   GRAW_END_QUERY,
+   GRAW_GET_QUERY_RESULT,
 };
 
 enum graw_scrn_cmd {

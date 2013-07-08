@@ -349,6 +349,14 @@ static void graw_decode_create_ve(struct grend_decode_ctx *ctx, uint32_t handle,
                                       ve);
 }
 
+static void graw_decode_create_query(struct grend_decode_ctx *ctx, uint32_t handle)
+{
+   uint32_t query_type;
+
+   query_type = ctx->ds->buf[ctx->ds->buf_offset + 2];
+   grend_create_query(ctx->grctx, handle, query_type);
+}
+
 static void graw_decode_create_object(struct grend_decode_ctx *ctx)
 {
    uint32_t header = ctx->ds->buf[ctx->ds->buf_offset];
@@ -383,6 +391,9 @@ static void graw_decode_create_object(struct grend_decode_ctx *ctx)
       break;
    case GRAW_OBJECT_SAMPLER_STATE:
       graw_decode_create_sampler_state(ctx, handle, length);
+      break;
+   case GRAW_QUERY:
+      graw_decode_create_query(ctx, handle);
       break;
    }
 }

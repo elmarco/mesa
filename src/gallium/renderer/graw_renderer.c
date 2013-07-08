@@ -108,6 +108,11 @@ struct grend_surface {
    struct grend_resource *texture;
 };
 
+struct grend_query {
+   GLuint type;
+   GLuint id;
+};
+
 struct grend_sampler {
 
 };
@@ -2522,4 +2527,28 @@ void graw_renderer_object_insert(struct grend_context *ctx, void *data,
                                  uint32_t size, uint32_t handle, enum graw_object_type type)
 {
    graw_object_insert(ctx->object_hash, data, size, handle, type);
+}
+
+void grend_create_query(struct grend_context *ctx, uint32_t handle,
+                        uint32_t query_type)
+{
+   struct grend_query *q;
+
+   q = CALLOC_STRUCT(grend_query);
+   if (!q)
+      return;
+
+   q->type = query_type;
+
+   switch (q->type) {
+   case PIPE_QUERY_OCCLUSION_COUNTER:
+      glGenQueries(1, &q->id);
+      break;
+   default:
+      fprintf(stderr,"unknown query object received %d\n", q->type);
+      break;
+   }
+
+   graw_renderer_object_insert(ctx, q, sizeof(struct grend_query), handle,
+                               GRAW_QUERY);
 }

@@ -22,7 +22,7 @@ compare(void *key1, void *key2)
       return 0;
 }
 
-static struct util_hash_table *handle_hash, *res_hash;
+static struct util_hash_table *res_hash;
 static uint32_t next_handle;
 
 struct graw_object {
@@ -31,28 +31,36 @@ struct graw_object {
    void *data;
 };
 
-void
-graw_object_init_hash(void)
+struct util_hash_table *graw_init_ctx_hash(void)
 {
-   if (!handle_hash)
-      handle_hash = util_hash_table_create(hash_func, compare);
+   struct util_hash_table *ctx_hash;
+   ctx_hash = util_hash_table_create(hash_func, compare);
+   return ctx_hash;
+}
 
+void graw_fini_ctx_hash(struct util_hash_table *ctx_hash)
+{
+   if (ctx_hash)
+      util_hash_table_destroy(ctx_hash);
+}
+
+void
+graw_object_init_resource_hash(void)
+{
    if (!res_hash)
       res_hash = util_hash_table_create(hash_func, compare);
 }
 
-void graw_object_fini_hash(void)
+void graw_object_fini_resource_hash(void)
 {
-   if (handle_hash)
-      util_hash_table_destroy(handle_hash);
-   handle_hash = NULL;
    if (res_hash)
       util_hash_table_destroy(res_hash);
    res_hash = NULL;
 }
 
 uint32_t
-graw_object_create(void *data, uint32_t length, enum graw_object_type type)
+graw_object_create(struct util_hash_table *handle_hash,
+                   void *data, uint32_t length, enum graw_object_type type)
 {
    struct graw_object *obj = CALLOC_STRUCT(graw_object);
 
@@ -66,7 +74,8 @@ graw_object_create(void *data, uint32_t length, enum graw_object_type type)
 }
 
 uint32_t
-graw_object_insert(void *data, uint32_t length, uint32_t handle, enum graw_object_type type)
+graw_object_insert(struct util_hash_table *handle_hash,
+                   void *data, uint32_t length, uint32_t handle, enum graw_object_type type)
 {
    struct graw_object *obj = CALLOC_STRUCT(graw_object);
 
@@ -80,7 +89,8 @@ graw_object_insert(void *data, uint32_t length, uint32_t handle, enum graw_objec
 }
 
 void
-graw_object_destroy(uint32_t handle, enum graw_object_type type)
+graw_object_destroy(struct util_hash_table *handle_hash,
+                    uint32_t handle, enum graw_object_type type)
 {
    struct graw_object *obj;
 
@@ -92,7 +102,8 @@ graw_object_destroy(uint32_t handle, enum graw_object_type type)
       
 }
 
-void *graw_object_lookup(uint32_t handle, enum graw_object_type type)
+void *graw_object_lookup(struct util_hash_table *handle_hash,
+                         uint32_t handle, enum graw_object_type type)
 {
    struct graw_object *obj;
 

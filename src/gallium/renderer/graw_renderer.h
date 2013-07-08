@@ -1,6 +1,7 @@
 #ifndef GRAW_RENDERER_H
 #define GRAW_RENDERER_H
 
+#include "graw_protocol.h"
 #include "graw_iov.h"
 struct grend_context;
 
@@ -163,4 +164,8 @@ void graw_renderer_check_fences(void);
 
 int swap_buffers(void);
 void grend_hw_switch_context(struct grend_context *ctx);
+void graw_renderer_object_insert(struct grend_context *ctx, void *data,
+                                 uint32_t size, uint32_t handle, enum graw_object_type type);
+void graw_renderer_object_destroy(struct grend_context *ctx, uint32_t handle);
+
 #endif

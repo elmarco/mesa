@@ -220,7 +220,7 @@ static void graw_decode_create_blend(struct grend_decode_ctx *ctx, uint32_t hand
       blend_state->rt[i].colormask = (tmp >> 27) & 0xf;
    }
 
-   graw_object_insert(blend_state, sizeof(struct pipe_blend_state), handle,
+   graw_renderer_object_insert(ctx->grctx, blend_state, sizeof(struct pipe_blend_state), handle,
                       GRAW_OBJECT_BLEND);
 }
 
@@ -252,7 +252,7 @@ static void graw_decode_create_dsa(struct grend_decode_ctx *ctx, uint32_t handle
    tmp = ctx->ds->buf[ctx->ds->buf_offset + 5];
    dsa_state->alpha.ref_value = fui(tmp);
 
-   graw_object_insert(dsa_state, sizeof(struct pipe_depth_stencil_alpha_state), handle,
+   graw_renderer_object_insert(ctx->grctx, dsa_state, sizeof(struct pipe_depth_stencil_alpha_state), handle,
                       GRAW_OBJECT_DSA);
 }
 
@@ -277,7 +277,7 @@ static void graw_decode_create_rasterizer(struct grend_decode_ctx *ctx, uint32_t
    rs_state->front_ccw = (tmp >> 15) & 0x1;
    rs_state->point_size = fui(ctx->ds->buf[ctx->ds->buf_offset + 3]);
    rs_state->sprite_coord_enable = ctx->ds->buf[ctx->ds->buf_offset + 4];
-   graw_object_insert(rs_state, sizeof(struct pipe_rasterizer_state), handle,
+   graw_renderer_object_insert(ctx->grctx, rs_state, sizeof(struct pipe_rasterizer_state), handle,
                       GRAW_OBJECT_RASTERIZER);
 }
 
@@ -322,7 +322,7 @@ static void graw_decode_create_sampler_state(struct grend_decode_ctx *ctx, uint3
    state->lod_bias = fui(ctx->ds->buf[ctx->ds->buf_offset + 3]);
    state->min_lod = fui(ctx->ds->buf[ctx->ds->buf_offset + 4]);
    state->max_lod = fui(ctx->ds->buf[ctx->ds->buf_offset + 5]);
-   graw_object_insert(state, sizeof(struct pipe_sampler_state), handle,
+   graw_renderer_object_insert(ctx->grctx, state, sizeof(struct pipe_sampler_state), handle,
                       GRAW_OBJECT_SAMPLER_STATE);
 }
 
@@ -421,7 +421,7 @@ static void graw_decode_bind_object(struct grend_decode_ctx *ctx)
 static void graw_decode_destroy_object(struct grend_decode_ctx *ctx)
 {
    uint32_t handle = ctx->ds->buf[ctx->ds->buf_offset+1];
-   graw_object_destroy(handle, 0);
+   graw_renderer_object_destroy(ctx->grctx, handle);
 }
 
 void graw_reset_decode(void)

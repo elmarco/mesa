@@ -635,6 +635,9 @@ static void grend_hw_emit_framebuffer_state(struct grend_context *ctx)
    }
 
    for (i = 0; i < ctx->nr_cbufs; i++) {
+      if (!ctx->surf[i])
+         continue;
+
       tex = ctx->surf[i]->texture;
 
       if (tex->target == GL_TEXTURE_CUBE_MAP) {
@@ -785,9 +788,8 @@ void grend_bind_vertex_elements_state(struct grend_context *ctx,
    }
    v = graw_object_lookup(handle, GRAW_OBJECT_VERTEX_ELEMENTS);
    if (!v) {
-      fprintf(stderr, "illegal ve lookup\n");
+      fprintf(stderr, "illegal ve lookup %d\n", handle);
    }
-      
    ctx->ve = v;
 }
 
@@ -1165,6 +1167,11 @@ void grend_draw_vbo(struct grend_context *ctx,
       }
    } 
 
+   if (!ctx->ve) {
+      fprintf(stderr,"illegal VE setup - skipping renderering\n");
+      return;
+   }
+
    num_enable = ctx->ve->count;
    for (i = 0; i < ctx->ve->count; i++) {
       struct grend_vertex_element *ve = &ctx->ve->elements[i];
@@ -1441,6 +1448,10 @@ void grend_object_bind_dsa(struct grend_context *ctx,
    }
 
    state = graw_object_lookup(handle, GRAW_OBJECT_DSA);
+   if (!state) {
+      fprintf(stderr,"failed to find DSA state for handle %d\n", handle);
+      return;
+   }
 
    if (ctx->dsa != state)
       ctx->stencil_state_dirty = TRUE;

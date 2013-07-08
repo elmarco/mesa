@@ -504,3 +504,16 @@ int graw_encoder_create_query(struct graw_context *ctx,
    return 0;
 }
 
+int graw_encoder_begin_query(struct graw_context *ctx,
+                             uint32_t handle)
+{
+   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_BEGIN_QUERY, 0, 1));
+   graw_encoder_write_dword(ctx->cbuf, handle);   
+}
+
+int graw_encoder_end_query(struct graw_context *ctx,
+                           uint32_t handle)
+{
+   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_END_QUERY, 0, 1));
+   graw_encoder_write_dword(ctx->cbuf, handle);   
+}

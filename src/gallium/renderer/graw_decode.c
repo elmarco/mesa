@@ -552,6 +552,20 @@ static void graw_decode_bind_sampler_states(struct grend_decode_ctx *ctx, int le
                                     &ctx->ds->buf[ctx->ds->buf_offset + 2]);
 }
 
+static void graw_decode_begin_query(struct grend_decode_ctx *ctx)
+{
+   uint32_t handle = ctx->ds->buf[ctx->ds->buf_offset + 1];
+
+   grend_begin_query(ctx->grctx, handle);
+}
+
+static void graw_decode_end_query(struct grend_decode_ctx *ctx)
+{
+   uint32_t handle = ctx->ds->buf[ctx->ds->buf_offset + 1];
+
+   grend_end_query(ctx->grctx, handle);
+}
+
 void graw_renderer_context_create_internal(uint32_t handle)
 {
    struct grend_decode_ctx *dctx;
@@ -679,6 +693,12 @@ static void graw_decode_block(uint32_t *block, int ndw)
          break;
       case GRAW_BIND_SAMPLER_STATES:
          graw_decode_bind_sampler_states(gdctx, header >> 16);
+         break;
+      case GRAW_BEGIN_QUERY:
+         graw_decode_begin_query(gdctx);
+         break;
+      case GRAW_END_QUERY:
+         graw_decode_end_query(gdctx);
          break;
       }
       gdctx->ds->buf_offset += (header >> 16) + 1;

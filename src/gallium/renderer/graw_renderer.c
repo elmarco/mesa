@@ -111,6 +111,7 @@ struct grend_surface {
 struct grend_query {
    GLuint type;
    GLuint id;
+   GLuint gltype;
 };
 
 struct grend_sampler {
@@ -2542,6 +2543,7 @@ void grend_create_query(struct grend_context *ctx, uint32_t handle,
 
    switch (q->type) {
    case PIPE_QUERY_OCCLUSION_COUNTER:
+      q->gltype = GL_SAMPLES_PASSED_ARB;      
       glGenQueries(1, &q->id);
       break;
    default:
@@ -2551,4 +2553,26 @@ void grend_create_query(struct grend_context *ctx, uint32_t handle,
 
    graw_renderer_object_insert(ctx, q, sizeof(struct grend_query), handle,
                                GRAW_QUERY);
+}
+
+void grend_begin_query(struct grend_context *ctx, uint32_t handle)
+{
+   struct grend_query *q;
+   GLenum qtype;
+
+   q = graw_object_lookup(ctx->object_hash, handle, GRAW_QUERY);
+   if (!q)
+      return;
+
+   glBeginQuery(q->gltype, q->id);
+}
+
+void grend_end_query(struct grend_context *ctx, uint32_t handle)
+{
+   struct grend_query *q;
+   q = graw_object_lookup(ctx->object_hash, handle, GRAW_QUERY);
+   if (!q)
+      return;
+
+   glEndQuery(q->gltype);
 }

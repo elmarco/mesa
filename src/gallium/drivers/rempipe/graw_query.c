@@ -1,6 +1,6 @@
 #include "util/u_memory.h"
 #include "graw_context.h"
-
+#include "graw_encode.h"
 struct graw_query_buffer {
    struct graw_resource *buf;
    unsigned results_end;
@@ -36,7 +36,7 @@ static struct pipe_query *graw_create_query(struct pipe_context *ctx,
    query->type = query_type;
    query->handle = handle;
 
-   graw_encoder_create_query(ctx, handle, query_type);
+   graw_encoder_create_query(grctx, handle, query_type);
 
    return (struct pipe_query *)query;
 }
@@ -44,9 +44,10 @@ static struct pipe_query *graw_create_query(struct pipe_context *ctx,
 static void graw_destroy_query(struct pipe_context *ctx,
                         struct pipe_query *q)
 {
+   struct graw_context *grctx = (struct graw_context *)ctx;
    struct graw_query *query = (struct graw_query *)q;
 
-   graw_encode_delete_object(ctx, query->handle, GRAW_QUERY);
+   graw_encode_delete_object(grctx, query->handle, GRAW_QUERY);
 
    FREE(query);
 }
@@ -54,13 +55,17 @@ static void graw_destroy_query(struct pipe_context *ctx,
 static void graw_begin_query(struct pipe_context *ctx,
                              struct pipe_query *q)
 {
-
+   struct graw_context *grctx = (struct graw_context *)ctx;
+   struct graw_query *query = (struct graw_query *)q;
+   graw_encoder_begin_query(grctx, query->handle);
 }
 
 static void graw_end_query(struct pipe_context *ctx,
                            struct pipe_query *q)
 {
-
+   struct graw_context *grctx = (struct graw_context *)ctx;
+   struct graw_query *query = (struct graw_query *)q;
+   graw_encoder_end_query(grctx, query->handle);
 }
 
 static boolean graw_get_query_result(struct pipe_context *ctx,

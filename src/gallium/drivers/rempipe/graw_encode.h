@@ -160,4 +160,13 @@ int graw_encode_blit(struct graw_context *ctx,
                      struct graw_resource *dst_res,
                      struct graw_resource *src_res,
                      const struct pipe_blit_info *blit);
+
+int graw_encoder_create_query(struct graw_context *ctx,
+                              uint32_t handle,
+                              uint query_type);
+
+int graw_encoder_begin_query(struct graw_context *ctx,
+                             uint32_t handle);
+int graw_encoder_end_query(struct graw_context *ctx,
+                           uint32_t handle);
 #endif

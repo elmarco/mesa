@@ -666,6 +666,11 @@ void grend_set_framebuffer_state(struct grend_context *ctx,
    grend_hw_set_framebuffer_state(ctx);
 }
 
+static void grend_hw_emit_depth_range(struct grend_context *ctx)
+{
+   glDepthRange(ctx->view_near_val, ctx->view_far_val);
+}
+
 void grend_set_viewport_state(struct grend_context *ctx,
                               const struct pipe_viewport_state *state)
 {
@@ -698,9 +703,9 @@ void grend_set_viewport_state(struct grend_context *ctx,
 
    if (ctx->view_near_val != near_val ||
        ctx->view_far_val != far_val) {
-      glDepthRange(near_val, far_val);
       ctx->view_near_val = near_val;
       ctx->view_far_val = far_val;
+      grend_hw_emit_depth_range(ctx);
    }
 }
 

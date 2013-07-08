@@ -543,7 +543,7 @@ static void graw_decode_bind_sampler_states(struct grend_decode_ctx *ctx, int le
                                     &ctx->ds->buf[ctx->ds->buf_offset + 2]);
 }
 
-void graw_renderer_context_create(uint32_t handle)
+void graw_renderer_context_create_internal(uint32_t handle)
 {
    struct grend_decode_ctx *dctx;
 
@@ -561,8 +561,19 @@ void graw_renderer_context_create(uint32_t handle)
    }
 
    dctx->ds = &dctx->ids;
-   
+
    dec_ctx[handle] = dctx;
+}
+
+void graw_renderer_context_create(uint32_t handle)
+{
+   if (handle > GRAW_MAX_CTX)
+      return;
+   /* context 0 is always available with no guarantees */
+   if (handle == 0)
+      return;
+
+   graw_renderer_context_create_internal(handle);
 }
 
 void graw_renderer_context_destroy(uint32_t handle)

@@ -30,6 +30,7 @@
 
 /* since we are storing things in OpenGL FBOs we need to flip transfer operations by default */
 static void grend_update_viewport_state(struct grend_context *ctx);
+static void grend_update_scissor_state(struct grend_context *ctx);
 
 extern int graw_shader_use_explicit;
 int localrender;
@@ -50,7 +51,7 @@ struct global_renderer_state {
    GLboolean stencil_test_enabled;
    GLuint program_id;
    struct list_head fence_list;
-   uint32_t current_ctx_id;
+   int current_ctx_id;
 };
 
 static struct global_renderer_state grend_state;
@@ -150,7 +151,7 @@ struct grend_shader_view {
 };
 
 struct grend_context {
-   uint32_t ctx_id;
+   int ctx_id;
    GLuint vaoid;
    GLuint num_enabled_attribs;
 
@@ -1005,6 +1006,10 @@ void grend_clear(struct grend_context *ctx,
    GLbitfield bits = 0;
    glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, ctx->fb_id);
 
+   if (ctx->stencil_state_dirty)
+      grend_update_stencil_state(ctx);
+   if (ctx->scissor_state_dirty || grend_state.scissor_dirty)
+      grend_update_scissor_state(ctx);
    if (ctx->viewport_state_dirty || grend_state.viewport_dirty)
       grend_update_viewport_state(ctx);
 
@@ -1755,6 +1760,9 @@ graw_renderer_init(void)
    grend_state.viewport_dirty = grend_state.scissor_dirty = TRUE;
    grend_state.program_id = (GLuint)-1;
    list_inithead(&grend_state.fence_list);
+  
+   /* create 0 context */
+   graw_renderer_context_create_internal(0);
 }
 
 void
@@ -1773,7 +1781,7 @@ void grend_destroy_context(struct grend_context *ctx)
    FREE(ctx);
 }
 
-struct grend_context *grend_create_context(uint32_t id)
+struct grend_context *grend_create_context(int id)
 {
    struct grend_context *grctx = CALLOC_STRUCT(grend_context);
    int i;

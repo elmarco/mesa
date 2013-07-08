@@ -197,6 +197,8 @@ struct grend_context {
    int nr_cbufs;
    struct grend_surface *zsurf;
    struct grend_surface *surf[8];
+   
+   struct pipe_blend_state blend_state;
 };
 
 static struct grend_resource *frontbuffer;
@@ -1331,20 +1333,10 @@ translate_stencil_op(GLuint op)
 #undef CASE
 }
 
-void grend_object_bind_blend(struct grend_context *ctx,
-                             uint32_t handle)
+static void grend_hw_emit_blend(struct grend_context *ctx)
 {
-   struct pipe_blend_state *state;
+   struct pipe_blend_state *state = &ctx->blend_state;
 
-   if (handle == 0) {
-      grend_blend_enable(GL_FALSE);
-      return;
-   }
-   state = graw_object_lookup(handle, GRAW_OBJECT_BLEND);
-   if (!state) {
-      fprintf(stderr,"%s: got illegal handle %d\n", __func__, handle);
-      return;
-   }
    if (state->logicop_enable) {
       glEnable(GL_COLOR_LOGIC_OP);
       glLogicOp(translate_logicop(state->logicop_func));
@@ -1371,6 +1363,28 @@ void grend_object_bind_blend(struct grend_context *ctx,
                   state->rt[0].colormask & PIPE_MASK_B ? GL_TRUE : GL_FALSE,
                   state->rt[0].colormask & PIPE_MASK_A ? GL_TRUE : GL_FALSE);
    }
+
+}
+
+void grend_object_bind_blend(struct grend_context *ctx,
+                             uint32_t handle)
+{
+   struct pipe_blend_state *state;
+
+   if (handle == 0) {
+      memset(&ctx->blend_state, 0, sizeof(ctx->blend_state));
+      grend_blend_enable(GL_FALSE);
+      return;
+   }
+   state = graw_object_lookup(handle, GRAW_OBJECT_BLEND);
+   if (!state) {
+      fprintf(stderr,"%s: got illegal handle %d\n", __func__, handle);
+      return;
+   }
+
+   ctx->blend_state = *state;
+
+   grend_hw_emit_blend(ctx);
 }
 
 void grend_object_bind_dsa(struct grend_context *ctx,

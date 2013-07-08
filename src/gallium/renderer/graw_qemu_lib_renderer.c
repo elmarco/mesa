@@ -57,7 +57,7 @@ static void graw_process_cmd(QXL3DCommand *cmd, struct graw_iovec *iov,
       break;
    case QXL_3D_DESTROY_CONTEXT:
       graw_renderer_context_destroy(cmd->u.ctx.handle);
-
+      break;
    case QXL_3D_CMD_CREATE_RESOURCE:
 //         fprintf(stderr,"got res create %d %d\n", cmd->u.res_create.width,
 //                 cmd->u.res_create.height);

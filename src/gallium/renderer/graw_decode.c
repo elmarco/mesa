@@ -375,8 +375,6 @@ static void graw_decode_create_object(struct grend_decode_ctx *ctx)
    case GRAW_OBJECT_VERTEX_ELEMENTS:
       graw_decode_create_ve(ctx, handle, length);
       break;
-   case GRAW_RESOURCE:
-      break;
    case GRAW_SURFACE:
       graw_decode_create_surface(ctx, handle);
       break;

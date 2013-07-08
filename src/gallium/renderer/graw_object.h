@@ -11,4 +11,9 @@ void *graw_object_lookup(uint32_t handle, enum graw_object_type obj);
 uint32_t graw_object_insert(void *data, uint32_t length, uint32_t handle, enum graw_object_type type);
 
 uint32_t graw_object_assign_handle(void);
+
+/* resources are global */
+void *graw_insert_resource(void *data, uint32_t length, uint32_t handle);
+void graw_destroy_resource(uint32_t handle);
+void *graw_lookup_resource(uint32_t handle);
 #endif

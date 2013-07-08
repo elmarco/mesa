@@ -199,6 +199,7 @@ struct grend_context {
    struct grend_surface *surf[8];
    
    struct pipe_blend_state blend_state;
+   struct pipe_depth_stencil_alpha_state dsa_state;
 };
 
 static struct grend_resource *frontbuffer;
@@ -1387,20 +1388,9 @@ void grend_object_bind_blend(struct grend_context *ctx,
    grend_hw_emit_blend(ctx);
 }
 
-void grend_object_bind_dsa(struct grend_context *ctx,
-                           uint32_t handle)
+static void grend_hw_emit_dsa(struct grend_context *ctx)
 {
-   struct pipe_depth_stencil_alpha_state *state;
-
-   if (handle == 0) {
-      grend_depth_test_enable(GL_FALSE);
-      grend_alpha_test_enable(GL_FALSE);
-      grend_stencil_test_enable(GL_FALSE);
-      ctx->dsa = NULL;
-      return;
-   }
-
-   state = graw_object_lookup(handle, GRAW_OBJECT_DSA);
+   struct pipe_depth_stencil_alpha_state *state = &ctx->dsa_state;
 
    if (state->depth.enabled) {
       grend_depth_test_enable(GL_TRUE);
@@ -1418,9 +1408,28 @@ void grend_object_bind_dsa(struct grend_context *ctx,
    } else
       grend_alpha_test_enable(GL_FALSE);
 
+
+}
+void grend_object_bind_dsa(struct grend_context *ctx,
+                           uint32_t handle)
+{
+   struct pipe_depth_stencil_alpha_state *state;
+
+   if (handle == 0) {
+      memset(&ctx->dsa_state, 0, sizeof(ctx->dsa_state));
+      ctx->dsa = NULL;
+      ctx->stencil_state_dirty = TRUE;
+      grend_hw_emit_dsa(ctx);
+      return;
+   }
+
+   state = graw_object_lookup(handle, GRAW_OBJECT_DSA);
+
    if (ctx->dsa != state)
       ctx->stencil_state_dirty = TRUE;
+   ctx->dsa_state = *state;
    ctx->dsa = state;
+   grend_hw_emit_dsa(ctx);
 }
  
 void grend_update_stencil_state(struct grend_context *ctx)

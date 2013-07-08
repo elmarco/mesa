@@ -582,13 +582,10 @@ void grend_create_sampler_view(struct grend_context *ctx,
    graw_object_insert(view, sizeof(*view), handle, GRAW_OBJECT_SAMPLER_VIEW);
 }
 
-void grend_set_framebuffer_state(struct grend_context *ctx,
-                                 uint32_t nr_cbufs, uint32_t surf_handle[8],
-                                 uint32_t zsurf_handle)
+static void grend_hw_set_framebuffer_state(struct grend_context *ctx)
 {
-   struct grend_surface *surf, *zsurf;
-   struct grend_resource *tex;
    int i;
+   struct grend_resource *tex;
    static const GLenum buffers[8] = {
       GL_COLOR_ATTACHMENT0_EXT,
       GL_COLOR_ATTACHMENT1_EXT,
@@ -606,14 +603,9 @@ void grend_set_framebuffer_state(struct grend_context *ctx,
 
    glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, ctx->fb_id);
 
-   if (zsurf_handle) {
-      GLuint attachment;
-      zsurf = graw_object_lookup(zsurf_handle, GRAW_SURFACE);
-      if (!zsurf) {
-         fprintf(stderr,"%s: can't find surface for Z %d\n", __func__, zsurf_handle);
-         return;
-      }
-      tex = zsurf->texture;
+   if (ctx->zsurf) {
+      GLenum attachment;
+      tex = ctx->zsurf->texture;
       if (!tex)
          return;
       if (tex->base.format == PIPE_FORMAT_S8_UINT)
@@ -623,7 +615,41 @@ void grend_set_framebuffer_state(struct grend_context *ctx,
       else
          attachment = GL_DEPTH_STENCIL_ATTACHMENT;
       glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, attachment,
-                                tex->target, tex->id, zsurf->val0);
+                                tex->target, tex->id, ctx->zsurf->val0);
+   }
+
+   for (i = 0; i < ctx->nr_cbufs; i++) {
+      tex = ctx->surf[i]->texture;
+
+      if (tex->target == GL_TEXTURE_CUBE_MAP) {
+         glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, buffers[i],
+                                   GL_TEXTURE_CUBE_MAP_POSITIVE_X + (ctx->surf[i]->val1 & 0xffff), tex->id, ctx->surf[i]->val0);
+      } else
+         glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, buffers[i],
+                                   tex->target, tex->id, ctx->surf[i]->val0);
+
+      if (i == 0 && tex->base.height0 != ctx->fb_height) {
+         ctx->fb_height = tex->base.height0;
+         ctx->scissor_state_dirty = TRUE;
+         ctx->viewport_state_dirty = TRUE;
+      }
+   }
+   glDrawBuffers(ctx->nr_cbufs, buffers);
+}
+
+void grend_set_framebuffer_state(struct grend_context *ctx,
+                                 uint32_t nr_cbufs, uint32_t surf_handle[8],
+                                 uint32_t zsurf_handle)
+{
+   struct grend_surface *surf, *zsurf;
+   int i;
+
+   if (zsurf_handle) {
+      zsurf = graw_object_lookup(zsurf_handle, GRAW_SURFACE);
+      if (!zsurf) {
+         fprintf(stderr,"%s: can't find surface for Z %d\n", __func__, zsurf_handle);
+         return;
+      }
       ctx->zsurf = zsurf;
    }
 
@@ -634,25 +660,10 @@ void grend_set_framebuffer_state(struct grend_context *ctx,
          fprintf(stderr,"%s: can't find surface for cbuf %d %d\n", __func__, i, surf_handle[i]);
          return;
       }
-      tex = surf->texture;
-
       ctx->surf[i] = surf;
-      if (tex->target == GL_TEXTURE_CUBE_MAP) {
-         glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, buffers[i],
-                                   GL_TEXTURE_CUBE_MAP_POSITIVE_X + (surf->val1 & 0xffff), tex->id, surf->val0);
-      } else
-         glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, buffers[i],
-                                   tex->target, tex->id, surf->val0);
-
-      if (i == 0 && tex->base.height0 != ctx->fb_height) {
-         ctx->fb_height = tex->base.height0;
-         ctx->scissor_state_dirty = TRUE;
-         ctx->viewport_state_dirty = TRUE;
-      }
-
    }
 
-   glDrawBuffers(nr_cbufs, buffers);
+   grend_hw_set_framebuffer_state(ctx);
 }
 
 void grend_set_viewport_state(struct grend_context *ctx,

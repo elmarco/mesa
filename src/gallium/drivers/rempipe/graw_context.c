@@ -742,6 +742,7 @@ struct pipe_context *graw_context_create(struct pipe_screen *pscreen,
    grctx->base.blit =  graw_blit;
 
    graw_init_transfer_functions(grctx);
+   graw_init_query_functions(grctx);
 
    list_inithead(&grctx->to_flush_bufs);
    util_slab_create(&grctx->texture_transfer_pool, sizeof(struct graw_transfer),

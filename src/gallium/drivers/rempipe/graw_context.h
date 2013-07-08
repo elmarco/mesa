@@ -114,4 +114,5 @@ rempipe_resource_from_handle(struct pipe_screen *screen,
 void graw_init_blit_functions(struct graw_context *grctx);
 
 void graw_init_transfer_functions(struct graw_context *grctx);
+void graw_init_query_functions(struct graw_context *grctx);
 #endif

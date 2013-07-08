@@ -516,7 +516,15 @@ static struct grend_linked_shader_program *lookup_shader_program(struct grend_co
   }
   return 0;
 }
-  
+
+static void grend_free_programs(struct grend_context *ctx)
+{
+   struct grend_linked_shader_program *ent, *tmp;
+   LIST_FOR_EACH_ENTRY_SAFE(ent, tmp, &ctx->programs, head) {
+      glDeleteProgram(ent->id);
+      list_del(&ent->head);
+   }
+}  
 
 static void grend_apply_sampler_state(struct grend_context *ctx,
                                       struct grend_resource *res,
@@ -1777,7 +1785,12 @@ graw_renderer_fini(void)
 
 void grend_destroy_context(struct grend_context *ctx)
 {
-   glDeleteVertexArrays(1, &ctx->vaoid);
+   if (ctx->fb_id)
+      glDeleteFramebuffers(1, &ctx->fb_id);
+
+   grend_free_programs(ctx);
+
+//   glDeleteVertexArrays(1, &ctx->vaoid);
    FREE(ctx);
 }
 

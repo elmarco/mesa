@@ -2576,3 +2576,23 @@ void grend_end_query(struct grend_context *ctx, uint32_t handle)
 
    glEndQuery(q->gltype);
 }
+
+void grend_get_query_result(struct grend_context *ctx, uint32_t handle,
+                            uint32_t wait)
+{
+   struct grend_query *q;
+   GLint ready;
+   GLuint passed;
+   q = graw_object_lookup(ctx->object_hash, handle, GRAW_QUERY);
+   if (!q)
+      return;
+
+   glGetQueryObjectiv(q->id, GL_QUERY_RESULT_AVAILABLE_ARB, &ready);
+
+   if (!ready && !wait)
+      return;
+
+   glGetQueryObjectuiv(q->id, GL_QUERY_RESULT_ARB, &passed);
+
+   
+}

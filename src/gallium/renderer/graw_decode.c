@@ -566,6 +566,13 @@ static void graw_decode_end_query(struct grend_decode_ctx *ctx)
    grend_end_query(ctx->grctx, handle);
 }
 
+static void graw_decode_get_query_result(struct grend_decode_ctx *ctx)
+{
+   uint32_t handle = ctx->ds->buf[ctx->ds->buf_offset + 1];
+   uint32_t wait = ctx->ds->buf[ctx->ds->buf_offset + 2];
+   grend_get_query_result(ctx->grctx, handle, wait);
+}
+
 void graw_renderer_context_create_internal(uint32_t handle)
 {
    struct grend_decode_ctx *dctx;

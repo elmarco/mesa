@@ -517,3 +517,11 @@ int graw_encoder_end_query(struct graw_context *ctx,
    graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_END_QUERY, 0, 1));
    graw_encoder_write_dword(ctx->cbuf, handle);   
 }
+
+int graw_encoder_get_query_result(struct graw_context *ctx,
+                                  uint32_t handle, boolean wait)
+{
+   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_GET_QUERY_RESULT, 0, 2));
+   graw_encoder_write_dword(ctx->cbuf, handle);
+   graw_encoder_write_dword(ctx->cbuf, wait ? 1 : 0);
+}

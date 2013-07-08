@@ -73,6 +73,10 @@ static boolean graw_get_query_result(struct pipe_context *ctx,
                                      boolean wait,
                                      union pipe_query_result *result)
 {
+   struct graw_context *grctx = (struct graw_context *)ctx;
+   struct graw_query *query = (struct graw_query *)q;
+
+   graw_encoder_get_query_result(ctx, query->handle, wait);
    return FALSE;
 }
 

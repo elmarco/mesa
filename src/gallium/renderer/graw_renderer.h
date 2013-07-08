@@ -173,5 +173,6 @@ void grend_create_query(struct grend_context *ctx, uint32_t handle,
 
 void grend_begin_query(struct grend_context *ctx, uint32_t handle);
 void grend_end_query(struct grend_context *ctx, uint32_t handle);
-
+void grend_get_query_result(struct grend_context *ctx, uint32_t handle,
+                            uint32_t wait);
 #endif

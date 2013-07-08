@@ -187,7 +187,6 @@ struct grend_context {
 
    GLenum old_targets[PIPE_MAX_SAMPLERS];
 
-   struct pipe_scissor_state ss;
    boolean scissor_state_dirty;
    boolean viewport_state_dirty;
    uint32_t fb_height;
@@ -196,6 +195,8 @@ struct grend_context {
    struct grend_surface *zsurf;
    struct grend_surface *surf[8];
    
+   struct pipe_scissor_state ss;
+
    struct pipe_blend_state blend_state;
    struct pipe_depth_stencil_alpha_state dsa_state;
    struct pipe_rasterizer_state rs_state;
@@ -586,7 +587,7 @@ void grend_create_sampler_view(struct grend_context *ctx,
    graw_object_insert(view, sizeof(*view), handle, GRAW_OBJECT_SAMPLER_VIEW);
 }
 
-static void grend_hw_set_framebuffer_state(struct grend_context *ctx)
+static void grend_hw_emit_framebuffer_state(struct grend_context *ctx)
 {
    int i;
    struct grend_resource *tex;
@@ -667,7 +668,7 @@ void grend_set_framebuffer_state(struct grend_context *ctx,
       ctx->surf[i] = surf;
    }
 
-   grend_hw_set_framebuffer_state(ctx);
+   grend_hw_emit_framebuffer_state(ctx);
 }
 
 static void grend_hw_emit_depth_range(struct grend_context *ctx)

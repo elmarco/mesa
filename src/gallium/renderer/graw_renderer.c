@@ -164,8 +164,6 @@ struct grend_context {
 
    struct grend_shader_view views[PIPE_SHADER_TYPES];
 
-   struct pipe_rasterizer_state *rs_state;
-
    struct pipe_index_buffer ib;
    uint32_t index_buffer_res_id;
 
@@ -200,6 +198,7 @@ struct grend_context {
    
    struct pipe_blend_state blend_state;
    struct pipe_depth_stencil_alpha_state dsa_state;
+   struct pipe_rasterizer_state rs_state;
 };
 
 static struct grend_resource *frontbuffer;
@@ -1131,8 +1130,8 @@ void grend_draw_vbo(struct grend_context *ctx,
                grend_apply_sampler_state(ctx, texture, shader_type, sampler_id);
                ctx->views[shader_type].old_ids[i] = texture->id;
             }
-            if (ctx->rs_state->point_quad_rasterization) {
-               if (ctx->rs_state->sprite_coord_enable & (1 << i))
+            if (ctx->rs_state.point_quad_rasterization) {
+               if (ctx->rs_state.sprite_coord_enable & (1 << i))
                   glTexEnvi(GL_POINT_SPRITE_ARB, GL_COORD_REPLACE_ARB, GL_TRUE);
                else
                   glTexEnvi(GL_POINT_SPRITE_ARB, GL_COORD_REPLACE_ARB, GL_FALSE);
@@ -1482,19 +1481,10 @@ static inline GLenum translate_fill(uint32_t mode)
    assert(0);
    return 0;
 }
-void grend_object_bind_rasterizer(struct grend_context *ctx,
-                                  uint32_t handle)
-{
-   struct pipe_rasterizer_state *state;
 
-   if (handle == 0)
-      return;
-   state = graw_object_lookup(handle, GRAW_OBJECT_RASTERIZER);
-   
-   if (!state) {
-      fprintf(stderr,"%s: cannot find object %d\n", __func__, handle);
-      return;
-   }
+static void grend_hw_emit_rs(struct grend_context *ctx)
+{
+   struct pipe_rasterizer_state *state = &ctx->rs_state;
 
 #if 0
    if (state->depth_clip) {
@@ -1548,7 +1538,26 @@ void grend_object_bind_rasterizer(struct grend_context *ctx,
    } else
       glDisable(GL_CULL_FACE);
 
-   ctx->rs_state = state;
+}
+void grend_object_bind_rasterizer(struct grend_context *ctx,
+                                  uint32_t handle)
+{
+   struct pipe_rasterizer_state *state;
+
+   if (handle == 0) {
+      memset(&ctx->rs_state, 0, sizeof(ctx->rs_state));
+      return;
+   }
+
+   state = graw_object_lookup(handle, GRAW_OBJECT_RASTERIZER);
+   
+   if (!state) {
+      fprintf(stderr,"%s: cannot find object %d\n", __func__, handle);
+      return;
+   }
+
+   ctx->rs_state = *state;
+   grend_hw_emit_rs(ctx);
 }
 
 static GLuint convert_wrap(int wrap)

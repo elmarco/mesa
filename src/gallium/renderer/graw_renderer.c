@@ -199,6 +199,8 @@ struct grend_context {
    struct pipe_blend_state blend_state;
    struct pipe_depth_stencil_alpha_state dsa_state;
    struct pipe_rasterizer_state rs_state;
+
+   struct pipe_blend_color blend_color;
 };
 
 static struct grend_resource *frontbuffer;
@@ -2125,11 +2127,18 @@ void grend_set_stencil_ref(struct grend_context *ctx,
    
 }
 
+static void grend_hw_emit_blend_color(struct grend_context *ctx)
+{
+   struct pipe_blend_color *color = &ctx->blend_color;
+   glBlendColor(color->color[0], color->color[1], color->color[2],
+                color->color[3]);
+}
+
 void grend_set_blend_color(struct grend_context *ctx,
                            struct pipe_blend_color *color)
 {
-   glBlendColor(color->color[0], color->color[1], color->color[2],
-                color->color[3]);
+   ctx->blend_color = *color;
+   grend_hw_emit_blend_color(ctx);
 }
 
 void grend_set_scissor_state(struct grend_context *ctx,

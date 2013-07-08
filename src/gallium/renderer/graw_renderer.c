@@ -50,6 +50,7 @@ struct global_renderer_state {
    GLboolean stencil_test_enabled;
    GLuint program_id;
    struct list_head fence_list;
+   uint32_t current_ctx_id;
 };
 
 static struct global_renderer_state grend_state;
@@ -149,6 +150,7 @@ struct grend_shader_view {
 };
 
 struct grend_context {
+   uint32_t ctx_id;
    GLuint vaoid;
    GLuint num_enabled_attribs;
 
@@ -1771,11 +1773,12 @@ void grend_destroy_context(struct grend_context *ctx)
    FREE(ctx);
 }
 
-struct grend_context *grend_create_context(void)
+struct grend_context *grend_create_context(uint32_t id)
 {
    struct grend_context *grctx = CALLOC_STRUCT(grend_context);
    int i;
 
+   grctx->ctx_id = id;
    list_inithead(&grctx->programs);
 
    glGenVertexArrays(1, &grctx->vaoid);
@@ -2423,4 +2426,26 @@ void graw_renderer_check_fences(void)
    if (latest_id == 0)
       return;
    graw_write_fence(latest_id);
+}
+
+void grend_hw_switch_context(struct grend_context *ctx)
+{
+
+   if (ctx->ctx_id == grend_state.current_ctx_id)
+      return;
+
+   /* re-emit all the state */
+   grend_hw_emit_framebuffer_state(ctx);
+   grend_hw_emit_depth_range(ctx);
+   grend_hw_emit_blend(ctx);
+   grend_hw_emit_dsa(ctx);
+   grend_hw_emit_rs(ctx);
+   grend_hw_emit_blend_color(ctx);
+
+   ctx->stencil_state_dirty = TRUE;
+   ctx->scissor_state_dirty = TRUE;
+   ctx->viewport_state_dirty = TRUE;
+   ctx->shader_dirty = TRUE;
+
+   grend_state.current_ctx_id = ctx->ctx_id;
 }

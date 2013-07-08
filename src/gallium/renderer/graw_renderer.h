@@ -37,7 +37,7 @@ void grend_flush(struct grend_context *ctx);
 
 
 void grend_flush_frontbuffer(uint32_t res_handle);
-struct grend_context *grend_create_context(void);
+struct grend_context *grend_create_context(uint32_t id);
 void grend_destroy_context(struct grend_context *ctx);
 void graw_renderer_context_create(uint32_t handle);
 void graw_renderer_context_destroy(uint32_t handle);
@@ -161,5 +161,5 @@ void graw_write_fence(unsigned fence_id);
 void graw_renderer_check_fences(void);
 
 int swap_buffers(void);
-
+void grend_hw_switch_context(struct grend_context *ctx);
 #endif

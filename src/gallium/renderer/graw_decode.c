@@ -554,7 +554,7 @@ void graw_renderer_context_create(uint32_t handle)
    if (!dctx)
        return;
    
-   dctx->grctx = grend_create_context();
+   dctx->grctx = grend_create_context(handle);
    if (!dctx->grctx) {
       free(dctx);
       return;
@@ -592,6 +592,7 @@ static void graw_decode_block(uint32_t *block, int ndw)
 
    gdctx = dec_ctx[ctx_id];
 
+   grend_hw_switch_context(gdctx->grctx);
    gdctx->ds->buf = block;
    gdctx->ds->buf_total = ndw;
    gdctx->ds->buf_offset = 1;

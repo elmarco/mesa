@@ -2023,6 +2023,22 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
          glPixelStorei(GL_UNPACK_ROW_LENGTH, src_stride / 4);
       }
 
+      switch (util_format_get_blocksize(res->base.format)) {
+      case 1:
+         glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+         break;
+      case 2:
+         glPixelStorei(GL_UNPACK_ALIGNMENT, 2);
+         break;
+      case 4:
+      default:
+         glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+         break;
+      }
+
+      glformat = tex_conv_table[res->base.format].glformat;
+      gltype = tex_conv_table[res->base.format].gltype; 
+
       if (res->is_front || invert) {
          if (!res->is_front) {
             if (res->readback_fb_id == 0 || res->readback_fb_level != level) {
@@ -2050,8 +2066,8 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
          grend_stencil_test_enable(GL_FALSE);
          glPixelZoom(1.0f, (!invert) ? 1.0f : -1.0f);
          glWindowPos2i(dst_box->x, (!invert) ? dst_box->y : res->base.height0 - dst_box->y);
-         glDrawPixels(dst_box->width, dst_box->height, GL_BGRA,
-                      GL_UNSIGNED_BYTE, data);
+         glDrawPixels(dst_box->width, dst_box->height, glformat, gltype,
+                      data);
       } else {
          glBindTexture(res->target, res->id);
 
@@ -2082,6 +2098,7 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
       }
       if (src_stride)
          glPixelStorei(GL_UNPACK_ROW_LENGTH, old_stride);
+      glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
 
       if (num_iovs > 1)
          free(data);
@@ -2155,8 +2172,12 @@ void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t level, uint32
             
             glGenFramebuffers(1, &fb_id);
             glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fb_id);
-            glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
-                                      res->target, res->id, level);
+            if (res->target == GL_TEXTURE_1D)
+               glFramebufferTexture1DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
+                                         res->target, res->id, level);
+            else
+               glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
+                                         res->target, res->id, level);
             res->readback_fb_id = fb_id;
             res->readback_fb_level = level;
          } else {

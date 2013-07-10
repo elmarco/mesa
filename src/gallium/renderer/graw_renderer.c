@@ -2183,7 +2183,11 @@ void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t level, uint32
          } else {
             glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, res->readback_fb_id);
          }
-         y1 = h - box->y - box->height;
+         if (res->renderer_flipped)
+            y1 = h - box->y - box->height;
+         else
+            y1 = box->y;
+
          if (have_invert_mesa && actually_invert)
             glPixelStorei(GL_PACK_INVERT_MESA, 1);
          glReadBuffer(GL_COLOR_ATTACHMENT0_EXT);      

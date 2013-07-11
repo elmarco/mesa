@@ -1,5 +1,7 @@
 #include <stdlib.h>
 #include <sys/select.h>
+#include <GL/glew.h>
+#include <GL/gl.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <stdint.h>

@@ -1,12 +1,22 @@
 #ifndef GRAW_RENDERER_H
 #define GRAW_RENDERER_H
 
+#include "pipe/p_state.h"
 #include "graw_protocol.h"
 #include "graw_iov.h"
 struct grend_context;
 
-struct grend_resource;
-
+struct grend_resource {
+   struct pipe_resource base;
+   GLuint id;
+   GLenum target;
+   /* fb id if we need to readback this resource */
+   GLuint readback_fb_id;
+   GLuint readback_fb_level;
+   int is_front;
+   GLboolean renderer_flipped;
+   void *ptr;
+};
 
 void grend_create_vs(struct grend_context *ctx,
                      uint32_t handle,
@@ -175,4 +185,10 @@ void grend_begin_query(struct grend_context *ctx, uint32_t handle);
 void grend_end_query(struct grend_context *ctx, uint32_t handle);
 void grend_get_query_result(struct grend_context *ctx, uint32_t handle,
                             uint32_t wait);
+
+void grend_set_cursor_info(uint32_t cursor_handle, int x, int y);
+
+void grend_use_program(GLuint program_id);
+void grend_blend_enable(GLboolean blend_enable);
+void grend_depth_test_enable(GLboolean depth_test_enable);
 #endif

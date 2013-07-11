@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include <time.h>
 
+#include <GL/glew.h>
+#include <GL/gl.h>
+
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -165,6 +168,11 @@ int swap_buffers(void)
 {
     rcbs->swap_buffers(dev_cookie);  
     return 0;
+}
+
+void graw_renderer_set_cursor_info(uint32_t cursor_handle, int x, int y)
+{
+   grend_set_cursor_info(cursor_handle, x, y);
 }
 
 void graw_renderer_poll(void)

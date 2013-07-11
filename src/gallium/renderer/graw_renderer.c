@@ -24,6 +24,7 @@
 #include "graw_renderer.h"
 #include "graw_renderer_glx.h"
 #include "graw_decode.h"
+#include "graw_cursor.h"
 
 /* transfer boxes from the guest POV are in y = 0 = top orientation */
 /* blit/copy operations from the guest POV are in y = 0 = top orientation */
@@ -52,6 +53,8 @@ struct global_renderer_state {
    GLuint program_id;
    struct list_head fence_list;
    int current_ctx_id;
+
+   struct graw_cursor_info cursor_info;
 };
 
 static struct global_renderer_state grend_state;
@@ -79,16 +82,7 @@ struct grend_shader_state {
    int num_consts;
    int num_inputs;
 };
-struct grend_resource {
-   struct pipe_resource base;
-   GLuint id;
-   GLenum target;
-   /* fb id if we need to readback this resource */
-   GLuint readback_fb_id;
-   GLuint readback_fb_level;
-   int is_front;
-   GLboolean renderer_flipped;
-};
+
 
 struct grend_buffer {
    struct grend_resource base;
@@ -379,7 +373,7 @@ static struct {
       [PIPE_FORMAT_L32A32_SINT] = {GL_LUMINANCE_ALPHA32I_EXT, GL_LUMINANCE_ALPHA_INTEGER_EXT, GL_INT},
    };
 
-static void grend_use_program(GLuint program_id)
+void grend_use_program(GLuint program_id)
 {
    if (grend_state.program_id != program_id) {
       glUseProgram(program_id);
@@ -387,7 +381,7 @@ static void grend_use_program(GLuint program_id)
    }
 }
 
-static void grend_blend_enable(GLboolean blend_enable)
+void grend_blend_enable(GLboolean blend_enable)
 {
    if (grend_state.blend_enabled != blend_enable) {
       grend_state.blend_enabled = blend_enable;
@@ -398,7 +392,7 @@ static void grend_blend_enable(GLboolean blend_enable)
    }
 }
 
-static void grend_depth_test_enable(GLboolean depth_test_enable)
+void grend_depth_test_enable(GLboolean depth_test_enable)
 {
    if (grend_state.depth_test_enabled != depth_test_enable) {
       grend_state.depth_test_enabled = depth_test_enable;
@@ -570,7 +564,6 @@ void grend_create_sampler_view(struct grend_context *ctx,
                                uint32_t val0, uint32_t val1, uint32_t swizzle_packed)
 {
    struct grend_sampler_view *view;
-   const struct util_format_description *desc;
 
    view = CALLOC_STRUCT(grend_sampler_view);
    view->res_handle = res_handle;
@@ -1167,7 +1160,6 @@ void grend_draw_vbo(struct grend_context *ctx,
          
          } else {
             if (ctx->old_targets[sampler_id]) {
-               glDisable(ctx->old_targets[sampler_id]);
                ctx->old_targets[sampler_id] = 0;
             }
          }
@@ -1808,6 +1800,7 @@ graw_renderer_init(void)
    grend_state.program_id = (GLuint)-1;
    list_inithead(&grend_state.fence_list);
   
+   graw_cursor_init(&grend_state.cursor_info);
    /* create 0 context */
    graw_renderer_context_create_internal(0);
 }
@@ -2470,6 +2463,9 @@ int graw_renderer_flush_buffer(uint32_t res_handle,
                         0, res->base.height0, res->base.width0, 0,
                         GL_COLOR_BUFFER_BIT, GL_NEAREST);
       glDeleteFramebuffers(1, &fb_id);
+
+      graw_renderer_paint_cursor(&grend_state.cursor_info,
+                                 res);
    } else {
       glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
       glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
@@ -2620,4 +2616,11 @@ void grend_get_query_result(struct grend_context *ctx, uint32_t handle,
    glGetQueryObjectuiv(q->id, GL_QUERY_RESULT_ARB, &passed);
 
    
+}
+
+void grend_set_cursor_info(uint32_t cursor_handle, int x, int y)
+{
+   grend_state.cursor_info.res_handle = cursor_handle;
+   grend_state.cursor_info.x = x;
+   grend_state.cursor_info.y = y;
 }

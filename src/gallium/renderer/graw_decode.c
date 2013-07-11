@@ -1,6 +1,8 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
+#include <GL/glew.h>
+#include <GL/gl.h>
 
 #include "util/u_memory.h"
 #include "pipe/p_state.h"

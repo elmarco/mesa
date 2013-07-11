@@ -2424,23 +2424,10 @@ int graw_renderer_set_scanout(uint32_t res_handle,
    return 0;
 }
 
-int graw_renderer_flush_buffer(uint32_t res_handle,
-                               struct pipe_box *box)
+int graw_renderer_flush_buffer_res(struct grend_resource *res,
+                                   struct pipe_box *box)
 {
-   struct grend_resource *res;
    GLuint fb_id;
-
-   if (!localrender)
-      return 0;
-
-   res = graw_lookup_resource(res_handle);
-   if (!res)
-      return 0;
-
-   if (res != frontbuffer) {
-      fprintf(stderr,"not the frontbuffer %d\n", res_handle);
-      return 0;
-   }
 
    if (!res->is_front) {
       glGenFramebuffers(1, &fb_id);
@@ -2470,8 +2457,29 @@ int graw_renderer_flush_buffer(uint32_t res_handle,
       glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
       glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
    }
+
    swap_buffers();
    return 0;
+}
+
+int graw_renderer_flush_buffer(uint32_t res_handle,
+                               struct pipe_box *box)
+{
+   struct grend_resource *res;
+
+   if (!localrender)
+      return 0;
+
+   res = graw_lookup_resource(res_handle);
+   if (!res)
+      return 0;
+
+   if (res != frontbuffer) {
+      fprintf(stderr,"not the frontbuffer %d\n", res_handle);
+      return 0;
+   }
+
+   return graw_renderer_flush_buffer_res(res, box);
 }
 
 int graw_renderer_create_fence(int client_fence_id)
@@ -2623,4 +2631,7 @@ void grend_set_cursor_info(uint32_t cursor_handle, int x, int y)
    grend_state.cursor_info.res_handle = cursor_handle;
    grend_state.cursor_info.x = x;
    grend_state.cursor_info.y = y;
+
+   if (frontbuffer)
+      graw_renderer_remove_cursor(&grend_state.cursor_info, frontbuffer);
 }

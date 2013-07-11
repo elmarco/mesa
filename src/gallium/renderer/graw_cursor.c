@@ -62,6 +62,21 @@ void graw_cursor_init(struct graw_cursor_info *cursor)
 
 }
 
+int graw_renderer_remove_cursor(struct graw_cursor_info *cursor,
+                                struct grend_resource *dst_res)
+{
+   struct pipe_box box;
+   box.x = cursor->last_x;
+   box.y = cursor->last_y;
+   box.z = 0;
+   box.width = 64;
+   box.height = 64;
+   box.depth = 1;
+
+   graw_renderer_flush_buffer_res(dst_res, &box);
+   return 0;
+}
+
 int graw_renderer_paint_cursor(struct graw_cursor_info *cursor,
                                struct grend_resource *dst_res)
 {
@@ -111,12 +126,13 @@ int graw_renderer_paint_cursor(struct graw_cursor_info *cursor,
 
    glBindBufferARB(GL_ARRAY_BUFFER_ARB, cursor->vbo_id);
 
+   cursor->last_x = cursor->x;
+   cursor->last_y = cursor->y;
+
    x0 = ((float)cursor->x / (s_w / 2)) - 1.0;
    y0 = ((float)(s_h - cursor->y - cursor_res->base.width0) / (s_h / 2)) - 1.0;
    x1 = (((float)cursor->x + cursor_res->base.height0) / (s_w / 2)) - 1.0;
    y1 = (((float)(s_h - cursor->y)) / (s_h / 2)) - 1.0;
-
-   fprintf(stderr,"x0 %f %f %f %f\n", x0, y0, x1, y1);
 
    verts[0].x = x0;
    verts[0].y = y0;

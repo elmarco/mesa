@@ -1373,11 +1373,11 @@ static void grend_hw_emit_blend(struct grend_context *ctx)
 
       for (i = 0; i < PIPE_MAX_COLOR_BUFS; i++) {
          if (state->rt[i].blend_enable) {
-            glBlendFuncSeparatei(i, translate_blend_factor(state->rt[i].rgb_src_factor),
+            glBlendFuncSeparateiARB(i, translate_blend_factor(state->rt[i].rgb_src_factor),
                                  translate_blend_factor(state->rt[i].rgb_dst_factor),
                                  translate_blend_factor(state->rt[i].alpha_src_factor),
                                  translate_blend_factor(state->rt[i].alpha_dst_factor));
-            glBlendEquationSeparatei(i, translate_blend_func(state->rt[0].rgb_func),
+            glBlendEquationSeparateiARB(i, translate_blend_func(state->rt[0].rgb_func),
                                      translate_blend_func(state->rt[0].alpha_func));
             glEnableIndexedEXT(GL_BLEND, i);
          } else

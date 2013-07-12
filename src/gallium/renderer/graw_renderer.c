@@ -1818,13 +1818,19 @@ graw_renderer_fini(void)
 bool grend_destroy_context(struct grend_context *ctx)
 {
    bool switch_0 = (ctx->ctx_id == grend_state.current_ctx_id);
+   int i;
 
    if (ctx->fb_id)
       glDeleteFramebuffers(1, &ctx->fb_id);
 
    grend_free_programs(ctx);
 
-//   glDeleteVertexArrays(1, &ctx->vaoid);
+   glBindVertexArray(ctx->vaoid);
+
+   for (i = 0; i < ctx->num_enabled_attribs; i++)
+      glDisableVertexAttribArray(i);
+
+   glDeleteVertexArrays(1, &ctx->vaoid);
 
    graw_fini_ctx_hash(ctx->object_hash);
    FREE(ctx);

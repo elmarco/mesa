@@ -568,6 +568,12 @@ iter_instruction(struct tgsi_iterate_context *iter,
       fprintf(stderr,"failed to convert opcode %d\n", inst->Instruction.Opcode);
       break;
    }
+
+   if (inst->Instruction.Saturate == TGSI_SAT_ZERO_ONE) {
+      snprintf(buf, 255, "%s = clamp(%s, 0.0, 1.0);\n", dsts[0], dsts[0]);
+      strcat(ctx->glsl_main, buf);
+   }
+     
    return TRUE;
 }
 

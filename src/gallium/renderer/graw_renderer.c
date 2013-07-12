@@ -521,9 +521,17 @@ static struct grend_linked_shader_program *lookup_shader_program(struct grend_co
 static void grend_free_programs(struct grend_context *ctx)
 {
    struct grend_linked_shader_program *ent, *tmp;
+   int i;
    LIST_FOR_EACH_ENTRY_SAFE(ent, tmp, &ctx->programs, head) {
       glDeleteProgram(ent->id);
       list_del(&ent->head);
+
+      for (i = PIPE_SHADER_VERTEX; i <= PIPE_SHADER_FRAGMENT; i++) {
+         free(ent->samp_locs[i]);
+         free(ent->const_locs[i]);
+      }
+      free(ent->attrib_locs);
+      free(ent);
    }
 }  
 

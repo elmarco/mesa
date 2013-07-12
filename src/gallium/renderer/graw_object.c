@@ -98,6 +98,7 @@ graw_object_destroy(struct util_hash_table *handle_hash,
    if (!obj)
       return;
    util_hash_table_remove(handle_hash, intptr_to_pointer(handle));
+   free(obj->data);
    free(obj);
       
 }
@@ -143,6 +144,7 @@ void graw_destroy_resource(uint32_t handle)
    if (!obj)
       return;
    util_hash_table_remove(res_hash, intptr_to_pointer(handle));
+   free(obj->data);
    free(obj);
 }
 

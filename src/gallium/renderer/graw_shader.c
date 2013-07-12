@@ -86,11 +86,29 @@ iter_declaration(struct tgsi_iterate_context *iter,
       ctx->inputs[i].interpolate = decl->Interp.Interpolate;
       ctx->inputs[i].centroid = decl->Interp.Centroid;
       ctx->inputs[i].first = decl->Range.First;
-      if (iter->processor.Processor == TGSI_PROCESSOR_FRAGMENT)
-         name_prefix = "ex";
+      ctx->inputs[i].glsl_predefined = false;
+      ctx->inputs[i].glsl_no_index = false;
+      switch (ctx->inputs[i].name) {
+      case TGSI_SEMANTIC_POSITION:
+         if (iter->processor.Processor == TGSI_PROCESSOR_FRAGMENT) {
+            name_prefix = "gl_FragCoord";
+            ctx->inputs[i].glsl_predefined = true;
+            ctx->inputs[i].glsl_no_index = true;
+            break;
+         }
+         /* fallthrough for vertex shader */
+      default:
+         if (iter->processor.Processor == TGSI_PROCESSOR_FRAGMENT)
+            name_prefix = "ex";
+         else
+            name_prefix = "in";
+         break;
+      }
+
+      if (ctx->inputs[i].glsl_no_index)
+         snprintf(ctx->inputs[i].glsl_name, 64, "%s", name_prefix);
       else
-         name_prefix = "in";
-      snprintf(ctx->inputs[i].glsl_name, 64, "%s_%d", name_prefix, ctx->inputs[i].first);
+         snprintf(ctx->inputs[i].glsl_name, 64, "%s_%d", name_prefix, ctx->inputs[i].first);
       break;
    case TGSI_FILE_OUTPUT:
       i = ctx->num_outputs++;
@@ -98,6 +116,8 @@ iter_declaration(struct tgsi_iterate_context *iter,
       ctx->outputs[i].sid = decl->Semantic.Index;
       ctx->outputs[i].interpolate = decl->Interp.Interpolate;
       ctx->outputs[i].first = decl->Range.First;
+      ctx->outputs[i].glsl_predefined = false;
+      ctx->outputs[i].glsl_no_index = false;
       switch (ctx->outputs[i].name) {
       case TGSI_SEMANTIC_POSITION:
          if (iter->processor.Processor == TGSI_PROCESSOR_VERTEX) {
@@ -592,12 +612,14 @@ static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
    char buf[255];
 
    for (i = 0; i < ctx->num_inputs; i++) {
-      if (ctx->prog_type == TGSI_PROCESSOR_VERTEX && graw_shader_use_explicit) {
-         snprintf(buf, 255, "layout(location=%d) ", ctx->inputs[i].first);
+      if (!ctx->inputs[i].glsl_predefined) { 
+         if (ctx->prog_type == TGSI_PROCESSOR_VERTEX && graw_shader_use_explicit) {
+            snprintf(buf, 255, "layout(location=%d) ", ctx->inputs[i].first);
+            strcat(glsl_final, buf);
+         }
+         snprintf(buf, 255, "in vec4 %s;\n", ctx->inputs[i].glsl_name);
          strcat(glsl_final, buf);
       }
-      snprintf(buf, 255, "in vec4 %s;\n", ctx->inputs[i].glsl_name);
-      strcat(glsl_final, buf);
    }
    for (i = 0; i < ctx->num_outputs; i++) {
       if (!ctx->outputs[i].glsl_predefined) {

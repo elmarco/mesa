@@ -28,10 +28,10 @@ AM_CPPFLAGS = \
 	$(GALLIUM_CFLAGS) \
 	$(LIBDRM_CFLAGS)
 
-noinst_LTLIBRARIES = librempipe.la
+noinst_LTLIBRARIES = libvirgl.la
 
-librempipe_la_SOURCES = \
-	rempipe_screen.c \
+libvirgl_la_SOURCES = \
+	virgl_screen.c \
 	graw_context.c \
 	graw_encode.c \
 	graw_drm_winsys.c \

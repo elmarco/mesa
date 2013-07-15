@@ -13,9 +13,9 @@
 #include "graw_protocol.h"
 #include "graw_pipe_winsys.h"
 #include "graw_context.h"
-#include "rempipe.h"
+#include "virgl.h"
 #include "xf86drm.h"
-#include "qxl_drm.h"
+#include "virgl_drm.h"
 
 static uint32_t next_handle;
 uint32_t graw_object_assign_handle(void)

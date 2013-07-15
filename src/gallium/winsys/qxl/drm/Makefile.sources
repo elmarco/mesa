@@ -1,2 +1,0 @@
-C_SOURCES := \
-	qxl_drm_winsys.c

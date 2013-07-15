@@ -26,14 +26,14 @@
 
 #include "graw_context.h"
 
-#include "rempipe.h"
+#include "virgl.h"
 #include "state_tracker/sw_winsys.h"
  struct pipe_screen encscreen;
 
 static void graw_buffer_flush(struct graw_context *grctx,
                            struct graw_buffer *buf)
 {
-   struct rempipe_screen *rs = rempipe_screen(grctx->base.screen);
+   struct virgl_screen *rs = virgl_screen(grctx->base.screen);
    struct pipe_box hw_box;
    struct pipe_resource *res = &buf->base.base;
    assert(buf->base.backing_bo);
@@ -47,7 +47,7 @@ static void graw_buffer_flush(struct graw_context *grctx,
    buf->dirt_box.z = 0;
 
    grctx->num_transfers++;
-   rs->qws->transfer_put(buf->base.backing_bo, buf->base.hw_res,
+   rs->vws->transfer_put(buf->base.backing_bo, buf->base.hw_res,
                          &buf->dirt_box, 0, 0, 0);
 
 }
@@ -442,29 +442,29 @@ static void graw_draw_vbo(struct pipe_context *ctx,
 
 static void graw_flush_eq(struct graw_context *ctx, void *closure)
 {
-   struct rempipe_screen *rs = rempipe_screen(ctx->base.screen);
+   struct virgl_screen *rs = virgl_screen(ctx->base.screen);
    int i;
    /* send the buffer to the remote side for decoding - for now jdi */
    
 //   fprintf(stderr,"flush transfers: %d draws %d\n", ctx->num_transfers, ctx->num_draws);
    ctx->num_transfers = ctx->num_draws = 0;
-   rs->qws->submit_cmd(rs->qws, ctx->cbuf);
+   rs->vws->submit_cmd(rs->vws, ctx->cbuf);
 
    /* add back current framebuffer resources to reference list? */
    {
-      struct qxl_winsys *qws = rempipe_screen(ctx->base.screen)->qws;
+      struct virgl_winsys *vws = virgl_screen(ctx->base.screen)->vws;
       struct pipe_surface *surf;
       struct graw_resource *res;
       surf = ctx->framebuffer.zsbuf;
       if (surf) {
          res = (struct graw_resource *)surf->texture;
-         qws->emit_res(qws, ctx->cbuf, res->hw_res, FALSE);
+         vws->emit_res(vws, ctx->cbuf, res->hw_res, FALSE);
       }
       for (i = 0; i < ctx->framebuffer.nr_cbufs; i++) {
          surf = ctx->framebuffer.cbufs[i];
          if (surf) {
             res = (struct graw_resource *)surf->texture;
-            qws->emit_res(qws, ctx->cbuf, res->hw_res, FALSE);
+            vws->emit_res(vws, ctx->cbuf, res->hw_res, FALSE);
          }
       }
    }
@@ -662,9 +662,9 @@ static void
 graw_context_destroy( struct pipe_context *ctx )
 {
    struct graw_context *grctx = (struct graw_context *)ctx;
-   struct rempipe_screen *rs = rempipe_screen(ctx->screen);
+   struct virgl_screen *rs = virgl_screen(ctx->screen);
    
-   rs->qws->cmd_buf_destroy(grctx->cbuf);
+   rs->vws->cmd_buf_destroy(grctx->cbuf);
    if (grctx->blitter)
       util_blitter_destroy(grctx->blitter);
    if (grctx->uploader)
@@ -679,10 +679,10 @@ struct pipe_context *graw_context_create(struct pipe_screen *pscreen,
                                                          void *priv)
 {
    struct graw_context *grctx;
-   struct rempipe_screen *rs = rempipe_screen(pscreen);
+   struct virgl_screen *rs = virgl_screen(pscreen);
    grctx = CALLOC_STRUCT(graw_context);
 
-   grctx->cbuf = rs->qws->cmd_buf_create(rs->qws);
+   grctx->cbuf = rs->vws->cmd_buf_create(rs->vws);
    if (!grctx->cbuf) {
       FREE(grctx);
       return NULL;
@@ -768,7 +768,7 @@ void graw_flush_frontbuffer(struct pipe_screen *screen,
                             void *winsys_drawable_handle)
 {
 #if 0
-   struct sw_winsys *winsys = rempipe_screen(screen)->winsys;
+   struct sw_winsys *winsys = virgl_screen(screen)->winsys;
    struct graw_texture *gres = (struct graw_texture *)res;
    void *map;
    struct pipe_box box;
@@ -803,7 +803,7 @@ void graw_flush_frontbuffer(struct pipe_screen *screen,
 struct pipe_resource *graw_resource_create(struct pipe_screen *pscreen,
                                            const struct pipe_resource *template)
 {
-   struct rempipe_screen *rs = rempipe_screen(pscreen);
+   struct virgl_screen *rs = virgl_screen(pscreen);
    struct graw_buffer *buf;
    struct graw_texture *tex;
    uint32_t handle;
@@ -814,12 +814,12 @@ struct pipe_resource *graw_resource_create(struct pipe_screen *pscreen,
       buf->base.base = *template;
       buf->base.base.screen = pscreen;
       pipe_reference_init(&buf->base.base.reference, 1);
-      buf->base.hw_res = rs->qws->resource_create(rs->qws, template->target, template->format, template->bind, template->width0, 1, 1, 0, 0, 0);
+      buf->base.hw_res = rs->vws->resource_create(rs->vws, template->target, template->format, template->bind, template->width0, 1, 1, 0, 0, 0);
 
       if (buf->base.base.bind == PIPE_BIND_VERTEX_BUFFER ||
          buf->base.base.bind == PIPE_BIND_INDEX_BUFFER) {
          uint32_t size = template->width0;
-         buf->base.backing_bo = rs->qws->bo_create(rs->qws, size, 0);
+         buf->base.backing_bo = rs->vws->bo_create(rs->vws, size, 0);
       }
       assert(buf->base.hw_res);
       return &buf->base.base;
@@ -829,14 +829,14 @@ struct pipe_resource *graw_resource_create(struct pipe_screen *pscreen,
       tex->base.base = *template;
       tex->base.base.screen = pscreen;
       pipe_reference_init(&tex->base.base.reference, 1);
-      tex->base.hw_res = rs->qws->resource_create(rs->qws, template->target, template->format, template->bind, template->width0, template->height0, template->depth0, template->array_size, template->last_level, template->nr_samples);
+      tex->base.hw_res = rs->vws->resource_create(rs->vws, template->target, template->format, template->bind, template->width0, template->height0, template->depth0, template->array_size, template->last_level, template->nr_samples);
       assert(tex->base.hw_res);
 #if 0
       if (template->bind & (PIPE_BIND_DISPLAY_TARGET |
                             PIPE_BIND_SCANOUT |
                             PIPE_BIND_SHARED))
       {
-         struct sw_winsys *winsys = rempipe_screen(pscreen)->winsys;
+         struct sw_winsys *winsys = virgl_screen(pscreen)->winsys;
          tex->dt = winsys->displaytarget_create(winsys,
                                                 tex->base.base.bind,
                                                 tex->base.base.format,
@@ -853,12 +853,12 @@ struct pipe_resource *graw_resource_create(struct pipe_screen *pscreen,
 
 
 struct pipe_resource *
-rempipe_resource_from_handle(struct pipe_screen *screen,
+virgl_resource_from_handle(struct pipe_screen *screen,
                              const struct pipe_resource *template,
                              struct winsys_handle *whandle)
 {
-   struct sw_winsys *winsys = rempipe_screen(screen)->winsys;
-   struct rempipe_screen *rs = rempipe_screen(screen);
+   struct sw_winsys *winsys = virgl_screen(screen)->winsys;
+   struct virgl_screen *rs = virgl_screen(screen);
    struct graw_texture *rpr = CALLOC_STRUCT(graw_texture);
    uint32_t handle;
 
@@ -866,7 +866,7 @@ rempipe_resource_from_handle(struct pipe_screen *screen,
    pipe_reference_init(&rpr->base.base.reference, 1);
    rpr->base.base.screen = screen;      
 
-   rpr->base.hw_res = rs->qws->resource_create_from_handle(rs->qws, whandle);
+   rpr->base.hw_res = rs->vws->resource_create_from_handle(rs->vws, whandle);
    return &rpr->base.base;
 }   
 
@@ -874,18 +874,18 @@ void
 graw_resource_destroy(struct pipe_screen *pscreen,
                       struct pipe_resource *pt)
 {
-   struct rempipe_screen *rs = rempipe_screen(pscreen);
+   struct virgl_screen *rs = virgl_screen(pscreen);
 
    if (pt->target == PIPE_BUFFER) {
       struct graw_buffer *buf = (struct graw_buffer *)pt;
       if (buf->base.backing_bo)
          pb_reference(&buf->base.backing_bo, NULL);
-      rs->qws->resource_unref(rs->qws, buf->base.hw_res);
+      rs->vws->resource_unref(rs->vws, buf->base.hw_res);
       FREE(buf);
    } else {
       struct graw_texture *tex = (struct graw_texture *)pt;
 
-      rs->qws->resource_unref(rs->qws, tex->base.hw_res);
+      rs->vws->resource_unref(rs->vws, tex->base.hw_res);
       FREE(tex);
    }
 }

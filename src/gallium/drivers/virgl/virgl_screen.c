@@ -1,5 +1,3 @@
-
-
 #include "util/u_memory.h"
 #include "util/u_format.h"
 #include "util/u_format_s3tc.h"
@@ -14,10 +12,10 @@
 #include "state_tracker/sw_winsys.h"
 #include "tgsi/tgsi_exec.h"
 
-#include "../qxl/qxl_winsys.h"
+#include "virgl_winsys.h"
 
-#include "rempipe.h"
-#include "rp_public.h"
+#include "virgl.h"
+#include "virgl_public.h"
 #include "graw_context.h"
 
 #define SP_MAX_TEXTURE_2D_LEVELS 15  /* 16K x 16K */
@@ -25,20 +23,20 @@
 #define SP_MAX_TEXTURE_CUBE_LEVELS 13  /* 4K x 4K */
 
 static const char *
-rempipe_get_vendor(struct pipe_screen *screen)
+virgl_get_vendor(struct pipe_screen *screen)
 {
    return "Red Hat";
 }
 
 
 static const char *
-rempipe_get_name(struct pipe_screen *screen)
+virgl_get_name(struct pipe_screen *screen)
 {
-   return "rempipe";
+   return "virgl";
 }
 
 static int
-rempipe_get_param(struct pipe_screen *screen, enum pipe_cap param)
+virgl_get_param(struct pipe_screen *screen, enum pipe_cap param)
 {
    switch (param) {
    case PIPE_CAP_MAX_COMBINED_SAMPLERS:
@@ -160,9 +158,9 @@ rempipe_get_param(struct pipe_screen *screen, enum pipe_cap param)
 }
 
 static int
-rempipe_get_shader_param(struct pipe_screen *screen, unsigned shader, enum pipe_shader_cap param)
+virgl_get_shader_param(struct pipe_screen *screen, unsigned shader, enum pipe_shader_cap param)
 {
-   struct rempipe_screen *rp_screen = rempipe_screen(screen);
+   struct virgl_screen *rp_screen = virgl_screen(screen);
    switch(shader)
    {
    case PIPE_SHADER_FRAGMENT:
@@ -188,7 +186,7 @@ rempipe_get_shader_param(struct pipe_screen *screen, unsigned shader, enum pipe_
 }
 
 static float
-rempipe_get_paramf(struct pipe_screen *screen, enum pipe_capf param)
+virgl_get_paramf(struct pipe_screen *screen, enum pipe_capf param)
 {
    switch (param) {
    case PIPE_CAPF_MAX_LINE_WIDTH:
@@ -220,74 +218,7 @@ rempipe_get_paramf(struct pipe_screen *screen, enum pipe_capf param)
  * \param type  one of PIPE_TEXTURE, PIPE_SURFACE
  */
 static boolean
-rempipe_is_format_supported( struct pipe_screen *screen,
-                              enum pipe_format format,
-                              enum pipe_texture_target target,
-                              unsigned sample_count,
-                              unsigned bind)
-{
-   struct sw_winsys *winsys = rempipe_screen(screen)->winsys;
-   const struct util_format_description *format_desc;
-
-   assert(target == PIPE_BUFFER ||
-          target == PIPE_TEXTURE_1D ||
-          target == PIPE_TEXTURE_1D_ARRAY ||
-          target == PIPE_TEXTURE_2D ||
-          target == PIPE_TEXTURE_2D_ARRAY ||
-          target == PIPE_TEXTURE_RECT ||
-          target == PIPE_TEXTURE_3D ||
-          target == PIPE_TEXTURE_CUBE);
-
-   format_desc = util_format_description(format);
-   if (!format_desc)
-      return FALSE;
-
-   if (util_format_is_intensity(format))
-      return FALSE;
-   if (sample_count > 1)
-      return FALSE;
-
-   if (bind & (PIPE_BIND_DISPLAY_TARGET |
-               PIPE_BIND_SCANOUT |
-               PIPE_BIND_SHARED)) {
-      if(!winsys->is_displaytarget_format_supported(winsys, bind, format))
-         return FALSE;
-   }
-
-   if (bind & PIPE_BIND_RENDER_TARGET) {
-      if (format_desc->colorspace == UTIL_FORMAT_COLORSPACE_ZS)
-         return FALSE;
-
-      /*
-       * Although possible, it is unnatural to render into compressed or YUV
-       * surfaces. So disable these here to avoid going into weird paths
-       * inside the state trackers.
-       */
-      if (format_desc->block.width != 1 ||
-          format_desc->block.height != 1)
-         return FALSE;
-   }
-
-   if (bind & PIPE_BIND_DEPTH_STENCIL) {
-      if (format_desc->colorspace != UTIL_FORMAT_COLORSPACE_ZS)
-         return FALSE;
-   }
-
-   /*
-    * All other operations (sampling, transfer, etc).
-    */
-
-   if (format_desc->layout == UTIL_FORMAT_LAYOUT_S3TC) {
-      return util_format_s3tc_enabled;
-   }
-
-   /*
-    * Everything else should be supported by u_format.
-    */
-   return TRUE;
-}
-static boolean
-rempipe_qxl_is_format_supported( struct pipe_screen *screen,
+virgl_is_format_supported( struct pipe_screen *screen,
                                  enum pipe_format format,
                                  enum pipe_texture_target target,
                                  unsigned sample_count,
@@ -361,12 +292,12 @@ rempipe_qxl_is_format_supported( struct pipe_screen *screen,
    return TRUE;
 }
 
-static void rempipe_flush_frontbuffer(struct pipe_screen *screen,
+static void virgl_flush_frontbuffer(struct pipe_screen *screen,
                                       struct pipe_resource *res,
                                       unsigned level, unsigned layer,
                                       void *winsys_drawable_handle)
 {
-   struct sw_winsys *winsys = rempipe_screen(screen)->winsys;
+   struct sw_winsys *winsys = virgl_screen(screen)->winsys;
    struct graw_resource *gres = (struct graw_resource *)res;
    void *map;
 
@@ -376,78 +307,41 @@ static void rempipe_flush_frontbuffer(struct pipe_screen *screen,
 }
 
 static void
-rp_destroy_screen(struct pipe_screen *screen)
+virgl_destroy_screen(struct pipe_screen *screen)
 {
-   struct rempipe_screen *rp_screen = rempipe_screen(screen);
-   struct sw_winsys *winsys = rp_screen->winsys;
+   struct virgl_screen *vscreen = virgl_screen(screen);
+   struct virgl_winsys *vws = vscreen->vws;
 
-   if (winsys->destroy)
-      winsys->destroy(winsys);
-   FREE(screen);
-}
-
-static void
-rp_destroy_qxl_screen(struct pipe_screen *screen)
-{
-   struct rempipe_screen *rp_screen = rempipe_screen(screen);
-   struct qxl_winsys *qws = rp_screen->qws;
-
-   if (qws)
-      qws->destroy(qws);
-   FREE(screen);
+   if (vws)
+      vws->destroy(vws);
+   FREE(vscreen);
 }
  
 struct pipe_screen *
-rempipe_create_qxl_screen(struct qxl_winsys *qws)
+virgl_create_screen(struct virgl_winsys *vws)
 {
-      struct rempipe_screen *screen = CALLOC_STRUCT(rempipe_screen);
+      struct virgl_screen *screen = CALLOC_STRUCT(virgl_screen);
 
    if (!screen)
       return NULL;
 
-   screen->qws = qws;
+   screen->vws = vws;
    screen->winsys = NULL;
-   screen->base.get_name = rempipe_get_name;
-   screen->base.get_vendor = rempipe_get_vendor;
-   screen->base.get_param = rempipe_get_param;
-   screen->base.get_shader_param = rempipe_get_shader_param;
-   screen->base.get_paramf = rempipe_get_paramf;
-   screen->base.is_format_supported = rempipe_qxl_is_format_supported;
-   screen->base.destroy = rp_destroy_qxl_screen;
-   screen->base.resource_from_handle = rempipe_resource_from_handle;
+   screen->base.get_name = virgl_get_name;
+   screen->base.get_vendor = virgl_get_vendor;
+   screen->base.get_param = virgl_get_param;
+   screen->base.get_shader_param = virgl_get_shader_param;
+   screen->base.get_paramf = virgl_get_paramf;
+   screen->base.is_format_supported = virgl_is_format_supported;
+   screen->base.destroy = virgl_destroy_screen;
+   screen->base.resource_from_handle = virgl_resource_from_handle;
 
    graw_renderer_init();
    
    screen->base.context_create = graw_context_create;
    screen->base.resource_create = graw_resource_create;
    screen->base.resource_destroy = graw_resource_destroy;
-   screen->base.flush_frontbuffer = rempipe_flush_frontbuffer;
+   screen->base.flush_frontbuffer = virgl_flush_frontbuffer;
    return &screen->base;
 }
   
-struct pipe_screen *
-rempipe_create_screen(struct sw_winsys *winsys)
-{
-   struct rempipe_screen *screen = CALLOC_STRUCT(rempipe_screen);
-
-   if (!screen)
-      return NULL;
-
-   screen->winsys = winsys;
-   screen->base.get_name = rempipe_get_name;
-   screen->base.get_vendor = rempipe_get_vendor;
-   screen->base.get_param = rempipe_get_param;
-   screen->base.get_shader_param = rempipe_get_shader_param;
-   screen->base.get_paramf = rempipe_get_paramf;
-   screen->base.is_format_supported = rempipe_is_format_supported;
-   screen->base.destroy = rp_destroy_screen;
-   screen->base.resource_from_handle = rempipe_resource_from_handle;
-
-   graw_renderer_init();
-   
-   screen->base.context_create = graw_context_create;
-   screen->base.resource_create = graw_resource_create;
-   screen->base.resource_destroy = graw_resource_destroy;
-   screen->base.flush_frontbuffer = rempipe_flush_frontbuffer;
-   return &screen->base;
-}

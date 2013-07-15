@@ -1,4 +1,0 @@
-C_SOURCES := \
-          qxl_context.c \
-          qxl_screen.c \
-          qxl_texture.c

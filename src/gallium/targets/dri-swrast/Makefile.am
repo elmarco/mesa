@@ -31,7 +31,6 @@ AM_CPPFLAGS = \
 	-DGALLIUM_RBUG \
 	-DGALLIUM_TRACE \
 	-DGALLIUM_SOFTPIPE \
-	-DGALLIUM_REMPIPE \
 	-D__NOT_HAVE_DRM_H
 
 dridir = $(DRI_DRIVER_INSTALL_DIR)
@@ -50,7 +49,6 @@ swrast_dri_la_LIBADD = \
 	$(top_builddir)/src/gallium/state_trackers/dri/sw/libdrisw.la \
 	$(top_builddir)/src/gallium/winsys/sw/dri/libswdri.la \
 	$(top_builddir)/src/gallium/drivers/softpipe/libsoftpipe.la \
-	$(top_builddir)/src/gallium/drivers/rempipe/librempipe.la \
 	$(top_builddir)/src/gallium/drivers/trace/libtrace.la \
 	$(top_builddir)/src/gallium/drivers/rbug/librbug.la \
 	$(GALLIUM_DRI_LIB_DEPS)

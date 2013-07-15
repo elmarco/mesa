@@ -35,8 +35,7 @@ AM_CPPFLAGS = \
 	-DGALLIUM_RBUG \
 	-DGALLIUM_TRACE \
 	-DGALLIUM_NOOP \
-        -DGALLIUM_SOFTPIPE \
-        -DGALLIUM_REMPIPE
+        -DGALLIUM_SOFTPIPE
 
 dridir = $(DRI_DRIVER_INSTALL_DIR)
 dri_LTLIBRARIES = virgl_dri.la
@@ -53,26 +52,18 @@ virgl_dri_la_LIBADD = \
 	$(top_builddir)/src/mesa/libmesagallium.la \
 	$(top_builddir)/src/gallium/auxiliary/libgallium.la \
 	$(top_builddir)/src/gallium/state_trackers/dri/drm/libdridrm.la \
-	$(top_builddir)/src/gallium/winsys/qxl/drm/libqxldrm.la \
+	$(top_builddir)/src/gallium/winsys/virgl/drm/libvirgldrm.la \
 	$(top_builddir)/src/gallium/drivers/trace/libtrace.la \
 	$(top_builddir)/src/gallium/drivers/rbug/librbug.la \
 	$(top_builddir)/src/gallium/drivers/noop/libnoop.la \
         $(top_builddir)/src/gallium/winsys/sw/wrapper/libwsw.la \
         $(top_builddir)/src/gallium/drivers/softpipe/libsoftpipe.la \
-        $(top_builddir)/src/gallium/drivers/rempipe/librempipe.la \
-	$(top_builddir)/src/gallium/drivers/qxl/libqxl.la \
+	$(top_builddir)/src/gallium/drivers/virgl/libvirgl.la \
 	$(GALLIUM_DRI_LIB_DEPS) \
 	$(LIBDRM_LIBS) \
 	$(RADEON_LIBS)
 
 nodist_EXTRA_virgl_dri_la_SOURCES = dummy.cpp
-
-if HAVE_MESA_LLVM
-virgl_dri_la_LDFLAGS += $(LLVM_LDFLAGS)
-virgl_dri_la_LIBADD += $(LLVM_LIBS)
-AM_CPPFLAGS += -DGALLIUM_LLVMPIPE
-virgl_dri_la_LIBADD += $(top_builddir)/src/gallium/drivers/llvmpipe/libllvmpipe.la $(LLVM_LIBS)
-endif
 
 # Provide compatibility with scripts for the old Mesa build system for
 # a while by putting a link to the driver into /lib of the build tree.

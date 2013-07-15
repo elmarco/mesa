@@ -5,7 +5,7 @@
 #include "pipe/p_context.h"
 #include "graw_protocol.h"
 
-#include "rempipe.h"
+#include "virgl.h"
 #include "util/u_slab.h"
 #include "util/u_double_list.h"
 
@@ -13,7 +13,7 @@ struct graw_screen;
 
 struct graw_resource {
    struct pipe_resource base;
-   struct qxl_hw_res *hw_res;
+   struct virgl_hw_res *hw_res;
    boolean clean;
    struct pb_buffer *backing_bo; /* for vbo uploads at least */
 };
@@ -50,7 +50,7 @@ struct graw_sampler_view {
    
 struct graw_context {
    struct pipe_context base;
-   struct qxl_cmd_buf *cbuf;
+   struct virgl_cmd_buf *cbuf;
    uint32_t vaoid;
 
    struct graw_vertex_element *ve;
@@ -107,7 +107,7 @@ void graw_flush_frontbuffer(struct pipe_screen *screen,
 void grend_flush_frontbuffer(uint32_t res_handle);
 
 struct pipe_resource *
-rempipe_resource_from_handle(struct pipe_screen *screen,
+virgl_resource_from_handle(struct pipe_screen *screen,
                              const struct pipe_resource *templat,
                              struct winsys_handle *whandle);
 

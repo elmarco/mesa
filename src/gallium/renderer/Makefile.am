@@ -5,7 +5,7 @@ noinst_PROGRAMS=graw-renderer
 AM_LDFLAGS = ../auxiliary/libgallium.la $(GLEW_LIBS) $(GL_LIBS) -lm -ldl
 
 AM_CFLAGS = \
-        -I$(top_srcdir)/src/gallium/drivers/rempipe \
+        -I$(top_srcdir)/src/gallium/drivers/virgl \
 	-I$(top_srcdir)/src/gallium/include \
 	-I$(top_srcdir)/src/gallium/auxiliary \
 	-I$(top_srcdir)/src/gallium/drivers \

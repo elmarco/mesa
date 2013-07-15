@@ -29,6 +29,6 @@ AM_CFLAGS = \
 	$(GALLIUM_CFLAGS) \
 	$(LIBDRM_CFLAGS)
 
-noinst_LTLIBRARIES = libqxldrm.la
+noinst_LTLIBRARIES = libvirgldrm.la
 
-libqxldrm_la_SOURCES = $(C_SOURCES)
+libvirgldrm_la_SOURCES = $(C_SOURCES)

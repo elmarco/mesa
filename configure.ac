@@ -672,7 +672,7 @@ AC_ARG_ENABLE([gallium-tests],
 # Option for Gallium drivers
 
 # Keep this in sync with the --with-gallium-drivers help string default value
-GALLIUM_DRIVERS_DEFAULT="r300,r600,svga,swrast,qxl,virgl"
+GALLIUM_DRIVERS_DEFAULT="r300,r600,svga,swrast,virgl"
 
 AC_ARG_WITH([gallium-drivers],
     [AS_HELP_STRING([--with-gallium-drivers@<:@=DIRS...@:>@],
@@ -1885,26 +1885,11 @@ if test -n "$with_gallium_drivers"; then
             gallium_check_st "nouveau/drm" "dri-nouveau" "" "xvmc-nouveau" "vdpau-nouveau" "omx-nouveau"
             DRICOMMON_NEED_LIBDRM=yes
             ;;
-        xqxl)
-            HAVE_GALLIUM_QXL=yes
-            gallium_require_drm_loader
-            GALLIUM_DRIVERS_DIRS="$GALLIUM_DRIVERS_DIRS qxl softpipe rempipe"
-            if test "x$MESA_LLVM" = x1; then
-                HAVE_GALLIUM_LLVMPIPE=yes
-                GALLIUM_DRIVERS_DIRS="$GALLIUM_DRIVERS_DIRS llvmpipe"
-            fi
-            gallium_check_st "qxl/drm" "dri-qxl" "" "" "" ""
-            ;;
         xvirgl)
             HAVE_GALLIUM_VIRGL=yes
-            HAVE_GALLIUM_QXL=yes
             gallium_require_drm_loader
-            GALLIUM_DRIVERS_DIRS="$GALLIUM_DRIVERS_DIRS qxl softpipe rempipe"
-            if test "x$MESA_LLVM" = x1; then
-                HAVE_GALLIUM_LLVMPIPE=yes
-                GALLIUM_DRIVERS_DIRS="$GALLIUM_DRIVERS_DIRS llvmpipe"
-            fi
-            gallium_check_st "qxl/drm" "dri-virgl" "" "" "" ""
+            GALLIUM_DRIVERS_DIRS="$GALLIUM_DRIVERS_DIRS virgl"
+            gallium_check_st "virgl/drm" "dri-virgl" "" "" "" ""
             ;;
         xfreedreno)
             HAVE_GALLIUM_FREEDRENO=yes
@@ -1916,7 +1901,7 @@ if test -n "$with_gallium_drivers"; then
             ;;
         xswrast)
             HAVE_GALLIUM_SOFTPIPE=yes
-            GALLIUM_DRIVERS_DIRS="$GALLIUM_DRIVERS_DIRS softpipe rempipe"
+            GALLIUM_DRIVERS_DIRS="$GALLIUM_DRIVERS_DIRS softpipe"
             if test "x$MESA_LLVM" = x1; then
                 HAVE_GALLIUM_LLVMPIPE=yes
                 GALLIUM_DRIVERS_DIRS="$GALLIUM_DRIVERS_DIRS llvmpipe"
@@ -2134,16 +2119,15 @@ AC_CONFIG_FILES([Makefile
 		src/gallium/drivers/llvmpipe/Makefile
 		src/gallium/drivers/noop/Makefile
 		src/gallium/drivers/nouveau/Makefile
-		src/gallium/drivers/qxl/Makefile
 		src/gallium/drivers/r300/Makefile
 		src/gallium/drivers/r600/Makefile
 		src/gallium/drivers/radeon/Makefile
 		src/gallium/drivers/radeonsi/Makefile
 		src/gallium/drivers/rbug/Makefile
 		src/gallium/drivers/softpipe/Makefile
-		src/gallium/drivers/rempipe/Makefile
 		src/gallium/drivers/svga/Makefile
 		src/gallium/drivers/trace/Makefile
+		src/gallium/drivers/virgl/Makefile
 		src/gallium/renderer/Makefile
 		src/gallium/state_trackers/Makefile
 		src/gallium/state_trackers/clover/Makefile
@@ -2164,7 +2148,6 @@ AC_CONFIG_FILES([Makefile
 		src/gallium/targets/dri-i915/Makefile
 		src/gallium/targets/dri-ilo/Makefile
 		src/gallium/targets/dri-nouveau/Makefile
-		src/gallium/targets/dri-qxl/Makefile
 		src/gallium/targets/dri-swrast/Makefile
 		src/gallium/targets/dri-virgl/Makefile
 		src/gallium/targets/dri-vmwgfx/Makefile
@@ -2196,9 +2179,9 @@ AC_CONFIG_FILES([Makefile
 		src/gallium/winsys/i915/sw/Makefile
 		src/gallium/winsys/intel/drm/Makefile
 		src/gallium/winsys/nouveau/drm/Makefile
-		src/gallium/winsys/qxl/drm/Makefile
 		src/gallium/winsys/radeon/drm/Makefile
 		src/gallium/winsys/svga/drm/Makefile
+		src/gallium/winsys/virgl/drm/Makefile
 		src/gallium/winsys/sw/dri/Makefile
 		src/gallium/winsys/sw/fbdev/Makefile
 		src/gallium/winsys/sw/null/Makefile

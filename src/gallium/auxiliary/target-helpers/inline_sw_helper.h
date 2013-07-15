@@ -19,10 +19,6 @@
 #include "llvmpipe/lp_public.h"
 #endif
 
-#ifdef GALLIUM_REMPIPE
-#include "rempipe/rp_public.h"
-#endif
-
 
 static INLINE struct pipe_screen *
 sw_screen_create_named(struct sw_winsys *winsys, const char *driver)
@@ -32,10 +28,6 @@ sw_screen_create_named(struct sw_winsys *winsys, const char *driver)
 #if defined(GALLIUM_LLVMPIPE)
    if (screen == NULL && strcmp(driver, "llvmpipe") == 0)
       screen = llvmpipe_create_screen(winsys);
-#endif
-#if defined(GALLIUM_REMPIPE)
-   if (screen == NULL && strcmp(driver, "rempipe") == 0)
-      screen = rempipe_create_screen(winsys);
 #endif
 #if defined(GALLIUM_SOFTPIPE)
    if (screen == NULL)
@@ -57,8 +49,6 @@ sw_screen_create(struct sw_winsys *winsys)
    default_driver = "llvmpipe";
 #elif defined(GALLIUM_SOFTPIPE)
    default_driver = "softpipe";
-#elif defined(GALLIUM_REMPIPE)
-   default_driver = "rempipe";
 #else
    default_driver = "";
 #endif

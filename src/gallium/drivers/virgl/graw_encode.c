@@ -20,7 +20,7 @@ static int graw_encoder_write_cmd_dword(struct graw_context *ctx,
 {
    int len = (dword >> 16);
 
-   if ((ctx->cbuf->cdw + len + 1) > QXL_MAX_CMDBUF_DWORDS)
+   if ((ctx->cbuf->cdw + len + 1) > VIRGL_MAX_CMDBUF_DWORDS)
       ctx->base.flush(&ctx->base, NULL, 0);
 
    graw_encoder_write_dword(ctx->cbuf, dword);
@@ -30,10 +30,10 @@ static int graw_encoder_write_cmd_dword(struct graw_context *ctx,
 static void graw_encoder_write_res(struct graw_context *ctx,
                                    struct graw_resource *res)
 {
-   struct qxl_winsys *qws = rempipe_screen(ctx->base.screen)->qws;
+   struct virgl_winsys *vws = virgl_screen(ctx->base.screen)->vws;
 
    if (res && res->hw_res)
-      qws->emit_res(qws, ctx->cbuf, res->hw_res, TRUE);
+      vws->emit_res(vws, ctx->cbuf, res->hw_res, TRUE);
    else {
       graw_encoder_write_dword(ctx->cbuf, 0);
    }

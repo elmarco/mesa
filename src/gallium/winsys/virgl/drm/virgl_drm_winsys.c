@@ -1,7 +1,7 @@
 #define _FILE_OFFSET_BITS 64
 
-#include "qxl_drm_winsys.h"
-#include "qxl_drm_public.h"
+#include "virgl_drm_winsys.h"
+#include "virgl_drm_public.h"
 #include "util/u_memory.h"
 #include "state_tracker/drm_driver.h"
 
@@ -11,44 +11,44 @@
 #include <xf86drm.h>
 #include "virgl_drm.h"
 
-struct qxl_bomgr {
+struct virgl_bomgr {
    struct pb_manager base;
-   struct qxl_drm_winsys *qws;
+   struct virgl_drm_winsys *qws;
 
 };
 
-static INLINE struct qxl_bomgr *qxl_bomgr(struct pb_manager *mgr)
+static INLINE struct virgl_bomgr *virgl_bomgr(struct pb_manager *mgr)
 {
-   return (struct qxl_bomgr *)mgr;
+   return (struct virgl_bomgr *)mgr;
 }
 
-const struct pb_vtbl qxl_bo_vtbl;
+const struct pb_vtbl virgl_bo_vtbl;
 
-static INLINE struct qxl_bo *qxl_bo(struct pb_buffer *bo)
+static INLINE struct virgl_bo *virgl_bo(struct pb_buffer *bo)
 {
-   assert(bo->vtbl == &qxl_bo_vtbl);
-   return (struct qxl_bo *)bo;
+   assert(bo->vtbl == &virgl_bo_vtbl);
+   return (struct virgl_bo *)bo;
 }
 
-static struct qxl_bo *get_qxl_bo(struct pb_buffer *_buf)
+static struct virgl_bo *get_virgl_bo(struct pb_buffer *_buf)
 {
-    struct qxl_bo *bo = NULL;
+    struct virgl_bo *bo = NULL;
 
-    if (_buf->vtbl == &qxl_bo_vtbl) {
-        bo = qxl_bo(_buf);
+    if (_buf->vtbl == &virgl_bo_vtbl) {
+        bo = virgl_bo(_buf);
     } else {
         struct pb_buffer *base_buf;
         pb_size offset;
         pb_get_base_buffer(_buf, &base_buf, &offset);
 
-        if (base_buf->vtbl == &qxl_bo_vtbl)
-            bo = qxl_bo(base_buf);
+        if (base_buf->vtbl == &virgl_bo_vtbl)
+            bo = virgl_bo(base_buf);
     }
 
     return bo;
 }
 
-static void qxl_bo_get_base_buffer(struct pb_buffer *buf,
+static void virgl_bo_get_base_buffer(struct pb_buffer *buf,
                                    struct pb_buffer **base_buf,
                                    unsigned *offset)
 {
@@ -56,23 +56,23 @@ static void qxl_bo_get_base_buffer(struct pb_buffer *buf,
    *offset = 0;
 }
 
-static enum pipe_error qxl_bo_validate(struct pb_buffer *_buf,
+static enum pipe_error virgl_bo_validate(struct pb_buffer *_buf,
                                        struct pb_validate *vl,
                                        unsigned flags)
 {
    return PIPE_OK;
 }
                                        
-static void qxl_bo_fence(struct pb_buffer *buf,
+static void virgl_bo_fence(struct pb_buffer *buf,
                          struct pipe_fence_handle *fence)
 {
 
 }
 
-static void qxl_bo_destroy(struct pb_buffer *_buf)
+static void virgl_bo_destroy(struct pb_buffer *_buf)
 {
-   struct qxl_bo *bo = qxl_bo(_buf);
-   struct qxl_bomgr *mgr = bo->mgr;
+   struct virgl_bo *bo = virgl_bo(_buf);
+   struct virgl_bomgr *mgr = bo->mgr;
    struct drm_gem_close close_bo;
 
    if (bo->ptr)
@@ -84,22 +84,22 @@ static void qxl_bo_destroy(struct pb_buffer *_buf)
    FREE(bo);
 }
 
-const struct pb_vtbl qxl_bo_vtbl = {
-   qxl_bo_destroy,
+const struct pb_vtbl virgl_bo_vtbl = {
+   virgl_bo_destroy,
    NULL,
    NULL,
-   qxl_bo_validate,
-   qxl_bo_fence,
-   qxl_bo_get_base_buffer,
+   virgl_bo_validate,
+   virgl_bo_fence,
+   virgl_bo_get_base_buffer,
 };
 
-static struct pb_buffer *qxl_bomgr_create_bo(struct pb_manager *_mgr,
+static struct pb_buffer *virgl_bomgr_create_bo(struct pb_manager *_mgr,
                                              pb_size size,
                                              const struct pb_desc *desc)
 {
-   struct qxl_bomgr *mgr = qxl_bomgr(_mgr);
-   struct qxl_drm_winsys *qdws = mgr->qws;
-   struct qxl_bo *bo;
+   struct virgl_bomgr *mgr = virgl_bomgr(_mgr);
+   struct virgl_drm_winsys *qdws = mgr->qws;
+   struct virgl_bo *bo;
    struct drm_virgl_alloc alloccmd;
    int ret;
 
@@ -109,13 +109,13 @@ static struct pb_buffer *qxl_bomgr_create_bo(struct pb_manager *_mgr,
    if (ret != 0)
       return NULL;
 
-   bo = CALLOC_STRUCT(qxl_bo);
+   bo = CALLOC_STRUCT(virgl_bo);
 
    pipe_reference_init(&bo->base.reference, 1);
    bo->base.alignment = desc->alignment;
    bo->base.usage = desc->usage;
    bo->base.size = size;
-   bo->base.vtbl = &qxl_bo_vtbl;
+   bo->base.vtbl = &virgl_bo_vtbl;
    bo->handle = alloccmd.handle;
    bo->mgr = mgr;
    bo->qws = qdws;
@@ -123,15 +123,15 @@ static struct pb_buffer *qxl_bomgr_create_bo(struct pb_manager *_mgr,
    return &bo->base;
 }
 
-static void qxl_bomgr_flush(struct pb_manager *mgr)
+static void virgl_bomgr_flush(struct pb_manager *mgr)
 {
 
 }
 
-static boolean qxl_bomgr_is_buffer_busy(struct pb_manager *mgr,
+static boolean virgl_bomgr_is_buffer_busy(struct pb_manager *mgr,
                                         struct pb_buffer *_buf)
 {
-   struct qxl_bo *bo = get_qxl_bo(_buf);
+   struct virgl_bo *bo = get_virgl_bo(_buf);
    struct drm_virgl_3d_wait waitcmd;
    int ret;
 
@@ -142,32 +142,32 @@ static boolean qxl_bomgr_is_buffer_busy(struct pb_manager *mgr,
    return (ret != 0 ? TRUE : FALSE);
 }
 
-static void qxl_bomgr_destroy(struct pb_manager *_mgr)
+static void virgl_bomgr_destroy(struct pb_manager *_mgr)
 {
    FREE(_mgr);
 }
 
-static struct pb_manager *qxl_bomgr_create(struct qxl_drm_winsys *qdws)
+static struct pb_manager *virgl_bomgr_create(struct virgl_drm_winsys *qdws)
 {
-   struct qxl_bomgr *mgr;
+   struct virgl_bomgr *mgr;
 
-   mgr = CALLOC_STRUCT(qxl_bomgr);
+   mgr = CALLOC_STRUCT(virgl_bomgr);
    if (!mgr)
       return NULL;
 
-   mgr->base.destroy = qxl_bomgr_destroy;
-   mgr->base.create_buffer = qxl_bomgr_create_bo;
-   mgr->base.flush = qxl_bomgr_flush;
-   mgr->base.is_buffer_busy = qxl_bomgr_is_buffer_busy;
+   mgr->base.destroy = virgl_bomgr_destroy;
+   mgr->base.create_buffer = virgl_bomgr_create_bo;
+   mgr->base.flush = virgl_bomgr_flush;
+   mgr->base.is_buffer_busy = virgl_bomgr_is_buffer_busy;
 
    mgr->qws = qdws;
    return &mgr->base;
 }
 
-static void *qxl_bo_map(struct pb_buffer *_buf)
+static void *virgl_bo_map(struct pb_buffer *_buf)
 {
    struct drm_virgl_map mmap_arg;
-   struct qxl_bo *bo = get_qxl_bo(_buf);
+   struct virgl_bo *bo = get_virgl_bo(_buf);
    void *ptr;
 
    if (bo->ptr)
@@ -186,9 +186,9 @@ static void *qxl_bo_map(struct pb_buffer *_buf)
    return ptr;
 }
 
-static void qxl_bo_wait(struct pb_buffer *_buf)
+static void virgl_bo_wait(struct pb_buffer *_buf)
 {
-   struct qxl_bo *bo = get_qxl_bo(_buf);
+   struct virgl_bo *bo = get_virgl_bo(_buf);
    struct drm_virgl_3d_wait waitcmd;
    int ret;
 
@@ -200,18 +200,18 @@ static void qxl_bo_wait(struct pb_buffer *_buf)
       goto again;
 }
 
-static unsigned int qxl_bo_get_handle(struct pb_buffer *_buf)
+static unsigned int virgl_bo_get_handle(struct pb_buffer *_buf)
 {
-   struct qxl_bo *bo = get_qxl_bo(_buf);
+   struct virgl_bo *bo = get_virgl_bo(_buf);
    return bo->handle;
 }
 
 static struct pb_buffer *
-qxl_winsys_bo_create(struct qxl_winsys *qws,
+virgl_winsys_bo_create(struct virgl_winsys *qws,
                      unsigned size,
                      unsigned alignment)
 {
-   struct qxl_drm_winsys *qdws = qxl_drm_winsys(qws);
+   struct virgl_drm_winsys *qdws = virgl_drm_winsys(qws);
    struct pb_desc desc;
    struct pb_buffer *buffer;
 
@@ -226,13 +226,13 @@ qxl_winsys_bo_create(struct qxl_winsys *qws,
 }
 
 static int
-qxl_bo_transfer_put(struct pb_buffer *_buf,
-                    struct qxl_hw_res *res,
+virgl_bo_transfer_put(struct pb_buffer *_buf,
+                    struct virgl_hw_res *res,
                     const struct pipe_box *box,
                     uint32_t src_stride,
                     uint32_t buf_offset, uint32_t level)
 {
-   struct qxl_bo *bo = get_qxl_bo(_buf);
+   struct virgl_bo *bo = get_virgl_bo(_buf);
    struct drm_virgl_3d_transfer_put putcmd;
    int ret;
 
@@ -247,13 +247,13 @@ qxl_bo_transfer_put(struct pb_buffer *_buf,
 }
 
 static int
-qxl_bo_transfer_get(struct pb_buffer *_buf,
-                    struct qxl_hw_res *res,
+virgl_bo_transfer_get(struct pb_buffer *_buf,
+                    struct virgl_hw_res *res,
                     const struct pipe_box *box,
                     uint32_t buf_offset,
                     uint32_t level)
 {
-   struct qxl_bo *bo = get_qxl_bo(_buf);
+   struct virgl_bo *bo = get_virgl_bo(_buf);
    struct drm_virgl_3d_transfer_get getcmd;
    int ret;
 
@@ -267,22 +267,22 @@ qxl_bo_transfer_get(struct pb_buffer *_buf,
 }
 
 static void
-qxl_drm_buffer_destroy(struct qxl_winsys *qws,
-                       struct qxl_winsys_buffer *buffer)
+virgl_drm_buffer_destroy(struct virgl_winsys *qws,
+                       struct virgl_winsys_buffer *buffer)
 {
    FREE(buffer);
 }
 
-static struct qxl_winsys_buffer *
-qxl_drm_buffer_from_handle(struct qxl_winsys *qws,
+static struct virgl_winsys_buffer *
+virgl_drm_buffer_from_handle(struct virgl_winsys *qws,
                            struct winsys_handle *whandle,
                            uint32_t size,
                            int32_t *stride)
 {
-   struct qxl_drm_winsys *qdws = qxl_drm_winsys(qws);
-   struct qxl_drm_buffer *buf = CALLOC_STRUCT(qxl_drm_buffer);
+   struct virgl_drm_winsys *qdws = virgl_drm_winsys(qws);
+   struct virgl_drm_buffer *buf = CALLOC_STRUCT(virgl_drm_buffer);
    struct drm_gem_open open_arg;
-//   struct drm_qxl_bo_info info_arg;
+//   struct drm_virgl_bo_info info_arg;
    if (!buf)
       return NULL;
 
@@ -304,13 +304,13 @@ qxl_drm_buffer_from_handle(struct qxl_winsys *qws,
 
 #if 0
    info_arg.handle = buf->handle;
-   if (drmIoctl(qdws->fd, DRM_IOCTL_QXL_BO_INFO, &info_arg)) {
+   if (drmIoctl(qdws->fd, DRM_IOCTL_VIRGL_BO_INFO, &info_arg)) {
       goto err;
    }
 
    *stride = info_arg.stride;
 #endif
-   return (struct qxl_winsys_buffer *)buf;
+   return (struct virgl_winsys_buffer *)buf;
  err:
    FREE(buf);
    return NULL;
@@ -319,9 +319,9 @@ qxl_drm_buffer_from_handle(struct qxl_winsys *qws,
 
 
 static void
-qxl_drm_winsys_destroy(struct qxl_winsys *qws)
+virgl_drm_winsys_destroy(struct virgl_winsys *qws)
 {
-   struct qxl_drm_winsys *qdws = qxl_drm_winsys(qws);
+   struct virgl_drm_winsys *qdws = virgl_drm_winsys(qws);
 
    qdws->cman->destroy(qdws->cman);
    qdws->kman->destroy(qdws->kman);
@@ -329,11 +329,11 @@ qxl_drm_winsys_destroy(struct qxl_winsys *qws)
    FREE(qdws);
 }
 
-static void qxl_drm_resource_reference(struct qxl_drm_winsys *qdws,
-                                       struct qxl_hw_res **dres,
-                                       struct qxl_hw_res *sres)
+static void virgl_drm_resource_reference(struct virgl_drm_winsys *qdws,
+                                       struct virgl_hw_res **dres,
+                                       struct virgl_hw_res *sres)
 {
-   struct qxl_hw_res *old = *dres;
+   struct virgl_hw_res *old = *dres;
    struct drm_virgl_3d_resource_unref unrefcmd;
    if (pipe_reference(&(*dres)->reference, &sres->reference)) {
       if (old->do_del) {
@@ -345,7 +345,7 @@ static void qxl_drm_resource_reference(struct qxl_drm_winsys *qdws,
    *dres = sres;
 }
 
-static struct qxl_hw_res *qxl_drm_winsys_resource_create(struct qxl_winsys *qws,
+static struct virgl_hw_res *virgl_drm_winsys_resource_create(struct virgl_winsys *qws,
                                                enum pipe_texture_target target,
                                                uint32_t format,
                                                uint32_t bind,
@@ -356,12 +356,12 @@ static struct qxl_hw_res *qxl_drm_winsys_resource_create(struct qxl_winsys *qws,
                                                uint32_t last_level,
                                                uint32_t nr_samples)
 {
-   struct qxl_drm_winsys *qdws = qxl_drm_winsys(qws);
+   struct virgl_drm_winsys *qdws = virgl_drm_winsys(qws);
    struct drm_virgl_3d_resource_create createcmd;
    int ret;
-   struct qxl_hw_res *res;
+   struct virgl_hw_res *res;
 
-   res = CALLOC_STRUCT(qxl_hw_res);
+   res = CALLOC_STRUCT(virgl_hw_res);
    if (!res)
       return NULL;
 
@@ -389,13 +389,13 @@ static struct qxl_hw_res *qxl_drm_winsys_resource_create(struct qxl_winsys *qws,
    return res;
 }
 
-static struct qxl_hw_res *qxl_drm_winsys_resource_create_handle(struct qxl_winsys *qws,
+static struct virgl_hw_res *virgl_drm_winsys_resource_create_handle(struct virgl_winsys *qws,
                                                                 struct winsys_handle *whandle)
 {
-   struct qxl_drm_winsys *qdws = qxl_drm_winsys(qws);
-   struct qxl_hw_res *res;
+   struct virgl_drm_winsys *qdws = virgl_drm_winsys(qws);
+   struct virgl_hw_res *res;
 
-   res = CALLOC_STRUCT(qxl_hw_res);
+   res = CALLOC_STRUCT(virgl_hw_res);
    if (!res)
       return NULL;
 
@@ -406,28 +406,28 @@ static struct qxl_hw_res *qxl_drm_winsys_resource_create_handle(struct qxl_winsy
    return res;  
 }
 
-static void qxl_drm_winsys_resource_unref(struct qxl_winsys *qws,
-                                          struct qxl_hw_res *hres)
+static void virgl_drm_winsys_resource_unref(struct virgl_winsys *qws,
+                                          struct virgl_hw_res *hres)
 {
-   struct qxl_drm_winsys *qdws = qxl_drm_winsys(qws);
+   struct virgl_drm_winsys *qdws = virgl_drm_winsys(qws);
 
-   qxl_drm_resource_reference(qdws, &hres, NULL);
+   virgl_drm_resource_reference(qdws, &hres, NULL);
 }
 
-static struct qxl_cmd_buf *qxl_drm_cmd_buf_create(struct qxl_winsys *qws)
+static struct virgl_cmd_buf *virgl_drm_cmd_buf_create(struct virgl_winsys *qws)
 {
-   struct qxl_drm_winsys *qdws = qxl_drm_winsys(qws);
-   struct qxl_drm_cmd_buf *cbuf;
+   struct virgl_drm_winsys *qdws = virgl_drm_winsys(qws);
+   struct virgl_drm_cmd_buf *cbuf;
 
-   cbuf = CALLOC_STRUCT(qxl_drm_cmd_buf);
+   cbuf = CALLOC_STRUCT(virgl_drm_cmd_buf);
    if (!cbuf)
       return NULL;
 
    cbuf->ws = qws;
 
    cbuf->nres = 512;
-   cbuf->res_bo = (struct qxl_hw_res **)
-      CALLOC(1, cbuf->nres * sizeof(struct qxl_hw_buf*));
+   cbuf->res_bo = (struct virgl_hw_res **)
+      CALLOC(1, cbuf->nres * sizeof(struct virgl_hw_buf*));
    if (!cbuf->res_bo) {
       return FALSE;
    }
@@ -436,16 +436,16 @@ static struct qxl_cmd_buf *qxl_drm_cmd_buf_create(struct qxl_winsys *qws)
    return &cbuf->base;
 }
 
-static void qxl_drm_cmd_buf_destroy(struct qxl_cmd_buf *_cbuf)
+static void virgl_drm_cmd_buf_destroy(struct virgl_cmd_buf *_cbuf)
 {
-   struct qxl_drm_cmd_buf *cbuf = (struct qxl_drm_cmd_buf *)_cbuf;
+   struct virgl_drm_cmd_buf *cbuf = (struct virgl_drm_cmd_buf *)_cbuf;
 
    FREE(cbuf->res_bo);
    FREE(cbuf);
 
 }
 
-static boolean qxl_drm_lookup_res(struct qxl_drm_cmd_buf *cbuf, struct qxl_hw_res *res)
+static boolean virgl_drm_lookup_res(struct virgl_drm_cmd_buf *cbuf, struct virgl_hw_res *res)
 {
    int i;
 
@@ -455,51 +455,51 @@ static boolean qxl_drm_lookup_res(struct qxl_drm_cmd_buf *cbuf, struct qxl_hw_re
    return FALSE;
 }
 
-static void qxl_drm_add_res(struct qxl_drm_winsys *qdws,
-                            struct qxl_drm_cmd_buf *cbuf, struct qxl_hw_res *res)
+static void virgl_drm_add_res(struct virgl_drm_winsys *qdws,
+                            struct virgl_drm_cmd_buf *cbuf, struct virgl_hw_res *res)
 {
    if (cbuf->cres > cbuf->nres)
       assert(0);
 
    cbuf->res_bo[cbuf->cres] = NULL;
-   qxl_drm_resource_reference(qdws, &cbuf->res_bo[cbuf->cres], res);
+   virgl_drm_resource_reference(qdws, &cbuf->res_bo[cbuf->cres], res);
    p_atomic_inc(&res->num_cs_references);
    cbuf->cres++;
 }
 
-static void qxl_drm_release_all_res(struct qxl_drm_winsys *qdws,
-                                    struct qxl_drm_cmd_buf *cbuf)
+static void virgl_drm_release_all_res(struct virgl_drm_winsys *qdws,
+                                    struct virgl_drm_cmd_buf *cbuf)
 {
    int i;
 
    for (i = 0; i < cbuf->cres; i++) {
       p_atomic_dec(&cbuf->res_bo[i]->num_cs_references);
-      qxl_drm_resource_reference(qdws, &cbuf->res_bo[i], NULL);
+      virgl_drm_resource_reference(qdws, &cbuf->res_bo[i], NULL);
    }
    cbuf->cres = 0;
 }
 
-static void qxl_drm_emit_res(struct qxl_winsys *qws,
-                             struct qxl_cmd_buf *_cbuf, struct qxl_hw_res *res, boolean write_buf)
+static void virgl_drm_emit_res(struct virgl_winsys *qws,
+                             struct virgl_cmd_buf *_cbuf, struct virgl_hw_res *res, boolean write_buf)
 {
-   struct qxl_drm_winsys *qdws = qxl_drm_winsys(qws);
-   struct qxl_drm_cmd_buf *cbuf = (struct qxl_drm_cmd_buf *)_cbuf;
+   struct virgl_drm_winsys *qdws = virgl_drm_winsys(qws);
+   struct virgl_drm_cmd_buf *cbuf = (struct virgl_drm_cmd_buf *)_cbuf;
    int i;
-   boolean already_in_list = qxl_drm_lookup_res(cbuf, res);
+   boolean already_in_list = virgl_drm_lookup_res(cbuf, res);
    
    if (write_buf)
       cbuf->base.buf[cbuf->base.cdw++] = res->res_handle;
 
    if (!already_in_list)
-      qxl_drm_add_res(qdws, cbuf, res);
+      virgl_drm_add_res(qdws, cbuf, res);
 }
 
-static boolean qxl_drm_res_is_ref(struct qxl_winsys *qws,
-                               struct qxl_cmd_buf *_cbuf,
-                               struct qxl_hw_res *res)
+static boolean virgl_drm_res_is_ref(struct virgl_winsys *qws,
+                               struct virgl_cmd_buf *_cbuf,
+                               struct virgl_hw_res *res)
 {
-   struct qxl_drm_winsys *qdws = qxl_drm_winsys(qws);
-   struct qxl_drm_cmd_buf *cbuf = (struct qxl_drm_cmd_buf *)_cbuf;
+   struct virgl_drm_winsys *qdws = virgl_drm_winsys(qws);
+   struct virgl_drm_cmd_buf *cbuf = (struct virgl_drm_cmd_buf *)_cbuf;
    
    if (!res->num_cs_references)
       return FALSE;
@@ -507,10 +507,10 @@ static boolean qxl_drm_res_is_ref(struct qxl_winsys *qws,
    return TRUE;
 }
 
-static int qxl_drm_winsys_submit_cmd(struct qxl_winsys *qws, struct qxl_cmd_buf *_cbuf)
+static int virgl_drm_winsys_submit_cmd(struct virgl_winsys *qws, struct virgl_cmd_buf *_cbuf)
 {
-   struct qxl_drm_winsys *qdws = qxl_drm_winsys(qws);
-   struct qxl_drm_cmd_buf *cbuf = (struct qxl_drm_cmd_buf *)_cbuf;
+   struct virgl_drm_winsys *qdws = virgl_drm_winsys(qws);
+   struct virgl_drm_cmd_buf *cbuf = (struct virgl_drm_cmd_buf *)_cbuf;
    struct drm_virgl_execbuffer eb;
    int ret;
 
@@ -524,48 +524,45 @@ static int qxl_drm_winsys_submit_cmd(struct qxl_winsys *qws, struct qxl_cmd_buf 
 
    cbuf->base.cdw = 0;
 
-   qxl_drm_release_all_res(qdws, cbuf);
+   virgl_drm_release_all_res(qdws, cbuf);
    return ret;
 }
 
-struct qxl_winsys *
-qxl_drm_winsys_create(int drmFD)
+struct virgl_winsys *
+virgl_drm_winsys_create(int drmFD)
 {
-   struct qxl_drm_winsys *qdws;
+   struct virgl_drm_winsys *qdws;
    unsigned int deviceID;
 
-   qdws = CALLOC_STRUCT(qxl_drm_winsys);
+   qdws = CALLOC_STRUCT(virgl_drm_winsys);
    if (!qdws)
       return NULL;
 
    qdws->fd = drmFD;
 
-   qdws->kman = qxl_bomgr_create(qdws);
+   qdws->kman = virgl_bomgr_create(qdws);
    if (!qdws->kman)
       goto fail;
    qdws->cman = pb_cache_manager_create(qdws->kman, 1000000);
    if (!qdws->cman)
       goto fail;
 
-   qdws->base.destroy = qxl_drm_winsys_destroy;
+   qdws->base.destroy = virgl_drm_winsys_destroy;
 
-   qdws->base.buffer_from_handle = qxl_drm_buffer_from_handle;
-   qdws->base.buffer_destroy = qxl_drm_buffer_destroy;
-   
-   qdws->base.bo_create = qxl_winsys_bo_create;
-   qdws->base.bo_map = qxl_bo_map;
-   qdws->base.bo_wait = qxl_bo_wait;
-   qdws->base.bo_get_handle = qxl_bo_get_handle;
-   qdws->base.transfer_put = qxl_bo_transfer_put;
-   qdws->base.transfer_get = qxl_bo_transfer_get;
-   qdws->base.resource_create = qxl_drm_winsys_resource_create;
-   qdws->base.resource_unref = qxl_drm_winsys_resource_unref;
-   qdws->base.resource_create_from_handle = qxl_drm_winsys_resource_create_handle;
-   qdws->base.cmd_buf_create = qxl_drm_cmd_buf_create;
-   qdws->base.cmd_buf_destroy = qxl_drm_cmd_buf_destroy;
-   qdws->base.submit_cmd = qxl_drm_winsys_submit_cmd;
-   qdws->base.emit_res = qxl_drm_emit_res;
-   qdws->base.res_is_referenced = qxl_drm_res_is_ref;
+   qdws->base.bo_create = virgl_winsys_bo_create;
+   qdws->base.bo_map = virgl_bo_map;
+   qdws->base.bo_wait = virgl_bo_wait;
+   qdws->base.bo_get_handle = virgl_bo_get_handle;
+   qdws->base.transfer_put = virgl_bo_transfer_put;
+   qdws->base.transfer_get = virgl_bo_transfer_get;
+   qdws->base.resource_create = virgl_drm_winsys_resource_create;
+   qdws->base.resource_unref = virgl_drm_winsys_resource_unref;
+   qdws->base.resource_create_from_handle = virgl_drm_winsys_resource_create_handle;
+   qdws->base.cmd_buf_create = virgl_drm_cmd_buf_create;
+   qdws->base.cmd_buf_destroy = virgl_drm_cmd_buf_destroy;
+   qdws->base.submit_cmd = virgl_drm_winsys_submit_cmd;
+   qdws->base.emit_res = virgl_drm_emit_res;
+   qdws->base.res_is_referenced = virgl_drm_res_is_ref;
    return &qdws->base;
 
  fail:

@@ -3,42 +3,28 @@
 #define GRAW_ENCODER_H
 
 #include <stdio.h>
-#include "../qxl/qxl_winsys.h"
+#include "virgl_winsys.h"
 #include "graw_context.h"
 struct graw_surface {
    struct pipe_surface base;
    uint32_t handle;
 };
 
-#if 0
-struct qxl_cmd_buf {
-   uint32_t *buf;
-   uint32_t buf_total;
-   uint32_t buf_offset;
-
-   /* for testing purposes */
-   uint32_t buf_read_offset;
-
-   void (*flush)(struct qxl_cmd_buf *state, void *closure);
-   void *closure;
-};
-#endif
-
-static inline void graw_encoder_write_dword(struct qxl_cmd_buf *state,
+static inline void graw_encoder_write_dword(struct virgl_cmd_buf *state,
                                             uint32_t dword)
 {
 //   fprintf(stderr,"[%d] 0x%x\n", state->cdw, dword);
    state->buf[state->cdw++] = dword;
 }
 
-static inline void graw_encoder_write_qword(struct qxl_cmd_buf *state,
+static inline void graw_encoder_write_qword(struct virgl_cmd_buf *state,
                                             uint64_t qword)
 {
    memcpy(state->buf + state->cdw, &qword, sizeof(uint64_t));
    state->cdw += 2;
 }
 
-static inline void graw_encoder_write_block(struct qxl_cmd_buf *state,
+static inline void graw_encoder_write_block(struct virgl_cmd_buf *state,
 					    uint8_t *ptr, uint32_t len)
 {
    int x;

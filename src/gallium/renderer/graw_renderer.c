@@ -36,6 +36,7 @@ static void grend_update_scissor_state(struct grend_context *ctx);
 extern int graw_shader_use_explicit;
 int localrender;
 static int have_invert_mesa = 0;
+static int draw_cursor = 0;
 
 struct grend_fence {
    uint32_t fence_id;
@@ -2464,8 +2465,9 @@ int graw_renderer_flush_buffer_res(struct grend_resource *res,
                         GL_COLOR_BUFFER_BIT, GL_NEAREST);
       glDeleteFramebuffers(1, &fb_id);
 
-      graw_renderer_paint_cursor(&grend_state.cursor_info,
-                                 res);
+      if (draw_cursor)
+         graw_renderer_paint_cursor(&grend_state.cursor_info,
+                                    res);
    } else {
       glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
       glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
@@ -2645,6 +2647,6 @@ void grend_set_cursor_info(uint32_t cursor_handle, int x, int y)
    grend_state.cursor_info.x = x;
    grend_state.cursor_info.y = y;
 
-   if (frontbuffer)
+   if (frontbuffer && draw_cursor)
       graw_renderer_remove_cursor(&grend_state.cursor_info, frontbuffer);
 }

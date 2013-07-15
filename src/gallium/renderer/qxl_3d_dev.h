@@ -22,12 +22,9 @@ struct drm_qxl_3d_box {
 	uint32_t w, h, d;
 };
 
-#define QXL_3D_TRANSFER_FLAG_INVERT (1 << 0)
-
 struct qxl_3d_transfer_put {
         uint64_t phy_addr;
 	uint32_t res_handle;
-        uint32_t transfer_flags;
 	struct drm_qxl_3d_box dst_box;
 	uint32_t dst_level;
         uint32_t src_stride;
@@ -36,7 +33,6 @@ struct qxl_3d_transfer_put {
 struct qxl_3d_transfer_get {
         uint64_t phy_addr;
 	uint32_t res_handle;
-        uint32_t transfer_flags;
 	struct drm_qxl_3d_box box;
         uint32_t level;
         uint32_t dx, dy;

@@ -1966,7 +1966,6 @@ static void iov_vertex_upload(void *cookie, uint32_t doff, void *src, int len)
 void graw_renderer_transfer_write_iov(uint32_t res_handle,
                                       int level,
                                       uint32_t src_stride,
-                                      uint32_t flags,
                                       struct pipe_box *dst_box,
                                       uint64_t offset,
                                       struct graw_iovec *iov,
@@ -2014,7 +2013,7 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
       GLenum glformat;
       GLenum gltype;
       int old_stride = 0;
-      int invert = flags & (1 << 0);
+      int invert = 0;
 
       grend_use_program(0);
 
@@ -2113,7 +2112,7 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
 
 }
 
-void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t level, uint32_t flags, struct pipe_box *box, uint64_t offset, struct graw_iovec *iov, int num_iovs)
+void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t level, struct pipe_box *box, uint64_t offset, struct graw_iovec *iov, int num_iovs)
 {
    struct grend_resource *res;
    void *myptr = iov[0].iov_base + offset;
@@ -2146,7 +2145,7 @@ void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t level, uint32
       GLint  y1;
       uint32_t send_size = 0;
       void *data;
-      boolean invert = flags & (1 << 0) ? TRUE : FALSE;
+      boolean invert = FALSE;
       boolean actually_invert, separate_invert = FALSE;
 
       grend_use_program(0);

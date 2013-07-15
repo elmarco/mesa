@@ -60,10 +60,14 @@ virgl_dri_la_LIBADD = \
         $(top_builddir)/src/gallium/drivers/softpipe/libsoftpipe.la \
 	$(top_builddir)/src/gallium/drivers/virgl/libvirgl.la \
 	$(GALLIUM_DRI_LIB_DEPS) \
-	$(LIBDRM_LIBS) \
-	$(RADEON_LIBS)
+	$(LIBDRM_LIBS)
 
 nodist_EXTRA_virgl_dri_la_SOURCES = dummy.cpp
+
+if HAVE_MESA_LLVM
+virgl_dri_la_LDFLAGS += $(LLVM_LDFLAGS)
+virgl_dri_la_LIBADD += $(LLVM_LIBS)
+endif
 
 # Provide compatibility with scripts for the old Mesa build system for
 # a while by putting a link to the driver into /lib of the build tree.

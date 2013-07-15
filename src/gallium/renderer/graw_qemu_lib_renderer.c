@@ -13,7 +13,7 @@
 #include <sys/un.h>
 #include <sys/eventfd.h>
 #include "send_scm.h"
-#include "qxl_3d_dev.h"
+#include "virgl_hw.h"
 #include "pipe/p_state.h"
 #include "util/u_format.h"
 #include "util/u_math.h"
@@ -26,7 +26,7 @@ static void *dev_cookie;
 extern int localrender;
 
 void graw_renderer_init(void);
-static void graw_process_cmd(QXL3DCommand *cmd, struct graw_iovec *iov,
+static void graw_process_cmd(struct virgl_command *cmd, struct graw_iovec *iov,
                              unsigned int niovs);
 
 void graw_lib_renderer_init(void *cookie, struct graw_renderer_callbacks *cbs)
@@ -43,25 +43,25 @@ static void send_irq(uint32_t pd)
 
 void graw_process_vcmd(void *cmd, struct graw_iovec *iov, unsigned int niovs)
 {
-   QXL3DCommand *qcmd = cmd;
+   struct virgl_command *qcmd = cmd;
 
    graw_process_cmd(qcmd, iov, niovs);
    graw_renderer_check_fences();
 }
 
-static void graw_process_cmd(QXL3DCommand *cmd, struct graw_iovec *iov,
+static void graw_process_cmd(struct virgl_command *cmd, struct graw_iovec *iov,
                              unsigned int niovs)
 {
    static int inited;
 
    switch (cmd->type) {
-   case QXL_3D_CMD_CREATE_CONTEXT:
+   case VIRGL_CMD_CREATE_CONTEXT:
       graw_renderer_context_create(cmd->u.ctx.handle);
       break;
-   case QXL_3D_DESTROY_CONTEXT:
+   case VIRGL_CMD_DESTROY_CONTEXT:
       graw_renderer_context_destroy(cmd->u.ctx.handle);
       break;
-   case QXL_3D_CMD_CREATE_RESOURCE:
+   case VIRGL_CMD_CREATE_RESOURCE:
 //         fprintf(stderr,"got res create %d %d\n", cmd->u.res_create.width,
 //                 cmd->u.res_create.height);
       graw_renderer_resource_create(cmd->u.res_create.handle,
@@ -75,42 +75,42 @@ static void graw_process_cmd(QXL3DCommand *cmd, struct graw_iovec *iov,
                                     cmd->u.res_create.last_level,
                                     cmd->u.res_create.nr_samples);
       break;
-   case QXL_3D_CMD_SUBMIT:
-//         fprintf(stderr,"cmd submit %lx %d\n", cmd->u.cmd_submit.phy_addr, cmd->u.cmd_submit.size);
+   case VIRGL_CMD_SUBMIT:
+//         fprintf(stderr,"cmd submit %lx %d\n", cmd->u.cmd_submit.data, cmd->u.cmd_submit.size);
       
    {
       graw_decode_block_iov(iov, niovs, cmd->u.cmd_submit.phy_addr, cmd->u.cmd_submit.size / 4);
    }
    
    break;
-   case QXL_3D_TRANSFER_GET:
+   case VIRGL_CMD_TRANSFER_GET:
 //         fprintf(stderr,"got transfer get %d\n", cmd->u.transfer_get.res_handle);
       graw_renderer_transfer_send_iov(cmd->u.transfer_get.res_handle,
                                       cmd->u.transfer_get.level,
                                       (struct pipe_box *)&cmd->u.transfer_get.box,
-                                      cmd->u.transfer_get.phy_addr, iov,
+                                      cmd->u.transfer_get.data, iov,
                                       niovs);
       break;
-   case QXL_3D_TRANSFER_PUT:
+   case VIRGL_CMD_TRANSFER_PUT:
       graw_renderer_transfer_write_iov(cmd->u.transfer_put.res_handle,
                                    cmd->u.transfer_put.dst_level,
                                    cmd->u.transfer_put.src_stride,
                                    (struct pipe_box *)&cmd->u.transfer_put.dst_box,
-                                   cmd->u.transfer_put.phy_addr, iov,
+                                   cmd->u.transfer_put.data, iov,
                                    niovs);
       break;
       
-   case QXL_3D_SET_SCANOUT:
+   case VIRGL_CMD_SET_SCANOUT:
       graw_renderer_set_scanout(cmd->u.set_scanout.res_handle,
                                 (struct pipe_box *)&cmd->u.set_scanout.box);
       (*rcbs->resize_front)(dev_cookie, cmd->u.set_scanout.box.w,
                             cmd->u.set_scanout.box.h);
       break;
-   case QXL_3D_FLUSH_BUFFER:
+   case VIRGL_CMD_FLUSH_BUFFER:
       graw_renderer_flush_buffer(cmd->u.flush_buffer.res_handle,
                                  (struct pipe_box *)&cmd->u.flush_buffer.box);
       break;
-   case QXL_3D_RESOURCE_UNREF:
+   case VIRGL_CMD_RESOURCE_UNREF:
       graw_renderer_resource_unref(cmd->u.res_unref.res_handle);
       break;
    case 0xdeadbeef:
@@ -123,7 +123,7 @@ static void graw_process_cmd(QXL3DCommand *cmd, struct graw_iovec *iov,
       break;
    }
    
-   if (cmd->flags & QXL_3D_COMMAND_EMIT_FENCE)
+   if (cmd->flags & VIRGL_COMMAND_EMIT_FENCE)
       graw_renderer_create_fence(cmd->fence_id);
 
 }

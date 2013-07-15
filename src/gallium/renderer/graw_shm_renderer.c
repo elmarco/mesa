@@ -10,7 +10,7 @@
 #include <sys/un.h>
 #include <sys/eventfd.h>
 #include "send_scm.h"
-#include "qxl_3d_dev.h"
+#include "virgl_hw.h"
 #include "pipe/p_state.h"
 #include "util/u_format.h"
 #include "util/u_math.h"
@@ -140,7 +140,7 @@ int main(int argc, char **argv)
    SPICE_RING_INIT(&ramp->cmd_3d_ring);
    ramp->version = 1;
    {
-      QXL3DCommand *cmd;
+      struct virgl_command *cmd;
       int notify;
    restart:
       process_x_event();
@@ -166,7 +166,7 @@ int main(int argc, char **argv)
 //      fprintf(stderr, "got cmd %x\n", cmd->type);
 
       switch (cmd->type) {
-      case QXL_3D_CMD_CREATE_RESOURCE:
+      case VIRGL_CMD_CREATE_RESOURCE:
 //         fprintf(stderr,"got res create %d %d\n", cmd->u.res_create.width,
 //                 cmd->u.res_create.height);
          graw_renderer_resource_create(cmd->u.res_create.handle,
@@ -180,7 +180,7 @@ int main(int argc, char **argv)
                                        cmd->u.res_create.last_level,
                                        cmd->u.res_create.nr_samples);
          break;
-      case QXL_3D_CMD_SUBMIT:
+      case VIRGL_CMD_SUBMIT:
 //         fprintf(stderr,"cmd submit %lx %d\n", cmd->u.cmd_submit.phy_addr, cmd->u.cmd_submit.size);
 
          {
@@ -188,7 +188,7 @@ int main(int argc, char **argv)
          }
 
          break;
-      case QXL_3D_TRANSFER_GET:
+      case VIRGL_CMD_TRANSFER_GET:
 //         fprintf(stderr,"got transfer get %d\n", cmd->u.transfer_get.res_handle);
 	 graw_renderer_transfer_send_iov(cmd->u.transfer_get.res_handle,
                                      cmd->u.transfer_get.level,
@@ -196,7 +196,7 @@ int main(int argc, char **argv)
                                      cmd->u.transfer_get.phy_addr,
                                          &iov, 1);
 	 break;
-      case QXL_3D_TRANSFER_PUT:
+      case VIRGL_CMD_TRANSFER_PUT:
 	 graw_renderer_transfer_write_iov(cmd->u.transfer_put.res_handle,
 				      cmd->u.transfer_put.dst_level,
 				      cmd->u.transfer_put.src_stride,
@@ -205,15 +205,15 @@ int main(int argc, char **argv)
                                           &iov, 1);
 	 break;
 
-      case QXL_3D_SET_SCANOUT:
+      case VIRGL_CMD_SET_SCANOUT:
          graw_renderer_set_scanout(cmd->u.set_scanout.res_handle,
                                    (struct pipe_box *)&cmd->u.set_scanout.box);
          break;
-      case QXL_3D_FLUSH_BUFFER:
+      case VIRGL_CMD_FLUSH_BUFFER:
          graw_renderer_flush_buffer(cmd->u.flush_buffer.res_handle,
                                    (struct pipe_box *)&cmd->u.flush_buffer.box);
          break;
-      case QXL_3D_RESOURCE_UNREF:
+      case VIRGL_CMD_RESOURCE_UNREF:
          graw_renderer_resource_unref(cmd->u.res_unref.res_handle);
          break;
       case 0xdeadbeef:
@@ -229,7 +229,7 @@ int main(int argc, char **argv)
          break;
       }
 
-      if (cmd->flags & QXL_3D_COMMAND_EMIT_FENCE)
+      if (cmd->flags & VIRGL_COMMAND_EMIT_FENCE)
          graw_renderer_create_fence(cmd->fence_id);
 
       SPICE_RING_POP(&ramp->cmd_3d_ring, notify);

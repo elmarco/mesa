@@ -1132,7 +1132,7 @@ void grend_draw_vbo(struct grend_context *ctx,
             }
          }
          for (i = 0; i < (ctx->consts[shader_type].num_consts + 3) / 4; i++) {
-            if (ctx->prog->const_locs[shader_type][i] != -1)
+            if (ctx->prog->const_locs[shader_type][i] != -1 && ctx->consts[shader_type].consts)
                glUniform4fv(ctx->prog->const_locs[shader_type][i], 1, &ctx->consts[shader_type].consts[i * 4]);
          }
          ctx->const_dirty[shader_type] = FALSE;

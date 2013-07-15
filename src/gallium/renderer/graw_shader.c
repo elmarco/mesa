@@ -22,10 +22,10 @@ struct graw_shader_io {
    int			sid;
    unsigned		interpolate;
    boolean                 centroid;
-   unsigned		write_mask;
    unsigned first;
    boolean glsl_predefined;
    boolean glsl_no_index;
+   boolean override_no_wm;
    char glsl_name[64];
 };
 
@@ -88,6 +88,7 @@ iter_declaration(struct tgsi_iterate_context *iter,
       ctx->inputs[i].first = decl->Range.First;
       ctx->inputs[i].glsl_predefined = false;
       ctx->inputs[i].glsl_no_index = false;
+      ctx->inputs[i].override_no_wm = false;
       switch (ctx->inputs[i].name) {
       case TGSI_SEMANTIC_POSITION:
          if (iter->processor.Processor == TGSI_PROCESSOR_FRAGMENT) {
@@ -118,6 +119,7 @@ iter_declaration(struct tgsi_iterate_context *iter,
       ctx->outputs[i].first = decl->Range.First;
       ctx->outputs[i].glsl_predefined = false;
       ctx->outputs[i].glsl_no_index = false;
+      ctx->outputs[i].override_no_wm = false;
       switch (ctx->outputs[i].name) {
       case TGSI_SEMANTIC_POSITION:
          if (iter->processor.Processor == TGSI_PROCESSOR_VERTEX) {
@@ -126,6 +128,13 @@ iter_declaration(struct tgsi_iterate_context *iter,
             name_prefix = "gl_Position";
             ctx->outputs[i].glsl_predefined = true;
             ctx->outputs[i].glsl_no_index = true;
+         } else if (iter->processor.Processor == TGSI_PROCESSOR_FRAGMENT) {
+            if (ctx->outputs[i].first > 0)
+               fprintf(stderr,"Illegal position input\n");
+            name_prefix = "gl_FragDepth";
+            ctx->outputs[i].glsl_predefined = true;
+            ctx->outputs[i].glsl_no_index = true;
+            ctx->outputs[i].override_no_wm = true;
          }
          break;
       case TGSI_SEMANTIC_COLOR:
@@ -250,7 +259,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
       if (dst->Register.File == TGSI_FILE_OUTPUT) {
          for (j = 0; j < ctx->num_outputs; j++)
             if (ctx->outputs[j].first == dst->Register.Index) {
-               snprintf(dsts[i], 255, "%s%s", ctx->outputs[j].glsl_name, writemask);
+               snprintf(dsts[i], 255, "%s%s", ctx->outputs[j].glsl_name, ctx->outputs[j].override_no_wm ? "" : writemask);
                break;
             }
       }

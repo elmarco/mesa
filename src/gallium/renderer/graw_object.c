@@ -148,7 +148,7 @@ void graw_destroy_resource(uint32_t handle)
    free(obj);
 }
 
-void *graw_lookup_resource(uint32_t handle)
+void *graw_lookup_resource(uint32_t handle, uint32_t ctx_id)
 {
    struct graw_object *obj;
    obj = util_hash_table_get(res_hash, intptr_to_pointer(handle));

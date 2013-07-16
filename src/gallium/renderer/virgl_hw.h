@@ -20,6 +20,8 @@ enum virgl_cmd_type {
 	VIRGL_CMD_SET_SCANOUT,
 	VIRGL_CMD_FLUSH_BUFFER,
 	VIRGL_CMD_RESOURCE_UNREF,
+	VIRGL_CMD_ATTACH_RES_CTX,
+	VIRGL_CMD_DETACH_RES_CTX,
 };
 
 /* put a box of data from a BO into a tex/buffer resource */
@@ -29,6 +31,7 @@ struct virgl_transfer_put {
 	struct virgl_box dst_box; /* dst box */
 	uint32_t dst_level;
 	uint32_t src_stride;
+        uint32_t ctx_id;
 };
 
 struct virgl_transfer_get {
@@ -37,15 +40,18 @@ struct virgl_transfer_get {
 	struct virgl_box box;
 	int level;
 	uint32_t dx, dy;
+        uint32_t ctx_id;
 };
 
 struct virgl_flush_buffer {
 	uint32_t res_handle;
+        uint32_t ctx_id;
 	struct virgl_box box;
 };
 
 struct virgl_set_scanout {
 	uint32_t res_handle;
+        uint32_t ctx_id;
 	struct virgl_box box;
 };
 
@@ -78,6 +84,11 @@ struct virgl_cmd_context {
         uint32_t pad;
 };
 
+struct virgl_cmd_resource_context {
+	uint32_t resource;
+	uint32_t ctx_id;
+};
+
 #define VIRGL_COMMAND_EMIT_FENCE (1 << 0)
 
 struct virgl_command {
@@ -93,6 +104,7 @@ struct virgl_command {
 		struct virgl_set_scanout set_scanout;
 		struct virgl_flush_buffer flush_buffer;
 		struct virgl_resource_unref res_unref;
+		struct virgl_cmd_resource_context res_ctx;
 	} u;
 };
 

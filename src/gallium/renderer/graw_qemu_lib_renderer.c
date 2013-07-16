@@ -86,6 +86,7 @@ static void graw_process_cmd(struct virgl_command *cmd, struct graw_iovec *iov,
    case VIRGL_CMD_TRANSFER_GET:
 //         fprintf(stderr,"got transfer get %d\n", cmd->u.transfer_get.res_handle);
       graw_renderer_transfer_send_iov(cmd->u.transfer_get.res_handle,
+                                      cmd->u.transfer_get.ctx_id,
                                       cmd->u.transfer_get.level,
                                       (struct pipe_box *)&cmd->u.transfer_get.box,
                                       cmd->u.transfer_get.data, iov,
@@ -93,6 +94,7 @@ static void graw_process_cmd(struct virgl_command *cmd, struct graw_iovec *iov,
       break;
    case VIRGL_CMD_TRANSFER_PUT:
       graw_renderer_transfer_write_iov(cmd->u.transfer_put.res_handle,
+                                       cmd->u.transfer_put.ctx_id,
                                    cmd->u.transfer_put.dst_level,
                                    cmd->u.transfer_put.src_stride,
                                    (struct pipe_box *)&cmd->u.transfer_put.dst_box,
@@ -102,16 +104,24 @@ static void graw_process_cmd(struct virgl_command *cmd, struct graw_iovec *iov,
       
    case VIRGL_CMD_SET_SCANOUT:
       graw_renderer_set_scanout(cmd->u.set_scanout.res_handle,
+                                cmd->u.set_scanout.ctx_id,
                                 (struct pipe_box *)&cmd->u.set_scanout.box);
       (*rcbs->resize_front)(dev_cookie, cmd->u.set_scanout.box.w,
                             cmd->u.set_scanout.box.h);
       break;
    case VIRGL_CMD_FLUSH_BUFFER:
       graw_renderer_flush_buffer(cmd->u.flush_buffer.res_handle,
+                                 cmd->u.flush_buffer.ctx_id,
                                  (struct pipe_box *)&cmd->u.flush_buffer.box);
       break;
    case VIRGL_CMD_RESOURCE_UNREF:
       graw_renderer_resource_unref(cmd->u.res_unref.res_handle);
+      break;
+   case VIRGL_CMD_ATTACH_RES_CTX:
+      /* TODO add security */
+      break;
+   case VIRGL_CMD_DETACH_RES_CTX:
+      /* TODO add security */
       break;
    case 0xdeadbeef:
       if (inited) {

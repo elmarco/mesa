@@ -557,7 +557,7 @@ void grend_create_surface(struct grend_context *ctx,
    surf->format = format;
    surf->val0 = val0;
    surf->val1 = val1;
-   surf->texture = graw_lookup_resource(res_handle);
+   surf->texture = graw_lookup_resource(res_handle, ctx->ctx_id);
 
    if (!surf->texture) {
       fprintf(stderr,"%s: failed to find resource for surface %d\n", __func__, res_handle);
@@ -586,7 +586,7 @@ void grend_create_sampler_view(struct grend_context *ctx,
    view->cur_base = 0;
    view->cur_max = 1000;
 
-   view->texture = graw_lookup_resource(res_handle);
+   view->texture = graw_lookup_resource(res_handle, ctx->ctx_id);
 
    if (!view->texture) {
       fprintf(stderr,"%s: failed to find resource %d\n", __func__, res_handle);
@@ -834,7 +834,7 @@ void grend_set_index_buffer(struct grend_context *ctx,
    ctx->ib.offset = offset;
    if (res_handle) {
       if (ctx->index_buffer_res_id != res_handle) {
-         res = graw_lookup_resource(res_handle);
+         res = graw_lookup_resource(res_handle, ctx->ctx_id);
          ctx->ib.buffer = &res->base;
          ctx->index_buffer_res_id = res_handle;
       }
@@ -858,7 +858,7 @@ void grend_set_single_vbo(struct grend_context *ctx,
       ctx->vbo[index].buffer = NULL;
       ctx->vbo_res_ids[index] = 0;
    } else if (ctx->vbo_res_ids[index] != res_handle) {
-      res = graw_lookup_resource(res_handle);
+      res = graw_lookup_resource(res_handle, ctx->ctx_id);
       ctx->vbo[index].buffer = &res->base;
       ctx->vbo_res_ids[index] = res_handle;
    }
@@ -922,7 +922,7 @@ void grend_transfer_inline_write(struct grend_context *ctx,
 {
    struct grend_resource *res;
 
-   res = graw_lookup_resource(res_handle);
+   res = graw_lookup_resource(res_handle, ctx->ctx_id);
    if (res->target == GL_ELEMENT_ARRAY_BUFFER_ARB) {
       glBindBufferARB(GL_ELEMENT_ARRAY_BUFFER_ARB, res->id);
       glBufferSubData(GL_ELEMENT_ARRAY_BUFFER_ARB, box->x, box->width, data);
@@ -1731,41 +1731,7 @@ void grend_flush_frontbuffer(uint32_t res_handle)
 
    if (!localrender)
       return;
-       
-#if 1
-   res = graw_lookup_resource(res_handle);
 
-   glDrawBuffer(GL_NONE);
-   grend_use_program(0);
-   
-   glMatrixMode(GL_PROJECTION);
-   glLoadIdentity();
-   glOrtho(0, res->base.width0, 0, res->base.height0, -1, 1);
-   glMatrixMode(GL_MODELVIEW);
-   glLoadIdentity();
-   glDisable(GL_BLEND);
-   glBindTexture(res->target, res->id);
-   glBindFramebuffer(GL_FRAMEBUFFER_EXT, 0);
-   glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
-   glTexParameteri(res->target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-   glTexParameteri(res->target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-   glTexParameteri(res->target, GL_TEXTURE_BASE_LEVEL, 0);
-   glTexParameteri(res->target, GL_TEXTURE_MAX_LEVEL, 0);
-   glBegin(GL_QUADS);
-#define VAL res->base.width0
-   glTexCoord2f(0, 0);
-   glVertex2f(0, 0);
-   glTexCoord2f(1, 0);
-   glVertex2f(VAL, 0);
-   glTexCoord2f(1, -1);
-   glVertex2f(VAL, VAL);
-   glTexCoord2f(0, -1);
-   glVertex2f(0, VAL);
-   glEnd();
-   glDisable(res->target);
-   swap_buffers();
-#endif
 }
 
 static GLenum tgsitargettogltarget(const enum pipe_texture_target target)
@@ -1936,7 +1902,7 @@ void graw_renderer_resource_unref(uint32_t res_handle)
 {
    struct grend_resource *res;
 
-   res = graw_lookup_resource(res_handle);
+   res = graw_lookup_resource(res_handle, 0);
 
    if (!res)
       return;
@@ -1965,6 +1931,7 @@ static void iov_vertex_upload(void *cookie, uint32_t doff, void *src, int len)
 }
 
 void graw_renderer_transfer_write_iov(uint32_t res_handle,
+                                      uint32_t ctx_id,
                                       int level,
                                       uint32_t src_stride,
                                       struct pipe_box *dst_box,
@@ -1976,7 +1943,7 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
    void *data;
    int need_temp;
 
-   res = graw_lookup_resource(res_handle);
+   res = graw_lookup_resource(res_handle, ctx_id);
    if (res == NULL) {
       fprintf(stderr,"transfer for non-existant res %d\n", res_handle);
       return;
@@ -2113,13 +2080,16 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
 
 }
 
-void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t level, struct pipe_box *box, uint64_t offset, struct graw_iovec *iov, int num_iovs)
+void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t ctx_id,
+                                     uint32_t level, struct pipe_box *box,
+                                     uint64_t offset, struct graw_iovec *iov,
+                                     int num_iovs)
 {
    struct grend_resource *res;
    void *myptr = iov[0].iov_base + offset;
    int need_temp = 0;
 
-   res = graw_lookup_resource(res_handle);
+   res = graw_lookup_resource(res_handle, ctx_id);
    if (!res) {
       fprintf(stderr,"transfer for non-existant res %d\n", res_handle);
       return;
@@ -2261,8 +2231,8 @@ void graw_renderer_resource_copy_region(struct grend_context *ctx,
    GLuint fb_ids[2];
    GLbitfield glmask = 0;
    GLint sy1, sy2, dy1, dy2;
-   src_res = graw_lookup_resource(src_handle);
-   dst_res = graw_lookup_resource(dst_handle);
+   src_res = graw_lookup_resource(src_handle, ctx->ctx_id);
+   dst_res = graw_lookup_resource(dst_handle, ctx->ctx_id);
 
    if (!src_res || !dst_res) {
       fprintf(stderr,"illegal handle in copy region %d %d\n", src_handle, dst_handle);
@@ -2314,7 +2284,8 @@ void graw_renderer_resource_copy_region(struct grend_context *ctx,
    glDeleteFramebuffers(2, fb_ids);
 }
 
-static void graw_renderer_blit_int(uint32_t dst_handle, uint32_t src_handle,
+static void graw_renderer_blit_int(uint32_t ctx_id,
+                                   uint32_t dst_handle, uint32_t src_handle,
                                    const struct pipe_blit_info *info)
 {
    struct grend_resource *src_res, *dst_res;
@@ -2322,8 +2293,8 @@ static void graw_renderer_blit_int(uint32_t dst_handle, uint32_t src_handle,
    GLbitfield glmask = 0;
    int src_y1, src_y2, dst_y1, dst_y2;
 
-   src_res = graw_lookup_resource(src_handle);
-   dst_res = graw_lookup_resource(dst_handle);
+   src_res = graw_lookup_resource(src_handle, ctx_id);
+   dst_res = graw_lookup_resource(dst_handle, ctx_id);
 
    if (!src_res || !dst_res) {
       fprintf(stderr,"illegal handle in blit %d %d\n", src_handle, dst_handle);
@@ -2396,14 +2367,14 @@ void graw_renderer_blit(struct grend_context *ctx,
                         uint32_t dst_handle, uint32_t src_handle,
                         const struct pipe_blit_info *info)
 {
-   graw_renderer_blit_int(dst_handle, src_handle, info);
+   graw_renderer_blit_int(ctx->ctx_id, dst_handle, src_handle, info);
 }
 
-int graw_renderer_set_scanout(uint32_t res_handle,
+int graw_renderer_set_scanout(uint32_t res_handle, uint32_t ctx_id,
                               struct pipe_box *box)
 {
    struct grend_resource *res;
-   res = graw_lookup_resource(res_handle);
+   res = graw_lookup_resource(res_handle, ctx_id);
    if (!res)
       return 0;
 
@@ -2428,7 +2399,7 @@ int graw_renderer_set_scanout(uint32_t res_handle,
       bi.scissor_enable = 0;
 
       res->is_front = 1;
-      graw_renderer_blit_int(res_handle, res_handle, &bi);
+      graw_renderer_blit_int(0, res_handle, res_handle, &bi);
       
       frontbuffer->is_front = 0;
    }
@@ -2478,6 +2449,7 @@ int graw_renderer_flush_buffer_res(struct grend_resource *res,
 }
 
 int graw_renderer_flush_buffer(uint32_t res_handle,
+                               uint32_t ctx_id,
                                struct pipe_box *box)
 {
    struct grend_resource *res;
@@ -2485,7 +2457,7 @@ int graw_renderer_flush_buffer(uint32_t res_handle,
    if (!localrender)
       return 0;
 
-   res = graw_lookup_resource(res_handle);
+   res = graw_lookup_resource(res_handle, ctx_id);
    if (!res)
       return 0;
 

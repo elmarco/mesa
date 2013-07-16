@@ -624,10 +624,9 @@ void graw_renderer_context_destroy(uint32_t handle)
       grend_hw_switch_context(dec_ctx[0]->grctx);      
 }
 
-static void graw_decode_block(uint32_t *block, int ndw)
+static void graw_decode_block(uint32_t ctx_id, uint32_t *block, int ndw)
 {
    int i = 0;
-   int ctx_id = block[0];
    struct grend_decode_ctx *gdctx;
  
    if (ctx_id > GRAW_MAX_CTX)
@@ -641,7 +640,7 @@ static void graw_decode_block(uint32_t *block, int ndw)
    grend_hw_switch_context(gdctx->grctx);
    gdctx->ds->buf = block;
    gdctx->ds->buf_total = ndw;
-   gdctx->ds->buf_offset = 1;
+   gdctx->ds->buf_offset = 0;
 
    while (gdctx->ds->buf_offset < gdctx->ds->buf_total) {
       uint32_t header = gdctx->ds->buf[gdctx->ds->buf_offset];
@@ -717,7 +716,7 @@ static void graw_decode_block(uint32_t *block, int ndw)
 }
 
 void graw_decode_block_iov(struct graw_iovec *iov, unsigned int niovs,
-                           uint64_t offset, int ndw)
+                           uint32_t ctx_id, uint64_t offset, int ndw)
 {
    uint32_t *block = (uint32_t *)(iov[0].iov_base + offset);
    void *data;
@@ -727,7 +726,7 @@ void graw_decode_block_iov(struct graw_iovec *iov, unsigned int niovs,
    }
    else
       data = (uint32_t *)(iov[0].iov_base + offset);
-   graw_decode_block(data, ndw);
+   graw_decode_block(ctx_id, data, ndw);
    if (niovs > 1)
       free(data);
 

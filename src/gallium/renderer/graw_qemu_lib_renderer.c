@@ -79,7 +79,7 @@ static void graw_process_cmd(struct virgl_command *cmd, struct graw_iovec *iov,
 //         fprintf(stderr,"cmd submit %lx %d\n", cmd->u.cmd_submit.data, cmd->u.cmd_submit.size);
       
    {
-      graw_decode_block_iov(iov, niovs, cmd->u.cmd_submit.phy_addr, cmd->u.cmd_submit.size / 4);
+      graw_decode_block_iov(iov, niovs, cmd->u.cmd_submit.ctx_id, cmd->u.cmd_submit.phy_addr, cmd->u.cmd_submit.size / 4);
    }
    
    break;

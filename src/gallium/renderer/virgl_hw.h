@@ -70,6 +70,7 @@ struct virgl_resource_unref {
 struct virgl_cmd_submit {
 	uint64_t phy_addr;
 	uint32_t size;
+        uint32_t ctx_id;
 };
 
 struct virgl_cmd_context {

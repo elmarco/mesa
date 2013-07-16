@@ -15,7 +15,7 @@ struct graw_resource {
    struct pipe_resource base;
    struct virgl_hw_res *hw_res;
    boolean clean;
-   struct pb_buffer *backing_bo; /* for vbo uploads at least */
+//   struct pb_buffer *backing_bo; /* for vbo uploads at least */
 };
 
 struct graw_buffer {
@@ -84,7 +84,7 @@ struct graw_context {
 
 struct graw_transfer {
    struct pipe_transfer base;
-   struct pb_buffer *bo;
+//   struct pb_buffer *bo;
    uint32_t lmsize;
    uint32_t offset;
 };

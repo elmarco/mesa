@@ -226,97 +226,43 @@ virgl_winsys_bo_create(struct virgl_winsys *qws,
 }
 
 static int
-virgl_bo_transfer_put(struct pb_buffer *_buf,
-                    struct virgl_hw_res *res,
-                    const struct pipe_box *box,
-                    uint32_t src_stride,
-                    uint32_t buf_offset, uint32_t level)
+virgl_bo_transfer_put(struct virgl_winsys *vws,
+                      struct virgl_hw_res *res,
+                      const struct pipe_box *box,
+                      uint32_t src_stride,
+                      uint32_t buf_offset, uint32_t level)
 {
-   struct virgl_bo *bo = get_virgl_bo(_buf);
+   struct virgl_drm_winsys *vdws = virgl_drm_winsys(vws);
    struct drm_virgl_3d_transfer_put putcmd;
    int ret;
 
-   putcmd.res_handle = res->res_handle;
-   putcmd.bo_handle = bo->handle;
+   putcmd.bo_handle = res->bo_handle;
    putcmd.dst_box = *(struct drm_virgl_3d_box *)box;
    putcmd.src_stride = src_stride;
    putcmd.src_offset = buf_offset;
    putcmd.dst_level = level;
-   ret = drmIoctl(bo->qws->fd, DRM_IOCTL_VIRGL_TRANSFER_PUT, &putcmd);
+   ret = drmIoctl(vdws->fd, DRM_IOCTL_VIRGL_TRANSFER_PUT, &putcmd);
    return ret;
 }
 
 static int
-virgl_bo_transfer_get(struct pb_buffer *_buf,
-                    struct virgl_hw_res *res,
+virgl_bo_transfer_get(struct virgl_winsys *vws,
+                      struct virgl_hw_res *res,
                     const struct pipe_box *box,
                     uint32_t buf_offset,
                     uint32_t level)
 {
-   struct virgl_bo *bo = get_virgl_bo(_buf);
+   struct virgl_drm_winsys *vdws = virgl_drm_winsys(vws);
    struct drm_virgl_3d_transfer_get getcmd;
    int ret;
 
-   getcmd.res_handle = res->res_handle;
-   getcmd.bo_handle = bo->handle;
+   getcmd.bo_handle = res->bo_handle;
    getcmd.level = level;
    getcmd.dst_offset = buf_offset;
    getcmd.box = *(struct drm_virgl_3d_box *)box;
-   ret = drmIoctl(bo->qws->fd, DRM_IOCTL_VIRGL_TRANSFER_GET, &getcmd);
+   ret = drmIoctl(vdws->fd, DRM_IOCTL_VIRGL_TRANSFER_GET, &getcmd);
    return ret;
 }
-
-static void
-virgl_drm_buffer_destroy(struct virgl_winsys *qws,
-                       struct virgl_winsys_buffer *buffer)
-{
-   FREE(buffer);
-}
-
-static struct virgl_winsys_buffer *
-virgl_drm_buffer_from_handle(struct virgl_winsys *qws,
-                           struct winsys_handle *whandle,
-                           uint32_t size,
-                           int32_t *stride)
-{
-   struct virgl_drm_winsys *qdws = virgl_drm_winsys(qws);
-   struct virgl_drm_buffer *buf = CALLOC_STRUCT(virgl_drm_buffer);
-   struct drm_gem_open open_arg;
-//   struct drm_virgl_bo_info info_arg;
-   if (!buf)
-      return NULL;
-
-   memset(&open_arg, 0, sizeof(open_arg));
-//   memset(&info_arg, 0, sizeof(info_arg));
-
-   buf->magic = 0xDEADBEEF;
-   buf->flinked = TRUE;
-   buf->flink = whandle->handle;
-   buf->size = size;
-   open_arg.name = whandle->handle;
-   if (drmIoctl(qdws->fd, DRM_IOCTL_GEM_OPEN, &open_arg)) {
-      goto err;
-   }
-
-   buf->handle = open_arg.handle;
-   buf->name = whandle->handle;
-   
-
-#if 0
-   info_arg.handle = buf->handle;
-   if (drmIoctl(qdws->fd, DRM_IOCTL_VIRGL_BO_INFO, &info_arg)) {
-      goto err;
-   }
-
-   *stride = info_arg.stride;
-#endif
-   return (struct virgl_winsys_buffer *)buf;
- err:
-   FREE(buf);
-   return NULL;
-
-}
-
 
 static void
 virgl_drm_winsys_destroy(struct virgl_winsys *qws)
@@ -334,11 +280,9 @@ static void virgl_drm_resource_reference(struct virgl_drm_winsys *qdws,
                                        struct virgl_hw_res *sres)
 {
    struct virgl_hw_res *old = *dres;
-   struct drm_virgl_3d_resource_unref unrefcmd;
    if (pipe_reference(&(*dres)->reference, &sres->reference)) {
       if (old->do_del) {
-         unrefcmd.res_handle = old->res_handle;
-         drmIoctl(qdws->fd, DRM_IOCTL_VIRGL_RESOURCE_UNREF, &unrefcmd);
+         // refe
       }
       FREE(old);
    }
@@ -354,10 +298,10 @@ static struct virgl_hw_res *virgl_drm_winsys_resource_create(struct virgl_winsys
                                                uint32_t depth,
                                                uint32_t array_size,
                                                uint32_t last_level,
-                                               uint32_t nr_samples)
+                                                             uint32_t nr_samples, uint32_t size)
 {
    struct virgl_drm_winsys *qdws = virgl_drm_winsys(qws);
-   struct drm_virgl_3d_resource_create createcmd;
+   struct drm_virgl_resource_create createcmd;
    int ret;
    struct virgl_hw_res *res;
 
@@ -375,7 +319,7 @@ static struct virgl_hw_res *virgl_drm_winsys_resource_create(struct virgl_winsys
    createcmd.last_level = last_level;
    createcmd.nr_samples = nr_samples;
    createcmd.res_handle = 0;
-
+   createcmd.size = size;
    ret = drmIoctl(qdws->fd, DRM_IOCTL_VIRGL_RESOURCE_CREATE, &createcmd);
    if (ret != 0) {
       FREE(res);
@@ -384,6 +328,8 @@ static struct virgl_hw_res *virgl_drm_winsys_resource_create(struct virgl_winsys
    
    res->do_del = 1;
    res->res_handle = createcmd.res_handle;
+   res->bo_handle = createcmd.bo_handle;
+   res->size = size;
    pipe_reference_init(&res->reference, 1);
    res->num_cs_references = 0;
    return res;
@@ -393,17 +339,41 @@ static struct virgl_hw_res *virgl_drm_winsys_resource_create_handle(struct virgl
                                                                 struct winsys_handle *whandle)
 {
    struct virgl_drm_winsys *qdws = virgl_drm_winsys(qws);
+   struct drm_gem_open open_arg = {};
+   struct drm_virgl_resource_info info_arg = {};
    struct virgl_hw_res *res;
 
+   memset(&open_arg, 0, sizeof(open_arg));
    res = CALLOC_STRUCT(virgl_hw_res);
    if (!res)
       return NULL;
 
+   open_arg.name = whandle->handle;
+   if (drmIoctl(qdws->fd, DRM_IOCTL_GEM_OPEN, &open_arg)) {
+        FREE(res);
+        goto fail;
+   }
    res->do_del = 0;
-   res->res_handle = whandle->handle;
+   res->bo_handle = open_arg.handle;
+   res->name = whandle->handle;
+   memset(&info_arg, 0, sizeof(info_arg));
+   info_arg.bo_handle = res->bo_handle;
+
+   if (drmIoctl(qdws->fd, DRM_IOCTL_VIRGL_RESOURCE_INFO, &info_arg)) {
+      /* close */
+      FREE(res);
+      goto fail;
+   }
+
+   res->res_handle = info_arg.res_handle;
+   res->size = info_arg.size;
+
    pipe_reference_init(&res->reference, 1);
    res->num_cs_references = 0;
    return res;  
+
+ fail:
+   return NULL;
 }
 
 static void virgl_drm_winsys_resource_unref(struct virgl_winsys *qws,
@@ -412,6 +382,43 @@ static void virgl_drm_winsys_resource_unref(struct virgl_winsys *qws,
    struct virgl_drm_winsys *qdws = virgl_drm_winsys(qws);
 
    virgl_drm_resource_reference(qdws, &hres, NULL);
+}
+
+static void *virgl_drm_resource_map(struct virgl_winsys *qws, struct virgl_hw_res *res)
+{
+   struct virgl_drm_winsys *qdws = virgl_drm_winsys(qws);
+   struct drm_virgl_map mmap_arg;
+   void *ptr;
+
+   if (res->ptr)
+      return res->ptr;
+
+   mmap_arg.handle = res->bo_handle;
+   if (drmIoctl(qdws->fd, DRM_IOCTL_VIRGL_MAP, &mmap_arg))
+      return NULL;
+
+   ptr = os_mmap(0, res->size, PROT_READ|PROT_WRITE, MAP_SHARED,
+                 qdws->fd, mmap_arg.offset);
+   if (ptr == MAP_FAILED)
+      return NULL;
+
+   res->ptr = ptr;
+   return ptr;
+
+}
+
+static void virgl_drm_resource_wait(struct virgl_winsys *qws, struct virgl_hw_res *res)
+{
+   struct virgl_drm_winsys *qdws = virgl_drm_winsys(qws);
+   struct drm_virgl_3d_wait waitcmd;
+   int ret;
+
+   waitcmd.handle = res->bo_handle;
+   waitcmd.flags = 0;
+ again:
+   ret = drmIoctl(qdws->fd, DRM_IOCTL_VIRGL_WAIT, &waitcmd);
+   if (ret == -EAGAIN)
+      goto again;
 }
 
 static struct virgl_cmd_buf *virgl_drm_cmd_buf_create(struct virgl_winsys *qws)
@@ -558,6 +565,8 @@ virgl_drm_winsys_create(int drmFD)
    qdws->base.resource_create = virgl_drm_winsys_resource_create;
    qdws->base.resource_unref = virgl_drm_winsys_resource_unref;
    qdws->base.resource_create_from_handle = virgl_drm_winsys_resource_create_handle;
+   qdws->base.resource_map = virgl_drm_resource_map;
+   qdws->base.resource_wait = virgl_drm_resource_wait;
    qdws->base.cmd_buf_create = virgl_drm_cmd_buf_create;
    qdws->base.cmd_buf_destroy = virgl_drm_cmd_buf_destroy;
    qdws->base.submit_cmd = virgl_drm_winsys_submit_cmd;

@@ -18,13 +18,20 @@ struct virgl_bo {
    struct virgl_drm_winsys *qws;
    uint32_t handle;
    void *ptr;
+   uint32_t res_handle;
+   int num_cs_references;
+   uint32_t do_del;
 };
 
 struct virgl_hw_res {
    struct pipe_reference reference;
    uint32_t res_handle;
+   uint32_t bo_handle;
+   uint32_t name;
    int num_cs_references;
    uint32_t do_del;
+   uint32_t size;
+   void *ptr;
 };
   
 struct virgl_drm_winsys
@@ -33,17 +40,6 @@ struct virgl_drm_winsys
    int fd;
    struct pb_manager *kman;
    struct pb_manager *cman;
-};
-
-struct virgl_drm_buffer {
-   unsigned magic;
-   void *ptr;
-   boolean flinked;
-   unsigned flink;
-
-   uint32_t handle;
-   uint32_t name;
-   uint32_t size;
 };
 
 struct virgl_drm_cmd_buf {
@@ -56,12 +52,6 @@ struct virgl_drm_cmd_buf {
    struct virgl_hw_res **res_bo;
    struct virgl_winsys *ws;
 };
-
-static INLINE struct virgl_drm_buffer *
-virgl_drm_buffer(struct virgl_winsys_buffer *buffer)
-{
-   return (struct virgl_drm_buffer *)buffer;
-}
 
 static INLINE struct virgl_drm_winsys *
 virgl_drm_winsys(struct virgl_winsys *iws)

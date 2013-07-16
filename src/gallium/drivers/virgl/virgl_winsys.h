@@ -23,18 +23,17 @@ struct virgl_winsys {
                                   unsigned size,
                                   unsigned alignment);
 
-   boolean (*bo_is_busy)(struct pb_buffer *buf);
    void (*bo_wait)(struct pb_buffer *buf);
    void *(*bo_map)(struct pb_buffer *buf);
    unsigned int (*bo_get_handle)(struct pb_buffer *buf);
 
-   int (*transfer_put)(struct pb_buffer *buf,
+   int (*transfer_put)(struct virgl_winsys *vws,
                        struct virgl_hw_res *res,
                        const struct pipe_box *box,
                        uint32_t src_stride, uint32_t buf_offset,
                        uint32_t level);
 
-   int (*transfer_get)(struct pb_buffer *buf,
+   int (*transfer_get)(struct virgl_winsys *vws,
                        struct virgl_hw_res *res,
                        const struct pipe_box *box,
                        uint32_t buf_offset,
@@ -45,9 +44,13 @@ struct virgl_winsys {
                                uint32_t format, uint32_t bind,
                                uint32_t width, uint32_t height,
                                uint32_t depth, uint32_t array_size,
-                               uint32_t last_level, uint32_t nr_samples);
+                               uint32_t last_level, uint32_t nr_samples,
+                               uint32_t size);
 
    void (*resource_unref)(struct virgl_winsys *vws, struct virgl_hw_res *res);
+
+   void *(*resource_map)(struct virgl_winsys *vws, struct virgl_hw_res *res);
+   void (*resource_wait)(struct virgl_winsys *vws, struct virgl_hw_res *res);
 
    struct virgl_hw_res *(*resource_create_from_handle)(struct virgl_winsys *vws,
                                                      struct winsys_handle *whandle);

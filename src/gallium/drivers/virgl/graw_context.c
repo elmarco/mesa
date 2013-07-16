@@ -36,7 +36,6 @@ static void graw_buffer_flush(struct graw_context *grctx,
    struct virgl_screen *rs = virgl_screen(grctx->base.screen);
    struct pipe_box hw_box;
    struct pipe_resource *res = &buf->base.base;
-   assert(buf->base.backing_bo);
 
    assert(buf->on_list);
 
@@ -47,7 +46,7 @@ static void graw_buffer_flush(struct graw_context *grctx,
    buf->dirt_box.z = 0;
 
    grctx->num_transfers++;
-   rs->vws->transfer_put(buf->base.backing_bo, buf->base.hw_res,
+   rs->vws->transfer_put(rs->vws, buf->base.hw_res,
                          &buf->dirt_box, 0, 0, 0);
 
 }
@@ -807,20 +806,16 @@ struct pipe_resource *graw_resource_create(struct pipe_screen *pscreen,
    struct graw_buffer *buf;
    struct graw_texture *tex;
    uint32_t handle;
-
+   uint32_t size;
    if (template->target == PIPE_BUFFER) {
       buf = CALLOC_STRUCT(graw_buffer);
       buf->base.clean = TRUE;
       buf->base.base = *template;
       buf->base.base.screen = pscreen;
       pipe_reference_init(&buf->base.base.reference, 1);
-      buf->base.hw_res = rs->vws->resource_create(rs->vws, template->target, template->format, template->bind, template->width0, 1, 1, 0, 0, 0);
+      size = template->width0;
+      buf->base.hw_res = rs->vws->resource_create(rs->vws, template->target, template->format, template->bind, template->width0, 1, 1, 0, 0, 0, size);
 
-      if (buf->base.base.bind == PIPE_BIND_VERTEX_BUFFER ||
-         buf->base.base.bind == PIPE_BIND_INDEX_BUFFER) {
-         uint32_t size = template->width0;
-         buf->base.backing_bo = rs->vws->bo_create(rs->vws, size, 0);
-      }
       assert(buf->base.hw_res);
       return &buf->base.base;
    } else {
@@ -829,24 +824,10 @@ struct pipe_resource *graw_resource_create(struct pipe_screen *pscreen,
       tex->base.base = *template;
       tex->base.base.screen = pscreen;
       pipe_reference_init(&tex->base.base.reference, 1);
-      tex->base.hw_res = rs->vws->resource_create(rs->vws, template->target, template->format, template->bind, template->width0, template->height0, template->depth0, template->array_size, template->last_level, template->nr_samples);
+      size = template->width0 * template->height0 * template->depth0 * template->array_size * (template->nr_samples ? template->nr_samples : 1)
+         * util_format_get_blocksize(template->format) * (template->last_level + 1);
+      tex->base.hw_res = rs->vws->resource_create(rs->vws, template->target, template->format, template->bind, template->width0, template->height0, template->depth0, template->array_size, template->last_level, template->nr_samples, size);
       assert(tex->base.hw_res);
-#if 0
-      if (template->bind & (PIPE_BIND_DISPLAY_TARGET |
-                            PIPE_BIND_SCANOUT |
-                            PIPE_BIND_SHARED))
-      {
-         struct sw_winsys *winsys = virgl_screen(pscreen)->winsys;
-         tex->dt = winsys->displaytarget_create(winsys,
-                                                tex->base.base.bind,
-                                                tex->base.base.format,
-                                                tex->base.base.width0, 
-                                                tex->base.base.height0,
-                                                16,
-                                                &tex->stride );
-      }
-      
-#endif
       return &tex->base.base;
    }
 }
@@ -878,8 +859,6 @@ graw_resource_destroy(struct pipe_screen *pscreen,
 
    if (pt->target == PIPE_BUFFER) {
       struct graw_buffer *buf = (struct graw_buffer *)pt;
-      if (buf->base.backing_bo)
-         pb_reference(&buf->base.backing_bo, NULL);
       rs->vws->resource_unref(rs->vws, buf->base.hw_res);
       FREE(buf);
    } else {

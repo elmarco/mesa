@@ -18,7 +18,6 @@ static void *graw_transfer_map(struct pipe_context *ctx,
    struct graw_transfer *trans;
    void *ptr;
    boolean readback = TRUE;
-   struct virgl_bo *bo;
 
    if ((!(usage & PIPE_TRANSFER_UNSYNCHRONIZED)) && vs->vws->res_is_referenced(vs->vws, grctx->cbuf, grres->hw_res))
       ctx->flush(ctx, NULL, 0);
@@ -30,22 +29,8 @@ static void *graw_transfer_map(struct pipe_context *ctx,
    trans->lmsize = box->width * box->height * box->depth * util_format_get_blocksize(resource->format);
    trans->lmsize = align(trans->lmsize, 4);
 
-   if (grres->backing_bo) {
-      trans->bo = NULL;
-      pb_reference(&trans->bo, grres->backing_bo);
-   } else {
-      /* allocate a bo */
-      trans->bo = vs->vws->bo_create(vs->vws, trans->lmsize, 0);
-      if (!trans->bo) {
-         util_slab_free(&grctx->texture_transfer_pool, trans);
-         return NULL;
-      }
-   }
-
-   ptr = vs->vws->bo_map(trans->bo);
+   ptr = vs->vws->resource_map(vs->vws, grres->hw_res);
    if (!ptr) {
-      pb_reference(&trans->bo, NULL);
-      util_slab_free(&grctx->texture_transfer_pool, trans);
       return NULL;
    }
 
@@ -57,18 +42,14 @@ static void *graw_transfer_map(struct pipe_context *ctx,
             (PIPE_TRANSFER_WRITE | PIPE_TRANSFER_FLUSH_EXPLICIT))
       readback = FALSE;
 
-   if (readback == FALSE) {
-      if ((usage & PIPE_TRANSFER_READ))
-         memset(ptr, 0, trans->lmsize);
-   } else {
-      struct graw_resource *grres = (struct graw_resource *)resource;
-      struct virgl_screen *vs = virgl_screen(ctx->screen);
-      uint32_t offset = grres->backing_bo ? box->x : 0;
+   if (readback)
+   {
+      uint32_t offset = box->x;
 
-      vs->vws->transfer_get(trans->bo, grres->hw_res, box, offset, level);
+      vs->vws->transfer_get(vs->vws, grres->hw_res, box, offset, level);
 
       /* wait for data */
-      vs->vws->bo_wait(trans->bo);
+      vs->vws->resource_wait(vs->vws, grres->hw_res);
    }
 
    trans->base.resource = resource;
@@ -77,7 +58,7 @@ static void *graw_transfer_map(struct pipe_context *ctx,
    trans->base.box = *box;
    trans->base.stride = box->width * util_format_get_blocksize(resource->format);
    trans->base.layer_stride = 0;
-   trans->offset = grres->backing_bo ? box->x : 0;
+   trans->offset = box->x;
    *transfer = &trans->base;
 
    return ptr + trans->offset;
@@ -97,14 +78,13 @@ static void graw_transfer_unmap(struct pipe_context *ctx,
          struct virgl_screen *vs = virgl_screen(ctx->screen);
          grres->clean = FALSE;
          grctx->num_transfers++;
-         vs->vws->transfer_put(trans->bo, grres->hw_res,
+         vs->vws->transfer_put(vs->vws, grres->hw_res,
                                &transfer->box, 0, trans->offset, transfer->level);
 
       }
       
    }
 
-   pb_reference(&trans->bo, NULL);
    util_slab_free(&grctx->texture_transfer_pool, trans);
 }
 
@@ -120,7 +100,7 @@ static void graw_transfer_flush_region(struct pipe_context *ctx,
    struct pipe_box hw_box;
    struct virgl_screen *vs = virgl_screen(ctx->screen);
 
-   if (grres->backing_bo) {
+   if (1 /*grres->backing_bo*/) {
       struct graw_buffer *buf = (struct graw_buffer *)grres;
 
       if (!buf->on_list) {
@@ -149,7 +129,7 @@ static void graw_transfer_flush_region(struct pipe_context *ctx,
    hw_box.depth = box->depth;
 
    grctx->num_transfers++;
-   vs->vws->transfer_put(trans->bo, grres->hw_res,
+   vs->vws->transfer_put(vs->vws, grres->hw_res,
                          &hw_box, 0, offset, transfer->level);
 
    grres->clean = FALSE;   

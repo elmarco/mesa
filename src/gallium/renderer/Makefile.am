@@ -1,7 +1,4 @@
 
-noinst_PROGRAMS=graw-renderer
-#graw-shm-renderer
-
 AM_LDFLAGS = ../auxiliary/libgallium.la $(GLEW_LIBS) $(GL_LIBS) -lm -ldl
 
 AM_CFLAGS = \
@@ -14,17 +11,17 @@ AM_CFLAGS = \
 	$(PIC_FLAGS) \
 	$(VISIBILITY_CFLAGS)
 
-graw_renderer_SOURCES = \
-        graw_pipe_renderer.c \
-        graw_renderer_glx.c
+#graw_renderer_SOURCES = \
+#        graw_pipe_renderer.c \
+#        graw_renderer_glx.c
 
-graw_shm_renderer_SOURCES = \
-        graw_shm_renderer.c \
-        graw_renderer_glx.c \
-        send_scm.c
+#graw_shm_renderer_SOURCES = \
+#        graw_shm_renderer.c \
+#        graw_renderer_glx.c \
+#        send_scm.c
 
-graw_renderer_LDADD = libgrend.la -lX11
-graw_shm_renderer_LDADD = libgrend.la -lrt -lX11
+#graw_renderer_LDADD = libgrend.la -lX11
+#graw_shm_renderer_LDADD = libgrend.la -lrt -lX11
 
 libgrend_la_SOURCES = \
         graw_renderer.c \
@@ -34,11 +31,17 @@ libgrend_la_SOURCES = \
 	graw_cursor.c \
         iov.c
 
-lib_LTLIBRARIES = libgmoney.la
+pkgconfigdir = $(libdir)/pkgconfig
+pkgconfig_DATA = virglrenderer.pc
+
+lib_LTLIBRARIES = libvirglrenderer.la
 noinst_LTLIBRARIES = libgrend.la
 
-GM_LDFLAGS = -Wl,-Bsymbolic -version-number 1:2 -no-undefined
-libgmoney_la_SOURCES = graw_qemu_lib_renderer.c
-libgmoney_la_LIBADD = libgrend.la
-libgmoney_la_LDFLAGS = $(GM_LDFLAGS)
+GM_LDFLAGS = -Wl,-Bsymbolic -version-number 0:1 -no-undefined
+libvirglrenderer_la_SOURCES = graw_qemu_lib_renderer.c
+libvirglrenderer_la_LIBADD = libgrend.la
+libvirglrenderer_la_LDFLAGS = $(GM_LDFLAGS)
+libvirglrenderer_ladir = $(libdir)
 
+libvirglrendererincludedir = ${includedir}
+libvirglrendererinclude_HEADERS = virglrenderer.h

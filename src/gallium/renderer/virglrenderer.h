@@ -1,7 +1,11 @@
-/* library interface from virgl to graw renderer */
+/* library interface from QEMU to virglrenderer */
 
-#ifndef GRAW_RENDERER_LIB_IF_H
-#define GRAW_RENDERER_LIB_IF_H
+#ifndef VIRGLRENDERER_H
+#define VIRGLRENDERER_H
+
+#include <stdint.h>
+
+struct graw_iovec;
 
 #define GREND_EXPORT  __attribute__((visibility("default")))
 GREND_EXPORT void graw_renderer_poll(void); /* force fences */

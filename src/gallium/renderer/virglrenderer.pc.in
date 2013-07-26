@@ -1,0 +1,10 @@
+prefix=@prefix@
+exec_prefix=${prefix}
+libdir=@libdir@
+includedir=@includedir@
+
+Name: virglrenderer
+Description: Virgl qemu renderer plugin
+Version: @PACKAGE_VERSION@
+Libs: -L${libdir} -lvirglrenderer
+Cflags: -I${includedir}

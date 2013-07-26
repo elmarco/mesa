@@ -2129,6 +2129,7 @@ AC_CONFIG_FILES([Makefile
 		src/gallium/drivers/trace/Makefile
 		src/gallium/drivers/virgl/Makefile
 		src/gallium/renderer/Makefile
+		src/gallium/renderer/virglrenderer.pc
 		src/gallium/state_trackers/Makefile
 		src/gallium/state_trackers/clover/Makefile
 		src/gallium/state_trackers/dri/Makefile

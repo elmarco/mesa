@@ -19,7 +19,7 @@
 #include "util/u_math.h"
 #include "graw_renderer.h"
 
-#include "graw_renderer_lib_if.h"
+#include "virglrenderer.h"
 static struct graw_renderer_callbacks *rcbs;
 
 static void *dev_cookie;

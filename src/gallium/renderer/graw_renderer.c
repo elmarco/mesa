@@ -2081,7 +2081,8 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
 }
 
 void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t ctx_id,
-                                     uint32_t level, struct pipe_box *box,
+                                     uint32_t level, uint32_t dst_stride,
+                                     struct pipe_box *box,
                                      uint64_t offset, struct graw_iovec *iov,
                                      int num_iovs)
 {
@@ -2130,7 +2131,7 @@ void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t ctx_id,
       if (actually_invert && !have_invert_mesa)
          separate_invert = TRUE;
 
-      if (num_iovs > 1 || separate_invert)
+      if (num_iovs > 1 || separate_invert || dst_stride)
          need_temp = 1;
 
       if (need_temp) {
@@ -2182,7 +2183,7 @@ void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t ctx_id,
       if (have_invert_mesa && actually_invert)
          glPixelStorei(GL_PACK_INVERT_MESA, 0);
       if (need_temp) {
-         graw_transfer_write_tex_return(&res->base, box, level, offset, iov, num_iovs, data, send_size, separate_invert);
+         graw_transfer_write_tex_return(&res->base, box, level, dst_stride, offset, iov, num_iovs, data, send_size, separate_invert);
          free(data);
       }
    }

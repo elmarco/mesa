@@ -39,7 +39,7 @@ struct virgl_transfer_get {
 	uint32_t res_handle;
 	struct virgl_box box;
 	int level;
-	uint32_t dx, dy;
+	uint32_t dst_stride;
         uint32_t ctx_id;
 };
 

@@ -136,7 +136,8 @@ void graw_renderer_blit(struct grend_context *ctx,
                         const struct pipe_blit_info *info);
 
 void graw_renderer_transfer_send_iov(uint32_t handle, uint32_t ctx_id,
-                                     uint32_t level, struct pipe_box *box,
+                                     uint32_t level, uint32_t dst_stride,
+                                     struct pipe_box *box,
                                      uint64_t offset, struct graw_iovec *iov,
                                      int iovec_cnt);
 void grend_set_stencil_ref(struct grend_context *ctx, struct pipe_stencil_ref *ref);
@@ -155,6 +156,7 @@ void graw_transfer_write_return(void *data, uint32_t bytes, uint64_t offset,
 void graw_transfer_write_tex_return(struct pipe_resource *res,
 				    struct pipe_box *box,
                                     uint32_t level,
+                                    uint32_t dst_stride,
                                     uint64_t offset,
                                     struct graw_iovec *iov,
                                     int num_iovs,

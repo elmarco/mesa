@@ -189,6 +189,7 @@ void graw_transfer_write_return(void *data, uint32_t bytes, uint64_t offset,
 void graw_transfer_write_tex_return(struct pipe_resource *res,
 				    struct pipe_box *box,
                                        uint32_t level,
+                                       uint32_t dst_stride,
                                        uint64_t offset,
                                        struct graw_iovec *iov,
                                     int num_iovs, void *myptr, int size, int invert)

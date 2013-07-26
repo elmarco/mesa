@@ -1980,24 +1980,22 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
    } else {
       GLenum glformat;
       GLenum gltype;
-      int old_stride = 0;
-      int invert = 0;
+      int elsize = util_format_get_blocksize(res->base.format);
 
       grend_use_program(0);
 
       if (num_iovs > 1) {
          GLuint size = graw_iov_size(iov, num_iovs);
-         data = malloc(size);
+         data = malloc(size - offset);
          graw_iov_to_buf(iov, num_iovs, offset, data, size - offset);
       } else
          data = iov[0].iov_base + offset;
 
       if (src_stride) {
-         glGetIntegerv(GL_UNPACK_ROW_LENGTH, &old_stride);
-         glPixelStorei(GL_UNPACK_ROW_LENGTH, src_stride / 4);
+         glPixelStorei(GL_UNPACK_ROW_LENGTH, src_stride / elsize);
       }
 
-      switch (util_format_get_blocksize(res->base.format)) {
+      switch (elsize) {
       case 1:
          glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
          break;
@@ -2013,8 +2011,8 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
       glformat = tex_conv_table[res->base.format].glformat;
       gltype = tex_conv_table[res->base.format].gltype; 
 
-      if (res->is_front || invert) {
-         if (!res->is_front) {
+      if (res->is_front) {
+         if (0) {// may be need later !res->is_front) {
             if (res->readback_fb_id == 0 || res->readback_fb_level != level) {
                GLuint fb_id;
                if (res->readback_fb_id)
@@ -2038,8 +2036,8 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
          grend_depth_test_enable(GL_FALSE);
          grend_alpha_test_enable(GL_FALSE);
          grend_stencil_test_enable(GL_FALSE);
-         glPixelZoom(1.0f, (!invert) ? 1.0f : -1.0f);
-         glWindowPos2i(dst_box->x, (!invert) ? dst_box->y : res->base.height0 - dst_box->y);
+         glPixelZoom(1.0f, 1.0f);
+         glWindowPos2i(dst_box->x, dst_box->y);
          glDrawPixels(dst_box->width, dst_box->height, glformat, gltype,
                       data);
       } else {
@@ -2071,7 +2069,7 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
          }
       }
       if (src_stride)
-         glPixelStorei(GL_UNPACK_ROW_LENGTH, old_stride);
+         glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
       glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
 
       if (num_iovs > 1)
@@ -2117,16 +2115,15 @@ void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t ctx_id,
       GLint  y1;
       uint32_t send_size = 0;
       void *data;
-      boolean invert = FALSE;
       boolean actually_invert, separate_invert = FALSE;
 
       grend_use_program(0);
 
       /* if we are asked to invert and reading from a front then don't */
-      if (invert && res->is_front)
+      if (res->is_front)
          actually_invert = FALSE;
       else
-         actually_invert = res->renderer_flipped ^ invert;
+         actually_invert = res->renderer_flipped;
 
       if (actually_invert && !have_invert_mesa)
          separate_invert = TRUE;
@@ -2135,7 +2132,7 @@ void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t ctx_id,
          need_temp = 1;
 
       if (need_temp) {
-         send_size = box->width * box->height * box->depth * util_format_get_blocksize(res->base.format);      
+         send_size = box->width * box->height * box->depth * util_format_get_blocksize(res->base.format);
          data = malloc(send_size);
          if (!data)
             fprintf(stderr,"malloc failed %d\n", send_size);

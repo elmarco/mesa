@@ -622,7 +622,15 @@ static void graw_set_scissor_state(struct pipe_context *ctx,
 static void graw_set_sample_mask(struct pipe_context *ctx,
                                  unsigned sample_mask)
 {
+   struct graw_context *grctx = (struct graw_context *)ctx;
+   graw_encoder_set_sample_mask(grctx, sample_mask);
+}
 
+static void graw_set_clip_state(struct pipe_context *ctx,
+                                const struct pipe_clip_state *clip)
+{
+   struct graw_context *grctx = (struct graw_context *)ctx;
+   graw_encoder_set_clip_state(grctx, clip);
 }
 
 static void graw_resource_copy_region(struct pipe_context *ctx,
@@ -735,6 +743,7 @@ struct pipe_context *graw_context_create(struct pipe_screen *pscreen,
    grctx->base.set_scissor_state = graw_set_scissor_state;
    grctx->base.set_sample_mask = graw_set_sample_mask;
    grctx->base.set_stencil_ref = graw_set_stencil_ref;
+   grctx->base.set_clip_state = graw_set_clip_state;
 
    grctx->base.set_blend_color = graw_set_blend_color;
 

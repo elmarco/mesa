@@ -138,6 +138,12 @@ int graw_encoder_set_scissor_state(struct graw_context *ctx,
 void graw_encoder_set_polygon_stipple(struct graw_context *ctx,
                                       const struct pipe_poly_stipple *ps);
 
+void graw_encoder_set_sample_mask(struct graw_context *ctx,
+                                  unsigned sample_mask);
+
+void graw_encoder_set_clip_state(struct graw_context *ctx,
+                                 const struct pipe_clip_state *clip);
+
 int graw_encode_resource_copy_region(struct graw_context *ctx,
                                      struct graw_resource *dst_res,
                                      unsigned dst_level,

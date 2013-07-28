@@ -519,6 +519,25 @@ static void graw_decode_set_polygon_stipple(struct grend_decode_ctx *ctx)
    grend_set_polygon_stipple(ctx->grctx, &ps);
 }
 
+static void graw_decode_set_clip_state(struct grend_decode_ctx *ctx)
+{
+   struct pipe_clip_state clip;
+   int i, j;
+
+   for (i = 0; i < 8; i++)
+      for (j = 0; j < 4; j++)
+         clip.ucp[i][j] = ctx->ds->buf[ctx->ds->buf_offset + 1 + (i * 4) + j];
+   grend_set_clip_state(ctx->grctx, &clip);
+}
+
+static void graw_decode_set_sample_mask(struct grend_decode_ctx *ctx)
+{
+   unsigned mask;
+
+   mask = ctx->ds->buf[ctx->ds->buf_offset + 1];
+   grend_set_sample_mask(ctx->grctx, mask);
+}
+
 static void graw_decode_resource_copy_region(struct grend_decode_ctx *ctx)
 {
    struct pipe_box box;
@@ -749,6 +768,12 @@ static void graw_decode_block(uint32_t ctx_id, uint32_t *block, int ndw)
          break;
       case GRAW_SET_POLYGON_STIPPLE:
          graw_decode_set_polygon_stipple(gdctx);
+         break;
+      case GRAW_SET_CLIP_STATE:
+         graw_decode_set_clip_state(gdctx);
+         break;
+      case GRAW_SET_SAMPLE_MASK:
+         graw_decode_set_sample_mask(gdctx);
          break;
       }
       gdctx->ds->buf_offset += (header >> 16) + 1;

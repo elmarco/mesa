@@ -462,6 +462,25 @@ void graw_encoder_set_polygon_stipple(struct graw_context *ctx,
    }
 }
 
+void graw_encoder_set_sample_mask(struct graw_context *ctx,
+                                  unsigned sample_mask)
+{
+   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_SET_SAMPLE_MASK, 0, 1));
+   graw_encoder_write_dword(ctx->cbuf, sample_mask);
+}
+
+void graw_encoder_set_clip_state(struct graw_context *ctx,
+                                 const struct pipe_clip_state *clip)
+{
+   int i, j;
+   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_SET_CLIP_STATE, 0, 32));
+   for (i = 0; i < PIPE_MAX_CLIP_PLANES; i++) {
+      for (j = 0; j < 4; j++) {
+         graw_encoder_write_dword(ctx->cbuf, uif(clip->ucp[i][j]));
+      }
+   }   
+}
+
 int graw_encode_resource_copy_region(struct graw_context *ctx,
                                      struct graw_resource *dst_res,
                                      unsigned dst_level,

@@ -146,6 +146,9 @@ void grend_set_scissor_state(struct grend_context *ctx, struct pipe_scissor_stat
 
 void grend_set_polygon_stipple(struct grend_context *ctx, struct pipe_poly_stipple *ps);
 
+void grend_set_clip_state(struct grend_context *ctx, struct pipe_clip_state *ucp);
+void grend_set_sample_mask(struct grend_context *ctx, unsigned sample_mask);
+
 void grend_set_constants(struct grend_context *ctx,
                          uint32_t shader,
                          uint32_t index,

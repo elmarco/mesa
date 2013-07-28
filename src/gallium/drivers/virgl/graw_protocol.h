@@ -41,6 +41,8 @@ enum graw_cmd {
    GRAW_END_QUERY,
    GRAW_GET_QUERY_RESULT,
    GRAW_SET_POLYGON_STIPPLE,
+   GRAW_SET_CLIP_STATE,
+   GRAW_SET_SAMPLE_MASK,
 };
 
 enum graw_scrn_cmd {

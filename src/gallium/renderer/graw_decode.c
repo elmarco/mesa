@@ -508,6 +508,17 @@ static void graw_decode_set_scissor_state(struct grend_decode_ctx *ctx)
    grend_set_scissor_state(ctx->grctx, &ss);
 }
 
+static void graw_decode_set_polygon_stipple(struct grend_decode_ctx *ctx)
+{
+   struct pipe_poly_stipple ps;
+   int i;
+
+   for (i = 0; i < 32; i++)
+      ps.stipple[i] = ctx->ds->buf[ctx->ds->buf_offset + 1 + i];
+
+   grend_set_polygon_stipple(ctx->grctx, &ps);
+}
+
 static void graw_decode_resource_copy_region(struct grend_decode_ctx *ctx)
 {
    struct pipe_box box;
@@ -735,6 +746,9 @@ static void graw_decode_block(uint32_t ctx_id, uint32_t *block, int ndw)
          break;
       case GRAW_END_QUERY:
          graw_decode_end_query(gdctx);
+         break;
+      case GRAW_SET_POLYGON_STIPPLE:
+         graw_decode_set_polygon_stipple(gdctx);
          break;
       }
       gdctx->ds->buf_offset += (header >> 16) + 1;

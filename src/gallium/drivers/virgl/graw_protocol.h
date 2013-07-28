@@ -40,6 +40,7 @@ enum graw_cmd {
    GRAW_BEGIN_QUERY,
    GRAW_END_QUERY,
    GRAW_GET_QUERY_RESULT,
+   GRAW_SET_POLYGON_STIPPLE,
 };
 
 enum graw_scrn_cmd {

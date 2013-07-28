@@ -452,6 +452,16 @@ int graw_encoder_set_scissor_state(struct graw_context *ctx,
    graw_encoder_write_dword(ctx->cbuf, (ss->maxx | ss->maxy << 16));
 }
 
+void graw_encoder_set_polygon_stipple(struct graw_context *ctx,
+                                      const struct pipe_poly_stipple *ps)
+{
+   int i;
+   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_SET_POLYGON_STIPPLE, 0, 32));
+   for (i = 0; i < 32; i++) {
+      graw_encoder_write_dword(ctx->cbuf, ps->stipple[i]);
+   }
+}
+
 int graw_encode_resource_copy_region(struct graw_context *ctx,
                                      struct graw_resource *dst_res,
                                      unsigned dst_level,

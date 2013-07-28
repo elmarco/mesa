@@ -144,6 +144,8 @@ void grend_set_stencil_ref(struct grend_context *ctx, struct pipe_stencil_ref *r
 void grend_set_blend_color(struct grend_context *ctx, struct pipe_blend_color *color);
 void grend_set_scissor_state(struct grend_context *ctx, struct pipe_scissor_state *ss);
 
+void grend_set_polygon_stipple(struct grend_context *ctx, struct pipe_poly_stipple *ps);
+
 void grend_set_constants(struct grend_context *ctx,
                          uint32_t shader,
                          uint32_t index,

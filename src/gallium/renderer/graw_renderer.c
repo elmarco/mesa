@@ -2219,6 +2219,12 @@ void grend_set_scissor_state(struct grend_context *ctx,
    ctx->scissor_state_dirty = TRUE;
 }
 
+void grend_set_polygon_stipple(struct grend_context *ctx,
+                               struct pipe_poly_stipple *ps)
+{
+
+}
+
 void graw_renderer_resource_copy_region(struct grend_context *ctx,
                                         uint32_t dst_handle, uint32_t dst_level,
                                         uint32_t dstx, uint32_t dsty, uint32_t dstz,

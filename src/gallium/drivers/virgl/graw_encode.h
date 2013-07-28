@@ -134,6 +134,10 @@ int graw_encoder_set_blend_color(struct graw_context *ctx,
 
 int graw_encoder_set_scissor_state(struct graw_context *ctx,
                                    const struct pipe_scissor_state *ss);
+
+void graw_encoder_set_polygon_stipple(struct graw_context *ctx,
+                                      const struct pipe_poly_stipple *ps);
+
 int graw_encode_resource_copy_region(struct graw_context *ctx,
                                      struct graw_resource *dst_res,
                                      unsigned dst_level,

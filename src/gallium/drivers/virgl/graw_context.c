@@ -608,7 +608,8 @@ static void graw_bind_vertex_sampler_states(struct pipe_context *ctx,
 static void graw_set_polygon_stipple(struct pipe_context *ctx,
                                      const struct pipe_poly_stipple *ps)
 {
-
+   struct graw_context *grctx = (struct graw_context *)ctx;
+   graw_encoder_set_polygon_stipple(grctx, ps);
 }
 
 static void graw_set_scissor_state(struct pipe_context *ctx,

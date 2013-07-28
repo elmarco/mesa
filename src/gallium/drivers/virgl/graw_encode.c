@@ -125,7 +125,7 @@ int graw_encode_rasterizer_state(struct graw_context *ctx,
 {
    uint32_t tmp;
 
-   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_CREATE_OBJECT, GRAW_OBJECT_RASTERIZER, 1 + 4));
+   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_CREATE_OBJECT, GRAW_OBJECT_RASTERIZER, 1 + 8));
    graw_encoder_write_dword(ctx->cbuf, handle);
 
    tmp = (state->flatshade << 0) |
@@ -140,12 +140,29 @@ int graw_encode_rasterizer_state(struct graw_context *ctx,
       (state->fill_front << 10) |
       (state->fill_back << 12) |
       (state->scissor << 14) |
-      (state->front_ccw << 15);
+      (state->front_ccw << 15) |
+      (state->clamp_vertex_color << 16) |
+      (state->clamp_fragment_color << 17) |
+      (state->offset_line << 18) |
+      (state->offset_point << 19) |
+      (state->offset_tri << 20) |
+      (state->poly_smooth << 21) |
+      (state->poly_stipple_enable << 22) |
+      (state->point_smooth << 23) |
+      (state->point_size_per_vertex << 24) |
+      (state->multisample << 25) |
+      (state->line_smooth << 26) |
+      (state->line_stipple_enable << 27) |
+      (state->line_last_pixel << 28);
    
    graw_encoder_write_dword(ctx->cbuf, tmp);
    graw_encoder_write_dword(ctx->cbuf, uif(state->point_size));
    graw_encoder_write_dword(ctx->cbuf, state->sprite_coord_enable);
-   graw_encoder_write_dword(ctx->cbuf, 0);
+   graw_encoder_write_dword(ctx->cbuf, state->line_stipple_pattern | (state->line_stipple_factor << 16) | (state->clip_plane_enable << 24));
+   graw_encoder_write_dword(ctx->cbuf, uif(state->line_width));
+   graw_encoder_write_dword(ctx->cbuf, uif(state->offset_units));
+   graw_encoder_write_dword(ctx->cbuf, uif(state->offset_scale));
+   graw_encoder_write_dword(ctx->cbuf, uif(state->offset_clamp));
 }
 
 int graw_encode_shader_state(struct graw_context *ctx,

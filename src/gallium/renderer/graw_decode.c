@@ -264,21 +264,49 @@ static void graw_decode_create_rasterizer(struct grend_decode_ctx *ctx, uint32_t
    uint32_t tmp;
 
    tmp = ctx->ds->buf[ctx->ds->buf_offset + 2];
-   rs_state->flatshade = tmp & 1;
-   rs_state->depth_clip = (tmp >> 1) & 0x1;
-   rs_state->gl_rasterization_rules = (tmp >> 2) & 0x1;
-   rs_state->rasterizer_discard = (tmp >> 3) & 0x1;
-   rs_state->flatshade_first = (tmp >> 4) & 0x1;
-   rs_state->light_twoside = (tmp >> 5) & 0x1;
-   rs_state->sprite_coord_mode = (tmp >> 6) & 0x1;
-   rs_state->point_quad_rasterization = (tmp >> 7) & 0x1;
-   rs_state->cull_face = (tmp >> 8) & 0x3;
-   rs_state->fill_front = (tmp >> 10) & 0x3;
-   rs_state->fill_back = (tmp >> 12) & 0x3;
-   rs_state->scissor = (tmp >> 14) & 0x1;
-   rs_state->front_ccw = (tmp >> 15) & 0x1;
+#define ebit(name, bit) rs_state->name = (tmp >> bit) & 0x1
+#define emask(name, bit, mask) rs_state->name = (tmp >> bit) & mask
+
+   ebit(flatshade, 0);
+   ebit(depth_clip, 1);
+   ebit(gl_rasterization_rules, 2);
+   ebit(rasterizer_discard, 3);
+   ebit(flatshade_first, 4);
+   ebit(light_twoside, 5);
+   ebit(sprite_coord_mode, 6);
+   ebit(point_quad_rasterization, 7);
+   emask(cull_face, 8, 0x3);
+   emask(fill_front, 10, 0x3);
+   emask(fill_back, 12, 0x3);
+   ebit(scissor, 14);
+   ebit(front_ccw, 15);
+   ebit(clamp_vertex_color, 16);
+   ebit(clamp_fragment_color, 17);
+   ebit(offset_line, 18);
+   ebit(offset_point, 19);
+   ebit(offset_tri, 20);
+   ebit(poly_smooth, 21);
+   ebit(poly_stipple_enable, 22);
+   ebit(point_smooth, 23);
+   ebit(point_size_per_vertex, 24);
+   ebit(multisample, 25);
+   ebit(line_smooth, 26);
+   ebit(line_stipple_enable, 27);
+   ebit(line_last_pixel, 28);
+   
    rs_state->point_size = fui(ctx->ds->buf[ctx->ds->buf_offset + 3]);
    rs_state->sprite_coord_enable = ctx->ds->buf[ctx->ds->buf_offset + 4];
+   tmp = ctx->ds->buf[ctx->ds->buf_offset + 5];
+   emask(line_stipple_pattern, 0, 0xffff);
+   emask(line_stipple_factor, 16, 0xff);
+   emask(clip_plane_enable, 24, 0xff);
+
+   rs_state->line_width = fui(ctx->ds->buf[ctx->ds->buf_offset + 6]);
+   rs_state->offset_units = fui(ctx->ds->buf[ctx->ds->buf_offset + 7]);
+   rs_state->offset_scale = fui(ctx->ds->buf[ctx->ds->buf_offset + 8]);
+   rs_state->offset_clamp = fui(ctx->ds->buf[ctx->ds->buf_offset + 9]);
+   
+   
    graw_renderer_object_insert(ctx->grctx, rs_state, sizeof(struct pipe_rasterizer_state), handle,
                       GRAW_OBJECT_RASTERIZER);
 }

@@ -824,7 +824,7 @@ struct pipe_resource *graw_resource_create(struct pipe_screen *pscreen,
       buf->base.base.screen = pscreen;
       pipe_reference_init(&buf->base.base.reference, 1);
       size = template->width0;
-      buf->base.hw_res = rs->vws->resource_create(rs->vws, template->target, template->format, template->bind, template->width0, 1, 1, 0, 0, 0, size);
+      buf->base.hw_res = rs->vws->resource_create(rs->vws, template->target, template->format, template->bind, template->width0, 1, 1, 1, 0, 0, size);
 
       assert(buf->base.hw_res);
       return &buf->base.base;

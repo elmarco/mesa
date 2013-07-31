@@ -32,6 +32,7 @@ struct virgl_hw_res {
    uint32_t do_del;
    uint32_t size;
    void *ptr;
+   uint32_t stride;
 };
   
 struct virgl_drm_winsys

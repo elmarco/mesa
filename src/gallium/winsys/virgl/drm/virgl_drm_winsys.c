@@ -238,7 +238,6 @@ virgl_bo_transfer_put(struct virgl_winsys *vws,
 
    putcmd.bo_handle = res->bo_handle;
    putcmd.dst_box = *(struct drm_virgl_3d_box *)box;
-   putcmd.src_stride = src_stride;
    putcmd.src_offset = buf_offset;
    putcmd.dst_level = level;
    ret = drmIoctl(vdws->fd, DRM_IOCTL_VIRGL_TRANSFER_PUT, &putcmd);
@@ -319,7 +318,6 @@ static struct virgl_hw_res *virgl_drm_winsys_resource_create(struct virgl_winsys
    createcmd.last_level = last_level;
    createcmd.nr_samples = nr_samples;
    createcmd.res_handle = 0;
-   createcmd.size = size;
    ret = drmIoctl(qdws->fd, DRM_IOCTL_VIRGL_RESOURCE_CREATE, &createcmd);
    if (ret != 0) {
       FREE(res);
@@ -329,7 +327,8 @@ static struct virgl_hw_res *virgl_drm_winsys_resource_create(struct virgl_winsys
    res->do_del = 1;
    res->res_handle = createcmd.res_handle;
    res->bo_handle = createcmd.bo_handle;
-   res->size = size;
+   res->size = createcmd.size;
+   res->stride = createcmd.stride;
    pipe_reference_init(&res->reference, 1);
    res->num_cs_references = 0;
    return res;

@@ -303,7 +303,7 @@ static struct virgl_hw_res *virgl_drm_winsys_resource_create(struct virgl_winsys
                                                uint32_t depth,
                                                uint32_t array_size,
                                                uint32_t last_level,
-                                                             uint32_t nr_samples, uint32_t size)
+                                               uint32_t nr_samples)
 {
    struct virgl_drm_winsys *qdws = virgl_drm_winsys(qws);
    struct drm_virgl_resource_create createcmd;

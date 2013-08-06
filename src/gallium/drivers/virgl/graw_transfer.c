@@ -18,6 +18,7 @@ static void *graw_transfer_map(struct pipe_context *ctx,
    struct graw_transfer *trans;
    void *ptr;
    boolean readback = TRUE;
+   uint32_t elsize;
    uint32_t offset;
    if ((!(usage & PIPE_TRANSFER_UNSYNCHRONIZED)) && vs->vws->res_is_referenced(vs->vws, grctx->cbuf, grres->hw_res))
       ctx->flush(ctx, NULL, 0);
@@ -38,8 +39,9 @@ static void *graw_transfer_map(struct pipe_context *ctx,
    else if ((usage & (PIPE_TRANSFER_WRITE | PIPE_TRANSFER_FLUSH_EXPLICIT)) ==
             (PIPE_TRANSFER_WRITE | PIPE_TRANSFER_FLUSH_EXPLICIT))
       readback = FALSE;
-
-   offset = (box->y * (resource->width0 * util_format_get_blocksize(resource->format)) + (box->x * util_format_get_blocksize(resource->format)));
+   
+   elsize = util_format_get_blocksize(resource->format);
+   offset = (box->y * (resource->width0 * elsize)) + (box->x * elsize);
    if (readback)
    {
 
@@ -53,7 +55,7 @@ static void *graw_transfer_map(struct pipe_context *ctx,
    trans->base.level = level;
    trans->base.usage = usage;
    trans->base.box = *box;
-   trans->base.stride = resource->width0 * util_format_get_blocksize(resource->format);
+   trans->base.stride = resource->width0 * elsize;
    trans->base.layer_stride = 0;
    trans->offset = offset;
    *transfer = &trans->base;

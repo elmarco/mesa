@@ -38,10 +38,19 @@ struct util_hash_table *graw_init_ctx_hash(void)
    return ctx_hash;
 }
 
+static enum pipe_error free_cb(void *key, void *value, void *data)
+{
+   free(value);
+   return PIPE_OK;
+}
+
 void graw_fini_ctx_hash(struct util_hash_table *ctx_hash)
 {
-   if (ctx_hash)
-      util_hash_table_destroy(ctx_hash);
+   if (!ctx_hash)
+      return;
+   
+   util_hash_table_foreach(ctx_hash, free_cb, NULL);
+   util_hash_table_destroy(ctx_hash);
 }
 
 void

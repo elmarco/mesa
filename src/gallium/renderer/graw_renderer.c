@@ -1908,6 +1908,9 @@ void graw_renderer_resource_unref(uint32_t res_handle)
    if (!res)
       return;
 
+   if (res->readback_fb_id)
+      glDeleteFramebuffers(1, &res->readback_fb_id);
+
    if (res->target == GL_ELEMENT_ARRAY_BUFFER_ARB) {
       glDeleteBuffers(1, &res->id);
    } else if (res->target == GL_ARRAY_BUFFER_ARB) {

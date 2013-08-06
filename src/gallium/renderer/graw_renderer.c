@@ -1930,6 +1930,31 @@ static void iov_vertex_upload(void *cookie, uint32_t doff, void *src, int len)
    glBufferSubData(GL_ARRAY_BUFFER_ARB, d_box->x + doff, len, src);
 }
 
+static void copy_transfer_data(struct pipe_resource *res,
+                               struct graw_iovec *iov,
+                               unsigned int num_iovs,
+                               void *data,
+                               uint32_t src_stride,
+                               struct pipe_box *box,
+                               uint64_t offset)
+{
+   int elsize = util_format_get_blocksize(res->format);
+   GLuint size = graw_iov_size(iov, num_iovs);
+   GLuint send_size = box->width * box->height * box->depth * elsize;
+   uint32_t myoffset = offset;
+
+   int h;
+   if (send_size == size)
+      graw_iov_to_buf(iov, num_iovs, offset, data, size - offset);
+   else {
+      for (h = 0; h < box->height; h++) {
+         void *ptr = data + (h * box->width * elsize);
+         graw_iov_to_buf(iov, num_iovs, myoffset, ptr, box->width * elsize);
+         myoffset += src_stride;
+      }
+   }
+}
+
 void graw_renderer_transfer_write_iov(uint32_t res_handle,
                                       uint32_t ctx_id,
                                       int level,
@@ -1980,18 +2005,27 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
    } else {
       GLenum glformat;
       GLenum gltype;
+      int need_temp = 0;
       int elsize = util_format_get_blocksize(res->base.format);
-
+      int x = 0, y = 0;
       grend_use_program(0);
 
       if (num_iovs > 1) {
+         need_temp = 1;
+      }
+
+      if (need_temp) {
          GLuint size = graw_iov_size(iov, num_iovs);
-         data = malloc(size - offset);
-         graw_iov_to_buf(iov, num_iovs, offset, data, size - offset);
+         GLuint send_size = dst_box->width * dst_box->height * dst_box->depth * util_format_get_blocksize(res->base.format);
+//         data = malloc(size - offset);
+         data = malloc(send_size);
+         fprintf(stderr,"alloc size for transfer %d %d %d %d\n", size, offset, size - offset, send_size);
+         copy_transfer_data(&res->base, iov, num_iovs, data, src_stride,
+                            dst_box, offset);
       } else
          data = iov[0].iov_base + offset;
 
-      if (src_stride) {
+      if (src_stride && !need_temp) {
          glPixelStorei(GL_UNPACK_ROW_LENGTH, src_stride / elsize);
       }
 
@@ -2041,6 +2075,7 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
          glDrawPixels(dst_box->width, dst_box->height, glformat, gltype,
                       data);
       } else {
+         uint32_t h = u_minify(res->base.height0, level);
          glBindTexture(res->target, res->id);
 
          glformat = tex_conv_table[res->base.format].glformat;
@@ -2049,30 +2084,38 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
             glformat = GL_BGRA;
             gltype = GL_UNSIGNED_BYTE;
          }
-	 
+
+         x = dst_box->x;
+
+
+         if (res->renderer_flipped)
+            y = h - dst_box->y - dst_box->height;
+         else
+            y = dst_box->y;
+
          if (res->target == GL_TEXTURE_CUBE_MAP) {
             GLenum ctarget = GL_TEXTURE_CUBE_MAP_POSITIVE_X + dst_box->z;
-            
-            glTexSubImage2D(ctarget, level, dst_box->x, dst_box->y, dst_box->width, dst_box->height,
+
+            glTexSubImage2D(ctarget, level, x, y, dst_box->width, dst_box->height,
                             glformat, gltype, data);
          } else if (res->target == GL_TEXTURE_3D || res->target == GL_TEXTURE_2D_ARRAY) {
-            glTexSubImage3D(res->target, level, dst_box->x, dst_box->y, dst_box->z,
+            glTexSubImage3D(res->target, level, x, y, dst_box->z,
                             dst_box->width, dst_box->height, dst_box->depth,
                             glformat, gltype, data);
          } else if (res->target == GL_TEXTURE_1D) {
             glTexSubImage1D(res->target, level, dst_box->x, dst_box->width,
                             glformat, gltype, data);
          } else {
-            glTexSubImage2D(res->target, level, dst_box->x, res->target == GL_TEXTURE_1D_ARRAY ? dst_box->z : dst_box->y,
+            glTexSubImage2D(res->target, level, x, res->target == GL_TEXTURE_1D_ARRAY ? dst_box->z : y,
                             dst_box->width, dst_box->height,
                             glformat, gltype, data);
          }
       }
-      if (src_stride)
+      if (src_stride && !need_temp)
          glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
       glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
 
-      if (num_iovs > 1)
+      if (need_temp)
          free(data);
    }
 

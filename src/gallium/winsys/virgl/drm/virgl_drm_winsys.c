@@ -247,9 +247,9 @@ virgl_bo_transfer_put(struct virgl_winsys *vws,
 static int
 virgl_bo_transfer_get(struct virgl_winsys *vws,
                       struct virgl_hw_res *res,
-                    const struct pipe_box *box,
-                    uint32_t buf_offset,
-                    uint32_t level)
+                      const struct pipe_box *box,
+                      uint32_t buf_offset,
+                      uint32_t level)
 {
    struct virgl_drm_winsys *vdws = virgl_drm_winsys(vws);
    struct drm_virgl_3d_transfer_get getcmd;
@@ -280,9 +280,15 @@ static void virgl_drm_resource_reference(struct virgl_drm_winsys *qdws,
 {
    struct virgl_hw_res *old = *dres;
    if (pipe_reference(&(*dres)->reference, &sres->reference)) {
+      struct drm_gem_close args;
       if (old->do_del) {
          // refe
       }
+      if (old->ptr)
+         os_munmap(old->ptr, old->size);
+      args.handle = old->bo_handle;
+      drmIoctl(qdws->fd, DRM_IOCTL_GEM_CLOSE, &args);
+
       FREE(old);
    }
    *dres = sres;

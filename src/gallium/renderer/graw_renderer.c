@@ -679,7 +679,8 @@ void grend_set_framebuffer_state(struct grend_context *ctx,
          return;
       }
       ctx->zsurf = zsurf;
-   }
+   } else
+      ctx->zsurf = NULL;
 
    ctx->nr_cbufs = nr_cbufs;
    for (i = 0; i < nr_cbufs; i++) {

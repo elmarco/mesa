@@ -329,18 +329,32 @@ static void *graw_create_vs_state(struct pipe_context *ctx,
                                    const struct pipe_shader_state *shader)
 {
    struct graw_context *grctx = (struct graw_context *)ctx;
+   struct graw_vs_state *vs_state = CALLOC_STRUCT(graw_vs_state);
    uint32_t handle;
    int ret;
 
-   handle = graw_object_assign_handle();
-
-   /* encode VS state */
-   ret = graw_encode_shader_state(grctx, handle,
-                                  GRAW_OBJECT_VS, shader);
-   if (ret)
+   if (!vs_state)
       return NULL;
 
-   return (void *)(unsigned long)handle;
+   vs_state->shader_handle = graw_object_assign_handle();
+
+   /* encode VS state */
+   ret = graw_encode_shader_state(grctx, vs_state->shader_handle,
+                                  GRAW_OBJECT_VS, shader);
+   if (ret) {
+      FREE(vs_state);
+      return NULL;
+   }
+
+   vs_state->so_handle = graw_object_assign_handle();
+   ret = graw_encode_stream_output_info(grctx, vs_state->so_handle,
+                                        GRAW_OBJECT_VS_SO, shader);
+   if (ret) {
+      FREE(vs_state);
+      return NULL;
+   }
+
+   return (void *)vs_state;
 }
 
 static void *graw_create_fs_state(struct pipe_context *ctx,
@@ -374,19 +388,26 @@ static void
 graw_delete_vs_state(struct pipe_context *ctx,
                      void *vs)
 {
-   uint32_t handle = (unsigned long)vs;
+   struct graw_vs_state *state = vs;
    struct graw_context *grctx = (struct graw_context *)ctx;
 
-   graw_encode_delete_object(grctx, handle, GRAW_OBJECT_VS);
+   graw_encode_delete_object(grctx, state->shader_handle, GRAW_OBJECT_VS);
+   graw_encode_delete_object(grctx, state->so_handle, GRAW_OBJECT_VS_SO);
 }
 
 static void graw_bind_vs_state(struct pipe_context *ctx,
                                         void *vss)
 {
-   uint32_t handle = (unsigned long)vss;
+   struct graw_vs_state *state = vss;
    struct graw_context *grctx = (struct graw_context *)ctx;
 
-   graw_encode_bind_object(grctx, handle, GRAW_OBJECT_VS);
+   if (state) {
+      graw_encode_bind_object(grctx, state->shader_handle, GRAW_OBJECT_VS);
+      graw_encode_bind_object(grctx, state->so_handle, GRAW_OBJECT_VS_SO);
+   } else {
+      graw_encode_bind_object(grctx, 0, GRAW_OBJECT_VS);
+      graw_encode_bind_object(grctx, 0, GRAW_OBJECT_VS_SO);
+   }
 }
 
 
@@ -752,6 +773,7 @@ struct pipe_context *graw_context_create(struct pipe_screen *pscreen,
 
    graw_init_transfer_functions(grctx);
    graw_init_query_functions(grctx);
+   graw_init_so_functions(grctx);
 
    list_inithead(&grctx->to_flush_bufs);
    util_slab_create(&grctx->texture_transfer_pool, sizeof(struct graw_transfer),

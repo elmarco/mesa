@@ -14,6 +14,8 @@ enum graw_object_type {
    GRAW_RESOURCE,
    GRAW_SURFACE,
    GRAW_QUERY,
+   GRAW_OBJECT_VS_SO,
+   GRAW_STREAMOUT_TARGET,
 };
 
 /* context cmds to be encoded in the command stream */
@@ -43,6 +45,7 @@ enum graw_cmd {
    GRAW_SET_POLYGON_STIPPLE,
    GRAW_SET_CLIP_STATE,
    GRAW_SET_SAMPLE_MASK,
+   GRAW_SET_STREAMOUT_TARGETS,
 };
 
 enum graw_scrn_cmd {

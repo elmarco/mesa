@@ -47,6 +47,16 @@ struct graw_sampler_view {
    struct pipe_sampler_view base;
    uint32_t handle;
 };
+
+struct graw_vs_state {
+   uint32_t shader_handle;
+   uint32_t so_handle;
+};
+
+struct graw_so_target {
+   struct pipe_stream_output_target base;
+   uint32_t handle;
+};
    
 struct graw_context {
    struct pipe_context base;
@@ -115,4 +125,5 @@ void graw_init_blit_functions(struct graw_context *grctx);
 
 void graw_init_transfer_functions(struct graw_context *grctx);
 void graw_init_query_functions(struct graw_context *grctx);
+void graw_init_so_functions(struct graw_context *grctx);
 #endif

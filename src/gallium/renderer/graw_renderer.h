@@ -32,6 +32,8 @@ void grend_bind_vs(struct grend_context *ctx,
 void grend_bind_fs(struct grend_context *ctx,
                    uint32_t handle);
 
+void grend_bind_vs_so(struct grend_context *ctx,
+                      uint32_t handle);
 void grend_clear(struct grend_context *ctx,
                  unsigned buffers,
                  const union pipe_color_union *color,
@@ -65,6 +67,16 @@ void grend_create_sampler_view(struct grend_context *ctx,
                                uint32_t handle,
                                uint32_t res_handle, uint32_t format,
                                uint32_t val0, uint32_t val1, uint32_t swizzle_packed);
+
+void grend_create_so_target(struct grend_context *ctx,
+                            uint32_t handle,
+                            uint32_t res_handle,
+                            uint32_t buffer_offset,
+                            uint32_t buffer_size);
+void grend_set_streamout_targets(struct grend_context *ctx,
+                                 uint32_t append_bitmask,
+                                 uint32_t num_targets,
+                                 uint32_t *handles);
 
 void grend_create_vertex_elements_state(struct grend_context *ctx,
                                         uint32_t handle,

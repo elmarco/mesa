@@ -36,4 +36,5 @@ libvirgl_la_SOURCES = \
 	graw_encode.c \
 	graw_drm_winsys.c \
         graw_transfer.c \
-        graw_query.c
+        graw_query.c \
+        graw_streamout.c

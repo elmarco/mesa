@@ -60,6 +60,47 @@ static int graw_decode_create_shader(struct grend_decode_ctx *ctx, uint32_t type
    return 0;
 }
 
+static int graw_decode_create_stream_output(struct grend_decode_ctx *ctx, uint32_t type,
+                                            uint32_t handle,
+                                            uint16_t length)
+{
+   struct pipe_stream_output_info *so = CALLOC_STRUCT(pipe_stream_output_info);
+   int num_out = length - 5;
+   int i;
+
+   for (i = 0; i < 4; i++)
+      so->stride[i] = ctx->ds->buf[ctx->ds->buf_offset + 2 + i];
+
+   for (i = 0; i < num_out; i++) {
+      uint32_t tmp = ctx->ds->buf[ctx->ds->buf_offset + 6 + i];
+
+      so->output[i].register_index = tmp & 0xff;
+      so->output[i].start_component = (tmp >> 8) & 0x3;
+      so->output[i].num_components = (tmp >> 10) & 0x7;
+      so->output[i].output_buffer = (tmp >> 13) & 0x7;
+      so->output[i].dst_offset = (tmp >> 16) & 0xffff;
+   }
+   so->num_outputs = num_out;
+   
+   if (type == GRAW_OBJECT_VS_SO)
+      graw_renderer_object_insert(ctx->grctx, so, sizeof(*so), handle, GRAW_OBJECT_VS_SO);
+   else
+      assert(0);
+   return 0;
+}
+
+static int graw_decode_create_stream_output_target(struct grend_decode_ctx *ctx, uint32_t handle)
+{
+   uint32_t res_handle, buffer_size, buffer_offset;
+
+   res_handle = ctx->ds->buf[ctx->ds->buf_offset + 2];
+   buffer_offset = ctx->ds->buf[ctx->ds->buf_offset + 3];
+   buffer_size = ctx->ds->buf[ctx->ds->buf_offset + 4];
+
+   grend_create_so_target(ctx->grctx, handle, res_handle, buffer_offset,
+                          buffer_size);
+}
+
 static void graw_decode_set_framebuffer_state(struct grend_decode_ctx *ctx)
 {
    uint32_t nr_cbufs = ctx->ds->buf[ctx->ds->buf_offset + 1];
@@ -425,6 +466,12 @@ static void graw_decode_create_object(struct grend_decode_ctx *ctx)
    case GRAW_QUERY:
       graw_decode_create_query(ctx, handle);
       break;
+   case GRAW_OBJECT_VS_SO:
+      graw_decode_create_stream_output(ctx, obj_type, handle, length);
+      break;
+   case GRAW_STREAMOUT_TARGET:
+      graw_decode_create_stream_output_target(ctx, handle);
+      break;
    }
 }
 
@@ -455,6 +502,9 @@ static void graw_decode_bind_object(struct grend_decode_ctx *ctx)
       break;
    case GRAW_OBJECT_VERTEX_ELEMENTS:
       grend_bind_vertex_elements_state(ctx->grctx, handle);
+      break;
+   case GRAW_OBJECT_VS_SO:
+      grend_bind_vs_so(ctx->grctx, handle);
       break;
    }
 }
@@ -633,6 +683,20 @@ static void graw_decode_get_query_result(struct grend_decode_ctx *ctx)
    grend_get_query_result(ctx->grctx, handle, wait);
 }
 
+static void graw_decode_set_streamout_targets(struct grend_decode_ctx *ctx,
+                                              uint16_t length)
+{
+   uint32_t handles[16];
+   uint32_t num_handles = length - 1;
+   uint32_t append_bitmask;
+   int i;
+
+   append_bitmask = ctx->ds->buf[ctx->ds->buf_offset + 1];
+   for (i = 0; i < num_handles; i++)
+      handles[i] = ctx->ds->buf[ctx->ds->buf_offset + 2 + i];
+   grend_set_streamout_targets(ctx->grctx, append_bitmask, num_handles, handles);
+}
+
 void graw_renderer_context_create_internal(uint32_t handle)
 {
    struct grend_decode_ctx *dctx;
@@ -774,6 +838,9 @@ static void graw_decode_block(uint32_t ctx_id, uint32_t *block, int ndw)
          break;
       case GRAW_SET_SAMPLE_MASK:
          graw_decode_set_sample_mask(gdctx);
+         break;
+      case GRAW_SET_STREAMOUT_TARGETS:
+         graw_decode_set_streamout_targets(gdctx, header >> 16);
          break;
       }
       gdctx->ds->buf_offset += (header >> 16) + 1;

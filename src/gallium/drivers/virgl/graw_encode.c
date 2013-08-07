@@ -183,6 +183,33 @@ int graw_encode_shader_state(struct graw_context *ctx,
    return 0;
 }
 
+int graw_encode_stream_output_info(struct graw_context *ctx,
+                                   uint32_t handle,
+                                   uint32_t type,
+                                   const struct pipe_shader_state *shader)
+{
+   int len = shader->stream_output.num_outputs;
+   int i;
+   uint32_t tmp;
+
+   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_CREATE_OBJECT, type, 4 + 1 + len));
+   graw_encoder_write_dword(ctx->cbuf, handle);
+   assert(4 == PIPE_MAX_SO_BUFFERS);
+   for (i = 0; i < 4; i++)
+      graw_encoder_write_dword(ctx->cbuf, shader->stream_output.stride[i]);
+
+   for (i = 0; i < len; i++) {
+      tmp = shader->stream_output.output[i].register_index | 
+         (unsigned)shader->stream_output.output[i].start_component << 8 | 
+         (unsigned)shader->stream_output.output[i].num_components << 10 | 
+         (unsigned)shader->stream_output.output[i].output_buffer << 13 | 
+         (unsigned)shader->stream_output.output[i].dst_offset << 16;
+      graw_encoder_write_dword(ctx->cbuf, tmp);
+   }
+   return 0;
+}
+
+
 int graw_encode_clear(struct graw_context *ctx,
                       unsigned buffers,
                       const union pipe_color_union *color,
@@ -303,6 +330,20 @@ int graw_encoder_create_surface(struct graw_context *ctx,
       graw_encoder_write_dword(ctx->cbuf, templat->u.tex.level);
       graw_encoder_write_dword(ctx->cbuf, templat->u.tex.first_layer | (templat->u.tex.last_layer << 16));
    }
+   return 0;
+}
+
+int graw_encoder_create_so_target(struct graw_context *ctx,
+                                  uint32_t handle,
+                                  struct graw_resource *res,
+                                  unsigned buffer_offset,
+                                  unsigned buffer_size)
+{
+   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_CREATE_OBJECT, GRAW_STREAMOUT_TARGET, 4));
+   graw_encoder_write_dword(ctx->cbuf, handle);
+   graw_encoder_write_res(ctx, res);
+   graw_encoder_write_dword(ctx->cbuf, buffer_offset);
+   graw_encoder_write_dword(ctx->cbuf, buffer_size);
    return 0;
 }
 
@@ -571,3 +612,20 @@ int graw_encoder_get_query_result(struct graw_context *ctx,
    graw_encoder_write_dword(ctx->cbuf, handle);
    graw_encoder_write_dword(ctx->cbuf, wait ? 1 : 0);
 }
+
+int graw_encoder_set_so_targets(struct graw_context *ctx,
+                                unsigned num_targets,
+                                struct pipe_stream_output_target **targets,
+                                unsigned append_bitmask)
+{
+   int i;
+
+   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_SET_STREAMOUT_TARGETS, 0, num_targets + 1));
+   graw_encoder_write_dword(ctx->cbuf, append_bitmask);
+   for (i = 0; i < num_targets; i++) {
+      struct graw_so_target *tg = (struct graw_so_target *)targets[i];
+      graw_encoder_write_dword(ctx->cbuf, tg->handle);
+   }
+   return 0;
+}
+

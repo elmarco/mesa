@@ -51,6 +51,22 @@ extern int graw_encode_shader_state(struct graw_context *ctx,
                                     uint32_t type,
                                     const struct pipe_shader_state *shader);
 
+int graw_encode_stream_output_info(struct graw_context *ctx,
+                                   uint32_t handle,
+                                   uint32_t type,
+                                   const struct pipe_shader_state *shader);
+
+int graw_encoder_set_so_targets(struct graw_context *ctx,
+                                unsigned num_targets,
+                                struct pipe_stream_output_target **targets,
+                                unsigned append_bitmask);
+
+int graw_encoder_create_so_target(struct graw_context *ctx,
+                                  uint32_t handle,
+                                  struct graw_resource *res,
+                                  unsigned buffer_offset,
+                                  unsigned buffer_size);
+
 int graw_encode_clear(struct graw_context *ctx,
                       unsigned buffers,
                       const union pipe_color_union *color,

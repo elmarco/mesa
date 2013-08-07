@@ -83,7 +83,7 @@ virgl_get_param(struct pipe_screen *screen, enum pipe_cap param)
    case PIPE_CAP_DEPTH_CLIP_DISABLE:
       return 0;
    case PIPE_CAP_MAX_STREAM_OUTPUT_BUFFERS:
-      return 0; //PIPE_MAX_SO_BUFFERS;
+      return PIPE_MAX_SO_BUFFERS;
    case PIPE_CAP_MAX_STREAM_OUTPUT_SEPARATE_COMPONENTS:
    case PIPE_CAP_MAX_STREAM_OUTPUT_INTERLEAVED_COMPONENTS:
       return 16*4;

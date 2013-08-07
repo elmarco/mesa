@@ -66,6 +66,8 @@ struct grend_linked_shader_program {
 
   struct grend_shader_state *vs;
   struct grend_shader_state *fs;
+  struct pipe_stream_output_info *vs_so;
+  uint32_t vs_so_id;
 
   GLuint num_samplers[PIPE_SHADER_TYPES];
   GLuint *samp_locs[PIPE_SHADER_TYPES];
@@ -111,6 +113,13 @@ struct grend_query {
 
 struct grend_sampler {
 
+};
+
+struct grend_so_target {
+   GLuint res_handle;
+   unsigned buffer_offset;
+   unsigned buffer_size;
+   struct grend_resource *buffer;
 };
 
 struct grend_sampler_view {
@@ -164,6 +173,9 @@ struct grend_context {
    struct grend_shader_state *vs;
    struct grend_shader_state *fs;
 
+   struct pipe_stream_output_info *vs_so;
+   uint32_t vs_so_id;
+
    bool shader_dirty;
    struct grend_linked_shader_program *prog;
 
@@ -207,6 +219,10 @@ struct grend_context {
    struct pipe_rasterizer_state rs_state;
 
    struct pipe_blend_color blend_color;
+
+   int num_so_targets;
+   struct grend_so_target *so_targets[16];
+
 };
 
 static struct grend_resource *frontbuffer;
@@ -425,9 +441,44 @@ static void grend_stencil_test_enable(GLboolean stencil_test_enable)
    }
 }
 
+static void set_stream_out_varyings(int prog_id, struct pipe_stream_output_info *vs_so)
+{
+   char *varyings[PIPE_MAX_SHADER_OUTPUTS];
+   int i;
+   char tmp[64];
+   int bit_done = 0;
+   int index;
+   if (!vs_so->num_outputs)
+      return;
+
+   index = 0;
+   for (i = 0; i < vs_so->num_outputs; i++) {
+      if (bit_done & (1 << vs_so->output[i].register_index)) {
+         varyings[i] = NULL;
+         continue;
+      }
+      bit_done |= (1 << vs_so->output[i].register_index);
+      if (vs_so->output[i].register_index == 0)
+         snprintf(tmp, 64, "gl_Position");
+      else
+         snprintf(tmp, 64, "ex_%d", vs_so->output[i].register_index - 1);
+
+      varyings[index++] = strdup(tmp);
+   }
+
+   glTransformFeedbackVaryings(prog_id, index,
+                               varyings, GL_INTERLEAVED_ATTRIBS_EXT);
+
+   for (i = 0; i < index; i++)
+      if (varyings[i])
+         free(varyings[i]);
+}
+
 static struct grend_linked_shader_program *add_shader_program(struct grend_context *ctx,
 							       struct grend_shader_state *vs,
-							       struct grend_shader_state *fs) {
+                                                              struct grend_shader_state *fs,
+                                                              struct pipe_stream_output_info *vs_so, uint32_t vs_so_id) {
+  
   struct grend_linked_shader_program *sprog = malloc(sizeof(struct grend_linked_shader_program));
   char name[16];
   int i;
@@ -436,6 +487,7 @@ static struct grend_linked_shader_program *add_shader_program(struct grend_conte
 
   prog_id = glCreateProgram();
   glAttachShader(prog_id, vs->id);
+  set_stream_out_varyings(prog_id, vs_so);
   glAttachShader(prog_id, fs->id);
   ret = glGetError();
   glLinkProgram(prog_id);
@@ -447,6 +499,8 @@ static struct grend_linked_shader_program *add_shader_program(struct grend_conte
   sprog->vs = vs;
   sprog->fs = fs;
   sprog->id = prog_id;
+  sprog->vs_so_id = vs_so_id;
+  sprog->vs_so = vs_so;
   list_add(&sprog->head, &ctx->programs);
 
   if (vs->num_samplers) {
@@ -509,11 +563,11 @@ static struct grend_linked_shader_program *add_shader_program(struct grend_conte
 }
 
 static struct grend_linked_shader_program *lookup_shader_program(struct grend_context *ctx,
-			   GLuint vs_id, GLuint fs_id)
+                                                                 GLuint vs_id, GLuint fs_id, GLuint vs_so_id)
 {
   struct grend_linked_shader_program *ent;
   LIST_FOR_EACH_ENTRY(ent, &ctx->programs, head) {
-    if (ent->vs->id == vs_id && ent->fs->id == fs_id)
+     if (ent->vs->id == vs_id && ent->fs->id == fs_id && ent->vs_so_id == vs_so_id)
       return ent;
   }
   return 0;
@@ -924,12 +978,11 @@ void grend_transfer_inline_write(struct grend_context *ctx,
    struct grend_resource *res;
 
    res = graw_lookup_resource(res_handle, ctx->ctx_id);
-   if (res->target == GL_ELEMENT_ARRAY_BUFFER_ARB) {
-      glBindBufferARB(GL_ELEMENT_ARRAY_BUFFER_ARB, res->id);
-      glBufferSubData(GL_ELEMENT_ARRAY_BUFFER_ARB, box->x, box->width, data);
-   } else if (res->target == GL_ARRAY_BUFFER_ARB) {
-      glBindBufferARB(GL_ARRAY_BUFFER_ARB, res->id);
-      glBufferSubData(GL_ARRAY_BUFFER_ARB, box->x, box->width, data);
+   if (res->target == GL_ELEMENT_ARRAY_BUFFER_ARB ||
+       res->target == GL_ARRAY_BUFFER_ARB ||
+       res->target == GL_TRANSFORM_FEEDBACK_BUFFER) {
+      glBindBufferARB(res->target, res->id);
+      glBufferSubData(res->target, box->x, box->width, data);
    } else {
       GLenum glformat, gltype;
       glBindTexture(res->target, res->id);
@@ -1005,6 +1058,17 @@ void grend_bind_vs(struct grend_context *ctx,
    ctx->vs = state;
 }
 
+void grend_bind_vs_so(struct grend_context *ctx,
+                      uint32_t handle)
+{
+   struct pipe_stream_output_info *so;
+
+   so = graw_object_lookup(ctx->object_hash, handle, GRAW_OBJECT_VS_SO);
+   if (ctx->vs_so != so)
+      ctx->shader_dirty = true;
+   ctx->vs_so = so;
+   ctx->vs_so_id = handle;
+}
 
 void grend_bind_fs(struct grend_context *ctx,
                    uint32_t handle)
@@ -1102,9 +1166,9 @@ void grend_draw_vbo(struct grend_context *ctx,
         fprintf(stderr,"dropping rendering due to missing shaders\n");
         return;
      }
-     prog = lookup_shader_program(ctx, ctx->vs->id, ctx->fs->id);
+     prog = lookup_shader_program(ctx, ctx->vs->id, ctx->fs->id, ctx->vs_so_id);
      if (!prog) {
-       prog = add_shader_program(ctx, ctx->vs, ctx->fs);
+        prog = add_shader_program(ctx, ctx->vs, ctx->fs, ctx->vs_so, ctx->vs_so_id);
      }
      if (ctx->prog != prog) {
        new_program = TRUE;
@@ -1232,7 +1296,10 @@ void grend_draw_vbo(struct grend_context *ctx,
       struct grend_resource *res = (struct grend_resource *)ctx->ib.buffer;
       glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, res->id);
    }
-   
+
+   if (ctx->num_so_targets) {
+      glBeginTransformFeedback(info->mode);
+   }
    /* set the vertex state up now on a delay */
    if (!info->indexed) {
       GLenum mode = info->mode;
@@ -1260,6 +1327,9 @@ void grend_draw_vbo(struct grend_context *ctx,
       else
          glDrawElementsInstancedARB(mode, info->count, elsz, (void *)(unsigned long)ctx->ib.offset, info->instance_count);
    }
+
+   if (ctx->num_so_targets)
+      glEndTransformFeedback();
 
    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
    glBindVertexArray(0);
@@ -1553,6 +1623,11 @@ static void grend_hw_emit_rs(struct grend_context *ctx)
    if (state->point_size)
       glPointSize(state->point_size);
 
+   if (state->rasterizer_discard)
+      glEnable(GL_RASTERIZER_DISCARD);
+   else
+      glDisable(GL_RASTERIZER_DISCARD);
+
    glPolygonMode(GL_FRONT, translate_fill(state->fill_front));
    glPolygonMode(GL_BACK, translate_fill(state->fill_back));
    if (state->flatshade) {
@@ -1842,6 +1917,11 @@ void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target tar
       glGenBuffersARB(1, &gr->id);
       glBindBufferARB(gr->target, gr->id);
       glBufferData(gr->target, width, NULL, GL_STREAM_DRAW);
+   } else if (bind == PIPE_BIND_STREAM_OUTPUT) {
+      gr->target = GL_TRANSFORM_FEEDBACK_BUFFER;
+      glGenBuffersARB(1, &gr->id);
+      glBindBuffer(gr->target, gr->id);
+      glBufferData(gr->target, width, NULL, GL_STREAM_DRAW);
    } else if (target == PIPE_BUFFER) {
       gr->target = GL_ARRAY_BUFFER_ARB;
       glGenBuffersARB(1, &gr->id);
@@ -1911,9 +1991,9 @@ void graw_renderer_resource_unref(uint32_t res_handle)
    if (res->readback_fb_id)
       glDeleteFramebuffers(1, &res->readback_fb_id);
 
-   if (res->target == GL_ELEMENT_ARRAY_BUFFER_ARB) {
-      glDeleteBuffers(1, &res->id);
-   } else if (res->target == GL_ARRAY_BUFFER_ARB) {
+   if (res->target == GL_ELEMENT_ARRAY_BUFFER_ARB ||
+       res->target == GL_ARRAY_BUFFER_ARB ||
+       res->target == GL_TRANSFORM_FEEDBACK_BUFFER) {
       glDeleteBuffers(1, &res->id);
    } else
       glDeleteTextures(1, &res->id);
@@ -1977,33 +2057,21 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
       fprintf(stderr,"transfer for non-existant res %d\n", res_handle);
       return;
    }
-   if (res->target == GL_ELEMENT_ARRAY_BUFFER_ARB) {
-      glBindBufferARB(GL_ELEMENT_ARRAY_BUFFER_ARB, res->id);
+   if (res->target == GL_TRANSFORM_FEEDBACK_BUFFER ||
+       res->target == GL_ELEMENT_ARRAY_BUFFER_ARB ||
+       res->target == GL_ARRAY_BUFFER_ARB) {
+      glBindBufferARB(res->target, res->id);
 
       if (use_sub_data == 1) {
          graw_iov_to_buf_cb(iov, num_iovs, offset, dst_box->width, &iov_element_upload, (void *)dst_box);
       } else {
-         data = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER_ARB, dst_box->x, dst_box->width, GL_MAP_INVALIDATE_RANGE_BIT | GL_MAP_UNSYNCHRONIZED_BIT | GL_MAP_WRITE_BIT);
+         data = glMapBufferRange(res->target, dst_box->x, dst_box->width, GL_MAP_INVALIDATE_RANGE_BIT | GL_MAP_UNSYNCHRONIZED_BIT | GL_MAP_WRITE_BIT);
          if (data == NULL) {
             fprintf(stderr,"map failed for element buffer\n");
             graw_iov_to_buf_cb(iov, num_iovs, offset, dst_box->width, &iov_element_upload, (void *)dst_box);
          } else {
             graw_iov_to_buf(iov, num_iovs, offset, data, dst_box->width);
-            glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER_ARB);
-         }
-      }
-   } else if (res->target == GL_ARRAY_BUFFER_ARB) {
-      glBindBufferARB(GL_ARRAY_BUFFER_ARB, res->id);
-      if (use_sub_data == 1) {
-         graw_iov_to_buf_cb(iov, num_iovs, offset, dst_box->width, &iov_vertex_upload, (void *)dst_box);
-      } else {
-         data = glMapBufferRange(GL_ARRAY_BUFFER_ARB, dst_box->x, dst_box->width, GL_MAP_INVALIDATE_RANGE_BIT | GL_MAP_UNSYNCHRONIZED_BIT | GL_MAP_WRITE_BIT);
-         if (data == NULL) {
-            fprintf(stderr,"map failed for array\n");
-            graw_iov_to_buf_cb(iov, num_iovs, offset, dst_box->width, &iov_vertex_upload, (void *)dst_box);
-         } else {
-            graw_iov_to_buf(iov, num_iovs, offset, data, dst_box->width);
-            glUnmapBuffer(GL_ARRAY_BUFFER_ARB);
+            glUnmapBuffer(res->target);
          }
       }
    } else {
@@ -2141,20 +2209,18 @@ void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t ctx_id,
       return;
    }
 
-   if (res->target == GL_ELEMENT_ARRAY_BUFFER_ARB) {
+   if (res->target == GL_ELEMENT_ARRAY_BUFFER_ARB ||
+       res->target == GL_ARRAY_BUFFER_ARB ||
+       res->target == GL_TRANSFORM_FEEDBACK_BUFFER) {
       uint32_t send_size = box->width * util_format_get_blocksize(res->base.format);      
       void *data;
-      glBindBufferARB(GL_ELEMENT_ARRAY_BUFFER_ARB, res->id);
-      data = glMapBuffer(GL_ELEMENT_ARRAY_BUFFER_ARB, GL_READ_ONLY);
-      graw_transfer_write_return(data + box->x, send_size, offset, iov, num_iovs);
-      glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER_ARB);
-   } else if (res->target == GL_ARRAY_BUFFER_ARB) {
-      uint32_t send_size = box->width * util_format_get_blocksize(res->base.format);      
-      void *data;
-      glBindBufferARB(GL_ARRAY_BUFFER_ARB, res->id);
-      data = glMapBuffer(GL_ARRAY_BUFFER_ARB, GL_READ_ONLY);
-      graw_transfer_write_return(data + box->x, send_size, offset, iov, num_iovs);
-      glUnmapBuffer(GL_ARRAY_BUFFER_ARB);
+      glBindBufferARB(res->target, res->id);
+      data = glMapBuffer(res->target, GL_READ_ONLY);
+      if (!data)
+         fprintf(stderr,"unable to open buffer for reading %d\n", res->target);
+      else
+         graw_transfer_write_return(data + box->x, send_size, offset, iov, num_iovs);
+      glUnmapBuffer(res->target);
    } else {
       uint32_t h = u_minify(res->base.height0, level);
       GLenum format, type;
@@ -2280,6 +2346,36 @@ void grend_set_clip_state(struct grend_context *ctx, struct pipe_clip_state *ucp
 void grend_set_sample_mask(struct grend_context *ctx, unsigned sample_mask)
 {
 
+}
+
+
+static void grend_hw_emit_streamout_targets(struct grend_context *ctx)
+{
+   int i;
+
+   for (i = 0; i < ctx->num_so_targets; i++) {
+      glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, i, ctx->so_targets[i]->buffer->id);
+   }
+}
+
+void grend_set_streamout_targets(struct grend_context *ctx,
+                                 uint32_t append_bitmask,
+                                 uint32_t num_targets,
+                                 uint32_t *handles)
+{
+   struct grend_so_target *target;
+   int i;
+
+   ctx->num_so_targets = num_targets;
+   for (i = 0; i < num_targets; i++) {
+      target = graw_object_lookup(ctx->object_hash, handles[i], GRAW_STREAMOUT_TARGET);
+      if (!target) {
+         fprintf(stderr,"can't find so target %d\n", i);
+         return;
+      }
+      ctx->so_targets[i] = target;
+   }
+   grend_hw_emit_streamout_targets(ctx);
 }
 
 void graw_renderer_resource_copy_region(struct grend_context *ctx,
@@ -2585,6 +2681,7 @@ void grend_hw_switch_context(struct grend_context *ctx)
    grend_hw_emit_dsa(ctx);
    grend_hw_emit_rs(ctx);
    grend_hw_emit_blend_color(ctx);
+   grend_hw_emit_streamout_targets(ctx);
 
    ctx->stencil_state_dirty = TRUE;
    ctx->scissor_state_dirty = TRUE;
@@ -2682,4 +2779,25 @@ void grend_set_cursor_info(uint32_t cursor_handle, int x, int y)
 
    if (frontbuffer && draw_cursor)
       graw_renderer_remove_cursor(&grend_state.cursor_info, frontbuffer);
+}
+
+void grend_create_so_target(struct grend_context *ctx,
+                            uint32_t handle,
+                            uint32_t res_handle,
+                            uint32_t buffer_offset,
+                            uint32_t buffer_size)
+{
+   struct grend_so_target *target;
+
+   target = CALLOC_STRUCT(grend_so_target);
+   if (!target)
+      return;
+
+   target->res_handle = res_handle;
+   target->buffer_offset = buffer_offset;
+   target->buffer_size = buffer_size;
+   target->buffer = graw_lookup_resource(res_handle, ctx->ctx_id);
+
+   graw_object_insert(ctx->object_hash, target, sizeof(*target), handle,
+                      GRAW_STREAMOUT_TARGET);
 }

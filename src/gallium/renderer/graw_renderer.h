@@ -204,7 +204,8 @@ void graw_renderer_object_insert(struct grend_context *ctx, void *data,
 void graw_renderer_object_destroy(struct grend_context *ctx, uint32_t handle);
 
 void grend_create_query(struct grend_context *ctx, uint32_t handle,
-                           uint32_t query_type);
+                        uint32_t query_type, uint32_t res_handle,
+                        uint32_t offset);
 
 void grend_begin_query(struct grend_context *ctx, uint32_t handle);
 void grend_end_query(struct grend_context *ctx, uint32_t handle);

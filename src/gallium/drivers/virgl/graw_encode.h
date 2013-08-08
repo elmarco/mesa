@@ -175,7 +175,9 @@ int graw_encode_blit(struct graw_context *ctx,
 
 int graw_encoder_create_query(struct graw_context *ctx,
                               uint32_t handle,
-                              uint query_type);
+                              uint query_type,
+                              struct graw_resource *res,
+                              uint32_t offset);
 
 int graw_encoder_begin_query(struct graw_context *ctx,
                              uint32_t handle);

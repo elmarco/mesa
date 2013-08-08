@@ -583,11 +583,15 @@ int graw_encode_blit(struct graw_context *ctx,
 
 int graw_encoder_create_query(struct graw_context *ctx,
                               uint32_t handle,
-                              uint query_type)
+                              uint query_type,
+                              struct graw_resource *res,
+                              uint32_t offset)
 {
-   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_CREATE_OBJECT, GRAW_QUERY, 2));
+   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_CREATE_OBJECT, GRAW_QUERY, 4));
    graw_encoder_write_dword(ctx->cbuf, handle);
    graw_encoder_write_dword(ctx->cbuf, query_type);
+   graw_encoder_write_dword(ctx->cbuf, offset);
+   graw_encoder_write_res(ctx, res);
    return 0;
 }
 

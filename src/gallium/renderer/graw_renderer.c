@@ -44,6 +44,14 @@ struct grend_fence {
    struct list_head fences;
 };
 
+struct grend_query {
+   struct list_head queries;
+   GLuint type;
+   GLuint id;
+   GLuint gltype;
+   struct grend_resource *res;
+};
+
 struct global_renderer_state {
    bool viewport_dirty;
    bool scissor_dirty;
@@ -86,7 +94,6 @@ struct grend_shader_state {
    int num_inputs;
 };
 
-
 struct grend_buffer {
    struct grend_resource base;
 };
@@ -103,12 +110,6 @@ struct grend_surface {
    GLuint format;
    GLuint val0, val1;
    struct grend_resource *texture;
-};
-
-struct grend_query {
-   GLuint type;
-   GLuint id;
-   GLuint gltype;
 };
 
 struct grend_sampler {
@@ -1912,7 +1913,10 @@ void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target tar
    gr->base.height0 = height;
    gr->base.format = format;
    gr->base.target = target;
-   if (bind == PIPE_BIND_INDEX_BUFFER) {
+   if (bind == PIPE_BIND_CUSTOM) {
+      /* custom shuold only be for buffers */
+      gr->ptr = malloc(width);
+   } else if (bind == PIPE_BIND_INDEX_BUFFER) {
       gr->target = GL_ELEMENT_ARRAY_BUFFER_ARB;
       glGenBuffersARB(1, &gr->id);
       glBindBufferARB(gr->target, gr->id);
@@ -1991,6 +1995,8 @@ void graw_renderer_resource_unref(uint32_t res_handle)
    if (res->readback_fb_id)
       glDeleteFramebuffers(1, &res->readback_fb_id);
 
+   if (res->ptr)
+      free(res->ptr);
    if (res->target == GL_ELEMENT_ARRAY_BUFFER_ARB ||
        res->target == GL_ARRAY_BUFFER_ARB ||
        res->target == GL_TRANSFORM_FEEDBACK_BUFFER) {
@@ -2209,7 +2215,10 @@ void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t ctx_id,
       return;
    }
 
-   if (res->target == GL_ELEMENT_ARRAY_BUFFER_ARB ||
+   if (res->target == 0 && res->ptr) {
+      uint32_t send_size = box->width * util_format_get_blocksize(res->base.format);      
+      graw_transfer_write_return(res->ptr + box->x, send_size, offset, iov, num_iovs);
+   } else if (res->target == GL_ELEMENT_ARRAY_BUFFER_ARB ||
        res->target == GL_ARRAY_BUFFER_ARB ||
        res->target == GL_TRANSFORM_FEEDBACK_BUFFER) {
       uint32_t send_size = box->width * util_format_get_blocksize(res->base.format);      
@@ -2705,7 +2714,8 @@ void graw_renderer_object_insert(struct grend_context *ctx, void *data,
 }
 
 void grend_create_query(struct grend_context *ctx, uint32_t handle,
-                        uint32_t query_type)
+                        uint32_t query_type, uint32_t res_handle,
+                        uint32_t offset)
 {
    struct grend_query *q;
 
@@ -2714,11 +2724,23 @@ void grend_create_query(struct grend_context *ctx, uint32_t handle,
       return;
 
    q->type = query_type;
+   q->res = graw_lookup_resource(res_handle, ctx->ctx_id);
+   if (!q->res)
+      fprintf(stderr,"cannot lookup query resource %d\n", res_handle);
 
+   glGenQueries(1, &q->id);
    switch (q->type) {
    case PIPE_QUERY_OCCLUSION_COUNTER:
       q->gltype = GL_SAMPLES_PASSED_ARB;      
-      glGenQueries(1, &q->id);
+      break;
+   case PIPE_QUERY_OCCLUSION_PREDICATE:
+      q->gltype = GL_ANY_SAMPLES_PASSED;
+      break;
+   case PIPE_QUERY_TIMESTAMP:
+      q->gltype = GL_TIMESTAMP;
+      break;
+   case PIPE_QUERY_TIME_ELAPSED:
+      q->gltype = GL_TIME_ELAPSED;
       break;
    default:
       fprintf(stderr,"unknown query object received %d\n", q->type);
@@ -2738,6 +2760,7 @@ void grend_begin_query(struct grend_context *ctx, uint32_t handle)
    if (!q)
       return;
 
+   /* add to active query list for this context */
    glBeginQuery(q->gltype, q->id);
 }
 
@@ -2748,6 +2771,7 @@ void grend_end_query(struct grend_context *ctx, uint32_t handle)
    if (!q)
       return;
 
+   /* remove from active query list for this context */
    glEndQuery(q->gltype);
 }
 
@@ -2768,7 +2792,8 @@ void grend_get_query_result(struct grend_context *ctx, uint32_t handle,
 
    glGetQueryObjectuiv(q->id, GL_QUERY_RESULT_ARB, &passed);
 
-   
+   *(uint32_t *)q->res->ptr = 1;
+   memcpy(q->res->ptr + 4, &passed, sizeof(uint32_t));
 }
 
 void grend_set_cursor_info(uint32_t cursor_handle, int x, int y)

@@ -423,9 +423,13 @@ static void graw_decode_create_ve(struct grend_decode_ctx *ctx, uint32_t handle,
 static void graw_decode_create_query(struct grend_decode_ctx *ctx, uint32_t handle)
 {
    uint32_t query_type;
-
+   uint32_t res_handle;
+   uint32_t offset;
    query_type = ctx->ds->buf[ctx->ds->buf_offset + 2];
-   grend_create_query(ctx->grctx, handle, query_type);
+   offset = ctx->ds->buf[ctx->ds->buf_offset + 3];
+   res_handle = ctx->ds->buf[ctx->ds->buf_offset + 4];
+
+   grend_create_query(ctx->grctx, handle, query_type, res_handle, offset);
 }
 
 static void graw_decode_create_object(struct grend_decode_ctx *ctx)
@@ -829,6 +833,9 @@ static void graw_decode_block(uint32_t ctx_id, uint32_t *block, int ndw)
          break;
       case GRAW_END_QUERY:
          graw_decode_end_query(gdctx);
+         break;
+      case GRAW_GET_QUERY_RESULT:
+         graw_decode_get_query_result(gdctx);
          break;
       case GRAW_SET_POLYGON_STIPPLE:
          graw_decode_set_polygon_stipple(gdctx);

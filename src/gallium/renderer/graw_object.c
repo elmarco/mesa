@@ -38,9 +38,27 @@ struct util_hash_table *graw_init_ctx_hash(void)
    return ctx_hash;
 }
 
+static void graw_free_object(struct graw_object *obj)
+{
+   switch (obj->type) {
+   case GRAW_QUERY:
+      grend_destroy_query((struct grend_query *)obj->data);
+      break;
+   case GRAW_OBJECT_VS:
+   case GRAW_OBJECT_FS:
+      grend_destroy_shader((struct grend_shader_state *)obj->data);
+      break;
+   default:
+      break;
+   }
+   free(obj->data);
+   free(obj);
+}
+
 static enum pipe_error free_cb(void *key, void *value, void *data)
 {
-   free(value);
+   struct graw_object *obj = value;
+   graw_free_object(obj);
    return PIPE_OK;
 }
 
@@ -107,9 +125,7 @@ graw_object_destroy(struct util_hash_table *handle_hash,
    if (!obj)
       return;
    util_hash_table_remove(handle_hash, intptr_to_pointer(handle));
-   free(obj->data);
-   free(obj);
-      
+   graw_free_object(obj);
 }
 
 void *graw_object_lookup(struct util_hash_table *handle_hash,

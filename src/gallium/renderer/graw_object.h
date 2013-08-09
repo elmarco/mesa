@@ -19,4 +19,9 @@ uint32_t graw_object_assign_handle(void);
 void *graw_insert_resource(void *data, uint32_t length, uint32_t handle);
 void graw_destroy_resource(uint32_t handle);
 void *graw_lookup_resource(uint32_t handle, uint32_t ctx_id);
+
+struct grend_query;
+struct grend_shader_state;
+void grend_destroy_shader(struct grend_shader_state *state);
+void grend_destroy_query(struct grend_query *query);
 #endif

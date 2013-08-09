@@ -995,6 +995,10 @@ void grend_transfer_inline_write(struct grend_context *ctx,
    }
 }
 
+void grend_destroy_shader(struct grend_shader_state *state)
+{
+   glDeleteShader(state->id);
+}
 
 void grend_create_vs(struct grend_context *ctx,
                      uint32_t handle,
@@ -2749,6 +2753,11 @@ void grend_create_query(struct grend_context *ctx, uint32_t handle,
 
    graw_renderer_object_insert(ctx, q, sizeof(struct grend_query), handle,
                                GRAW_QUERY);
+}
+
+void grend_destroy_query(struct grend_query *query)
+{
+   glDeleteQueries(1, &query->id);
 }
 
 void grend_begin_query(struct grend_context *ctx, uint32_t handle)

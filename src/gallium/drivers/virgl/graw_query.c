@@ -95,7 +95,10 @@ static boolean graw_get_query_result(struct pipe_context *ctx,
    map = pipe_buffer_map_range(ctx, &query->buf->base, 4, sizeof(union pipe_query_result),
                                PIPE_TRANSFER_READ, &transfer);
 
-   memcpy(result, map, sizeof(uint32_t));
+   if (query->type == PIPE_QUERY_TIMESTAMP || query->type == PIPE_QUERY_TIME_ELAPSED)
+      memcpy(result, map, sizeof(uint64_t));
+   else
+      memcpy(result, map, sizeof(uint32_t));
    pipe_buffer_unmap(ctx, transfer);
    return TRUE;
 }

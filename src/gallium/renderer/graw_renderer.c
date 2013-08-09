@@ -2771,8 +2771,11 @@ void grend_end_query(struct grend_context *ctx, uint32_t handle)
    if (!q)
       return;
 
+   if (q->gltype == GL_TIMESTAMP)
+      glQueryCounter(q->id, q->gltype);
    /* remove from active query list for this context */
-   glEndQuery(q->gltype);
+   else
+      glEndQuery(q->gltype);
 }
 
 void grend_get_query_result(struct grend_context *ctx, uint32_t handle,
@@ -2781,19 +2784,37 @@ void grend_get_query_result(struct grend_context *ctx, uint32_t handle,
    struct grend_query *q;
    GLint ready;
    GLuint passed;
+   GLuint64 pass64;
+   boolean use_64 = FALSE;
+
    q = graw_object_lookup(ctx->object_hash, handle, GRAW_QUERY);
    if (!q)
       return;
+
+   switch (q->gltype) {
+   case GL_TIMESTAMP:
+   case GL_TIME_ELAPSED:
+      use_64 = TRUE;
+      break;
+   default:
+      break;
+   }
 
    glGetQueryObjectiv(q->id, GL_QUERY_RESULT_AVAILABLE_ARB, &ready);
 
    if (!ready && !wait)
       return;
 
-   glGetQueryObjectuiv(q->id, GL_QUERY_RESULT_ARB, &passed);
+   if (use_64)
+      glGetQueryObjectui64v(q->id, GL_QUERY_RESULT_ARB, &pass64);
+   else
+      glGetQueryObjectuiv(q->id, GL_QUERY_RESULT_ARB, &passed);
 
    *(uint32_t *)q->res->ptr = 1;
-   memcpy(q->res->ptr + 4, &passed, sizeof(uint32_t));
+   if (use_64)
+      memcpy(q->res->ptr + 4, &pass64, sizeof(uint64_t));
+   else
+      memcpy(q->res->ptr + 4, &passed, sizeof(uint32_t));
 }
 
 void grend_set_cursor_info(uint32_t cursor_handle, int x, int y)

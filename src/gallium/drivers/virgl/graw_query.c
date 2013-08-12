@@ -9,6 +9,7 @@ struct graw_query {
 
    unsigned type;
    unsigned result_size;
+   unsigned result_gotten_sent;
 };
 
 static void graw_render_condition(struct pipe_context *pipe,
@@ -30,7 +31,7 @@ static struct pipe_query *graw_create_query(struct pipe_context *ctx,
       return NULL;
 
    query->buf = (struct graw_resource *)pipe_buffer_create(ctx->screen, PIPE_BIND_CUSTOM,
-                                                           PIPE_USAGE_STAGING, sizeof(union pipe_query_result) + sizeof(uint32_t));
+                                                           PIPE_USAGE_STAGING, sizeof(struct graw_host_query_state));
    
    if (!query->buf) {
       FREE(query);
@@ -40,7 +41,7 @@ static struct pipe_query *graw_create_query(struct pipe_context *ctx,
    handle = graw_object_assign_handle();
    query->type = query_type;
    query->handle = handle;
-
+   query->buf->clean = FALSE;
    graw_encoder_create_query(grctx, handle, query_type, query->buf, 0);
 
    return (struct pipe_query *)query;
@@ -73,6 +74,14 @@ static void graw_end_query(struct pipe_context *ctx,
 {
    struct graw_context *grctx = (struct graw_context *)ctx;
    struct graw_query *query = (struct graw_query *)q;
+   struct pipe_transfer *transfer;
+   struct graw_host_query_state *host_state;
+
+   host_state = pipe_buffer_map(ctx, &query->buf->base,
+                               PIPE_TRANSFER_READ, &transfer);
+   host_state->query_state = VIRGL_QUERY_STATE_WAIT_HOST;
+   pipe_buffer_unmap(ctx, transfer);
+   
    graw_encoder_end_query(grctx, query->handle);
 }
 
@@ -83,22 +92,35 @@ static boolean graw_get_query_result(struct pipe_context *ctx,
 {
    struct graw_context *grctx = (struct graw_context *)ctx;
    struct graw_query *query = (struct graw_query *)q;
-   void *map;
    struct pipe_transfer *transfer;
+   struct graw_host_query_state *host_state;
 
-   graw_encoder_get_query_result(grctx, query->handle, wait);
+   /* ask host for query result */
+   if (!query->result_gotten_sent) {
+      query->result_gotten_sent = 1;
+      graw_encoder_get_query_result(grctx, query->handle, 0);
+      ctx->flush(ctx, NULL, 0);
+   }
 
-   ctx->flush(ctx, NULL, 0);
    /* do we  have to flush? */
    /* now we can do the transfer to get the result back? */
-
-   map = pipe_buffer_map_range(ctx, &query->buf->base, 4, sizeof(union pipe_query_result),
+ remap:
+   host_state = pipe_buffer_map(ctx, &query->buf->base,
                                PIPE_TRANSFER_READ, &transfer);
 
+   if (host_state->query_state != VIRGL_QUERY_STATE_DONE) {
+      pipe_buffer_unmap(ctx, transfer);
+      if (wait)
+         goto remap;
+      else
+         return FALSE;
+   }
+
    if (query->type == PIPE_QUERY_TIMESTAMP || query->type == PIPE_QUERY_TIME_ELAPSED)
-      memcpy(result, map, sizeof(uint64_t));
+      result->u64 = host_state->result;
    else
-      memcpy(result, map, sizeof(uint32_t));
+      result->u64 = (uint32_t)host_state->result;
+
    pipe_buffer_unmap(ctx, transfer);
    return TRUE;
 }

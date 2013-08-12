@@ -195,5 +195,6 @@ void graw_renderer_set_cursor_info(uint32_t cursor_handle, int x, int y)
 
 void graw_renderer_poll(void)
 {
+   graw_renderer_check_queries();
    graw_renderer_check_fences();
 }

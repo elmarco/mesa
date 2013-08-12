@@ -1,6 +1,16 @@
 #ifndef GRAW_PROTOCOL_H
 #define GRAW_PROTOCOL_H
 
+#define VIRGL_QUERY_STATE_NEW 0
+#define VIRGL_QUERY_STATE_DONE 1
+#define VIRGL_QUERY_STATE_WAIT_HOST 2
+
+struct graw_host_query_state {
+   uint32_t query_state;
+   uint32_t result_size;
+   uint64_t result;
+};
+
 enum graw_object_type {
    GRAW_OBJECT_NULL,
    GRAW_OBJECT_BLEND,

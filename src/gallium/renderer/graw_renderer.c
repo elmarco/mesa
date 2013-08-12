@@ -63,6 +63,8 @@ struct global_renderer_state {
    struct list_head fence_list;
    int current_ctx_id;
 
+   struct list_head waiting_query_list;
+
    struct graw_cursor_info cursor_info;
 };
 
@@ -1855,7 +1857,8 @@ graw_renderer_init(void)
    grend_state.viewport_dirty = grend_state.scissor_dirty = TRUE;
    grend_state.program_id = (GLuint)-1;
    list_inithead(&grend_state.fence_list);
-  
+   list_inithead(&grend_state.waiting_query_list);
+
    graw_cursor_init(&grend_state.cursor_info);
    /* create 0 context */
    graw_renderer_context_create_internal(0);
@@ -2681,6 +2684,55 @@ void graw_renderer_check_fences(void)
    graw_write_fence(latest_id);
 }
 
+static boolean graw_check_query(struct grend_query *query)
+{
+   GLint ready;
+   GLuint passed;
+   GLuint64 pass64;
+   boolean use_64 = FALSE;
+   struct graw_host_query_state *state;
+
+   glGetQueryObjectiv(query->id, GL_QUERY_RESULT_AVAILABLE_ARB, &ready);
+
+   if (!ready)
+      return FALSE;
+
+   switch (query->gltype) {
+   case GL_TIMESTAMP:
+   case GL_TIME_ELAPSED:
+      use_64 = TRUE;
+      break;
+   default:
+      break;
+   }
+   
+   if (use_64)
+      glGetQueryObjectui64v(query->id, GL_QUERY_RESULT_ARB, &pass64);
+   else
+      glGetQueryObjectuiv(query->id, GL_QUERY_RESULT_ARB, &passed);
+
+   state = query->res->ptr;
+
+   state->query_state = VIRGL_QUERY_STATE_DONE;
+   if (use_64)
+      state->result = pass64;
+   else
+      state->result = passed;
+   return TRUE;
+}
+
+void graw_renderer_check_queries(void)
+{
+   struct grend_query *query, *stor;
+   if (!inited)
+      return;   
+   
+   LIST_FOR_EACH_ENTRY_SAFE(query, stor, &grend_state.waiting_query_list, queries) {
+      if (graw_check_query(query) == TRUE)
+         list_delinit(&query->queries);
+   }
+}
+
 void grend_hw_switch_context(struct grend_context *ctx)
 {
 
@@ -2727,6 +2779,7 @@ void grend_create_query(struct grend_context *ctx, uint32_t handle,
    if (!q)
       return;
 
+   list_inithead(&q->queries);
    q->type = query_type;
    q->res = graw_lookup_resource(res_handle, ctx->ctx_id);
    if (!q->res)
@@ -2757,6 +2810,7 @@ void grend_create_query(struct grend_context *ctx, uint32_t handle,
 
 void grend_destroy_query(struct grend_query *query)
 {
+   list_del(&query->queries);
    glDeleteQueries(1, &query->id);
 }
 
@@ -2791,39 +2845,15 @@ void grend_get_query_result(struct grend_context *ctx, uint32_t handle,
                             uint32_t wait)
 {
    struct grend_query *q;
-   GLint ready;
-   GLuint passed;
-   GLuint64 pass64;
-   boolean use_64 = FALSE;
+   boolean ret;
 
    q = graw_object_lookup(ctx->object_hash, handle, GRAW_QUERY);
    if (!q)
       return;
 
-   switch (q->gltype) {
-   case GL_TIMESTAMP:
-   case GL_TIME_ELAPSED:
-      use_64 = TRUE;
-      break;
-   default:
-      break;
-   }
-
-   glGetQueryObjectiv(q->id, GL_QUERY_RESULT_AVAILABLE_ARB, &ready);
-
-   if (!ready && !wait)
-      return;
-
-   if (use_64)
-      glGetQueryObjectui64v(q->id, GL_QUERY_RESULT_ARB, &pass64);
-   else
-      glGetQueryObjectuiv(q->id, GL_QUERY_RESULT_ARB, &passed);
-
-   *(uint32_t *)q->res->ptr = 1;
-   if (use_64)
-      memcpy(q->res->ptr + 4, &pass64, sizeof(uint64_t));
-   else
-      memcpy(q->res->ptr + 4, &passed, sizeof(uint32_t));
+   ret = graw_check_query(q);
+   if (ret == FALSE)
+      list_addtail(&q->queries, &grend_state.waiting_query_list);
 }
 
 void grend_set_cursor_info(uint32_t cursor_handle, int x, int y)

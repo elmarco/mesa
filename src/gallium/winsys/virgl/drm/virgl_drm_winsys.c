@@ -3,6 +3,7 @@
 #include "virgl_drm_winsys.h"
 #include "virgl_drm_public.h"
 #include "util/u_memory.h"
+#include "util/u_format.h"
 #include "state_tracker/drm_driver.h"
 
 #include "os/os_mman.h"
@@ -309,7 +310,9 @@ static struct virgl_hw_res *virgl_drm_winsys_resource_create(struct virgl_winsys
    struct drm_virgl_resource_create createcmd;
    int ret;
    struct virgl_hw_res *res;
-
+   uint32_t stride = width * util_format_get_blocksize(format);
+   uint32_t size = stride * height * depth * array_size * (last_level + 1) * (nr_samples ? nr_samples : 1);
+   
    res = CALLOC_STRUCT(virgl_hw_res);
    if (!res)
       return NULL;
@@ -324,17 +327,20 @@ static struct virgl_hw_res *virgl_drm_winsys_resource_create(struct virgl_winsys
    createcmd.last_level = last_level;
    createcmd.nr_samples = nr_samples;
    createcmd.res_handle = 0;
+   createcmd.stride = stride;
+   createcmd.size = size;
+
    ret = drmIoctl(qdws->fd, DRM_IOCTL_VIRGL_RESOURCE_CREATE, &createcmd);
    if (ret != 0) {
       FREE(res);
       return NULL;
    }
-   
+
    res->do_del = 1;
    res->res_handle = createcmd.res_handle;
    res->bo_handle = createcmd.bo_handle;
-   res->size = createcmd.size;
-   res->stride = createcmd.stride;
+   res->size = size;
+   res->stride = stride;
    pipe_reference_init(&res->reference, 1);
    res->num_cs_references = 0;
    return res;
@@ -372,7 +378,7 @@ static struct virgl_hw_res *virgl_drm_winsys_resource_create_handle(struct virgl
 
    res->res_handle = info_arg.res_handle;
    res->size = info_arg.size;
-
+   res->stride = info_arg.stride;
    pipe_reference_init(&res->reference, 1);
    res->num_cs_references = 0;
    return res;  

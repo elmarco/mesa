@@ -197,6 +197,7 @@ int graw_renderer_create_fence(int client_fence_id);
 void graw_write_fence(unsigned fence_id);
 void graw_renderer_check_fences(void);
 void graw_renderer_check_queries(void);
+void grend_stop_current_queries(void);
 
 int swap_buffers(void);
 void grend_hw_switch_context(struct grend_context *ctx);

@@ -85,6 +85,7 @@ static void graw_process_cmd(struct virgl_command *cmd, struct graw_iovec *iov,
    break;
    case VIRGL_CMD_TRANSFER_GET:
 //         fprintf(stderr,"got transfer get %d\n", cmd->u.transfer_get.res_handle);
+      grend_stop_current_queries();
       graw_renderer_transfer_send_iov(cmd->u.transfer_get.res_handle,
                                       cmd->u.transfer_get.ctx_id,
                                       cmd->u.transfer_get.level,
@@ -94,6 +95,7 @@ static void graw_process_cmd(struct virgl_command *cmd, struct graw_iovec *iov,
                                       niovs);
       break;
    case VIRGL_CMD_TRANSFER_PUT:
+      grend_stop_current_queries();
       graw_renderer_transfer_write_iov(cmd->u.transfer_put.res_handle,
                                        cmd->u.transfer_put.ctx_id,
                                    cmd->u.transfer_put.dst_level,
@@ -104,6 +106,7 @@ static void graw_process_cmd(struct virgl_command *cmd, struct graw_iovec *iov,
       break;
       
    case VIRGL_CMD_SET_SCANOUT:
+      grend_stop_current_queries();
       graw_renderer_set_scanout(cmd->u.set_scanout.res_handle,
                                 cmd->u.set_scanout.ctx_id,
                                 (struct pipe_box *)&cmd->u.set_scanout.box);
@@ -111,6 +114,7 @@ static void graw_process_cmd(struct virgl_command *cmd, struct graw_iovec *iov,
                             cmd->u.set_scanout.box.h);
       break;
    case VIRGL_CMD_FLUSH_BUFFER:
+      grend_stop_current_queries();
       graw_renderer_flush_buffer(cmd->u.flush_buffer.res_handle,
                                  cmd->u.flush_buffer.ctx_id,
                                  (struct pipe_box *)&cmd->u.flush_buffer.box);

@@ -4,6 +4,7 @@
 #include "pipe/p_state.h"
 #include "graw_protocol.h"
 #include "graw_iov.h"
+#include "virgl_hw.h"
 struct grend_context;
 
 struct grend_resource {
@@ -18,6 +19,15 @@ struct grend_resource {
    void *ptr;
 };
 
+struct grend_format_table {
+   enum virgl_formats format;
+   GLenum internalformat;
+   GLenum glformat;
+   GLenum gltype;
+   uint32_t bindings;
+};
+
+void grend_insert_format(struct grend_format_table *entry);
 void grend_create_vs(struct grend_context *ctx,
                      uint32_t handle,
                      const struct pipe_shader_state *vs);
@@ -222,4 +232,7 @@ void grend_depth_test_enable(GLboolean depth_test_enable);
 
 int graw_renderer_flush_buffer_res(struct grend_resource *res,
                                    struct pipe_box *box);
+
+/* formats */
+void vrend_build_format_list(void);
 #endif

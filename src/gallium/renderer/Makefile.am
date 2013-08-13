@@ -29,6 +29,7 @@ libgrend_la_SOURCES = \
         graw_object.c \
         graw_decode.c \
 	graw_cursor.c \
+        graw_formats.c \
         iov.c
 
 pkgconfigdir = $(libdir)/pkgconfig

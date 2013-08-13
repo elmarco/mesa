@@ -64,6 +64,8 @@ struct dump_ctx {
    unsigned fragcoord_input;
 
    int num_address;
+   
+   struct pipe_stream_output_info *so;
 };
 
 static boolean
@@ -220,6 +222,41 @@ static char get_swiz_char(int swiz)
    case TGSI_SWIZZLE_W: return 'w';
    }
    return 0;
+}
+
+static void emit_so_movs(struct dump_ctx *ctx)
+{
+   char buf[255];
+   char dst[255], src[255];
+   int i, j;
+   char outtype[6] = {0};
+   char writemask[6];
+   for (i = 0; i < ctx->so->num_outputs; i++) {
+      if (ctx->so->output[i].start_component != 0) {
+         int wm_idx = 0;
+         writemask[wm_idx++] = '.';
+         for (j = 0; j < ctx->so->output[i].num_components; j++) {
+            unsigned idx = ctx->so->output[i].start_component + j;
+            if (idx >= 4)
+               break;
+            if (idx <= 2)
+               writemask[wm_idx++] = 'x' + idx;
+            else
+               writemask[wm_idx++] = 'w';
+         }
+         writemask[wm_idx] = '\0';
+      } else
+         writemask[0] = 0;
+      
+      if (ctx->so->output[i].num_components == 1)
+         snprintf(outtype, 6, "float");
+      else
+         snprintf(outtype, 6, "vec%d", ctx->so->output[i].num_components);
+
+      snprintf(buf, 255, "tfout%d = %s(%s%s);\n", i, outtype, ctx->outputs[ctx->so->output[i].register_index].glsl_name, writemask);
+      strcat(ctx->glsl_main, buf);
+   }
+
 }
 
 static boolean
@@ -558,6 +595,8 @@ iter_instruction(struct tgsi_iterate_context *iter,
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_END:
+      if (ctx->so)
+         emit_so_movs(ctx);
       strcat(ctx->glsl_main, "}\n");
       break;
    case TGSI_OPCODE_ARL:
@@ -650,6 +689,17 @@ static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
       }
    }
 
+   if (ctx->so) {
+      char outtype[6] = {0};
+      for (i = 0; i < ctx->so->num_outputs; i++) {
+         if (ctx->so->output[i].num_components == 1)
+            snprintf(outtype, 6, "float");
+         else
+            snprintf(outtype, 6, "vec%d", ctx->so->output[i].num_components);
+         snprintf(buf, 255, "out %s tfout%d;\n", outtype, i);
+         strcat(glsl_final, buf);
+      }
+   }
    if (ctx->num_temps) {
       snprintf(buf, 255, "vec4 temps[%d];\n", ctx->num_temps);
       strcat(glsl_final, buf);
@@ -676,7 +726,7 @@ static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
 }
 
 char *tgsi_convert(const struct tgsi_token *tokens,
-                   int flags, int *num_samplers, int *num_consts, int *num_inputs)
+                   int flags, int *num_samplers, int *num_consts, int *num_inputs, const struct pipe_stream_output_info *so_info)
 {
    struct dump_ctx ctx;
    char *glsl_final;
@@ -687,6 +737,10 @@ char *tgsi_convert(const struct tgsi_token *tokens,
    ctx.iter.iterate_immediate = iter_immediate;
    ctx.iter.iterate_property = iter_property;
    ctx.iter.epilog = NULL;
+
+   if (so_info && so_info->num_outputs) {
+      ctx.so = so_info;
+   }
 
    ctx.glsl_main = malloc(65536);
    ctx.glsl_main[0] = '\0';

@@ -466,32 +466,21 @@ static void grend_stencil_test_enable(GLboolean stencil_test_enable)
 static void set_stream_out_varyings(int prog_id, struct pipe_stream_output_info *vs_so)
 {
    char *varyings[PIPE_MAX_SHADER_OUTPUTS];
-   int i;
    char tmp[64];
-   int bit_done = 0;
-   int index;
+   int i;
    if (!vs_so->num_outputs)
       return;
 
-   index = 0;
    for (i = 0; i < vs_so->num_outputs; i++) {
-      if (bit_done & (1 << vs_so->output[i].register_index)) {
-         varyings[i] = NULL;
-         continue;
-      }
-      bit_done |= (1 << vs_so->output[i].register_index);
-      if (vs_so->output[i].register_index == 0)
-         snprintf(tmp, 64, "gl_Position");
-      else
-         snprintf(tmp, 64, "ex_%d", vs_so->output[i].register_index - 1);
+      snprintf(tmp, 64, "tfout%d", i);
 
-      varyings[index++] = strdup(tmp);
+      varyings[i] = strdup(tmp);
    }
 
-   glTransformFeedbackVaryings(prog_id, index,
+   glTransformFeedbackVaryings(prog_id, vs_so->num_outputs,
                                varyings, GL_INTERLEAVED_ATTRIBS_EXT);
 
-   for (i = 0; i < index; i++)
+   for (i = 0; i < vs_so->num_outputs; i++)
       if (varyings[i])
          free(varyings[i]);
 }
@@ -1026,7 +1015,7 @@ void grend_create_vs(struct grend_context *ctx,
    const GLchar *glsl_prog;
    GLenum ret;
    state->id = glCreateShader(GL_VERTEX_SHADER);
-   glsl_prog = tgsi_convert(vs->tokens, 0, &state->num_samplers, &state->num_consts, &state->num_inputs);
+   glsl_prog = tgsi_convert(vs->tokens, 0, &state->num_samplers, &state->num_consts, &state->num_inputs, &vs->stream_output);
    if (glsl_prog) {
       glShaderSource(state->id, 1, &glsl_prog, NULL);
       ret = glGetError();
@@ -1055,7 +1044,7 @@ void grend_create_fs(struct grend_context *ctx,
    GLchar *glsl_prog;
    GLenum ret;
    state->id = glCreateShader(GL_FRAGMENT_SHADER);
-   glsl_prog = tgsi_convert(fs->tokens, 0, &state->num_samplers, &state->num_consts, &state->num_inputs);
+   glsl_prog = tgsi_convert(fs->tokens, 0, &state->num_samplers, &state->num_consts, &state->num_inputs, NULL);
    if (glsl_prog) {
       glShaderSource(state->id, 1, (const char **)&glsl_prog, NULL);
       ret = glGetError();

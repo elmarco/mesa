@@ -272,6 +272,12 @@ virgl_is_format_supported( struct pipe_screen *screen,
       return util_format_s3tc_enabled;
    }
 
+   if (format == PIPE_FORMAT_R11G11B10_FLOAT) {
+      return TRUE;
+   } else if (format == PIPE_FORMAT_R9G9B9E5_FLOAT) {
+      return TRUE;
+   }
+
    /* Find the first non-VOID channel. */
    for (i = 0; i < 4; i++) {
       if (format_desc->channel[i].type != UTIL_FORMAT_TYPE_VOID) {

@@ -263,8 +263,12 @@ iter_instruction(struct tgsi_iterate_context *iter,
                break;
             }
       }
-      else if (dst->Register.File == TGSI_FILE_TEMPORARY)
-          snprintf(dsts[i], 255, "temp%d%s", dst->Register.Index, writemask);
+      else if (dst->Register.File == TGSI_FILE_TEMPORARY) {
+         if (dst->Register.Indirect) {
+            snprintf(dsts[i], 255, "temps[addr0 + %d]%s", dst->Register.Index, writemask);
+         } else
+            snprintf(dsts[i], 255, "temps[%d]%s", dst->Register.Index, writemask);
+      }
    }
       
    for (i = 0; i < inst->Instruction.NumSrcRegs; i++) {
@@ -289,7 +293,10 @@ iter_instruction(struct tgsi_iterate_context *iter,
             }
       }
       else if (src->Register.File == TGSI_FILE_TEMPORARY) {
-          snprintf(srcs[i], 255, "%ctemp%d%s", negate, src->Register.Index, swizzle);
+         if (src->Register.Indirect) {
+            snprintf(srcs[i], 255, "%ctemps[addr0 + %d]%s", negate, src->Register.Index, swizzle);
+         } else
+             snprintf(srcs[i], 255, "%ctemps[%d]%s", negate, src->Register.Index, swizzle);
       } else if (src->Register.File == TGSI_FILE_CONSTANT) {
 	  const char *cname = ctx->prog_type == TGSI_PROCESSOR_VERTEX ? "vsconst" : "fsconst";
           if (src->Register.Indirect) {
@@ -642,10 +649,12 @@ static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
          strcat(glsl_final, buf);
       }
    }
-   for (i = 0; i < ctx->num_temps; i++) {
-      snprintf(buf, 255, "vec4 temp%d;\n", i);
+
+   if (ctx->num_temps) {
+      snprintf(buf, 255, "vec4 temps[%d];\n", ctx->num_temps);
       strcat(glsl_final, buf);
    }
+
    for (i = 0; i < ctx->num_address; i++) {
       snprintf(buf, 255, "int addr%d;\n", i);
       strcat(glsl_final, buf);

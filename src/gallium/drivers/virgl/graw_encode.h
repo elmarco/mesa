@@ -3,7 +3,7 @@
 #define GRAW_ENCODER_H
 
 #include <stdio.h>
-#include "virgl_winsys.h"
+
 #include "graw_context.h"
 struct graw_surface {
    struct pipe_surface base;

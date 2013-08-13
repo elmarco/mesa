@@ -22,6 +22,9 @@ enum virgl_cmd_type {
 	VIRGL_CMD_RESOURCE_UNREF,
 	VIRGL_CMD_ATTACH_RES_CTX,
 	VIRGL_CMD_DETACH_RES_CTX,
+        VIRGL_CMD_RESOURCE_ATTACH_SG_LIST,
+        VIRGL_CMD_RESOURCE_INVALIDATE_SG_LIST,
+        VIRGL_CMD_GET_3D_CAPABILITIES,
 };
 
 /* put a box of data from a BO into a tex/buffer resource */
@@ -120,6 +123,10 @@ struct virgl_command {
 		struct virgl_flush_buffer flush_buffer;
 		struct virgl_resource_unref res_unref;
 		struct virgl_cmd_resource_context res_ctx;
+
+                struct virgl_cmd_resource_attach_sg attach_sg;
+                struct virgl_cmd_resource_invalidate_sg inval_sg;
+                struct virgl_cmd_get_cap get_cap;
 	} u;
 };
 
@@ -301,16 +308,18 @@ struct virgl_supported_format_mask {
 };
 /* capabilities set 2 - version 1 - 32-bit and float values */
 struct virgl_caps_v1 {
+        uint32_t max_version;
+        struct virgl_supported_format_mask sampler;
+        struct virgl_supported_format_mask render;
+        struct virgl_supported_format_mask depthstencil;
+        struct virgl_supported_format_mask vertexbuffer;
         struct virgl_caps_bool_set1 bset;
         uint32_t glsl_level;
         uint32_t max_texture_array_layers;
         uint32_t max_streamout_buffers;
         uint32_t max_dual_source_render_targets;
         uint32_t max_render_targets;
-        struct virgl_supported_format_mask sampler;
-        struct virgl_supported_format_mask fb;
-        struct virgl_supported_format_mask depthstencil;
-        struct virgl_supported_format_mask vertexbuffer;
+
 };
 
 union virgl_caps {

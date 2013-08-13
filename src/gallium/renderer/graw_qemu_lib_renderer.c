@@ -128,6 +128,13 @@ static void graw_process_cmd(struct virgl_command *cmd, struct graw_iovec *iov,
    case VIRGL_CMD_DETACH_RES_CTX:
       /* TODO add security */
       break;
+   case VIRGL_CMD_GET_3D_CAPABILITIES:
+      if (!niovs)
+         return;
+      graw_renderer_fill_caps(cmd->u.get_cap.cap_set,
+                              cmd->u.get_cap.cap_set_version,
+                              cmd->u.get_cap.offset, iov, niovs);
+      break;
    case 0xdeadbeef:
       if (inited) {
          graw_renderer_fini();

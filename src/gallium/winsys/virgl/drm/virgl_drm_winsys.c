@@ -546,6 +546,39 @@ static int virgl_drm_winsys_submit_cmd(struct virgl_winsys *qws, struct virgl_cm
    return ret;
 }
 
+static int virgl_drm_get_caps(struct virgl_winsys *vws, struct virgl_drm_caps *caps)
+{
+   struct virgl_drm_winsys *vdws = virgl_drm_winsys(vws);
+   struct drm_virgl_get_caps args;
+   struct drm_virgl_map mmap_arg;
+   struct drm_gem_close close_bo;
+   void *ptr;
+   int ret;
+
+   memset(&args, 0, sizeof(args));
+
+   ret = drmIoctl(vdws->fd, DRM_IOCTL_VIRGL_GET_CAPS, &args);
+   if (ret)
+      return ret;
+
+   mmap_arg.handle = args.handle;
+   if (drmIoctl(vdws->fd, DRM_IOCTL_VIRGL_MAP, &mmap_arg))
+      return -EINVAL;
+
+   ptr = os_mmap(0, sizeof(union virgl_caps), PROT_READ|PROT_WRITE, MAP_SHARED,
+                 vdws->fd, mmap_arg.offset);
+   if (ptr == MAP_FAILED)
+      return -EINVAL;
+
+   memcpy(&caps->caps, ptr, sizeof(union virgl_caps));
+          
+   os_munmap(ptr, sizeof(union virgl_caps));
+
+   close_bo.handle = args.handle;
+   drmIoctl(vdws->fd, DRM_IOCTL_GEM_CLOSE, &close_bo);
+   return 0;
+}
+
 struct virgl_winsys *
 virgl_drm_winsys_create(int drmFD)
 {
@@ -583,6 +616,8 @@ virgl_drm_winsys_create(int drmFD)
    qdws->base.submit_cmd = virgl_drm_winsys_submit_cmd;
    qdws->base.emit_res = virgl_drm_emit_res;
    qdws->base.res_is_referenced = virgl_drm_res_is_ref;
+   
+   qdws->base.get_caps = virgl_drm_get_caps;
    return &qdws->base;
 
  fail:

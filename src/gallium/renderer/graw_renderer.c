@@ -2848,3 +2848,38 @@ void grend_create_so_target(struct grend_context *ctx,
    graw_object_insert(ctx->object_hash, target, sizeof(*target), handle,
                       GRAW_STREAMOUT_TARGET);
 }
+
+void graw_renderer_fill_caps(uint32_t set, uint32_t version,
+                             uint32_t offset, struct graw_iovec *iov,
+                             unsigned int niovs)
+{
+   union virgl_caps caps;
+   int i;
+   if (set != 0) {
+      caps.max_version = 0;
+      goto out;
+   }
+   memset(&caps, 0, sizeof(caps));
+   caps.max_version = 1;
+   caps.v1.bset.indep_blend_enable = 1;
+   caps.v1.bset.indep_blend_func = 1;
+   caps.v1.bset.cube_map_array = 0;
+   caps.v1.glsl_level = 120;
+   caps.v1.max_texture_array_layers = 0;
+   caps.v1.max_streamout_buffers = 0;
+   caps.v1.max_dual_source_render_targets = 0;
+   caps.v1.max_render_targets = 1;
+
+   for (i = 0; i < VIRGL_FORMAT_MAX; i++) {
+      uint32_t offset = i / 32;
+      uint32_t index = i % 32;
+
+      if (tex_conv_table[i].internalformat != 0) {
+         caps.v1.sampler.bitmask[offset] |= (1 << index);
+         caps.v1.render.bitmask[offset] |= (1 << index);
+      }
+   }
+
+ out:
+   graw_iov_from_buf(iov, niovs, offset, &caps, sizeof(union virgl_caps));
+}

@@ -8,6 +8,11 @@ struct virgl_hw_res;
 
 #define VIRGL_MAX_CMDBUF_DWORDS (16*1024)
 
+struct virgl_drm_caps {
+   uint32_t bo_handle;
+   union virgl_caps caps;
+};
+
 struct virgl_cmd_buf {
    unsigned cdw;
    uint32_t *buf;
@@ -63,6 +68,8 @@ struct virgl_winsys {
    boolean (*res_is_referenced)(struct virgl_winsys *vws,
                                 struct virgl_cmd_buf *buf,
                                 struct virgl_hw_res *res);
+
+   int (*get_caps)(struct virgl_winsys *vws, struct virgl_drm_caps *caps);
 };
 
 

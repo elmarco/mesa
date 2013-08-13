@@ -12,8 +12,6 @@
 #include "state_tracker/sw_winsys.h"
 #include "tgsi/tgsi_exec.h"
 
-#include "virgl_winsys.h"
-
 #include "virgl.h"
 #include "virgl_public.h"
 #include "graw_context.h"
@@ -348,6 +346,8 @@ virgl_create_screen(struct virgl_winsys *vws)
    screen->base.resource_create = graw_resource_create;
    screen->base.resource_destroy = graw_resource_destroy;
    screen->base.flush_frontbuffer = virgl_flush_frontbuffer;
+
+   vws->get_caps(vws, &screen->caps);
    return &screen->base;
 }
   

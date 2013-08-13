@@ -233,6 +233,10 @@ void grend_depth_test_enable(GLboolean depth_test_enable);
 int graw_renderer_flush_buffer_res(struct grend_resource *res,
                                    struct pipe_box *box);
 
+void graw_renderer_fill_caps(uint32_t set, uint32_t version,
+                             uint32_t offset, struct graw_iovec *iov,
+                             unsigned int niovs);
+
 /* formats */
 void vrend_build_format_list(void);
 #endif

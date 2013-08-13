@@ -1,13 +1,18 @@
 #ifndef VIRGL_DRM_WINSYS_H
 #define VIRGL_DRM_WINSYS_H
 
+#include <stdint.h>
 #include "pipe/p_compiler.h"
 #include "drm.h"
 
 #include "pipe/p_screen.h"
 #include "pipe/p_context.h"
+
+#include "virgl_hw.h"
 #include "virgl/virgl_winsys.h"
 #include "pipebuffer/pb_bufmgr.h"
+
+
 
 struct virgl_bomgr;
 struct virgl_drm_winsys;

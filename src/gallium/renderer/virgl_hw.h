@@ -276,4 +276,43 @@ enum virgl_formats {
    VIRGL_FORMAT_MAX,
 };
 
+struct virgl_caps_bool_set1 {
+        unsigned indep_blend_enable:1;
+        unsigned indep_blend_func:1;
+        unsigned cube_map_array:1;
+        unsigned shader_stencil_export:1;
+        unsigned conditional_render:1;
+        unsigned start_instance:1;
+        unsigned primitive_restart:1;
+        unsigned blend_eq_sep:1;
+        unsigned instanceid:1;
+        unsigned vertex_element_instance_divisor:1;
+        unsigned seamless_cube_map:1;
+        unsigned occlusion_query:1;
+        unsigned timer_query:1;
+        unsigned streamout_pause_resume:1;
+};
+
+/* endless expansion capabilites - current gallium has 252 formats */
+struct virgl_supported_format_mask {
+        uint32_t bitmask[16];
+};
+/* capabilities set 2 - version 1 - 32-bit and float values */
+struct virgl_caps_v1 {
+        struct virgl_caps_bool_set1 bset;
+        uint32_t glsl_level;
+        uint32_t max_texture_array_layers;
+        uint32_t max_streamout_buffers;
+        uint32_t max_dual_source_render_targets;
+        uint32_t max_render_targets;
+        struct virgl_supported_format_mask sampler;
+        struct virgl_supported_format_mask fb;
+        struct virgl_supported_format_mask depthstencil;
+        struct virgl_supported_format_mask vertexbuffer;
+};
+
+union virgl_caps {
+        uint32_t max_version;
+        struct virgl_caps_v1 v1;
+};
 #endif

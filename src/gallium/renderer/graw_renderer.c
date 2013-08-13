@@ -26,6 +26,7 @@
 #include "graw_decode.h"
 #include "graw_cursor.h"
 
+#include "virgl_hw.h"
 /* transfer boxes from the guest POV are in y = 0 = top orientation */
 /* blit/copy operations from the guest POV are in y = 0 = top orientation */
 

@@ -30,7 +30,8 @@ static int graw_decode_create_shader(struct grend_decode_ctx *ctx, uint32_t type
 {
    struct pipe_shader_state *state = CALLOC_STRUCT(pipe_shader_state);
    struct tgsi_token *tokens;
-
+   int i;
+   uint32_t shader_offset;
    if (!state)
       return NULL;
    
@@ -40,9 +41,25 @@ static int graw_decode_create_shader(struct grend_decode_ctx *ctx, uint32_t type
       return -1;
    }
 
-//   fprintf(stderr,"shader\n%s\n", &ctx->ds->buf[ctx->ds->buf_offset + 2]);
-   if (!tgsi_text_translate(&ctx->ds->buf[ctx->ds->buf_offset + 2], tokens, DECODE_MAX_TOKENS)) {
-      fprintf(stderr,"failed to translate\n %s\n",&ctx->ds->buf[ctx->ds->buf_offset + 2]);
+   state->stream_output.num_outputs = ctx->ds->buf[ctx->ds->buf_offset + 2];
+   if (state->stream_output.num_outputs) {
+      for (i = 0; i < 4; i++)
+         state->stream_output.stride[i] = ctx->ds->buf[ctx->ds->buf_offset + 3 + i];
+      for (i = 0; i < state->stream_output.num_outputs; i++) {
+         uint32_t tmp = ctx->ds->buf[ctx->ds->buf_offset + 7 + i];
+      
+         state->stream_output.output[i].register_index = tmp & 0xff;
+         state->stream_output.output[i].start_component = (tmp >> 8) & 0x3;
+         state->stream_output.output[i].num_components = (tmp >> 10) & 0x7;
+         state->stream_output.output[i].output_buffer = (tmp >> 13) & 0x7;
+         state->stream_output.output[i].dst_offset = (tmp >> 16) & 0xffff;         
+      }
+      shader_offset = 7 + state->stream_output.num_outputs;
+   } else
+      shader_offset = 3;
+   fprintf(stderr,"shader\n%s\n", &ctx->ds->buf[ctx->ds->buf_offset + shader_offset]);
+   if (!tgsi_text_translate(&ctx->ds->buf[ctx->ds->buf_offset + shader_offset], tokens, DECODE_MAX_TOKENS)) {
+      fprintf(stderr,"failed to translate\n %s\n",&ctx->ds->buf[ctx->ds->buf_offset + shader_offset]);
       free(tokens);
       free(state);
       return -1;
@@ -57,35 +74,6 @@ static int graw_decode_create_shader(struct grend_decode_ctx *ctx, uint32_t type
 
    free(tokens);
    free(state);
-   return 0;
-}
-
-static int graw_decode_create_stream_output(struct grend_decode_ctx *ctx, uint32_t type,
-                                            uint32_t handle,
-                                            uint16_t length)
-{
-   struct pipe_stream_output_info *so = CALLOC_STRUCT(pipe_stream_output_info);
-   int num_out = length - 5;
-   int i;
-
-   for (i = 0; i < 4; i++)
-      so->stride[i] = ctx->ds->buf[ctx->ds->buf_offset + 2 + i];
-
-   for (i = 0; i < num_out; i++) {
-      uint32_t tmp = ctx->ds->buf[ctx->ds->buf_offset + 6 + i];
-
-      so->output[i].register_index = tmp & 0xff;
-      so->output[i].start_component = (tmp >> 8) & 0x3;
-      so->output[i].num_components = (tmp >> 10) & 0x7;
-      so->output[i].output_buffer = (tmp >> 13) & 0x7;
-      so->output[i].dst_offset = (tmp >> 16) & 0xffff;
-   }
-   so->num_outputs = num_out;
-   
-   if (type == GRAW_OBJECT_VS_SO)
-      graw_renderer_object_insert(ctx->grctx, so, sizeof(*so), handle, GRAW_OBJECT_VS_SO);
-   else
-      assert(0);
    return 0;
 }
 
@@ -470,9 +458,6 @@ static void graw_decode_create_object(struct grend_decode_ctx *ctx)
    case GRAW_QUERY:
       graw_decode_create_query(ctx, handle);
       break;
-   case GRAW_OBJECT_VS_SO:
-      graw_decode_create_stream_output(ctx, obj_type, handle, length);
-      break;
    case GRAW_STREAMOUT_TARGET:
       graw_decode_create_stream_output_target(ctx, handle);
       break;
@@ -506,9 +491,6 @@ static void graw_decode_bind_object(struct grend_decode_ctx *ctx)
       break;
    case GRAW_OBJECT_VERTEX_ELEMENTS:
       grend_bind_vertex_elements_state(ctx->grctx, handle);
-      break;
-   case GRAW_OBJECT_VS_SO:
-      grend_bind_vs_so(ctx->grctx, handle);
       break;
    }
 }

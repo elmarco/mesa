@@ -89,8 +89,6 @@ struct grend_linked_shader_program {
 
   struct grend_shader_state *vs;
   struct grend_shader_state *fs;
-  struct pipe_stream_output_info *vs_so;
-  uint32_t vs_so_id;
 
   GLuint num_samplers[PIPE_SHADER_TYPES];
   GLuint *samp_locs[PIPE_SHADER_TYPES];
@@ -107,6 +105,7 @@ struct grend_shader_state {
    int num_samplers;
    int num_consts;
    int num_inputs;
+   struct pipe_stream_output_info so_info;
 };
 
 struct grend_buffer {
@@ -188,9 +187,6 @@ struct grend_context {
    uint32_t vbo_res_ids[PIPE_MAX_ATTRIBS];
    struct grend_shader_state *vs;
    struct grend_shader_state *fs;
-
-   struct pipe_stream_output_info *vs_so;
-   uint32_t vs_so_id;
 
    bool shader_dirty;
    struct grend_linked_shader_program *prog;
@@ -500,10 +496,9 @@ static void set_stream_out_varyings(int prog_id, struct pipe_stream_output_info 
 }
 
 static struct grend_linked_shader_program *add_shader_program(struct grend_context *ctx,
-							       struct grend_shader_state *vs,
-                                                              struct grend_shader_state *fs,
-                                                              struct pipe_stream_output_info *vs_so, uint32_t vs_so_id) {
-  
+                                                              struct grend_shader_state *vs,
+                                                              struct grend_shader_state *fs)
+{
   struct grend_linked_shader_program *sprog = malloc(sizeof(struct grend_linked_shader_program));
   char name[16];
   int i;
@@ -512,7 +507,7 @@ static struct grend_linked_shader_program *add_shader_program(struct grend_conte
 
   prog_id = glCreateProgram();
   glAttachShader(prog_id, vs->id);
-  set_stream_out_varyings(prog_id, vs_so);
+  set_stream_out_varyings(prog_id, &vs->so_info);
   glAttachShader(prog_id, fs->id);
   ret = glGetError();
   glLinkProgram(prog_id);
@@ -524,8 +519,6 @@ static struct grend_linked_shader_program *add_shader_program(struct grend_conte
   sprog->vs = vs;
   sprog->fs = fs;
   sprog->id = prog_id;
-  sprog->vs_so_id = vs_so_id;
-  sprog->vs_so = vs_so;
   list_add(&sprog->head, &ctx->programs);
 
   if (vs->num_samplers) {
@@ -588,12 +581,12 @@ static struct grend_linked_shader_program *add_shader_program(struct grend_conte
 }
 
 static struct grend_linked_shader_program *lookup_shader_program(struct grend_context *ctx,
-                                                                 GLuint vs_id, GLuint fs_id, GLuint vs_so_id)
+                                                                 GLuint vs_id, GLuint fs_id)
 {
   struct grend_linked_shader_program *ent;
   LIST_FOR_EACH_ENTRY(ent, &ctx->programs, head) {
-     if (ent->vs->id == vs_id && ent->fs->id == fs_id && ent->vs_so_id == vs_so_id)
-      return ent;
+     if (ent->vs->id == vs_id && ent->fs->id == fs_id)
+        return ent;
   }
   return 0;
 }
@@ -1044,6 +1037,10 @@ void grend_create_vs(struct grend_context *ctx,
       }
    } else
      fprintf(stderr,"failed to convert VS prog\n");
+
+   /* copy over stream out info */
+   state->so_info = vs->stream_output;
+
    graw_object_insert(ctx->object_hash, state, sizeof(*state), handle, GRAW_OBJECT_VS);
 
    return;
@@ -1085,18 +1082,6 @@ void grend_bind_vs(struct grend_context *ctx,
    if (ctx->vs != state)
       ctx->shader_dirty = true;
    ctx->vs = state;
-}
-
-void grend_bind_vs_so(struct grend_context *ctx,
-                      uint32_t handle)
-{
-   struct pipe_stream_output_info *so;
-
-   so = graw_object_lookup(ctx->object_hash, handle, GRAW_OBJECT_VS_SO);
-   if (ctx->vs_so != so)
-      ctx->shader_dirty = true;
-   ctx->vs_so = so;
-   ctx->vs_so_id = handle;
 }
 
 void grend_bind_fs(struct grend_context *ctx,
@@ -1195,9 +1180,9 @@ void grend_draw_vbo(struct grend_context *ctx,
         fprintf(stderr,"dropping rendering due to missing shaders\n");
         return;
      }
-     prog = lookup_shader_program(ctx, ctx->vs->id, ctx->fs->id, ctx->vs_so_id);
+     prog = lookup_shader_program(ctx, ctx->vs->id, ctx->fs->id);
      if (!prog) {
-        prog = add_shader_program(ctx, ctx->vs, ctx->fs, ctx->vs_so, ctx->vs_so_id);
+        prog = add_shader_program(ctx, ctx->vs, ctx->fs);
      }
      if (ctx->prog != prog) {
        new_program = TRUE;

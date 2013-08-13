@@ -24,7 +24,6 @@ enum graw_object_type {
    GRAW_RESOURCE,
    GRAW_SURFACE,
    GRAW_QUERY,
-   GRAW_OBJECT_VS_SO,
    GRAW_STREAMOUT_TARGET,
 };
 

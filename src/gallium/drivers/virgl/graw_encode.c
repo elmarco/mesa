@@ -171,41 +171,33 @@ int graw_encode_shader_state(struct graw_context *ctx,
                              const struct pipe_shader_state *shader)
 {
    static char str[65536];
-   uint32_t len;
+   uint32_t shader_len, len;
+   int i;
+   uint32_t tmp;
 
    memset(str, 0, 65536);
    tgsi_dump_str(shader->tokens, 0, str, sizeof(str));
 
-   len = strlen(str) + 1;
-   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_CREATE_OBJECT, type, ((len + 3)/ 4) + 1));
+   shader_len = strlen(str) + 1;
+   len = ((shader_len + 3) / 4) + 2 + (shader->stream_output.num_outputs ? shader->stream_output.num_outputs + 4 : 0);
+
+   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_CREATE_OBJECT, type, len));
    graw_encoder_write_dword(ctx->cbuf, handle);
-   graw_encoder_write_block(ctx->cbuf, str, len);
-   return 0;
-}
+   graw_encoder_write_dword(ctx->cbuf, shader->stream_output.num_outputs);
+   if (shader->stream_output.num_outputs) {
+      for (i = 0; i < 4; i++)
+         graw_encoder_write_dword(ctx->cbuf, shader->stream_output.stride[i]);
 
-int graw_encode_stream_output_info(struct graw_context *ctx,
-                                   uint32_t handle,
-                                   uint32_t type,
-                                   const struct pipe_shader_state *shader)
-{
-   int len = shader->stream_output.num_outputs;
-   int i;
-   uint32_t tmp;
-
-   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_CREATE_OBJECT, type, 4 + 1 + len));
-   graw_encoder_write_dword(ctx->cbuf, handle);
-   assert(4 == PIPE_MAX_SO_BUFFERS);
-   for (i = 0; i < 4; i++)
-      graw_encoder_write_dword(ctx->cbuf, shader->stream_output.stride[i]);
-
-   for (i = 0; i < len; i++) {
-      tmp = shader->stream_output.output[i].register_index | 
-         (unsigned)shader->stream_output.output[i].start_component << 8 | 
-         (unsigned)shader->stream_output.output[i].num_components << 10 | 
-         (unsigned)shader->stream_output.output[i].output_buffer << 13 | 
-         (unsigned)shader->stream_output.output[i].dst_offset << 16;
-      graw_encoder_write_dword(ctx->cbuf, tmp);
+      for (i = 0; i < shader->stream_output.num_outputs; i++) {
+         tmp = shader->stream_output.output[i].register_index | 
+            (unsigned)shader->stream_output.output[i].start_component << 8 | 
+            (unsigned)shader->stream_output.output[i].num_components << 10 | 
+            (unsigned)shader->stream_output.output[i].output_buffer << 13 | 
+            (unsigned)shader->stream_output.output[i].dst_offset << 16;
+         graw_encoder_write_dword(ctx->cbuf, tmp);
+      }
    }
+   graw_encoder_write_block(ctx->cbuf, str, shader_len);
    return 0;
 }
 

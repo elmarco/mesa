@@ -95,7 +95,6 @@ struct graw_context {
 struct graw_transfer {
    struct pipe_transfer base;
 //   struct pb_buffer *bo;
-   uint32_t lmsize;
    uint32_t offset;
 };
 

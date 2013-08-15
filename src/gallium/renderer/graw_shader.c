@@ -259,6 +259,8 @@ static void emit_so_movs(struct dump_ctx *ctx)
 
 }
 
+#define emit_op1(op) snprintf(buf, 255, "%s = %s(%s(%s));\n", dsts[0], dstconv, op, srcs[0])
+#define emit_compare(op) snprintf(buf, 255, "%s = %s((%s(%s, %s))%s);\n", dsts[0], dstconv, op, srcs[0], srcs[1], writemask)
 static boolean
 iter_instruction(struct tgsi_iterate_context *iter,
                  struct tgsi_full_instruction *inst)
@@ -412,7 +414,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_ABS:
-      snprintf(buf, 255, "%s = %s(abs(%s));\n", dsts[0], dstconv, srcs[0]);
+      emit_op1("abs");
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_KIL:
@@ -446,31 +448,31 @@ iter_instruction(struct tgsi_iterate_context *iter,
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_EX2:
-      snprintf(buf, 255, "%s = %s(exp2(%s));\n", dsts[0], dstconv, srcs[0]);
+      emit_op1("exp2");
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_LG2:
-      snprintf(buf, 255, "%s = %s(log2(%s));\n", dsts[0], dstconv, srcs[0]);
+      emit_op1("log2");
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_LOG:
-      snprintf(buf, 255, "%s = %s(log(%s));\n", dsts[0], dstconv, srcs[0]);
+      emit_op1("log");
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_COS:
-      snprintf(buf, 255, "%s = %s(cos(%s));\n", dsts[0], dstconv, srcs[0]);
+      emit_op1("cos");
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_SIN:
-      snprintf(buf, 255, "%s = %s(sin(%s));\n", dsts[0], dstconv, srcs[0]);
+      emit_op1("sin");
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_DDX:
-      snprintf(buf, 255, "%s = %s(dFdx(%s));\n", dsts[0], dstconv, srcs[0]);
+      emit_op1("dFdx");
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_DDY:
-      snprintf(buf, 255, "%s = %s(dFdy(%s));\n", dsts[0], dstconv, srcs[0]);
+      emit_op1("dFdy");
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_RCP:
@@ -478,23 +480,23 @@ iter_instruction(struct tgsi_iterate_context *iter,
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_FLR:
-      snprintf(buf, 255, "%s = %s(floor(%s));\n", dsts[0], dstconv, srcs[0]);
+      emit_op1("floor");
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_CEIL:
-      snprintf(buf, 255, "%s = %s(ceil(%s));\n", dsts[0], dstconv, srcs[0]);
+      emit_op1("ceil");
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_FRC:
-      snprintf(buf, 255, "%s = %s(fract(%s));\n", dsts[0], dstconv, srcs[0]);
+      emit_op1("fract");
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_TRUNC:
-      snprintf(buf, 255, "%s = %s(trunc(%s));\n", dsts[0], dstconv, srcs[0]);
+      emit_op1("trunc");
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_SSG:
-      snprintf(buf, 255, "%s = %s(sign(%s));\n", dsts[0], dstconv, srcs[0]);
+      emit_op1("sign");
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_RSQ:
@@ -571,19 +573,19 @@ iter_instruction(struct tgsi_iterate_context *iter,
       break;
    case TGSI_OPCODE_USEQ:
    case TGSI_OPCODE_SEQ:
-      snprintf(buf, 255, "%s = %s((equal(%s, %s))%s);\n", dsts[0], dstconv, srcs[0], srcs[1], writemask);      
+      emit_compare("equal");
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_SLT:
-      snprintf(buf, 255, "%s = %s(lessThan(%s, %s));\n", dsts[0], dstconv, srcs[0], srcs[1]);      
+      emit_compare("lessThan");
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_SNE:
-      snprintf(buf, 255, "%s = %s(notEqual(%s, %s));\n", dsts[0], dstconv, srcs[0], srcs[1]);      
+      emit_compare("notEqual");
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_SGE:
-      snprintf(buf, 255, "%s = %s(greaterThanEqual(%s, %s));\n", dsts[0], dstconv, srcs[0], srcs[1]);      
+      emit_compare("greaterThanEqual");
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_POW:

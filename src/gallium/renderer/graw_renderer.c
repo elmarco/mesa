@@ -474,6 +474,19 @@ void grend_create_surface(struct grend_context *ctx,
    graw_object_insert(ctx->object_hash, surf, sizeof(*surf), handle, GRAW_SURFACE);
 }
 
+void grend_destroy_surface(struct grend_context *ctx, struct grend_surface *surf)
+{
+   int i;
+   if (ctx->zsurf == surf)
+      ctx->zsurf = NULL;
+
+   for (i = 0; i < ctx->nr_cbufs; i++) {
+      if (ctx->surf[i] == surf) {
+         ctx->nr_cbufs = 0;
+      }
+   }
+}
+
 void grend_create_sampler_view(struct grend_context *ctx,
                                uint32_t handle,
                                uint32_t res_handle, uint32_t format,
@@ -788,6 +801,7 @@ void grend_set_single_sampler_view(struct grend_context *ctx,
    if (handle) {
       view = graw_object_lookup(ctx->object_hash, handle, GRAW_OBJECT_SAMPLER_VIEW);
       if (!view) {
+         ctx->views[shader_type].views[index] = NULL;
          fprintf(stderr,"%s: failed to find view %d\n", __func__, handle);
          return;
       }
@@ -1736,7 +1750,8 @@ bool grend_destroy_context(struct grend_context *ctx)
 
    glDeleteVertexArrays(1, &ctx->vaoid);
 
-   graw_fini_ctx_hash(ctx->object_hash);
+   /* need to free any objects still in hash table - TODO */
+   graw_fini_ctx_hash(ctx->object_hash, ctx);
    FREE(ctx);
    return switch_0;
 }
@@ -2671,7 +2686,7 @@ void grend_hw_switch_context(struct grend_context *ctx)
 void
 graw_renderer_object_destroy(struct grend_context *ctx, uint32_t handle)
 {
-   graw_object_destroy(ctx->object_hash, handle, 0);
+   graw_object_destroy(ctx, ctx->object_hash, handle, 0);
 }
 
 void graw_renderer_object_insert(struct grend_context *ctx, void *data,

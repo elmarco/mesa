@@ -559,7 +559,10 @@ static void grend_hw_emit_framebuffer_state(struct grend_context *ctx)
          attachment = GL_DEPTH_ATTACHMENT;
       else
          attachment = GL_DEPTH_STENCIL_ATTACHMENT;
-      if (tex->target == GL_TEXTURE_1D_ARRAY || tex->target == GL_TEXTURE_2D_ARRAY) 
+      if (tex->target == GL_TEXTURE_3D)
+         glFramebufferTexture3DEXT(GL_FRAMEBUFFER_EXT, attachment,
+                                   tex->target, tex->id, ctx->zsurf->val0, ctx->zsurf->val1 & 0xffff);
+      else if (tex->target == GL_TEXTURE_1D_ARRAY || tex->target == GL_TEXTURE_2D_ARRAY) 
          glFramebufferTextureLayer(GL_FRAMEBUFFER_EXT, attachment,
                                    tex->id, ctx->zsurf->val0, ctx->zsurf->val1 & 0xffff);
       else
@@ -580,6 +583,12 @@ static void grend_hw_emit_framebuffer_state(struct grend_context *ctx)
                  tex->target == GL_TEXTURE_2D_ARRAY) {
          glFramebufferTextureLayer(GL_FRAMEBUFFER_EXT, buffers[i],
                                    tex->id, ctx->surf[i]->val0, ctx->surf[i]->val1 & 0xffff);
+      } else if (tex->target == GL_TEXTURE_3D) {
+         glFramebufferTexture3DEXT(GL_FRAMEBUFFER_EXT, buffers[i],
+                                   tex->target, tex->id, ctx->surf[i]->val0, ctx->surf[i]->val1 & 0xffff);
+      } else if (tex->target == GL_TEXTURE_1D) {
+         glFramebufferTexture1DEXT(GL_FRAMEBUFFER_EXT, buffers[i],
+                                   tex->target, tex->id, ctx->surf[i]->val0);
       } else
          glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, buffers[i],
                                    tex->target, tex->id, ctx->surf[i]->val0);

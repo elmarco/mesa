@@ -36,6 +36,7 @@ virgl_get_name(struct pipe_screen *screen)
 static int
 virgl_get_param(struct pipe_screen *screen, enum pipe_cap param)
 {
+   struct virgl_screen *vscreen = virgl_screen(screen);
    switch (param) {
    case PIPE_CAP_MAX_COMBINED_SAMPLERS:
       return 2 * PIPE_MAX_SAMPLERS;  /* VS + FS */
@@ -50,11 +51,11 @@ virgl_get_param(struct pipe_screen *screen, enum pipe_cap param)
    case PIPE_CAP_POINT_SPRITE:
       return 1;
    case PIPE_CAP_MAX_RENDER_TARGETS:
-      return PIPE_MAX_COLOR_BUFS;
+      return vscreen->caps.caps.v1.max_render_targets;
    case PIPE_CAP_MAX_DUAL_SOURCE_RENDER_TARGETS:
-      return 1;
+      return vscreen->caps.caps.v1.max_dual_source_render_targets;
    case PIPE_CAP_OCCLUSION_QUERY:
-      return 1;
+      return vscreen->caps.caps.v1.bset.occlusion_query;
    case PIPE_CAP_TEXTURE_MIRROR_CLAMP:
       return 1;
    case PIPE_CAP_TEXTURE_SHADOW_MAP:
@@ -68,11 +69,11 @@ virgl_get_param(struct pipe_screen *screen, enum pipe_cap param)
    case PIPE_CAP_MAX_TEXTURE_CUBE_LEVELS:
       return SP_MAX_TEXTURE_CUBE_LEVELS;
    case PIPE_CAP_BLEND_EQUATION_SEPARATE:
-      return 1;
+      return vscreen->caps.caps.v1.bset.blend_eq_sep;
    case PIPE_CAP_INDEP_BLEND_ENABLE:
-      return 1;
+      return vscreen->caps.caps.v1.bset.indep_blend_enable;
    case PIPE_CAP_INDEP_BLEND_FUNC:
-      return 1;
+      return vscreen->caps.caps.v1.bset.indep_blend_func;
    case PIPE_CAP_TGSI_FS_COORD_ORIGIN_UPPER_LEFT:
    case PIPE_CAP_TGSI_FS_COORD_ORIGIN_LOWER_LEFT:
    case PIPE_CAP_TGSI_FS_COORD_PIXEL_CENTER_HALF_INTEGER:
@@ -81,30 +82,30 @@ virgl_get_param(struct pipe_screen *screen, enum pipe_cap param)
    case PIPE_CAP_DEPTH_CLIP_DISABLE:
       return 0;
    case PIPE_CAP_MAX_STREAM_OUTPUT_BUFFERS:
-      return PIPE_MAX_SO_BUFFERS;
+      return vscreen->caps.caps.v1.max_streamout_buffers;
    case PIPE_CAP_MAX_STREAM_OUTPUT_SEPARATE_COMPONENTS:
    case PIPE_CAP_MAX_STREAM_OUTPUT_INTERLEAVED_COMPONENTS:
       return 16*4;
    case PIPE_CAP_PRIMITIVE_RESTART:
-      return 1;
+      return vscreen->caps.caps.v1.bset.primitive_restart;
    case PIPE_CAP_SHADER_STENCIL_EXPORT:
-      return 1;
+      return vscreen->caps.caps.v1.bset.shader_stencil_export;
    case PIPE_CAP_TGSI_INSTANCEID:
    case PIPE_CAP_VERTEX_ELEMENT_INSTANCE_DIVISOR:
       return 1;
    case PIPE_CAP_SEAMLESS_CUBE_MAP:
    case PIPE_CAP_SEAMLESS_CUBE_MAP_PER_TEXTURE:
-      return 0;
+      return vscreen->caps.caps.v1.bset.seamless_cube_map;
    case PIPE_CAP_SCALED_RESOLVE:
       return 0;
    case PIPE_CAP_MAX_TEXTURE_ARRAY_LAYERS:
-      return 256; /* for GL3 */
+      return vscreen->caps.caps.v1.max_texture_array_layers;
    case PIPE_CAP_MIN_TEXEL_OFFSET:
       return -8;
    case PIPE_CAP_MAX_TEXEL_OFFSET:
       return 7;
    case PIPE_CAP_CONDITIONAL_RENDER:
-      return 1;
+      return vscreen->caps.caps.v1.bset.conditional_render;
    case PIPE_CAP_TEXTURE_BARRIER:
       return 0;
    case PIPE_CAP_FRAGMENT_COLOR_CLAMPED:
@@ -114,7 +115,7 @@ virgl_get_param(struct pipe_screen *screen, enum pipe_cap param)
    case PIPE_CAP_MIXED_COLORBUFFER_FORMATS:
       return 0;
    case PIPE_CAP_GLSL_FEATURE_LEVEL:
-      return 120;
+      return vscreen->caps.caps.v1.glsl_level;
    case PIPE_CAP_QUADS_FOLLOW_PROVOKING_VERTEX_CONVENTION:
       return 0;
    case PIPE_CAP_COMPUTE:
@@ -127,12 +128,14 @@ virgl_get_param(struct pipe_screen *screen, enum pipe_cap param)
    case PIPE_CAP_CONSTANT_BUFFER_OFFSET_ALIGNMENT:
       return 16;
    case PIPE_CAP_STREAM_OUTPUT_PAUSE_RESUME:
+      return vscreen->caps.caps.v1.bset.streamout_pause_resume;
+   case PIPE_CAP_START_INSTANCE:
+      return vscreen->caps.caps.v1.bset.start_instance;
    case PIPE_CAP_TGSI_CAN_COMPACT_VARYINGS:
    case PIPE_CAP_TGSI_CAN_COMPACT_CONSTANTS:
    case PIPE_CAP_VERTEX_BUFFER_OFFSET_4BYTE_ALIGNED_ONLY:
    case PIPE_CAP_VERTEX_BUFFER_STRIDE_4BYTE_ALIGNED_ONLY:
    case PIPE_CAP_VERTEX_ELEMENT_SRC_OFFSET_4BYTE_ALIGNED_ONLY:
-   case PIPE_CAP_START_INSTANCE:
    case PIPE_CAP_PREFER_BLIT_BASED_TEXTURE_TRANSFER:
       return 0;
    case PIPE_CAP_QUERY_TIMESTAMP:
@@ -144,11 +147,13 @@ virgl_get_param(struct pipe_screen *screen, enum pipe_cap param)
    case PIPE_CAP_MIN_MAP_BUFFER_ALIGNMENT:
       return 1;
    case PIPE_CAP_TEXTURE_BUFFER_OBJECTS:
+      return vscreen->caps.caps.v1.bset.texture_buffer_object;
    case PIPE_CAP_TEXTURE_BUFFER_OFFSET_ALIGNMENT:
       return 0;
    case PIPE_CAP_CUBE_MAP_ARRAY:
+      return vscreen->caps.caps.v1.bset.cube_map_array;
    case PIPE_CAP_TEXTURE_MULTISAMPLE:
-      return 0;
+      return vscreen->caps.caps.v1.bset.texture_multisample;
    }
    /* should only get here on unhandled cases */
    debug_printf("Unexpected PIPE_CAP %d query\n", param);

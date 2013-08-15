@@ -2864,26 +2864,83 @@ void grend_create_so_target(struct grend_context *ctx,
                       GRAW_STREAMOUT_TARGET);
 }
 
+static void vrender_get_glsl_version(int *major, int *minor)
+{
+   int major_local, minor_local;
+   const char *version_str;
+   int c;
+   version_str = glGetString(GL_SHADING_LANGUAGE_VERSION);
+   c = sscanf(version_str, "%i.%i",
+              &major_local, &minor_local);
+   assert(c == 2);
+
+   if (major)
+      *major = major_local;
+   if (minor)
+      *minor = minor_local;
+}
+
 void graw_renderer_fill_caps(uint32_t set, uint32_t version,
                              uint32_t offset, struct graw_iovec *iov,
                              unsigned int niovs)
 {
    union virgl_caps caps;
    int i;
+   GLint max;
+   int glsl_major, glsl_minor;
    if (set != 0) {
       caps.max_version = 0;
       goto out;
    }
+   vrender_get_glsl_version(&glsl_major, &glsl_minor);
    memset(&caps, 0, sizeof(caps));
    caps.max_version = 1;
-   caps.v1.bset.indep_blend_enable = 1;
-   caps.v1.bset.indep_blend_func = 1;
-   caps.v1.bset.cube_map_array = 0;
+
+   caps.v1.bset.occlusion_query = 1;
+   if (glewIsSupported("GL_VERSION_3_0")) {
+      caps.v1.bset.indep_blend_enable = 1;
+      caps.v1.bset.conditional_render = 1;
+   } else {
+      if (glewIsSupported("GL_EXT_draw_buffers2"))
+         caps.v1.bset.indep_blend_enable = 1;
+      if (glewIsSupported("GL_NV_conditional_render"))
+         caps.v1.bset.conditional_render = 1;
+   }
+
+   if (glewIsSupported("GL_VERSION_3_1")) {
+      caps.v1.bset.instanceid = 1;
+   } else {
+      if (glewIsSupported("GL_ARB_draw_instanced"))
+         caps.v1.bset.instanceid = 1;
+   }
+
+   if (glewIsSupported("GL_VERSION_4_0")) {
+      caps.v1.bset.indep_blend_func = 1;
+      caps.v1.bset.cube_map_array = 1;
+   } else {
+      if (glewIsSupported("GL_ARB_draw_buffers_blend"))
+         caps.v1.bset.indep_blend_func = 1;
+      if (glewIsSupported("GL_ARB_texture_cube_map_array"))
+         caps.v1.bset.cube_map_array = 1;
+   }
+
+   if (glewIsSupported("GL_VERSION_4_2")) {
+      caps.v1.bset.start_instance = 1;
+   } else {
+      if (glewIsSupported("GL_ARB_base_instance"))      
+         caps.v1.bset.start_instance = 1;
+   }         
+   if (glewIsSupported("GL_ARB_shader_stencil_export"))
+      caps.v1.bset.shader_stencil_export = 1;
+
    caps.v1.glsl_level = 120;
-   caps.v1.max_texture_array_layers = 0;
+   if (glewIsSupported("GL_EXT_texture_array"))
+      caps.v1.max_texture_array_layers = 256;
    caps.v1.max_streamout_buffers = 0;
    caps.v1.max_dual_source_render_targets = 0;
-   caps.v1.max_render_targets = 1;
+
+   glGetIntegerv(GL_MAX_DRAW_BUFFERS, &max);
+   caps.v1.max_render_targets = max;
 
    for (i = 0; i < VIRGL_FORMAT_MAX; i++) {
       uint32_t offset = i / 32;

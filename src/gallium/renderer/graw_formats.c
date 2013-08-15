@@ -23,6 +23,7 @@ static struct grend_format_table base_rgba_formats[] =
    { VIRGL_FORMAT_B5G5R5X1_UNORM, GL_RGB5_A1, GL_RGB, GL_UNSIGNED_SHORT_5_5_5_1 },
    { VIRGL_FORMAT_B5G5R5A1_UNORM, GL_RGB5_A1, GL_RGBA, GL_UNSIGNED_SHORT_5_5_5_1 },
 
+   { VIRGL_FORMAT_B5G6R5_UNORM, GL_RGB4, GL_RGB, GL_UNSIGNED_SHORT_5_6_5 },
    { VIRGL_FORMAT_B2G3R3_UNORM, GL_R3_G3_B2, GL_RGB, GL_UNSIGNED_BYTE_3_3_2 },
 
    { VIRGL_FORMAT_R16G16B16X16_UNORM, GL_RGBA16, GL_RGBA, GL_UNSIGNED_SHORT },
@@ -164,7 +165,7 @@ static struct grend_format_table snorm_formats[] = {
       { VIRGL_FORMAT_R16G16B16X16_SNORM, GL_RGBA16_SNORM, GL_RGBA, GL_SHORT },
 };
 
-static struct grend_format_table la_snorm_formats[] = {
+static struct grend_format_table snorm_la_formats[] = {
       { VIRGL_FORMAT_A8_SNORM, GL_ALPHA8_SNORM, GL_ALPHA, GL_BYTE },
       { VIRGL_FORMAT_L8_SNORM, GL_LUMINANCE8_SNORM, GL_LUMINANCE, GL_BYTE },
       { VIRGL_FORMAT_L8A8_SNORM, GL_LUMINANCE8_ALPHA8_SNORM, GL_LUMINANCE_ALPHA, GL_BYTE },
@@ -239,7 +240,7 @@ void vrend_build_format_list(void)
 
    /* snorm */
    add_formats(snorm_formats);
-
+   add_formats(snorm_la_formats);
    add_formats(rgtc_formats);
 
    add_formats(srgb_formats);

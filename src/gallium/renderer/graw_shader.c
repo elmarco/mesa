@@ -571,7 +571,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
       break;
    case TGSI_OPCODE_USEQ:
    case TGSI_OPCODE_SEQ:
-      snprintf(buf, 255, "%s = %s(equal(%s, %s));\n", dsts[0], dstconv, srcs[0], srcs[1]);      
+      snprintf(buf, 255, "%s = %s((equal(%s, %s))%s);\n", dsts[0], dstconv, srcs[0], srcs[1], writemask);      
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_SLT:
@@ -591,7 +591,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_CMP:
-      snprintf(buf, 255, "%s = (float(%s) >= 0) ? %s : %s;\n", dsts[0], srcs[0], srcs[2], srcs[1]);
+      snprintf(buf, 255, "%s = ((float(%s) >= 0) ? %s : %s)%s;\n", dsts[0], srcs[0], srcs[2], srcs[1], writemask);
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_END:

@@ -559,8 +559,12 @@ static void grend_hw_emit_framebuffer_state(struct grend_context *ctx)
          attachment = GL_DEPTH_ATTACHMENT;
       else
          attachment = GL_DEPTH_STENCIL_ATTACHMENT;
-      glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, attachment,
-                                tex->target, tex->id, ctx->zsurf->val0);
+      if (tex->target == GL_TEXTURE_1D_ARRAY || tex->target == GL_TEXTURE_2D_ARRAY) 
+         glFramebufferTextureLayer(GL_FRAMEBUFFER_EXT, attachment,
+                                   tex->id, ctx->zsurf->val0, ctx->zsurf->val1 & 0xffff);
+      else
+         glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, attachment,
+                                   tex->target, tex->id, ctx->zsurf->val0);
    }
 
    for (i = 0; i < ctx->nr_cbufs; i++) {
@@ -572,6 +576,10 @@ static void grend_hw_emit_framebuffer_state(struct grend_context *ctx)
       if (tex->target == GL_TEXTURE_CUBE_MAP) {
          glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, buffers[i],
                                    GL_TEXTURE_CUBE_MAP_POSITIVE_X + (ctx->surf[i]->val1 & 0xffff), tex->id, ctx->surf[i]->val0);
+      } else if (tex->target == GL_TEXTURE_1D_ARRAY ||
+                 tex->target == GL_TEXTURE_2D_ARRAY) {
+         glFramebufferTextureLayer(GL_FRAMEBUFFER_EXT, buffers[i],
+                                   tex->id, ctx->surf[i]->val0, ctx->surf[i]->val1 & 0xffff);
       } else
          glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, buffers[i],
                                    tex->target, tex->id, ctx->surf[i]->val0);
@@ -1657,6 +1665,11 @@ static void grend_apply_sampler_state(struct grend_context *ctx,
       if (tex->state.lod_bias != state->lod_bias || set_all)
          glTexParameterf(target, GL_TEXTURE_LOD_BIAS, state->lod_bias);
    }
+
+   if (tex->state.compare_mode != state->compare_mode || set_all)
+      glTexParameteri(target, GL_TEXTURE_COMPARE_MODE, state->compare_mode ? GL_COMPARE_R_TO_TEXTURE : GL_NONE);
+   if (tex->state.compare_func != state->compare_func || set_all)
+      glTexParameteri(target, GL_TEXTURE_COMPARE_FUNC, GL_NEVER + state->compare_func);
 
    tex->state = *state;
 }

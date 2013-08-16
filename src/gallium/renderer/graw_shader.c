@@ -406,10 +406,14 @@ iter_instruction(struct tgsi_iterate_context *iter,
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_MAX:
+   case TGSI_OPCODE_IMAX:
+   case TGSI_OPCODE_UMAX:
       snprintf(buf, 255, "%s = %s(max(%s, %s));\n", dsts[0], dstconv, srcs[0], srcs[1]);
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_MIN:
+   case TGSI_OPCODE_IMIN:
+   case TGSI_OPCODE_UMIN:
       snprintf(buf, 255, "%s = %s(min(%s, %s));\n", dsts[0], dstconv, srcs[0], srcs[1]);
       strcat(ctx->glsl_main, buf);
       break;
@@ -559,7 +563,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
       break;
    case TGSI_OPCODE_TXB:
       ctx->samplers[sreg_index].tgsi_sampler_type = inst->Texture.Texture;
-      snprintf(buf, 255, "%s = texture(%s, %s.xy, %s.z)%s;\n", dsts[0], srcs[1], srcs[0], srcs[0], writemask);
+      snprintf(buf, 255, "%s = texture(%s, %s.xy, %s.w)%s;\n", dsts[0], srcs[1], srcs[0], srcs[0], writemask);
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_TXL:
@@ -567,8 +571,20 @@ iter_instruction(struct tgsi_iterate_context *iter,
       snprintf(buf, 255, "%s = textureLod(%s, %s, %s.z)%s;\n", dsts[0], srcs[1], srcs[0], srcs[0], writemask);
       strcat(ctx->glsl_main, buf);
       break;
+   case TGSI_OPCODE_I2F:
+      snprintf(buf, 255, "%s = float(%s);\n", dsts[0], srcs[0]);      
+      strcat(ctx->glsl_main, buf);
+      break;
    case TGSI_OPCODE_F2I:
       snprintf(buf, 255, "%s = int(%s);\n", dsts[0], srcs[0]);      
+      strcat(ctx->glsl_main, buf);
+      break;
+   case TGSI_OPCODE_F2U:
+      snprintf(buf, 255, "%s = uint(%s);\n", dsts[0], srcs[0]);      
+      strcat(ctx->glsl_main, buf);
+      break;
+   case TGSI_OPCODE_NOT:
+      snprintf(buf, 255, "%s = not(%s);\n", dsts[0], srcs[0]);
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_USEQ:

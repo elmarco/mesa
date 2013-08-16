@@ -274,6 +274,8 @@ iter_instruction(struct tgsi_iterate_context *iter,
    int sreg_index;
    char dstconv[6] = {0};
    char writemask[6] = {0};
+   char *twm;
+   boolean is_shad = FALSE;
    if (instno == 0)
       strcat(ctx->glsl_main, "void main(void)\n{\n");
    for (i = 0; i < inst->Instruction.NumDstRegs; i++) {
@@ -557,20 +559,39 @@ iter_instruction(struct tgsi_iterate_context *iter,
       break;
    case TGSI_OPCODE_TEX:
       ctx->samplers[sreg_index].tgsi_sampler_type = inst->Texture.Texture;
+      switch (inst->Texture.Texture) {
+      case TGSI_TEXTURE_1D:
+         twm = ".x";
+         break;
+      case TGSI_TEXTURE_2D:
+      case TGSI_TEXTURE_1D_ARRAY:
+         twm = ".xy";
+         break;
+      case TGSI_TEXTURE_SHADOW1D:
+      case TGSI_TEXTURE_SHADOW2D:
+      case TGSI_TEXTURE_SHADOW1D_ARRAY:
+         is_shad = TRUE;
+      case TGSI_TEXTURE_3D:
+      case TGSI_TEXTURE_CUBE:
+      case TGSI_TEXTURE_2D_ARRAY:
+         twm = ".xyz";
+         break;
+      case TGSI_TEXTURE_SHADOWCUBE:
+      case TGSI_TEXTURE_SHADOW2D_ARRAY:
+         is_shad = TRUE;
+      default:
+         twm = "";
+         break;
+      }
+      /* rect is special in GLSL 1.30 */
       if (inst->Texture.Texture == TGSI_TEXTURE_RECT)
          snprintf(buf, 255, "%s = texture2DRect(%s, %s.xy)%s;\n", dsts[0], srcs[1], srcs[0], writemask);
       else if (inst->Texture.Texture == TGSI_TEXTURE_SHADOWRECT)
          snprintf(buf, 255, "%s = shadow2DRect(%s, %s.xyz)%s;\n", dsts[0], srcs[1], srcs[0], writemask);
-      else if (inst->Texture.Texture == TGSI_TEXTURE_CUBE)
-         snprintf(buf, 255, "%s = texture(%s, %s.xyz)%s;\n", dsts[0], srcs[1], srcs[0], writemask);
-      else if (inst->Texture.Texture == TGSI_TEXTURE_SHADOW2D || inst->Texture.Texture == TGSI_TEXTURE_2D_ARRAY)
-         snprintf(buf, 255, "%s = %s(texture(%s, %s.xyz));\n", dsts[0], dstconv, srcs[1], srcs[0]);
-      else if (inst->Texture.Texture == TGSI_TEXTURE_SHADOW1D || inst->Texture.Texture == TGSI_TEXTURE_3D)
-         snprintf(buf, 255, "%s = %s(texture(%s, %s.xyz));\n", dsts[0], dstconv, srcs[1], srcs[0]);
-      else if (inst->Texture.Texture == TGSI_TEXTURE_1D)
-         snprintf(buf, 255, "%s = %s(texture(%s, %s.x));\n", dsts[0], dstconv, srcs[1], srcs[0]);
+      else if (is_shad) /* TGSI returns 1.0 in alpha */
+         snprintf(buf, 255, "%s = %s(vec4(vec3(texture(%s, %s%s)), 1.0)%s);\n", dsts[0], dstconv, srcs[1], srcs[0], twm, writemask);
       else
-         snprintf(buf, 255, "%s = texture(%s, %s.xy)%s;\n", dsts[0], srcs[1], srcs[0], writemask);
+         snprintf(buf, 255, "%s = %s(texture(%s, %s%s)%s);\n", dsts[0], dstconv, srcs[1], srcs[0], twm, writemask);
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_TXP:
@@ -595,7 +616,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
       break;
    case TGSI_OPCODE_TXL:
       ctx->samplers[sreg_index].tgsi_sampler_type = inst->Texture.Texture;
-      snprintf(buf, 255, "%s = textureLod(%s, %s, %s.z)%s;\n", dsts[0], srcs[1], srcs[0], srcs[0], writemask);
+      snprintf(buf, 255, "%s = textureLod(%s, %s, %s.w)%s;\n", dsts[0], srcs[1], srcs[0], srcs[0], writemask);
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_I2F:

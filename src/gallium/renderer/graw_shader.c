@@ -419,6 +419,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_ABS:
+   case TGSI_OPCODE_IABS:
       emit_op1("abs");
       strcat(ctx->glsl_main, buf);
       break;
@@ -525,6 +526,15 @@ iter_instruction(struct tgsi_iterate_context *iter,
       emit_arit_op2("*");
       strcat(ctx->glsl_main, buf);
       break;
+   case TGSI_OPCODE_ISHR:
+   case TGSI_OPCODE_USHR:
+      emit_arit_op2(">>");
+      strcat(ctx->glsl_main, buf);
+      break;
+   case TGSI_OPCODE_SHL:
+      emit_arit_op2("<<");
+      strcat(ctx->glsl_main, buf);
+      break;
    case TGSI_OPCODE_MAD:
       snprintf(buf, 255, "%s = %s(%s * %s + %s);\n", dsts[0], dstconv, srcs[0], srcs[1], srcs[2]);
       strcat(ctx->glsl_main, buf);
@@ -610,14 +620,19 @@ iter_instruction(struct tgsi_iterate_context *iter,
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_SLT:
+   case TGSI_OPCODE_ISLT:
+   case TGSI_OPCODE_USLT:
       emit_compare("lessThan");
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_SNE:
+   case TGSI_OPCODE_USNE:
       emit_compare("notEqual");
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_SGE:
+   case TGSI_OPCODE_ISGE:
+   case TGSI_OPCODE_USGE:
       emit_compare("greaterThanEqual");
       strcat(ctx->glsl_main, buf);
       break;

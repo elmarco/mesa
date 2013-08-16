@@ -69,7 +69,7 @@ virgl_get_param(struct pipe_screen *screen, enum pipe_cap param)
    case PIPE_CAP_MAX_TEXTURE_CUBE_LEVELS:
       return SP_MAX_TEXTURE_CUBE_LEVELS;
    case PIPE_CAP_BLEND_EQUATION_SEPARATE:
-      return vscreen->caps.caps.v1.bset.blend_eq_sep;
+      return 1;
    case PIPE_CAP_INDEP_BLEND_ENABLE:
       return vscreen->caps.caps.v1.bset.indep_blend_enable;
    case PIPE_CAP_INDEP_BLEND_FUNC:
@@ -163,25 +163,40 @@ virgl_get_param(struct pipe_screen *screen, enum pipe_cap param)
 static int
 virgl_get_shader_param(struct pipe_screen *screen, unsigned shader, enum pipe_shader_cap param)
 {
-   struct virgl_screen *rp_screen = virgl_screen(screen);
+   struct virgl_screen *vscreen = virgl_screen(screen);
    switch(shader)
    {
    case PIPE_SHADER_FRAGMENT:
-      return tgsi_exec_get_shader_param(param);
    case PIPE_SHADER_VERTEX:
    case PIPE_SHADER_GEOMETRY:
       switch (param) {
-      case PIPE_SHADER_CAP_MAX_TEXTURE_SAMPLERS:
-            return PIPE_MAX_SAMPLERS;
+      case PIPE_SHADER_CAP_MAX_INSTRUCTIONS:
+      case PIPE_SHADER_CAP_MAX_ALU_INSTRUCTIONS:
+      case PIPE_SHADER_CAP_MAX_TEX_INSTRUCTIONS:
+      case PIPE_SHADER_CAP_MAX_TEX_INDIRECTIONS:
+         return INT_MAX;
+      case PIPE_SHADER_CAP_INDIRECT_OUTPUT_ADDR:
+      case PIPE_SHADER_CAP_INDIRECT_TEMP_ADDR:
+      case PIPE_SHADER_CAP_INDIRECT_CONST_ADDR:
+         return 1;
+      case PIPE_SHADER_CAP_MAX_INPUTS:
+         return 16;
       case PIPE_SHADER_CAP_MAX_CONSTS:
          return 4096;
+      case PIPE_SHADER_CAP_MAX_CONST_BUFFERS:
+         return PIPE_MAX_CONSTANT_BUFFERS;
+      case PIPE_SHADER_CAP_MAX_ADDRS:
+         return 1;
+      case PIPE_SHADER_CAP_MAX_PREDS:
+         return 0;
+      case PIPE_SHADER_CAP_SUBROUTINES:
+         return 1;
+      case PIPE_SHADER_CAP_MAX_TEXTURE_SAMPLERS:
+            return PIPE_MAX_SAMPLERS;
+      case PIPE_SHADER_CAP_INTEGERS:
+         return vscreen->caps.caps.v1.glsl_level >= 130;
       default:
          return 0;
-#if 0
-            return draw_get_shader_param(shader, param);
-         else
-            return draw_get_shader_param_no_llvm(shader, param);
-#endif
       }
    default:
       return 0;
@@ -227,6 +242,7 @@ virgl_is_format_supported( struct pipe_screen *screen,
                                  unsigned sample_count,
                                  unsigned bind)
 {
+   struct virgl_screen *vscreen = virgl_screen(screen);
    const struct util_format_description *format_desc;
    int i;
 
@@ -245,7 +261,7 @@ virgl_is_format_supported( struct pipe_screen *screen,
 
    if (util_format_is_intensity(format))
       return FALSE;
-   if (sample_count > 1)
+   if (sample_count > 1 && !vscreen->caps.caps.v1.bset.texture_multisample)
       return FALSE;
 
    if (bind & PIPE_BIND_RENDER_TARGET) {

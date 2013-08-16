@@ -2109,6 +2109,12 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
          else
             y = dst_box->y;
 
+         if (res->base.format == VIRGL_FORMAT_Z24X8_UNORM) {
+            /* we get values from the guest as 24-bit scaled integers
+               but we give them to the host GL and it interprets them
+               as 32-bit scaled integers, so we need to scale them here */
+            glPixelTransferf(GL_DEPTH_SCALE, 256.0);
+         }
          if (res->target == GL_TEXTURE_CUBE_MAP) {
             GLenum ctarget = GL_TEXTURE_CUBE_MAP_POSITIVE_X + dst_box->z;
 
@@ -2125,6 +2131,9 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
             glTexSubImage2D(res->target, level, x, res->target == GL_TEXTURE_1D_ARRAY ? dst_box->z : y,
                             dst_box->width, dst_box->height,
                             glformat, gltype, data);
+         }
+         if (res->base.format == VIRGL_FORMAT_Z24X8_UNORM) {
+            glPixelTransferf(GL_DEPTH_SCALE, 1.0);
          }
       }
       if (src_stride && !need_temp)

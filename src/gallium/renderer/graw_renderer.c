@@ -116,6 +116,9 @@ struct grend_buffer {
 struct grend_texture {
    struct grend_resource base;
    struct pipe_sampler_state state;
+   GLenum cur_swizzle_r;
+   GLenum cur_swizzle_g;
+   GLenum cur_swizzle_b;
    GLenum cur_swizzle_a;
 };
 
@@ -147,6 +150,9 @@ struct grend_sampler_view {
    GLuint swizzle_g:3;
    GLuint swizzle_b:3;
    GLuint swizzle_a:3;
+   GLuint gl_swizzle_r;
+   GLuint gl_swizzle_g;
+   GLuint gl_swizzle_b;
    GLuint gl_swizzle_a;
    GLuint cur_base, cur_max;
    struct grend_resource *texture;
@@ -487,6 +493,19 @@ void grend_destroy_surface(struct grend_context *ctx, struct grend_surface *surf
    }
 }
 
+static inline GLenum to_gl_swizzle(int swizzle)
+{
+   switch (swizzle) {
+   case PIPE_SWIZZLE_RED: return GL_RED;
+   case PIPE_SWIZZLE_GREEN: return GL_GREEN;
+   case PIPE_SWIZZLE_BLUE: return GL_BLUE;
+   case PIPE_SWIZZLE_ALPHA: return GL_ALPHA;
+   case PIPE_SWIZZLE_ZERO: return GL_ZERO;
+   case PIPE_SWIZZLE_ONE: return GL_ONE;
+   }
+   assert(0);
+   return 0;
+}
 void grend_create_sampler_view(struct grend_context *ctx,
                                uint32_t handle,
                                uint32_t res_handle, uint32_t format,
@@ -513,16 +532,22 @@ void grend_create_sampler_view(struct grend_context *ctx,
       FREE(view);
       return;
    }
-   
+     
+   if (view->swizzle_r != 0 && view->swizzle_g != 1 && view->swizzle_b != 2 && view->swizzle_a != 3)
+      fprintf(stderr,"%d %d swizzles %d %d %d %d\n", view->format, view->texture->base.format, view->swizzle_r, view->swizzle_g, view->swizzle_b, view->swizzle_a);      
+
    if (view->format != view->texture->base.format) {
       fprintf(stderr,"%d %d swizzles %d %d %d %d\n", view->format, view->texture->base.format, view->swizzle_r, view->swizzle_g, view->swizzle_b, view->swizzle_a);
       /* hack to make tfp work for now */
       view->gl_swizzle_a = GL_ONE;
    } else {
       if (util_format_has_alpha(format))
-         view->gl_swizzle_a = GL_ALPHA;
+         view->gl_swizzle_a = to_gl_swizzle(view->swizzle_a);
       else
          view->gl_swizzle_a = GL_ONE;
+      view->gl_swizzle_r = to_gl_swizzle(view->swizzle_r);
+      view->gl_swizzle_g = to_gl_swizzle(view->swizzle_g);
+      view->gl_swizzle_b = to_gl_swizzle(view->swizzle_b);
    }
    graw_object_insert(ctx->object_hash, view, sizeof(*view), handle, GRAW_OBJECT_SAMPLER_VIEW);
 }
@@ -832,6 +857,18 @@ void grend_set_single_sampler_view(struct grend_context *ctx,
          if (view->cur_max != ((view->val1 >> 8) & 0xff)) {
             glTexParameteri(view->texture->target, GL_TEXTURE_MAX_LEVEL, (view->val1 >> 8) & 0xff);
             view->cur_max = (view->val1 >> 8) & 0xff;
+         }
+         if (tex->cur_swizzle_r != view->gl_swizzle_r) {
+            glTexParameteri(view->texture->target, GL_TEXTURE_SWIZZLE_R, view->gl_swizzle_r);
+            tex->cur_swizzle_r = view->gl_swizzle_r;
+         }
+         if (tex->cur_swizzle_g != view->gl_swizzle_g) {
+            glTexParameteri(view->texture->target, GL_TEXTURE_SWIZZLE_G, view->gl_swizzle_g);
+            tex->cur_swizzle_g = view->gl_swizzle_g;
+         }
+         if (tex->cur_swizzle_b != view->gl_swizzle_b) {
+            glTexParameteri(view->texture->target, GL_TEXTURE_SWIZZLE_B, view->gl_swizzle_b);
+            tex->cur_swizzle_b = view->gl_swizzle_b;
          }
          if (tex->cur_swizzle_a != view->gl_swizzle_a) {
             glTexParameteri(view->texture->target, GL_TEXTURE_SWIZZLE_A, view->gl_swizzle_a);

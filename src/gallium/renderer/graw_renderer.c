@@ -1697,13 +1697,13 @@ void grend_flush_frontbuffer(uint32_t res_handle)
 
 }
 
-static GLenum tgsitargettogltarget(const enum pipe_texture_target target)
+static GLenum tgsitargettogltarget(const enum pipe_texture_target target, int nr_samples)
 {
    switch(target) {
    case PIPE_TEXTURE_1D:
       return GL_TEXTURE_1D;
    case PIPE_TEXTURE_2D:
-      return GL_TEXTURE_2D;
+      return (nr_samples > 1) ? GL_TEXTURE_2D_MULTISAMPLE : GL_TEXTURE_2D;
    case PIPE_TEXTURE_3D:
       return GL_TEXTURE_3D;
    case PIPE_TEXTURE_RECT:
@@ -1714,7 +1714,7 @@ static GLenum tgsitargettogltarget(const enum pipe_texture_target target)
    case PIPE_TEXTURE_1D_ARRAY:
       return GL_TEXTURE_1D_ARRAY;
    case PIPE_TEXTURE_2D_ARRAY:
-      return GL_TEXTURE_2D_ARRAY;
+      return (nr_samples > 1) ? GL_TEXTURE_2D_MULTISAMPLE_ARRAY : GL_TEXTURE_2D_ARRAY;
    case PIPE_TEXTURE_CUBE_ARRAY:
       return GL_TEXTURE_CUBE_MAP_ARRAY;
    case PIPE_BUFFER:
@@ -1824,7 +1824,7 @@ void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target tar
    } else {
       struct grend_texture *gt = (struct grend_texture *)gr;
       GLenum internalformat, glformat, gltype;
-      gr->target = tgsitargettogltarget(target);
+      gr->target = tgsitargettogltarget(target, nr_samples);
       glGenTextures(1, &gr->id);
       glBindTexture(gr->target, gr->id);
 
@@ -1839,7 +1839,18 @@ void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target tar
          gltype = GL_UNSIGNED_BYTE;
       }
 
-      if (gr->target == GL_TEXTURE_CUBE_MAP) {
+      if (nr_samples > 1) {
+         if (gr->target == GL_TEXTURE_2D_MULTISAMPLE) {
+            glTexImage2DMultisample(gr->target, nr_samples,
+                                    internalformat, width, height,
+                                    TRUE);
+         } else {
+            glTexImage3DMultisample(gr->target, nr_samples,
+                                    internalformat, width, height, array_size,
+                                    TRUE);
+         }
+
+      } else if (gr->target == GL_TEXTURE_CUBE_MAP) {
          int i;
          for (i = 0; i < 6; i++) {
             GLenum ctarget = GL_TEXTURE_CUBE_MAP_POSITIVE_X + i;
@@ -2936,6 +2947,8 @@ void graw_renderer_fill_caps(uint32_t set, uint32_t version,
          caps.v1.bset.instanceid = 1;
    }
 
+   if (glewIsSupported("GL_ARB_texture_multisample"))
+      caps.v1.bset.texture_multisample = 1;
    if (glewIsSupported("GL_VERSION_4_0")) {
       caps.v1.bset.indep_blend_func = 1;
       caps.v1.bset.cube_map_array = 1;

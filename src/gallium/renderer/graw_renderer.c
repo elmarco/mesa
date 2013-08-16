@@ -3018,7 +3018,11 @@ void graw_renderer_fill_caps(uint32_t set, uint32_t version,
    if (glewIsSupported("GL_EXT_texture_array"))
       caps.v1.max_texture_array_layers = 256;
    caps.v1.max_streamout_buffers = 0;
-   caps.v1.max_dual_source_render_targets = 0;
+   if (glewIsSupported("GL_ARB_blend_func_extended")) {
+      glGetIntegerv(GL_MAX_DUAL_SOURCE_DRAW_BUFFERS, &max);
+      caps.v1.max_dual_source_render_targets = max;
+   } else
+      caps.v1.max_dual_source_render_targets = 0;
 
    glGetIntegerv(GL_MAX_DRAW_BUFFERS, &max);
    caps.v1.max_render_targets = max;

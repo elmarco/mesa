@@ -555,7 +555,7 @@ static void grend_hw_emit_framebuffer_state(struct grend_context *ctx)
          return;
       if (tex->base.format == PIPE_FORMAT_S8_UINT)
          attachment = GL_STENCIL_ATTACHMENT;
-      else if (tex->base.format == PIPE_FORMAT_Z24X8_UNORM || tex->base.format == PIPE_FORMAT_Z32_UNORM)
+      else if (tex->base.format == PIPE_FORMAT_Z24X8_UNORM || tex->base.format == PIPE_FORMAT_Z32_UNORM || tex->base.format == PIPE_FORMAT_Z16_UNORM)
          attachment = GL_DEPTH_ATTACHMENT;
       else
          attachment = GL_DEPTH_STENCIL_ATTACHMENT;

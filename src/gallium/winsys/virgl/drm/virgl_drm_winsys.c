@@ -262,7 +262,7 @@ virgl_bo_transfer_get(struct virgl_winsys *vws,
    getcmd.level = level;
    getcmd.offset = buf_offset;
    getcmd.stride = stride;
-   getcmd.layer_stride = stride;
+   getcmd.layer_stride = layer_stride;
    getcmd.box = *(struct drm_virgl_3d_box *)box;
    ret = drmIoctl(vdws->fd, DRM_IOCTL_VIRGL_TRANSFER_GET, &getcmd);
    return ret;

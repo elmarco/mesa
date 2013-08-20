@@ -554,6 +554,23 @@ void grend_create_sampler_view(struct grend_context *ctx,
 
 static void grend_hw_emit_framebuffer_state(struct grend_context *ctx)
 {
+   static const GLenum buffers[8] = {
+      GL_COLOR_ATTACHMENT0_EXT,
+      GL_COLOR_ATTACHMENT1_EXT,
+      GL_COLOR_ATTACHMENT2_EXT,
+      GL_COLOR_ATTACHMENT3_EXT,
+      GL_COLOR_ATTACHMENT4_EXT,
+      GL_COLOR_ATTACHMENT5_EXT,
+      GL_COLOR_ATTACHMENT6_EXT,
+      GL_COLOR_ATTACHMENT7_EXT,
+   };
+
+   glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, ctx->fb_id);
+   glDrawBuffers(ctx->nr_cbufs, buffers);
+}
+
+static void grend_hw_emit_fb_state(struct grend_context *ctx)
+{
    int i;
    struct grend_resource *tex;
    static const GLenum buffers[8] = {
@@ -624,7 +641,7 @@ static void grend_hw_emit_framebuffer_state(struct grend_context *ctx)
          ctx->viewport_state_dirty = TRUE;
       }
    }
-   glDrawBuffers(ctx->nr_cbufs, buffers);
+
 }
 
 void grend_set_framebuffer_state(struct grend_context *ctx,
@@ -654,6 +671,7 @@ void grend_set_framebuffer_state(struct grend_context *ctx,
       ctx->surf[i] = surf;
    }
 
+   grend_hw_emit_fb_state(ctx);
    grend_hw_emit_framebuffer_state(ctx);
 }
 

@@ -47,7 +47,7 @@ static void graw_buffer_flush(struct graw_context *grctx,
 
    grctx->num_transfers++;
    rs->vws->transfer_put(rs->vws, buf->base.hw_res,
-                         &buf->dirt_box, 0, 0, 0);
+                         &buf->dirt_box, 0, 0, 0, 0);
 
 }
 
@@ -811,6 +811,43 @@ void graw_flush_frontbuffer(struct pipe_screen *screen,
 #endif
 }
 
+static boolean
+vrend_resource_layout(struct pipe_screen *screen,
+                      struct graw_resource *res,
+                      uint32_t *total_size)
+{
+   struct pipe_resource *pt = &res->base;
+   unsigned level;
+   unsigned width = pt->width0;
+   unsigned height = pt->height0;
+   unsigned depth = pt->depth0;
+   unsigned buffer_size = 0;
+
+   for (level = 0; level <= pt->last_level; level++) {
+      unsigned slices;
+
+      if (pt->target == PIPE_TEXTURE_CUBE)
+         slices = 6;
+      else if (pt->target == PIPE_TEXTURE_3D)
+         slices = depth;
+      else
+         slices = pt->array_size;
+
+      res->stride[level] = util_format_get_stride(pt->format, width);
+      res->level_offset[level] = buffer_size;
+
+      buffer_size += (util_format_get_nblocksy(pt->format, height) *
+                      slices * res->stride[level]);
+
+      width = u_minify(width, 1);
+      height = u_minify(height, 1);
+      depth = u_minify(depth, 1);
+   }
+
+   *total_size = buffer_size;
+   return TRUE;
+}
+
 struct pipe_resource *graw_resource_create(struct pipe_screen *pscreen,
                                            const struct pipe_resource *template)
 {
@@ -825,7 +862,9 @@ struct pipe_resource *graw_resource_create(struct pipe_screen *pscreen,
       buf->base.base = *template;
       buf->base.base.screen = pscreen;
       pipe_reference_init(&buf->base.base.reference, 1);
-      size = template->width0;
+
+      vrend_resource_layout(pscreen, &buf->base, &size);
+
       buf->base.hw_res = rs->vws->resource_create(rs->vws, template->target, template->format, template->bind, template->width0, 1, 1, 1, 0, 0, size);
 
       assert(buf->base.hw_res);
@@ -836,8 +875,9 @@ struct pipe_resource *graw_resource_create(struct pipe_screen *pscreen,
       tex->base.base = *template;
       tex->base.base.screen = pscreen;
       pipe_reference_init(&tex->base.base.reference, 1);
-      size = template->width0 * template->height0 * template->depth0 * template->array_size * (template->nr_samples ? template->nr_samples : 1)
-         * util_format_get_blocksize(template->format) * (template->last_level + 1);
+
+      vrend_resource_layout(pscreen, &tex->base, &size);
+
       tex->base.hw_res = rs->vws->resource_create(rs->vws, template->target, template->format, template->bind, template->width0, template->height0, template->depth0, template->array_size, template->last_level, template->nr_samples, size);
       assert(tex->base.hw_res);
       return &tex->base.base;

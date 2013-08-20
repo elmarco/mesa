@@ -230,7 +230,7 @@ static int
 virgl_bo_transfer_put(struct virgl_winsys *vws,
                       struct virgl_hw_res *res,
                       const struct pipe_box *box,
-                      uint32_t src_stride,
+                      uint32_t stride, uint32_t layer_stride,
                       uint32_t buf_offset, uint32_t level)
 {
    struct virgl_drm_winsys *vdws = virgl_drm_winsys(vws);
@@ -238,9 +238,11 @@ virgl_bo_transfer_put(struct virgl_winsys *vws,
    int ret;
 
    putcmd.bo_handle = res->bo_handle;
-   putcmd.dst_box = *(struct drm_virgl_3d_box *)box;
-   putcmd.src_offset = buf_offset;
-   putcmd.dst_level = level;
+   putcmd.box = *(struct drm_virgl_3d_box *)box;
+   putcmd.offset = buf_offset;
+   putcmd.level = level;
+   putcmd.stride = stride;
+   putcmd.layer_stride = stride;
    ret = drmIoctl(vdws->fd, DRM_IOCTL_VIRGL_TRANSFER_PUT, &putcmd);
    return ret;
 }
@@ -249,8 +251,8 @@ static int
 virgl_bo_transfer_get(struct virgl_winsys *vws,
                       struct virgl_hw_res *res,
                       const struct pipe_box *box,
-                      uint32_t buf_offset,
-                      uint32_t level)
+                      uint32_t stride, uint32_t layer_stride,
+                      uint32_t buf_offset, uint32_t level)
 {
    struct virgl_drm_winsys *vdws = virgl_drm_winsys(vws);
    struct drm_virgl_3d_transfer_get getcmd;
@@ -258,7 +260,9 @@ virgl_bo_transfer_get(struct virgl_winsys *vws,
 
    getcmd.bo_handle = res->bo_handle;
    getcmd.level = level;
-   getcmd.dst_offset = buf_offset;
+   getcmd.offset = buf_offset;
+   getcmd.stride = stride;
+   getcmd.layer_stride = stride;
    getcmd.box = *(struct drm_virgl_3d_box *)box;
    ret = drmIoctl(vdws->fd, DRM_IOCTL_VIRGL_TRANSFER_GET, &getcmd);
    return ret;

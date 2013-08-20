@@ -31,10 +31,11 @@ enum virgl_cmd_type {
 struct virgl_transfer_put {
 	VIRGLPHYSICAL data;
 	uint32_t res_handle;
-	struct virgl_box dst_box; /* dst box */
-	uint32_t dst_level;
-	uint32_t src_stride;
-        uint32_t ctx_id;
+	struct virgl_box box;
+	uint32_t level;
+	uint32_t stride;
+	uint32_t layer_stride;
+	uint32_t ctx_id;
 };
 
 struct virgl_transfer_get {
@@ -42,8 +43,9 @@ struct virgl_transfer_get {
 	uint32_t res_handle;
 	struct virgl_box box;
 	int level;
-	uint32_t dst_stride;
-        uint32_t ctx_id;
+	uint32_t stride;
+	uint32_t layer_stride;
+	uint32_t ctx_id;
 };
 
 struct virgl_flush_buffer {

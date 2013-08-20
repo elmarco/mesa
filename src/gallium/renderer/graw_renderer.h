@@ -141,8 +141,9 @@ void grend_set_index_buffer(struct grend_context *ctx,
 void graw_renderer_transfer_write_iov(uint32_t handle, 
                                       uint32_t ctx_id,
                                       int level,
-                                      uint32_t src_stride,
-                                      struct pipe_box *dst_box,
+                                      uint32_t stride,
+                                      uint32_t layer_stride,
+                                      struct pipe_box *box,
                                       uint64_t offset,
                                       struct graw_iovec *iovec,
                                       unsigned int iovec_cnt);
@@ -158,7 +159,8 @@ void graw_renderer_blit(struct grend_context *ctx,
                         const struct pipe_blit_info *info);
 
 void graw_renderer_transfer_send_iov(uint32_t handle, uint32_t ctx_id,
-                                     uint32_t level, uint32_t dst_stride,
+                                     uint32_t level, uint32_t stride,
+                                     uint32_t layer_stride,
                                      struct pipe_box *box,
                                      uint64_t offset, struct graw_iovec *iov,
                                      int iovec_cnt);

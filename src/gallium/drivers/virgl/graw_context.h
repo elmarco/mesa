@@ -10,11 +10,16 @@
 #include "util/u_double_list.h"
 
 struct graw_screen;
+#define VR_MAX_TEXTURE_2D_LEVELS 15
 
 struct graw_resource {
    struct pipe_resource base;
    struct virgl_hw_res *hw_res;
    boolean clean;
+
+   unsigned long level_offset[VR_MAX_TEXTURE_2D_LEVELS];
+   unsigned stride[VR_MAX_TEXTURE_2D_LEVELS];
+
 //   struct pb_buffer *backing_bo; /* for vbo uploads at least */
 };
 

@@ -85,22 +85,28 @@ static void graw_process_cmd(struct virgl_command *cmd, struct graw_iovec *iov,
    break;
    case VIRGL_CMD_TRANSFER_GET:
 //         fprintf(stderr,"got transfer get %d\n", cmd->u.transfer_get.res_handle);
+      if (!niovs)
+         return;
       grend_stop_current_queries();
       graw_renderer_transfer_send_iov(cmd->u.transfer_get.res_handle,
                                       cmd->u.transfer_get.ctx_id,
                                       cmd->u.transfer_get.level,
-                                      cmd->u.transfer_get.dst_stride,
+                                      cmd->u.transfer_get.stride,
+                                      cmd->u.transfer_get.layer_stride,
                                       (struct pipe_box *)&cmd->u.transfer_get.box,
                                       cmd->u.transfer_get.data, iov,
                                       niovs);
       break;
    case VIRGL_CMD_TRANSFER_PUT:
+      if (!niovs)
+         return;
       grend_stop_current_queries();
       graw_renderer_transfer_write_iov(cmd->u.transfer_put.res_handle,
                                        cmd->u.transfer_put.ctx_id,
-                                   cmd->u.transfer_put.dst_level,
-                                   cmd->u.transfer_put.src_stride,
-                                   (struct pipe_box *)&cmd->u.transfer_put.dst_box,
+                                       cmd->u.transfer_put.level,
+                                       cmd->u.transfer_put.stride,
+                                       cmd->u.transfer_put.layer_stride,
+                                   (struct pipe_box *)&cmd->u.transfer_put.box,
                                    cmd->u.transfer_put.data, iov,
                                    niovs);
       break;

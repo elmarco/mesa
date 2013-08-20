@@ -4,6 +4,30 @@
 #include "pipebuffer/pb_buffer.h"
 #include "graw_context.h"
 
+static unsigned
+vrend_get_tex_image_offset(const struct graw_resource *res,
+                           unsigned level, unsigned layer)
+{
+   const unsigned hgt = u_minify(res->base.height0, level);
+   const unsigned nblocksy = util_format_get_nblocksy(res->base.format, hgt);
+   unsigned offset = res->level_offset[level];
+
+   if (res->base.target == PIPE_TEXTURE_CUBE ||
+       res->base.target == PIPE_TEXTURE_CUBE_ARRAY ||
+       res->base.target == PIPE_TEXTURE_3D ||
+       res->base.target == PIPE_TEXTURE_2D_ARRAY) {
+      offset += layer * nblocksy * res->stride[level];
+   }
+   else if (res->base.target == PIPE_TEXTURE_1D_ARRAY) {
+      offset += layer * res->stride[level];
+   }
+   else {
+      assert(layer == 0);
+   }
+
+   return offset;
+}
+
 static void *graw_transfer_map(struct pipe_context *ctx,
                                struct pipe_resource *resource,
                                unsigned level,
@@ -18,14 +42,28 @@ static void *graw_transfer_map(struct pipe_context *ctx,
    struct graw_transfer *trans;
    void *ptr;
    boolean readback = TRUE;
-   uint32_t elsize;
    uint32_t offset;
+   const unsigned h = u_minify(grres->base.height0, level);
+   const unsigned nblocksy = util_format_get_nblocksy(format, h);
+
    if ((!(usage & PIPE_TRANSFER_UNSYNCHRONIZED)) && vs->vws->res_is_referenced(vs->vws, grctx->cbuf, grres->hw_res))
       ctx->flush(ctx, NULL, 0);
 
    trans = util_slab_alloc(&grctx->texture_transfer_pool);
    if (trans == NULL)
       return NULL;
+
+   trans->base.resource = resource;
+   trans->base.level = level;
+   trans->base.usage = usage;
+   trans->base.box = *box;
+   trans->base.stride = grres->stride[level];
+   trans->base.layer_stride = trans->base.stride * nblocksy;
+
+   offset = vrend_get_tex_image_offset(grres, level, box->z);
+
+   offset += box->y / util_format_get_blockheight(format) * trans->base.stride +
+      box->x / util_format_get_blockwidth(format) * util_format_get_blocksize(format);
 
    ptr = vs->vws->resource_map(vs->vws, grres->hw_res);
    if (!ptr) {
@@ -39,24 +77,15 @@ static void *graw_transfer_map(struct pipe_context *ctx,
    else if ((usage & (PIPE_TRANSFER_WRITE | PIPE_TRANSFER_FLUSH_EXPLICIT)) ==
             (PIPE_TRANSFER_WRITE | PIPE_TRANSFER_FLUSH_EXPLICIT))
       readback = FALSE;
-   
-   elsize = util_format_get_blocksize(resource->format);
-   offset = (box->y * (resource->width0 * elsize)) + (box->x * elsize);
+
    if (readback)
    {
-
-      vs->vws->transfer_get(vs->vws, grres->hw_res, box, offset, level);
+      vs->vws->transfer_get(vs->vws, grres->hw_res, box, trans->base.stride, trans->base.layer_stride, offset, level);
 
       /* wait for data */
       vs->vws->resource_wait(vs->vws, grres->hw_res);
    }
 
-   trans->base.resource = resource;
-   trans->base.level = level;
-   trans->base.usage = usage;
-   trans->base.box = *box;
-   trans->base.stride = resource->width0 * elsize;
-   trans->base.layer_stride = 0;
    trans->offset = offset;
    *transfer = &trans->base;
 
@@ -78,7 +107,7 @@ static void graw_transfer_unmap(struct pipe_context *ctx,
          grres->clean = FALSE;
          grctx->num_transfers++;
          vs->vws->transfer_put(vs->vws, grres->hw_res,
-                               &transfer->box, 0, trans->offset, transfer->level);
+                               &transfer->box, trans->base.stride, trans->base.layer_stride, trans->offset, transfer->level);
 
       }
       
@@ -129,7 +158,7 @@ static void graw_transfer_flush_region(struct pipe_context *ctx,
 
    grctx->num_transfers++;
    vs->vws->transfer_put(vs->vws, grres->hw_res,
-                         &hw_box, 0, offset, transfer->level);
+                         &hw_box, trans->base.stride, 0, offset, transfer->level);
 
    grres->clean = FALSE;   
 }

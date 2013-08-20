@@ -527,7 +527,7 @@ static void graw_set_vertex_sampler_views(struct pipe_context *ctx,
       struct graw_sampler_view *grview = (struct graw_sampler_view *)views[i];
 
       handles[i] = grview ? grview->handle : 0;
-      pipe_sampler_view_reference((struct pipe_sampler_view **)&grctx->fs_views[i], views[i]);
+      pipe_sampler_view_reference((struct pipe_sampler_view **)&grctx->vs_views[i], views[i]);
    }
    graw_encode_set_sampler_views(grctx, PIPE_SHADER_VERTEX, num_views, handles);
 }

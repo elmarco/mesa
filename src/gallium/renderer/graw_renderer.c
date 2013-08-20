@@ -1797,6 +1797,9 @@ bool grend_destroy_context(struct grend_context *ctx)
    bool switch_0 = (ctx == grend_state.current_ctx);
    int i;
 
+   if (switch_0)
+      grend_state.current_ctx = NULL;
+
    if (ctx->fb_id)
       glDeleteFramebuffers(1, &ctx->fb_id);
 

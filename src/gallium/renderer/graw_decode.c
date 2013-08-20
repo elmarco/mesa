@@ -119,7 +119,7 @@ static void graw_decode_clear(struct grend_decode_ctx *ctx)
    grend_clear(ctx->grctx, buffers, &color, depth, stencil);
 }
 
-static float fui(unsigned int ui)
+static float uif(unsigned int ui)
 {
    union { float f; unsigned int ui; } myuif;
    myuif.ui = ui;
@@ -132,9 +132,9 @@ static void graw_decode_set_viewport_state(struct grend_decode_ctx *ctx)
    int i;
 
    for (i = 0; i < 4; i++)
-      vps.scale[i] = fui(ctx->ds->buf[ctx->ds->buf_offset + 1 + i]);
+      vps.scale[i] = uif(ctx->ds->buf[ctx->ds->buf_offset + 1 + i]);
    for (i = 0; i < 4; i++)
-      vps.translate[i] = fui(ctx->ds->buf[ctx->ds->buf_offset + 5 + i]);
+      vps.translate[i] = uif(ctx->ds->buf[ctx->ds->buf_offset + 5 + i]);
    
    grend_set_viewport_state(ctx->grctx, &vps);
 }
@@ -281,7 +281,7 @@ static void graw_decode_create_dsa(struct grend_decode_ctx *ctx, uint32_t handle
    }
 
    tmp = ctx->ds->buf[ctx->ds->buf_offset + 5];
-   dsa_state->alpha.ref_value = fui(tmp);
+   dsa_state->alpha.ref_value = uif(tmp);
 
    graw_renderer_object_insert(ctx->grctx, dsa_state, sizeof(struct pipe_depth_stencil_alpha_state), handle,
                       GRAW_OBJECT_DSA);
@@ -323,17 +323,17 @@ static void graw_decode_create_rasterizer(struct grend_decode_ctx *ctx, uint32_t
    ebit(line_stipple_enable, 27);
    ebit(line_last_pixel, 28);
    
-   rs_state->point_size = fui(ctx->ds->buf[ctx->ds->buf_offset + 3]);
+   rs_state->point_size = uif(ctx->ds->buf[ctx->ds->buf_offset + 3]);
    rs_state->sprite_coord_enable = ctx->ds->buf[ctx->ds->buf_offset + 4];
    tmp = ctx->ds->buf[ctx->ds->buf_offset + 5];
    emask(line_stipple_pattern, 0, 0xffff);
    emask(line_stipple_factor, 16, 0xff);
    emask(clip_plane_enable, 24, 0xff);
 
-   rs_state->line_width = fui(ctx->ds->buf[ctx->ds->buf_offset + 6]);
-   rs_state->offset_units = fui(ctx->ds->buf[ctx->ds->buf_offset + 7]);
-   rs_state->offset_scale = fui(ctx->ds->buf[ctx->ds->buf_offset + 8]);
-   rs_state->offset_clamp = fui(ctx->ds->buf[ctx->ds->buf_offset + 9]);
+   rs_state->line_width = uif(ctx->ds->buf[ctx->ds->buf_offset + 6]);
+   rs_state->offset_units = uif(ctx->ds->buf[ctx->ds->buf_offset + 7]);
+   rs_state->offset_scale = uif(ctx->ds->buf[ctx->ds->buf_offset + 8]);
+   rs_state->offset_clamp = uif(ctx->ds->buf[ctx->ds->buf_offset + 9]);
    
    
    graw_renderer_object_insert(ctx->grctx, rs_state, sizeof(struct pipe_rasterizer_state), handle,
@@ -378,9 +378,9 @@ static void graw_decode_create_sampler_state(struct grend_decode_ctx *ctx, uint3
    state->compare_mode = (tmp >> 15) & 0x1;
    state->compare_func = (tmp >> 16) & 0x7;
 
-   state->lod_bias = fui(ctx->ds->buf[ctx->ds->buf_offset + 3]);
-   state->min_lod = fui(ctx->ds->buf[ctx->ds->buf_offset + 4]);
-   state->max_lod = fui(ctx->ds->buf[ctx->ds->buf_offset + 5]);
+   state->lod_bias = uif(ctx->ds->buf[ctx->ds->buf_offset + 3]);
+   state->min_lod = uif(ctx->ds->buf[ctx->ds->buf_offset + 4]);
+   state->max_lod = uif(ctx->ds->buf[ctx->ds->buf_offset + 5]);
    graw_renderer_object_insert(ctx->grctx, state, sizeof(struct pipe_sampler_state), handle,
                       GRAW_OBJECT_SAMPLER_STATE);
 }
@@ -523,7 +523,7 @@ static void graw_decode_set_blend_color(struct grend_decode_ctx *ctx)
    int i;
    
    for (i = 0; i < 4; i++)
-      color.color[i] = fui(ctx->ds->buf[ctx->ds->buf_offset + 1 + i]);
+      color.color[i] = uif(ctx->ds->buf[ctx->ds->buf_offset + 1 + i]);
 
    grend_set_blend_color(ctx->grctx, &color);
 }

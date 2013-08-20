@@ -62,6 +62,11 @@ struct graw_so_target {
    struct pipe_stream_output_target base;
    uint32_t handle;
 };
+
+struct graw_textures_info {
+   struct graw_sampler_view *views[16];
+   uint32_t enabled_mask;
+};
    
 struct graw_context {
    struct pipe_context base;
@@ -77,8 +82,7 @@ struct graw_context {
 
    struct graw_encoder_state *eq;
 
-   struct graw_sampler_view fs_views[16];
-   struct graw_sampler_view vs_views[16];
+   struct graw_textures_info samplers[PIPE_SHADER_TYPES];
 
    struct pipe_framebuffer_state framebuffer;
 

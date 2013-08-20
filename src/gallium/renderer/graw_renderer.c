@@ -66,6 +66,12 @@ struct grend_query {
    boolean active_hw;
 };
 
+#define VIRGL_INVALID_RESOURCE 1
+struct global_error_state {
+   uint32_t last_error;
+};
+static struct global_error_state error_state;
+
 struct global_renderer_state {
    bool viewport_dirty;
    bool scissor_dirty;
@@ -250,6 +256,15 @@ static struct grend_nontimer_hw_query *grend_create_hw_query(struct grend_query 
 
 static struct grend_resource *frontbuffer;
 static struct grend_format_table tex_conv_table[VIRGL_FORMAT_MAX];
+
+static void __report_resource_error(const char *fname, int res_handle, const char *type_str)
+{
+   error_state.last_error = VIRGL_INVALID_RESOURCE;
+
+   fprintf(stderr,"%s: cannot find resource %d for %s\n", fname, res_handle, type_str);
+}
+
+#define report_resource_error(rh, ts) __report_resource_error(__func__, rh, ts)
 
 void
 grend_insert_format(struct grend_format_table *entry)
@@ -463,26 +478,31 @@ void grend_create_surface(struct grend_context *ctx,
    
 {
    struct grend_surface *surf;
+   struct grend_resource *res;
+
+   res = graw_lookup_resource(res_handle, ctx->ctx_id);
+   if (!res) {
+      report_resource_error(res_handle, "surface");
+      return;
+   }
 
    surf = CALLOC_STRUCT(grend_surface);
-
    surf->res_handle = res_handle;
    surf->format = format;
    surf->val0 = val0;
    surf->val1 = val1;
-   surf->texture = graw_lookup_resource(res_handle, ctx->ctx_id);
 
-   if (!surf->texture) {
-      fprintf(stderr,"%s: failed to find resource for surface %d\n", __func__, res_handle);
-      free(surf);
-      return;
-   }
+   grend_resource_reference(&surf->texture, res);
+
    graw_object_insert(ctx->object_hash, surf, sizeof(*surf), handle, GRAW_SURFACE);
 }
 
 void grend_destroy_surface(struct grend_context *ctx, struct grend_surface *surf)
 {
    int i;
+
+   grend_resource_reference(&surf->texture, NULL);
+
    if (ctx->zsurf == surf)
       ctx->zsurf = NULL;
 
@@ -491,6 +511,16 @@ void grend_destroy_surface(struct grend_context *ctx, struct grend_surface *surf
          ctx->nr_cbufs = 0;
       }
    }
+}
+
+void grend_destroy_sampler_view(struct grend_context *ctx, struct grend_sampler_view *samp)
+{
+   grend_resource_reference(&samp->texture, NULL);
+}
+
+void grend_destroy_so_target(struct grend_context *ctx, struct grend_so_target *target)
+{
+   grend_resource_reference(&target->buffer, NULL);
 }
 
 static inline GLenum to_gl_swizzle(int swizzle)
@@ -512,7 +542,14 @@ void grend_create_sampler_view(struct grend_context *ctx,
                                uint32_t val0, uint32_t val1, uint32_t swizzle_packed)
 {
    struct grend_sampler_view *view;
+   struct grend_resource *res;
 
+   res = graw_lookup_resource(res_handle, ctx->ctx_id);
+   if (!res) {
+      report_resource_error(res_handle, "sampler view");
+      return;
+   }
+   
    view = CALLOC_STRUCT(grend_sampler_view);
    view->res_handle = res_handle;
    view->format = format;
@@ -525,7 +562,7 @@ void grend_create_sampler_view(struct grend_context *ctx,
    view->cur_base = 0;
    view->cur_max = 1000;
 
-   view->texture = graw_lookup_resource(res_handle, ctx->ctx_id);
+   grend_resource_reference(&view->texture, res);
 
    if (!view->texture) {
       fprintf(stderr,"%s: failed to find resource %d\n", __func__, res_handle);
@@ -798,11 +835,17 @@ void grend_set_index_buffer(struct grend_context *ctx,
    if (res_handle) {
       if (ctx->index_buffer_res_id != res_handle) {
          res = graw_lookup_resource(res_handle, ctx->ctx_id);
-         ctx->ib.buffer = &res->base;
+         if (!res) {
+            grend_resource_reference((struct grend_resource **)&ctx->ib.buffer, NULL);
+            ctx->index_buffer_res_id = 0;
+            report_resource_error(res_handle, "index buffer");
+            return;
+         }
+         grend_resource_reference((struct grend_resource **)&ctx->ib.buffer, res);
          ctx->index_buffer_res_id = res_handle;
       }
    } else {
-      ctx->ib.buffer = NULL;
+      grend_resource_reference((struct grend_resource **)&ctx->ib.buffer, NULL);
       ctx->index_buffer_res_id = 0;
    }
 }
@@ -818,10 +861,15 @@ void grend_set_single_vbo(struct grend_context *ctx,
    ctx->vbo[index].buffer_offset = buffer_offset;
 
    if (res_handle == 0) {
-      ctx->vbo[index].buffer = NULL;
+      grend_resource_reference((struct grend_resource **)&ctx->vbo[index].buffer, NULL);
       ctx->vbo_res_ids[index] = 0;
    } else if (ctx->vbo_res_ids[index] != res_handle) {
       res = graw_lookup_resource(res_handle, ctx->ctx_id);
+      if (!res) {
+         report_resource_error(res_handle, "vbo");
+         return;
+      }
+      grend_resource_reference((struct grend_resource **)&ctx->vbo[index].buffer, res);
       ctx->vbo[index].buffer = &res->base;
       ctx->vbo_res_ids[index] = res_handle;
    }
@@ -845,6 +893,11 @@ void grend_set_single_sampler_view(struct grend_context *ctx,
       if (!view) {
          ctx->views[shader_type].views[index] = NULL;
          fprintf(stderr,"%s: failed to find view %d\n", __func__, handle);
+         return;
+      }
+      tex = graw_lookup_resource(view->res_handle, ctx->ctx_id);
+      if (!tex) {
+         fprintf(stderr,"cannot find texture to back resource view %d %d\n", handle, view->res_handle);
          return;
       }
       glBindTexture(view->texture->target, view->texture->id);
@@ -899,6 +952,10 @@ void grend_transfer_inline_write(struct grend_context *ctx,
    struct grend_resource *res;
 
    res = graw_lookup_resource(res_handle, ctx->ctx_id);
+   if (!res) {
+      report_resource_error(res_handle, "inline transfer");
+      return;
+   }
    if (res->target == GL_ELEMENT_ARRAY_BUFFER_ARB ||
        res->target == GL_ARRAY_BUFFER_ARB ||
        res->target == GL_TRANSFORM_FEEDBACK_BUFFER) {
@@ -1175,6 +1232,11 @@ void grend_draw_vbo(struct grend_context *ctx,
          break;
       }
       buf = (struct grend_buffer *)ctx->vbo[vbo_index].buffer;
+
+      if (!buf) {
+           fprintf(stderr,"cannot find vbo buf %d %d %d\n", i, ctx->ve->count, ctx->prog->vs->num_inputs);
+           return;
+      }
       glBindBuffer(GL_ARRAY_BUFFER, buf->base.id);
 
       if (graw_shader_use_explicit) {
@@ -1186,10 +1248,11 @@ void grend_draw_vbo(struct grend_context *ctx,
 
 	if (loc == -1) {
            fprintf(stderr,"cannot find loc %d %d %d\n", i, ctx->ve->count, ctx->prog->vs->num_inputs);
-          fprintf(stderr,"shader probably didn't compile - skipping rendering\n");
           num_enable--;
-          if (i == 0)
+          if (i == 0) {
+             fprintf(stderr,"shader probably didn't compile - skipping rendering\n");
              return;
+          }
           continue;
         }
       }
@@ -1839,6 +1902,7 @@ void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target tar
    struct grend_resource *gr = (struct grend_resource *)CALLOC_STRUCT(grend_texture);
    int level;
 
+   gr->handle = handle;
    gr->base.width0 = width;
    gr->base.height0 = height;
    gr->base.depth0 = depth;
@@ -1847,7 +1911,8 @@ void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target tar
    gr->base.last_level = last_level;
    gr->base.nr_samples = nr_samples;
    gr->base.array_size = array_size;
-     
+   pipe_reference_init(&gr->base.reference, 1);
+
    if (bind == PIPE_BIND_CUSTOM) {
       /* custom shuold only be for buffers */
       gr->ptr = malloc(width);
@@ -1929,15 +1994,8 @@ void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target tar
    graw_insert_resource(gr, sizeof(*gr), handle);
 }
 
-void graw_renderer_resource_unref(uint32_t res_handle)
+void graw_renderer_resource_destroy(struct grend_resource *res)
 {
-   struct grend_resource *res;
-
-   res = graw_lookup_resource(res_handle, 0);
-
-   if (!res)
-      return;
-
    if (res->readback_fb_id)
       glDeleteFramebuffers(1, &res->readback_fb_id);
 
@@ -1950,7 +2008,19 @@ void graw_renderer_resource_unref(uint32_t res_handle)
    } else
       glDeleteTextures(1, &res->id);
 
-   graw_destroy_resource(res_handle);
+   graw_destroy_resource(res->handle);
+}
+
+
+void graw_renderer_resource_unref(uint32_t res_handle)
+{
+   struct grend_resource *res;
+
+   res = graw_lookup_resource(res_handle, 0);
+   if (!res)
+      return;
+
+   grend_resource_reference(&res, NULL);
 }
 
 static int use_sub_data = 0;
@@ -2007,7 +2077,7 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
 
    res = graw_lookup_resource(res_handle, ctx_id);
    if (res == NULL) {
-      fprintf(stderr,"transfer for non-existant res %d\n", res_handle);
+      report_resource_error(res_handle, "transfer write");
       return;
    }
    if (res->target == GL_TRANSFORM_FEEDBACK_BUFFER ||
@@ -2167,7 +2237,7 @@ void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t ctx_id,
 
    res = graw_lookup_resource(res_handle, ctx_id);
    if (!res) {
-      fprintf(stderr,"transfer for non-existant res %d\n", res_handle);
+      report_resource_error(res_handle, "transfer read");
       return;
    }
 
@@ -2526,7 +2596,8 @@ int graw_renderer_set_scanout(uint32_t res_handle, uint32_t ctx_id,
       frontbuffer->is_front = 0;
    }
 #endif
-   frontbuffer = res;
+   grend_resource_reference(&frontbuffer, res);
+
    fprintf(stderr,"setting frontbuffer to %d\n", res_handle);
    return 0;
 }
@@ -2803,6 +2874,13 @@ void grend_create_query(struct grend_context *ctx, uint32_t handle,
                         uint32_t offset)
 {
    struct grend_query *q;
+   struct grend_resource *res;
+
+   res = graw_lookup_resource(res_handle, ctx->ctx_id);
+   if (!res) {
+      report_resource_error(res_handle, "query");
+      return;
+   }
 
    q = CALLOC_STRUCT(grend_query);
    if (!q)
@@ -2813,9 +2891,7 @@ void grend_create_query(struct grend_context *ctx, uint32_t handle,
    list_inithead(&q->hw_queries);
    q->type = query_type;
 
-   q->res = graw_lookup_resource(res_handle, ctx->ctx_id);
-   if (!q->res)
-      fprintf(stderr,"cannot lookup query resource %d\n", res_handle);
+   grend_resource_reference(&q->res, res);
 
    switch (q->type) {
    case PIPE_QUERY_OCCLUSION_COUNTER:
@@ -2846,6 +2922,7 @@ void grend_destroy_query(struct grend_query *query)
 {
    struct grend_nontimer_hw_query *hwq, *stor;
 
+   grend_resource_reference(&query->res, NULL);
    list_del(&query->ctx_queries);
    list_del(&query->waiting_queries);
    if (grend_is_timer_query(query->gltype)) {
@@ -2938,6 +3015,13 @@ void grend_create_so_target(struct grend_context *ctx,
                             uint32_t buffer_size)
 {
    struct grend_so_target *target;
+   struct grend_resource *res;
+
+   res = graw_lookup_resource(res_handle, ctx->ctx_id);
+   if (!res) {
+      report_resource_error(res_handle, "streamout target");
+      return;
+   }
 
    target = CALLOC_STRUCT(grend_so_target);
    if (!target)
@@ -2946,7 +3030,8 @@ void grend_create_so_target(struct grend_context *ctx,
    target->res_handle = res_handle;
    target->buffer_offset = buffer_offset;
    target->buffer_size = buffer_size;
-   target->buffer = graw_lookup_resource(res_handle, ctx->ctx_id);
+
+   grend_resource_reference(&target->buffer, res);
 
    graw_object_insert(ctx->object_hash, target, sizeof(*target), handle,
                       GRAW_STREAMOUT_TARGET);

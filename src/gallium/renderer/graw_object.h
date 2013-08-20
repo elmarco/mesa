@@ -23,7 +23,11 @@ void *graw_lookup_resource(uint32_t handle, uint32_t ctx_id);
 struct grend_query;
 struct grend_shader_state;
 struct grend_surface;
+struct grend_sampler_view;
+struct grend_so_target;
 void grend_destroy_shader(struct grend_shader_state *state);
 void grend_destroy_query(struct grend_query *query);
 void grend_destroy_surface(struct grend_context *ctx, struct grend_surface *surf);
+void grend_destroy_sampler_view(struct grend_context *ctx, struct grend_sampler_view *samp);
+void grend_destroy_so_target(struct grend_context *ctx, struct grend_so_target *target);
 #endif

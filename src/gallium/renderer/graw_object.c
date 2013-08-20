@@ -51,6 +51,11 @@ static void graw_free_object(struct grend_context *ctx, struct graw_object *obj)
    case GRAW_OBJECT_FS:
       grend_destroy_shader((struct grend_shader_state *)obj->data);
       break;
+   case GRAW_OBJECT_SAMPLER_VIEW:
+      grend_destroy_sampler_view(ctx, (struct grend_sampler_view *)obj->data);
+      break;
+   case GRAW_STREAMOUT_TARGET:
+      grend_destroy_so_target(ctx, (struct grend_so_target *)obj->data);
    default:
       break;
    }

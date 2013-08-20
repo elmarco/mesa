@@ -2,6 +2,7 @@
 #define GRAW_RENDERER_H
 
 #include "pipe/p_state.h"
+#include "util/u_inlines.h"
 #include "graw_protocol.h"
 #include "graw_iov.h"
 #include "virgl_hw.h"
@@ -17,6 +18,7 @@ struct grend_resource {
    int is_front;
    GLboolean renderer_flipped;
    void *ptr;
+   GLuint handle;
 };
 
 struct grend_format_table {
@@ -241,4 +243,17 @@ void graw_renderer_fill_caps(uint32_t set, uint32_t version,
 
 /* formats */
 void vrend_build_format_list(void);
+
+void graw_renderer_resource_destroy(struct grend_resource *res);
+
+static INLINE void
+grend_resource_reference(struct grend_resource **ptr, struct grend_resource *tex)
+{
+   struct grend_resource *old_tex = *ptr;
+
+   if (pipe_reference(&(*ptr)->base.reference, &tex->base.reference))
+      graw_renderer_resource_destroy(old_tex);
+   *ptr = tex;
+}
+
 #endif

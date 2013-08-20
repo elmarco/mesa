@@ -894,11 +894,13 @@ virgl_resource_from_handle(struct pipe_screen *screen,
    struct virgl_screen *rs = virgl_screen(screen);
    struct graw_texture *rpr = CALLOC_STRUCT(graw_texture);
    uint32_t handle;
+   uint32_t size;
 
    rpr->base.base = *template;
    pipe_reference_init(&rpr->base.base.reference, 1);
    rpr->base.base.screen = screen;      
 
+   vrend_resource_layout(screen, &rpr->base, &size);
    rpr->base.hw_res = rs->vws->resource_create_from_handle(rs->vws, whandle);
    return &rpr->base.base;
 }   

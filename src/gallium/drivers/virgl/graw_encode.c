@@ -4,7 +4,6 @@
 #include "util/u_memory.h"
 #include "util/u_math.h"
 #include "pipe/p_state.h"
-#include "graw_protocol.h"
 #include "graw_encode.h"
 #include "tgsi/tgsi_dump.h"
 
@@ -42,7 +41,7 @@ static void graw_encoder_write_res(struct graw_context *ctx,
 int graw_encode_bind_object(struct graw_context *ctx,
 			    uint32_t handle, uint32_t object)
 {
-   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_BIND_OBJECT, object, 1));
+   graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_BIND_OBJECT, object, 1));
    graw_encoder_write_dword(ctx->cbuf, handle);
    return 0;
 }
@@ -50,7 +49,7 @@ int graw_encode_bind_object(struct graw_context *ctx,
 int graw_encode_delete_object(struct graw_context *ctx,
 			      uint32_t handle, uint32_t object)
 {
-   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_DESTROY_OBJECT, object, 1));
+   graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_DESTROY_OBJECT, object, 1));
    graw_encoder_write_dword(ctx->cbuf, handle);
 }
 
@@ -61,7 +60,7 @@ int graw_encode_blend_state(struct graw_context *ctx,
    uint32_t tmp;
    int i;
 
-   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_CREATE_OBJECT, GRAW_OBJECT_BLEND, 2 + 1 + PIPE_MAX_COLOR_BUFS));
+   graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_CREATE_OBJECT, VIRGL_OBJECT_BLEND, 2 + 1 + PIPE_MAX_COLOR_BUFS));
    graw_encoder_write_dword(ctx->cbuf, handle);
 
    tmp = (blend_state->independent_blend_enable << 0) |
@@ -95,7 +94,7 @@ int graw_encode_dsa_state(struct graw_context *ctx,
 {
    uint32_t tmp;
    int i;
-   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_CREATE_OBJECT, GRAW_OBJECT_DSA, 1 + 4));
+   graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_CREATE_OBJECT, VIRGL_OBJECT_DSA, 1 + 4));
    graw_encoder_write_dword(ctx->cbuf, handle);
 
    tmp = dsa_state->depth.enabled |
@@ -125,7 +124,7 @@ int graw_encode_rasterizer_state(struct graw_context *ctx,
 {
    uint32_t tmp;
 
-   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_CREATE_OBJECT, GRAW_OBJECT_RASTERIZER, 1 + 8));
+   graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_CREATE_OBJECT, VIRGL_OBJECT_RASTERIZER, 1 + 8));
    graw_encoder_write_dword(ctx->cbuf, handle);
 
    tmp = (state->flatshade << 0) |
@@ -181,7 +180,7 @@ int graw_encode_shader_state(struct graw_context *ctx,
    shader_len = strlen(str) + 1;
    len = ((shader_len + 3) / 4) + 2 + (shader->stream_output.num_outputs ? shader->stream_output.num_outputs + 4 : 0);
 
-   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_CREATE_OBJECT, type, len));
+   graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_CREATE_OBJECT, type, len));
    graw_encoder_write_dword(ctx->cbuf, handle);
    graw_encoder_write_dword(ctx->cbuf, shader->stream_output.num_outputs);
    if (shader->stream_output.num_outputs) {
@@ -209,7 +208,7 @@ int graw_encode_clear(struct graw_context *ctx,
 {
    int i;
    
-   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_CLEAR, 0, 8));
+   graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_CLEAR, 0, 8));
                             
    graw_encoder_write_dword(ctx->cbuf, buffers);
    for (i = 0; i < 4; i++)
@@ -224,7 +223,7 @@ int graw_encoder_set_framebuffer_state(struct graw_context *ctx,
    struct graw_surface *zsurf = (struct graw_surface *)state->zsbuf;
    int i;
 
-   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_SET_FRAMEBUFFER_STATE, 0, 2 + state->nr_cbufs));
+   graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_SET_FRAMEBUFFER_STATE, 0, 2 + state->nr_cbufs));
    graw_encoder_write_dword(ctx->cbuf, state->nr_cbufs);
    graw_encoder_write_dword(ctx->cbuf, zsurf ? zsurf->handle : 0);
    for (i = 0; i < state->nr_cbufs; i++) {
@@ -238,7 +237,7 @@ int graw_encoder_set_viewport_state(struct graw_context *ctx,
 				    const struct pipe_viewport_state *state)
 {
    int i;
-   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_SET_VIEWPORT_STATE, 0, 8));
+   graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_SET_VIEWPORT_STATE, 0, 8));
    for (i = 0; i < 4; i++)
       graw_encoder_write_dword(ctx->cbuf, uif(state->scale[i]));
    for (i = 0; i < 4; i++)
@@ -252,7 +251,7 @@ int graw_encoder_create_vertex_elements(struct graw_context *ctx,
                                         const struct pipe_vertex_element *element)
 {
    int i;
-   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_CREATE_OBJECT, GRAW_OBJECT_VERTEX_ELEMENTS, (4 * num_elements) + 1));
+   graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_CREATE_OBJECT, VIRGL_OBJECT_VERTEX_ELEMENTS, (4 * num_elements) + 1));
    graw_encoder_write_dword(ctx->cbuf, handle);
    for (i = 0; i < num_elements; i++) {
       graw_encoder_write_dword(ctx->cbuf, element[i].src_offset);
@@ -268,7 +267,7 @@ int graw_encoder_set_vertex_buffers(struct graw_context *ctx,
                                     const struct pipe_vertex_buffer *buffers)
 {
    int i;
-   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_SET_VERTEX_BUFFERS, 0, (3 * num_buffers)));
+   graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_SET_VERTEX_BUFFERS, 0, (3 * num_buffers)));
    for (i = 0; i < num_buffers; i++) {
       struct graw_resource *res = (struct graw_resource *)buffers[i].buffer;
       graw_encoder_write_dword(ctx->cbuf, buffers[i].stride);
@@ -285,7 +284,7 @@ int graw_encoder_set_index_buffer(struct graw_context *ctx,
    if (ib)
       res = (struct graw_resource *)ib->buffer;
 
-   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_SET_INDEX_BUFFER, 0, length));
+   graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_SET_INDEX_BUFFER, 0, length));
    graw_encoder_write_res(ctx, res);
    if (ib) {
       graw_encoder_write_dword(ctx->cbuf, ib->index_size);
@@ -296,7 +295,7 @@ int graw_encoder_set_index_buffer(struct graw_context *ctx,
 int graw_encoder_draw_vbo(struct graw_context *ctx,
 			  const struct pipe_draw_info *info)
 {
-   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_DRAW_VBO, 0, 5));
+   graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_DRAW_VBO, 0, 5));
    graw_encoder_write_dword(ctx->cbuf, info->start);
    graw_encoder_write_dword(ctx->cbuf, info->count);
    graw_encoder_write_dword(ctx->cbuf, info->mode);
@@ -310,7 +309,7 @@ int graw_encoder_create_surface(struct graw_context *ctx,
 				struct graw_resource *res,
 				const struct pipe_surface *templat)
 {
-   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_CREATE_OBJECT, GRAW_SURFACE, 5));
+   graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_CREATE_OBJECT, VIRGL_OBJECT_SURFACE, 5));
    graw_encoder_write_dword(ctx->cbuf, handle);
    graw_encoder_write_res(ctx, res);
    graw_encoder_write_dword(ctx->cbuf, templat->format);
@@ -331,7 +330,7 @@ int graw_encoder_create_so_target(struct graw_context *ctx,
                                   unsigned buffer_offset,
                                   unsigned buffer_size)
 {
-   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_CREATE_OBJECT, GRAW_STREAMOUT_TARGET, 4));
+   graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_CREATE_OBJECT, VIRGL_OBJECT_STREAMOUT_TARGET, 4));
    graw_encoder_write_dword(ctx->cbuf, handle);
    graw_encoder_write_res(ctx, res);
    graw_encoder_write_dword(ctx->cbuf, buffer_offset);
@@ -352,7 +351,7 @@ int graw_encoder_inline_write(struct graw_context *ctx,
    size = align(size, 4);
 
    length = 11 + size / 4;
-   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_RESOURCE_INLINE_WRITE, 0, length));
+   graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_RESOURCE_INLINE_WRITE, 0, length));
    graw_encoder_write_res(ctx, res);
    graw_encoder_write_dword(ctx->cbuf, level);
    graw_encoder_write_dword(ctx->cbuf, usage);
@@ -372,7 +371,7 @@ int graw_encoder_inline_write(struct graw_context *ctx,
 int graw_encoder_flush_frontbuffer(struct graw_context *ctx,
                                    struct graw_resource *res)
 {
-//   graw_encoder_write_dword(ctx->cbuf, GRAW_CMD0(GRAW_FLUSH_FRONTUBFFER, 0, 1));
+//   graw_encoder_write_dword(ctx->cbuf, VIRGL_CMD0(VIRGL_CCMD_FLUSH_FRONTUBFFER, 0, 1));
 //   graw_encoder_write_dword(ctx->cbuf, res_handle);
    return 0;
 }
@@ -383,7 +382,7 @@ int graw_encode_sampler_state(struct graw_context *ctx,
 {
    uint32_t tmp;
 
-   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_CREATE_OBJECT, GRAW_OBJECT_SAMPLER_STATE , 5));
+   graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_CREATE_OBJECT, VIRGL_OBJECT_SAMPLER_STATE , 5));
    graw_encoder_write_dword(ctx->cbuf, handle);
 
    tmp = state->wrap_s |
@@ -407,7 +406,7 @@ int graw_encode_sampler_view(struct graw_context *ctx,
                              struct graw_resource *res,
                              const struct pipe_sampler_view *state)
 {
-   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_CREATE_OBJECT, GRAW_OBJECT_SAMPLER_VIEW, 6));
+   graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_CREATE_OBJECT, VIRGL_OBJECT_SAMPLER_VIEW, 6));
    graw_encoder_write_dword(ctx->cbuf, handle);
    graw_encoder_write_res(ctx, res);
    graw_encoder_write_dword(ctx->cbuf, state->format);
@@ -427,7 +426,7 @@ int graw_encode_set_sampler_views(struct graw_context *ctx,
                                   uint32_t *handles)
 {
    int i;
-   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_SET_SAMPLER_VIEWS, 0, num_handles + 1));
+   graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_SET_SAMPLER_VIEWS, 0, num_handles + 1));
    graw_encoder_write_dword(ctx->cbuf, shader_type);
    for (i = 0; i < num_handles; i++)
       graw_encoder_write_dword(ctx->cbuf, handles[i]);
@@ -440,7 +439,7 @@ int graw_encode_bind_sampler_states(struct graw_context *ctx,
                                     uint32_t *handles)
 {
    int i;
-   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_BIND_SAMPLER_STATES, 0, num_handles + 1));
+   graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_BIND_SAMPLER_STATES, 0, num_handles + 1));
    graw_encoder_write_dword(ctx->cbuf, shader_type);
    for (i = 0; i < num_handles; i++)
       graw_encoder_write_dword(ctx->cbuf, handles[i]);
@@ -453,7 +452,7 @@ int graw_encoder_write_constant_buffer(struct graw_context *ctx,
                                        uint32_t size,
                                        void *data)
 {
-   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_SET_CONSTANT_BUFFER, 0, size + 2));
+   graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_SET_CONSTANT_BUFFER, 0, size + 2));
    graw_encoder_write_dword(ctx->cbuf, shader);
    graw_encoder_write_dword(ctx->cbuf, index);
    if (data)
@@ -464,7 +463,7 @@ int graw_encoder_write_constant_buffer(struct graw_context *ctx,
 int graw_encoder_set_stencil_ref(struct graw_context *ctx,
                                  const struct pipe_stencil_ref *ref)
 {
-   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_SET_STENCIL_REF, 0, 1));
+   graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_SET_STENCIL_REF, 0, 1));
    graw_encoder_write_dword(ctx->cbuf, (ref->ref_value[0] | (ref->ref_value[1] << 8)));
 }
 
@@ -472,7 +471,7 @@ int graw_encoder_set_blend_color(struct graw_context *ctx,
                                  const struct pipe_blend_color *color)
 {
    int i;
-   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_SET_BLEND_COLOR, 0, 4));
+   graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_SET_BLEND_COLOR, 0, 4));
    for (i = 0; i < 4; i++)
       graw_encoder_write_dword(ctx->cbuf, uif(color->color[i]));
 }
@@ -480,7 +479,7 @@ int graw_encoder_set_blend_color(struct graw_context *ctx,
 int graw_encoder_set_scissor_state(struct graw_context *ctx,
                                    const struct pipe_scissor_state *ss)
 {
-   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_SET_SCISSOR_STATE, 0, 2));
+   graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_SET_SCISSOR_STATE, 0, 2));
    graw_encoder_write_dword(ctx->cbuf, (ss->minx | ss->miny << 16));
    graw_encoder_write_dword(ctx->cbuf, (ss->maxx | ss->maxy << 16));
 }
@@ -489,7 +488,7 @@ void graw_encoder_set_polygon_stipple(struct graw_context *ctx,
                                       const struct pipe_poly_stipple *ps)
 {
    int i;
-   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_SET_POLYGON_STIPPLE, 0, 32));
+   graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_SET_POLYGON_STIPPLE, 0, 32));
    for (i = 0; i < 32; i++) {
       graw_encoder_write_dword(ctx->cbuf, ps->stipple[i]);
    }
@@ -498,7 +497,7 @@ void graw_encoder_set_polygon_stipple(struct graw_context *ctx,
 void graw_encoder_set_sample_mask(struct graw_context *ctx,
                                   unsigned sample_mask)
 {
-   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_SET_SAMPLE_MASK, 0, 1));
+   graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_SET_SAMPLE_MASK, 0, 1));
    graw_encoder_write_dword(ctx->cbuf, sample_mask);
 }
 
@@ -506,7 +505,7 @@ void graw_encoder_set_clip_state(struct graw_context *ctx,
                                  const struct pipe_clip_state *clip)
 {
    int i, j;
-   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_SET_CLIP_STATE, 0, 32));
+   graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_SET_CLIP_STATE, 0, 32));
    for (i = 0; i < PIPE_MAX_CLIP_PLANES; i++) {
       for (j = 0; j < 4; j++) {
          graw_encoder_write_dword(ctx->cbuf, uif(clip->ucp[i][j]));
@@ -522,7 +521,7 @@ int graw_encode_resource_copy_region(struct graw_context *ctx,
                                      unsigned src_level,
                                      const struct pipe_box *src_box)
 {
-   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_RESOURCE_COPY_REGION, 0, 13));
+   graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_RESOURCE_COPY_REGION, 0, 13));
    graw_encoder_write_res(ctx, dst_res);
    graw_encoder_write_dword(ctx->cbuf, dst_level);
    graw_encoder_write_dword(ctx->cbuf, dstx);
@@ -544,7 +543,7 @@ int graw_encode_blit(struct graw_context *ctx,
                      struct graw_resource *src_res,
                      const struct pipe_blit_info *blit)
 {
-   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_BLIT, 0, 23));
+   graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_BLIT, 0, 23));
    graw_encoder_write_dword(ctx->cbuf, blit->mask);
    graw_encoder_write_dword(ctx->cbuf, blit->filter);
    graw_encoder_write_dword(ctx->cbuf, blit->scissor_enable);
@@ -579,7 +578,7 @@ int graw_encoder_create_query(struct graw_context *ctx,
                               struct graw_resource *res,
                               uint32_t offset)
 {
-   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_CREATE_OBJECT, GRAW_QUERY, 4));
+   graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_CREATE_OBJECT, VIRGL_OBJECT_QUERY, 4));
    graw_encoder_write_dword(ctx->cbuf, handle);
    graw_encoder_write_dword(ctx->cbuf, query_type);
    graw_encoder_write_dword(ctx->cbuf, offset);
@@ -590,21 +589,21 @@ int graw_encoder_create_query(struct graw_context *ctx,
 int graw_encoder_begin_query(struct graw_context *ctx,
                              uint32_t handle)
 {
-   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_BEGIN_QUERY, 0, 1));
+   graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_BEGIN_QUERY, 0, 1));
    graw_encoder_write_dword(ctx->cbuf, handle);   
 }
 
 int graw_encoder_end_query(struct graw_context *ctx,
                            uint32_t handle)
 {
-   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_END_QUERY, 0, 1));
+   graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_END_QUERY, 0, 1));
    graw_encoder_write_dword(ctx->cbuf, handle);   
 }
 
 int graw_encoder_get_query_result(struct graw_context *ctx,
                                   uint32_t handle, boolean wait)
 {
-   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_GET_QUERY_RESULT, 0, 2));
+   graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_GET_QUERY_RESULT, 0, 2));
    graw_encoder_write_dword(ctx->cbuf, handle);
    graw_encoder_write_dword(ctx->cbuf, wait ? 1 : 0);
 }
@@ -616,7 +615,7 @@ int graw_encoder_set_so_targets(struct graw_context *ctx,
 {
    int i;
 
-   graw_encoder_write_cmd_dword(ctx, GRAW_CMD0(GRAW_SET_STREAMOUT_TARGETS, 0, num_targets + 1));
+   graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_SET_STREAMOUT_TARGETS, 0, num_targets + 1));
    graw_encoder_write_dword(ctx->cbuf, append_bitmask);
    for (i = 0; i < num_targets; i++) {
       struct graw_so_target *tg = (struct graw_so_target *)targets[i];

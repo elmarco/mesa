@@ -17,7 +17,6 @@
 
 #include "state_tracker/graw.h"
 
-#include "graw_protocol.h"
 #include "graw_object.h"
 #include "graw_shader.h"
 
@@ -34,6 +33,7 @@
 static void grend_update_viewport_state(struct grend_context *ctx);
 static void grend_update_scissor_state(struct grend_context *ctx);
 static void grend_ctx_restart_queries(struct grend_context *ctx);
+static void grend_destroy_query_object(void *obj_ptr);
 
 extern int graw_shader_use_explicit;
 int localrender;
@@ -129,6 +129,7 @@ struct grend_texture {
 };
 
 struct grend_surface {
+   struct pipe_reference reference;
    GLuint id;
    GLuint res_handle;
    GLuint format;
@@ -265,6 +266,21 @@ static void __report_resource_error(const char *fname, int res_handle, const cha
 }
 
 #define report_resource_error(rh, ts) __report_resource_error(__func__, rh, ts)
+
+static void grend_destroy_surface(struct grend_surface *surf)
+{
+   grend_resource_reference(&surf->texture, NULL);
+}
+
+static INLINE void
+grend_surface_reference(struct grend_surface **ptr, struct grend_surface *surf)
+{
+   struct grend_surface *old_surf = *ptr;
+
+   if (pipe_reference(&(*ptr)->reference, &surf->reference))
+      grend_destroy_surface(old_surf);
+   *ptr = surf;
+}
 
 void
 grend_insert_format(struct grend_format_table *entry)
@@ -480,7 +496,7 @@ void grend_create_surface(struct grend_context *ctx,
    struct grend_surface *surf;
    struct grend_resource *res;
 
-   res = graw_lookup_resource(res_handle, ctx->ctx_id);
+   res = vrend_resource_lookup(res_handle, ctx->ctx_id);
    if (!res) {
       report_resource_error(res_handle, "surface");
       return;
@@ -491,36 +507,42 @@ void grend_create_surface(struct grend_context *ctx,
    surf->format = format;
    surf->val0 = val0;
    surf->val1 = val1;
+   pipe_reference_init(&surf->reference, 1);
 
    grend_resource_reference(&surf->texture, res);
 
-   graw_object_insert(ctx->object_hash, surf, sizeof(*surf), handle, GRAW_SURFACE);
+   vrend_object_insert(ctx->object_hash, surf, sizeof(*surf), handle, VIRGL_OBJECT_SURFACE);
 }
 
-void grend_destroy_surface(struct grend_context *ctx, struct grend_surface *surf)
+static void grend_destroy_surface_object(void *obj_ptr)
 {
-   int i;
+   struct grend_surface *surface = obj_ptr;
 
-   grend_resource_reference(&surf->texture, NULL);
-
-   if (ctx->zsurf == surf)
-      ctx->zsurf = NULL;
-
-   for (i = 0; i < ctx->nr_cbufs; i++) {
-      if (ctx->surf[i] == surf) {
-         ctx->nr_cbufs = 0;
-      }
-   }
+   grend_surface_reference(&surface, NULL);
 }
 
-void grend_destroy_sampler_view(struct grend_context *ctx, struct grend_sampler_view *samp)
+static void grend_destroy_sampler_view(struct grend_sampler_view *samp)
 {
    grend_resource_reference(&samp->texture, NULL);
+   free(samp);
 }
 
-void grend_destroy_so_target(struct grend_context *ctx, struct grend_so_target *target)
+static void grend_destroy_sampler_view_object(void *obj_ptr)
+{
+   struct grend_sampler_view *samp = obj_ptr;
+   grend_destroy_sampler_view(samp);
+}
+
+static void grend_destroy_so_target(struct grend_so_target *target)
 {
    grend_resource_reference(&target->buffer, NULL);
+   free(target);
+}
+
+static void grend_destroy_so_target_object(void *obj_ptr)
+{
+   struct grend_so_target *target = obj_ptr;
+   grend_destroy_so_target(target);
 }
 
 static inline GLenum to_gl_swizzle(int swizzle)
@@ -544,7 +566,7 @@ void grend_create_sampler_view(struct grend_context *ctx,
    struct grend_sampler_view *view;
    struct grend_resource *res;
 
-   res = graw_lookup_resource(res_handle, ctx->ctx_id);
+   res = vrend_resource_lookup(res_handle, ctx->ctx_id);
    if (!res) {
       report_resource_error(res_handle, "sampler view");
       return;
@@ -586,7 +608,7 @@ void grend_create_sampler_view(struct grend_context *ctx,
       view->gl_swizzle_g = to_gl_swizzle(view->swizzle_g);
       view->gl_swizzle_b = to_gl_swizzle(view->swizzle_b);
    }
-   graw_object_insert(ctx->object_hash, view, sizeof(*view), handle, GRAW_OBJECT_SAMPLER_VIEW);
+   vrend_object_insert(ctx->object_hash, view, sizeof(*view), handle, VIRGL_OBJECT_SAMPLER_VIEW);
 }
 
 static void grend_hw_emit_framebuffer_state(struct grend_context *ctx)
@@ -670,25 +692,31 @@ void grend_set_framebuffer_state(struct grend_context *ctx,
 {
    struct grend_surface *surf, *zsurf;
    int i;
-
+   int old_num;
    if (zsurf_handle) {
-      zsurf = graw_object_lookup(ctx->object_hash, zsurf_handle, GRAW_SURFACE);
+      zsurf = vrend_object_lookup(ctx->object_hash, zsurf_handle, VIRGL_OBJECT_SURFACE);
       if (!zsurf) {
          fprintf(stderr,"%s: can't find surface for Z %d\n", __func__, zsurf_handle);
          return;
       }
-      ctx->zsurf = zsurf;
+      grend_surface_reference(&ctx->zsurf, zsurf);
    } else
-      ctx->zsurf = NULL;
+      grend_surface_reference(&ctx->zsurf, NULL);
 
+   old_num = ctx->nr_cbufs;
    ctx->nr_cbufs = nr_cbufs;
    for (i = 0; i < nr_cbufs; i++) {
-      surf = graw_object_lookup(ctx->object_hash, surf_handle[i], GRAW_SURFACE);
+      surf = vrend_object_lookup(ctx->object_hash, surf_handle[i], VIRGL_OBJECT_SURFACE);
       if (!surf) {
          fprintf(stderr,"%s: can't find surface for cbuf %d %d\n", __func__, i, surf_handle[i]);
          return;
       }
-      ctx->surf[i] = surf;
+      grend_surface_reference(&ctx->surf[i], surf);
+   }
+
+   if (old_num > ctx->nr_cbufs) {
+      for (i = old_num; i < ctx->nr_cbufs; i++)
+         grend_surface_reference(&ctx->surf[i], NULL);
    }
 
    grend_hw_emit_framebuffer_state(ctx);
@@ -782,8 +810,8 @@ void grend_create_vertex_elements_state(struct grend_context *ctx,
       v->elements[i].nr_chan = desc->nr_channels;
    }
 
-   graw_object_insert(ctx->object_hash, v, sizeof(struct grend_vertex_element), handle,
-                      GRAW_OBJECT_VERTEX_ELEMENTS);
+   vrend_object_insert(ctx->object_hash, v, sizeof(struct grend_vertex_element), handle,
+                      VIRGL_OBJECT_VERTEX_ELEMENTS);
 }
 
 void grend_bind_vertex_elements_state(struct grend_context *ctx,
@@ -795,7 +823,7 @@ void grend_bind_vertex_elements_state(struct grend_context *ctx,
       ctx->ve = NULL;
       return;
    }
-   v = graw_object_lookup(ctx->object_hash, handle, GRAW_OBJECT_VERTEX_ELEMENTS);
+   v = vrend_object_lookup(ctx->object_hash, handle, VIRGL_OBJECT_VERTEX_ELEMENTS);
    if (!v) {
       fprintf(stderr, "illegal ve lookup %d\n", handle);
    }
@@ -834,7 +862,7 @@ void grend_set_index_buffer(struct grend_context *ctx,
    ctx->ib.offset = offset;
    if (res_handle) {
       if (ctx->index_buffer_res_id != res_handle) {
-         res = graw_lookup_resource(res_handle, ctx->ctx_id);
+         res = vrend_resource_lookup(res_handle, ctx->ctx_id);
          if (!res) {
             grend_resource_reference((struct grend_resource **)&ctx->ib.buffer, NULL);
             ctx->index_buffer_res_id = 0;
@@ -864,7 +892,7 @@ void grend_set_single_vbo(struct grend_context *ctx,
       grend_resource_reference((struct grend_resource **)&ctx->vbo[index].buffer, NULL);
       ctx->vbo_res_ids[index] = 0;
    } else if (ctx->vbo_res_ids[index] != res_handle) {
-      res = graw_lookup_resource(res_handle, ctx->ctx_id);
+      res = vrend_resource_lookup(res_handle, ctx->ctx_id);
       if (!res) {
          report_resource_error(res_handle, "vbo");
          return;
@@ -889,13 +917,13 @@ void grend_set_single_sampler_view(struct grend_context *ctx,
    struct grend_sampler_view *view = NULL;
    struct grend_texture *tex;
    if (handle) {
-      view = graw_object_lookup(ctx->object_hash, handle, GRAW_OBJECT_SAMPLER_VIEW);
+      view = vrend_object_lookup(ctx->object_hash, handle, VIRGL_OBJECT_SAMPLER_VIEW);
       if (!view) {
          ctx->views[shader_type].views[index] = NULL;
          fprintf(stderr,"%s: failed to find view %d\n", __func__, handle);
          return;
       }
-      tex = graw_lookup_resource(view->res_handle, ctx->ctx_id);
+      tex = vrend_resource_lookup(view->res_handle, ctx->ctx_id);
       if (!tex) {
          fprintf(stderr,"cannot find texture to back resource view %d %d\n", handle, view->res_handle);
          return;
@@ -951,7 +979,7 @@ void grend_transfer_inline_write(struct grend_context *ctx,
 {
    struct grend_resource *res;
 
-   res = graw_lookup_resource(res_handle, ctx->ctx_id);
+   res = vrend_resource_lookup(res_handle, ctx->ctx_id);
    if (!res) {
       report_resource_error(res_handle, "inline transfer");
       return;
@@ -972,9 +1000,16 @@ void grend_transfer_inline_write(struct grend_context *ctx,
    }
 }
 
-void grend_destroy_shader(struct grend_shader_state *state)
+static void grend_destroy_shader(struct grend_shader_state *state)
 {
    glDeleteShader(state->id);
+   free(state);
+}
+
+static void grend_destroy_shader_object(void *obj_ptr)
+{
+   struct grend_shader_state *state = obj_ptr;
+   grend_destroy_shader(state);
 }
 
 void grend_create_vs(struct grend_context *ctx,
@@ -1001,7 +1036,7 @@ void grend_create_vs(struct grend_context *ctx,
    /* copy over stream out info */
    state->so_info = vs->stream_output;
 
-   graw_object_insert(ctx->object_hash, state, sizeof(*state), handle, GRAW_OBJECT_VS);
+   vrend_object_insert(ctx->object_hash, state, sizeof(*state), handle, VIRGL_OBJECT_VS);
 
    return;
 }
@@ -1027,7 +1062,7 @@ void grend_create_fs(struct grend_context *ctx,
       //      fprintf(stderr,"FS:\n%s\n", glsl_prog);
    } else
      fprintf(stderr,"failed to convert FS prog\n");
-   graw_object_insert(ctx->object_hash, state, sizeof(*state), handle, GRAW_OBJECT_FS);
+   vrend_object_insert(ctx->object_hash, state, sizeof(*state), handle, VIRGL_OBJECT_FS);
 
    return;
 }
@@ -1037,7 +1072,7 @@ void grend_bind_vs(struct grend_context *ctx,
 {
    struct grend_shader_state *state;
 
-   state = graw_object_lookup(ctx->object_hash, handle, GRAW_OBJECT_VS);
+   state = vrend_object_lookup(ctx->object_hash, handle, VIRGL_OBJECT_VS);
 
    if (ctx->vs != state)
       ctx->shader_dirty = true;
@@ -1049,7 +1084,7 @@ void grend_bind_fs(struct grend_context *ctx,
 {
    struct grend_shader_state *state;
 
-   state = graw_object_lookup(ctx->object_hash, handle, GRAW_OBJECT_FS);
+   state = vrend_object_lookup(ctx->object_hash, handle, VIRGL_OBJECT_FS);
 
    if (ctx->fs != state)
       ctx->shader_dirty = true;
@@ -1481,7 +1516,7 @@ void grend_object_bind_blend(struct grend_context *ctx,
       grend_blend_enable(GL_FALSE);
       return;
    }
-   state = graw_object_lookup(ctx->object_hash, handle, GRAW_OBJECT_BLEND);
+   state = vrend_object_lookup(ctx->object_hash, handle, VIRGL_OBJECT_BLEND);
    if (!state) {
       fprintf(stderr,"%s: got illegal handle %d\n", __func__, handle);
       return;
@@ -1527,7 +1562,7 @@ void grend_object_bind_dsa(struct grend_context *ctx,
       return;
    }
 
-   state = graw_object_lookup(ctx->object_hash, handle, GRAW_OBJECT_DSA);
+   state = vrend_object_lookup(ctx->object_hash, handle, VIRGL_OBJECT_DSA);
    if (!state) {
       fprintf(stderr,"failed to find DSA state for handle %d\n", handle);
       return;
@@ -1663,7 +1698,7 @@ void grend_object_bind_rasterizer(struct grend_context *ctx,
       return;
    }
 
-   state = graw_object_lookup(ctx->object_hash, handle, GRAW_OBJECT_RASTERIZER);
+   state = vrend_object_lookup(ctx->object_hash, handle, VIRGL_OBJECT_RASTERIZER);
    
    if (!state) {
       fprintf(stderr,"%s: cannot find object %d\n", __func__, handle);
@@ -1706,7 +1741,7 @@ void grend_bind_sampler_states(struct grend_context *ctx,
       if (handles[i] == 0)
          state = NULL;
       else
-         state = graw_object_lookup(ctx->object_hash, handles[i], GRAW_OBJECT_SAMPLER_STATE);
+         state = vrend_object_lookup(ctx->object_hash, handles[i], VIRGL_OBJECT_SAMPLER_STATE);
       
       ctx->sampler_state[shader_type][i] = state;
    }
@@ -1826,14 +1861,21 @@ static GLenum tgsitargettogltarget(const enum pipe_texture_target target, int nr
 
 static int inited;
 
-void
-graw_renderer_init(void)
+void graw_renderer_init(void)
 {
    if (!inited) {
       inited = 1;
-      graw_object_init_resource_hash();
+      vrend_object_init_resource_table();
    }
    
+   /* callbacks for when we are cleaning up the object table */
+   vrend_object_set_destroy_callback(VIRGL_OBJECT_QUERY, grend_destroy_query_object);
+   vrend_object_set_destroy_callback(VIRGL_OBJECT_SURFACE, grend_destroy_surface_object);
+   vrend_object_set_destroy_callback(VIRGL_OBJECT_VS, grend_destroy_shader_object);
+   vrend_object_set_destroy_callback(VIRGL_OBJECT_FS, grend_destroy_shader_object);
+   vrend_object_set_destroy_callback(VIRGL_OBJECT_SAMPLER_VIEW, grend_destroy_sampler_view_object);
+   vrend_object_set_destroy_callback(VIRGL_OBJECT_STREAMOUT_TARGET, grend_destroy_so_target_object);
+
    vrend_build_format_list();
    grend_state.viewport_dirty = grend_state.scissor_dirty = TRUE;
    grend_state.program_id = (GLuint)-1;
@@ -1851,7 +1893,7 @@ graw_renderer_fini(void)
    if (!inited)
       return;
 
-   graw_object_fini_resource_hash();
+   vrend_object_fini_resource_table();
    inited = 0;
 }
 
@@ -1862,6 +1904,13 @@ bool grend_destroy_context(struct grend_context *ctx)
 
    if (switch_0)
       grend_state.current_ctx = NULL;
+
+   if (ctx->zsurf)
+      grend_surface_reference(&ctx->zsurf, NULL);
+
+   for (i = 0; i < ctx->nr_cbufs; i++) {
+      grend_surface_reference(&ctx->surf[i], NULL);
+   }
 
    if (ctx->fb_id)
       glDeleteFramebuffers(1, &ctx->fb_id);
@@ -1876,8 +1925,9 @@ bool grend_destroy_context(struct grend_context *ctx)
    glDeleteVertexArrays(1, &ctx->vaoid);
 
    /* need to free any objects still in hash table - TODO */
-   graw_fini_ctx_hash(ctx->object_hash, ctx);
+   vrend_object_fini_ctx_table(ctx->object_hash);
    FREE(ctx);
+
    return switch_0;
 }
 
@@ -1891,7 +1941,7 @@ struct grend_context *grend_create_context(int id)
    list_inithead(&grctx->active_nontimer_query_list);
    glGenVertexArrays(1, &grctx->vaoid);
 
-   grctx->object_hash = graw_init_ctx_hash();
+   grctx->object_hash = vrend_object_init_ctx_table();
 
    return grctx;
 }
@@ -1991,7 +2041,7 @@ void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target tar
       gt->state.max_lod = -1;
    }
 
-   graw_insert_resource(gr, sizeof(*gr), handle);
+   vrend_resource_insert(gr, sizeof(*gr), handle);
 }
 
 void graw_renderer_resource_destroy(struct grend_resource *res)
@@ -2008,7 +2058,8 @@ void graw_renderer_resource_destroy(struct grend_resource *res)
    } else
       glDeleteTextures(1, &res->id);
 
-   graw_destroy_resource(res->handle);
+   vrend_resource_remove(res->handle);
+   free(res);
 }
 
 
@@ -2016,7 +2067,7 @@ void graw_renderer_resource_unref(uint32_t res_handle)
 {
    struct grend_resource *res;
 
-   res = graw_lookup_resource(res_handle, 0);
+   res = vrend_resource_lookup(res_handle, 0);
    if (!res)
       return;
 
@@ -2051,7 +2102,7 @@ static void copy_transfer_data(struct pipe_resource *res,
 
    int h;
    if (send_size == size)
-      graw_iov_to_buf(iov, num_iovs, offset, data, size - offset);
+      graw_iov_to_buf(iov, num_iovs, offset, data, size);
    else {
       for (h = 0; h < box->height; h++) {
          void *ptr = data + (h * box->width * elsize);
@@ -2075,7 +2126,7 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
    void *data;
    int need_temp;
 
-   res = graw_lookup_resource(res_handle, ctx_id);
+   res = vrend_resource_lookup(res_handle, ctx_id);
    if (res == NULL) {
       report_resource_error(res_handle, "transfer write");
       return;
@@ -2235,7 +2286,7 @@ void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t ctx_id,
    void *myptr = iov[0].iov_base + offset;
    int need_temp = 0;
 
-   res = graw_lookup_resource(res_handle, ctx_id);
+   res = vrend_resource_lookup(res_handle, ctx_id);
    if (!res) {
       report_resource_error(res_handle, "transfer read");
       return;
@@ -2403,7 +2454,7 @@ void grend_set_streamout_targets(struct grend_context *ctx,
 
    ctx->num_so_targets = num_targets;
    for (i = 0; i < num_targets; i++) {
-      target = graw_object_lookup(ctx->object_hash, handles[i], GRAW_STREAMOUT_TARGET);
+      target = vrend_object_lookup(ctx->object_hash, handles[i], VIRGL_OBJECT_STREAMOUT_TARGET);
       if (!target) {
          fprintf(stderr,"can't find so target %d\n", i);
          return;
@@ -2423,8 +2474,9 @@ void graw_renderer_resource_copy_region(struct grend_context *ctx,
    GLuint fb_ids[2];
    GLbitfield glmask = 0;
    GLint sy1, sy2, dy1, dy2;
-   src_res = graw_lookup_resource(src_handle, ctx->ctx_id);
-   dst_res = graw_lookup_resource(dst_handle, ctx->ctx_id);
+
+   src_res = vrend_resource_lookup(src_handle, ctx->ctx_id);
+   dst_res = vrend_resource_lookup(dst_handle, ctx->ctx_id);
 
    if (!src_res || !dst_res) {
       fprintf(stderr,"illegal handle in copy region %d %d\n", src_handle, dst_handle);
@@ -2485,8 +2537,8 @@ static void graw_renderer_blit_int(uint32_t ctx_id,
    GLbitfield glmask = 0;
    int src_y1, src_y2, dst_y1, dst_y2;
 
-   src_res = graw_lookup_resource(src_handle, ctx_id);
-   dst_res = graw_lookup_resource(dst_handle, ctx_id);
+   src_res = vrend_resource_lookup(src_handle, ctx_id);
+   dst_res = vrend_resource_lookup(dst_handle, ctx_id);
 
    if (!src_res || !dst_res) {
       fprintf(stderr,"illegal handle in blit %d %d\n", src_handle, dst_handle);
@@ -2566,7 +2618,7 @@ int graw_renderer_set_scanout(uint32_t res_handle, uint32_t ctx_id,
                               struct pipe_box *box)
 {
    struct grend_resource *res;
-   res = graw_lookup_resource(res_handle, ctx_id);
+   res = vrend_resource_lookup(res_handle, ctx_id);
    if (!res)
       return 0;
 
@@ -2650,7 +2702,7 @@ int graw_renderer_flush_buffer(uint32_t res_handle,
    if (!localrender)
       return 0;
 
-   res = graw_lookup_resource(res_handle, ctx_id);
+   res = vrend_resource_lookup(res_handle, ctx_id);
    if (!res)
       return 0;
 
@@ -2730,7 +2782,7 @@ static boolean graw_check_query(struct grend_query *query)
    GLint ready;
    uint64_t result;
    boolean use_64 = FALSE;
-   struct graw_host_query_state *state;
+   struct virgl_host_query_state *state;
    struct grend_nontimer_hw_query *hwq, *stor;
    boolean ret;
 
@@ -2845,13 +2897,13 @@ void grend_hw_switch_context(struct grend_context *ctx)
 void
 graw_renderer_object_destroy(struct grend_context *ctx, uint32_t handle)
 {
-   graw_object_destroy(ctx, ctx->object_hash, handle, 0);
+   vrend_object_remove(ctx->object_hash, handle, 0);
 }
 
 void graw_renderer_object_insert(struct grend_context *ctx, void *data,
-                                 uint32_t size, uint32_t handle, enum graw_object_type type)
+                                 uint32_t size, uint32_t handle, enum virgl_object_type type)
 {
-   graw_object_insert(ctx->object_hash, data, size, handle, type);
+   vrend_object_insert(ctx->object_hash, data, size, handle, type);
 }
 
 static struct grend_nontimer_hw_query *grend_create_hw_query(struct grend_query *query)
@@ -2876,7 +2928,7 @@ void grend_create_query(struct grend_context *ctx, uint32_t handle,
    struct grend_query *q;
    struct grend_resource *res;
 
-   res = graw_lookup_resource(res_handle, ctx->ctx_id);
+   res = vrend_resource_lookup(res_handle, ctx->ctx_id);
    if (!res) {
       report_resource_error(res_handle, "query");
       return;
@@ -2915,10 +2967,10 @@ void grend_create_query(struct grend_context *ctx, uint32_t handle,
       glGenQueries(1, &q->timer_query_id);
 
    graw_renderer_object_insert(ctx, q, sizeof(struct grend_query), handle,
-                               GRAW_QUERY);
+                               VIRGL_OBJECT_QUERY);
 }
 
-void grend_destroy_query(struct grend_query *query)
+static void grend_destroy_query(struct grend_query *query)
 {
    struct grend_nontimer_hw_query *hwq, *stor;
 
@@ -2935,13 +2987,19 @@ void grend_destroy_query(struct grend_query *query)
    }
 }
 
+static void grend_destroy_query_object(void *obj_ptr)
+{
+   struct grend_query *query = obj_ptr;
+   grend_destroy_query(query);
+}
+
 void grend_begin_query(struct grend_context *ctx, uint32_t handle)
 {
    struct grend_query *q;
    GLenum qtype;
    struct grend_nontimer_hw_query *hwq;
 
-   q = graw_object_lookup(ctx->object_hash, handle, GRAW_QUERY);
+   q = vrend_object_lookup(ctx->object_hash, handle, VIRGL_OBJECT_QUERY);
    if (!q)
       return;
 
@@ -2964,7 +3022,7 @@ void grend_begin_query(struct grend_context *ctx, uint32_t handle)
 void grend_end_query(struct grend_context *ctx, uint32_t handle)
 {
    struct grend_query *q;
-   q = graw_object_lookup(ctx->object_hash, handle, GRAW_QUERY);
+   q = vrend_object_lookup(ctx->object_hash, handle, VIRGL_OBJECT_QUERY);
    if (!q)
       return;
 
@@ -2989,7 +3047,7 @@ void grend_get_query_result(struct grend_context *ctx, uint32_t handle,
    struct grend_query *q;
    boolean ret;
 
-   q = graw_object_lookup(ctx->object_hash, handle, GRAW_QUERY);
+   q = vrend_object_lookup(ctx->object_hash, handle, VIRGL_OBJECT_QUERY);
    if (!q)
       return;
 
@@ -3017,7 +3075,7 @@ void grend_create_so_target(struct grend_context *ctx,
    struct grend_so_target *target;
    struct grend_resource *res;
 
-   res = graw_lookup_resource(res_handle, ctx->ctx_id);
+   res = vrend_resource_lookup(res_handle, ctx->ctx_id);
    if (!res) {
       report_resource_error(res_handle, "streamout target");
       return;
@@ -3033,8 +3091,8 @@ void grend_create_so_target(struct grend_context *ctx,
 
    grend_resource_reference(&target->buffer, res);
 
-   graw_object_insert(ctx->object_hash, target, sizeof(*target), handle,
-                      GRAW_STREAMOUT_TARGET);
+   vrend_object_insert(ctx->object_hash, target, sizeof(*target), handle,
+                       VIRGL_OBJECT_STREAMOUT_TARGET);
 }
 
 static void vrender_get_glsl_version(int *major, int *minor)

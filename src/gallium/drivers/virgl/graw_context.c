@@ -20,8 +20,6 @@
 #include "state_tracker/graw.h"
 #include "state_tracker/drm_driver.h"
 
-#include "graw_protocol.h"
-
 #include "graw_encode.h"
 
 #include "graw_context.h"
@@ -29,6 +27,12 @@
 #include "virgl.h"
 #include "state_tracker/sw_winsys.h"
  struct pipe_screen encscreen;
+
+static uint32_t next_handle;
+uint32_t graw_object_assign_handle(void)
+{
+   return next_handle++;
+}
 
 static void graw_buffer_flush(struct graw_context *grctx,
                            struct graw_buffer *buf)
@@ -95,7 +99,7 @@ static void graw_surface_destroy(struct pipe_context *ctx,
    struct graw_surface *surf = (struct graw_surface *)psurf;
 
    pipe_resource_reference(&surf->base.texture, NULL);
-   graw_encode_delete_object(grctx, surf->handle, GRAW_SURFACE);
+   graw_encode_delete_object(grctx, surf->handle, VIRGL_OBJECT_SURFACE);
    FREE(surf);
 }
 
@@ -117,7 +121,7 @@ static void graw_bind_blend_state(struct pipe_context *ctx,
 {
    struct graw_context *grctx = (struct graw_context *)ctx;
    uint32_t handle = (unsigned long)blend_state;
-   graw_encode_bind_object(grctx, handle, GRAW_OBJECT_BLEND);
+   graw_encode_bind_object(grctx, handle, VIRGL_OBJECT_BLEND);
 }
 
 static void graw_delete_blend_state(struct pipe_context *ctx,
@@ -125,7 +129,7 @@ static void graw_delete_blend_state(struct pipe_context *ctx,
 {
    struct graw_context *grctx = (struct graw_context *)ctx;
    uint32_t handle = (unsigned long)blend_state;
-   graw_encode_delete_object(grctx, handle, GRAW_OBJECT_BLEND);
+   graw_encode_delete_object(grctx, handle, VIRGL_OBJECT_BLEND);
 }
 
 static void *graw_create_depth_stencil_alpha_state(struct pipe_context *ctx,
@@ -144,7 +148,7 @@ static void graw_bind_depth_stencil_alpha_state(struct pipe_context *ctx,
 {
    struct graw_context *grctx = (struct graw_context *)ctx;
    uint32_t handle = (unsigned long)blend_state;
-   graw_encode_bind_object(grctx, handle, GRAW_OBJECT_DSA);
+   graw_encode_bind_object(grctx, handle, VIRGL_OBJECT_DSA);
 }
 
 static void graw_delete_depth_stencil_alpha_state(struct pipe_context *ctx,
@@ -152,7 +156,7 @@ static void graw_delete_depth_stencil_alpha_state(struct pipe_context *ctx,
 {
    struct graw_context *grctx = (struct graw_context *)ctx;
    uint32_t handle = (unsigned long)dsa_state;
-   graw_encode_delete_object(grctx, handle, GRAW_OBJECT_DSA);
+   graw_encode_delete_object(grctx, handle, VIRGL_OBJECT_DSA);
 }
 
 static void *graw_create_rasterizer_state(struct pipe_context *ctx,
@@ -172,7 +176,7 @@ static void graw_bind_rasterizer_state(struct pipe_context *ctx,
    struct graw_context *grctx = (struct graw_context *)ctx;
    uint32_t handle = (unsigned long)rs_state;
 
-   graw_encode_bind_object(grctx, handle, GRAW_OBJECT_RASTERIZER);
+   graw_encode_bind_object(grctx, handle, VIRGL_OBJECT_RASTERIZER);
 }
 
 static void graw_delete_rasterizer_state(struct pipe_context *ctx,
@@ -180,7 +184,7 @@ static void graw_delete_rasterizer_state(struct pipe_context *ctx,
 {
    struct graw_context *grctx = (struct graw_context *)ctx;
    uint32_t handle = (unsigned long)rs_state;
-   graw_encode_delete_object(grctx, handle, GRAW_OBJECT_RASTERIZER);
+   graw_encode_delete_object(grctx, handle, VIRGL_OBJECT_RASTERIZER);
 }
 
 static void graw_set_framebuffer_state(struct pipe_context *ctx,
@@ -217,7 +221,7 @@ static void graw_delete_vertex_elements_state(struct pipe_context *ctx,
    struct graw_context *grctx = (struct graw_context *)ctx;
    uint32_t handle = (unsigned long)ve;
 
-   graw_encode_delete_object(grctx, handle, GRAW_OBJECT_VERTEX_ELEMENTS);
+   graw_encode_delete_object(grctx, handle, VIRGL_OBJECT_VERTEX_ELEMENTS);
 }
 
 static void graw_bind_vertex_elements_state(struct pipe_context *ctx,
@@ -225,7 +229,7 @@ static void graw_bind_vertex_elements_state(struct pipe_context *ctx,
 {
    struct graw_context *grctx = (struct graw_context *)ctx;
    uint32_t handle = (unsigned long)ve;
-   graw_encode_bind_object(grctx, handle, GRAW_OBJECT_VERTEX_ELEMENTS);
+   graw_encode_bind_object(grctx, handle, VIRGL_OBJECT_VERTEX_ELEMENTS);
 }
 
 static void graw_set_vertex_buffers(struct pipe_context *ctx,
@@ -336,7 +340,7 @@ static void *graw_create_vs_state(struct pipe_context *ctx,
 
    /* encode VS state */
    ret = graw_encode_shader_state(grctx, handle,
-                                  GRAW_OBJECT_VS, shader);
+                                  VIRGL_OBJECT_VS, shader);
    if (ret) {
       return NULL;
    }
@@ -354,7 +358,7 @@ static void *graw_create_fs_state(struct pipe_context *ctx,
 
    /* encode VS state */
    ret = graw_encode_shader_state(grctx, handle,
-                                  GRAW_OBJECT_FS, shader);
+                                  VIRGL_OBJECT_FS, shader);
    if (ret)
       return NULL;
 
@@ -368,7 +372,7 @@ graw_delete_fs_state(struct pipe_context *ctx,
    uint32_t handle = (unsigned long)fs;
    struct graw_context *grctx = (struct graw_context *)ctx;
 
-   graw_encode_delete_object(grctx, handle, GRAW_OBJECT_FS);
+   graw_encode_delete_object(grctx, handle, VIRGL_OBJECT_FS);
 }
 
 static void
@@ -378,7 +382,7 @@ graw_delete_vs_state(struct pipe_context *ctx,
    uint32_t handle = (unsigned long)vs;
    struct graw_context *grctx = (struct graw_context *)ctx;
 
-   graw_encode_delete_object(grctx, handle, GRAW_OBJECT_VS);
+   graw_encode_delete_object(grctx, handle, VIRGL_OBJECT_VS);
 }
 
 static void graw_bind_vs_state(struct pipe_context *ctx,
@@ -387,7 +391,7 @@ static void graw_bind_vs_state(struct pipe_context *ctx,
    uint32_t handle = (unsigned long)vss;
    struct graw_context *grctx = (struct graw_context *)ctx;
 
-   graw_encode_bind_object(grctx, handle, GRAW_OBJECT_VS);
+   graw_encode_bind_object(grctx, handle, VIRGL_OBJECT_VS);
 }
 
 
@@ -397,7 +401,7 @@ static void graw_bind_fs_state(struct pipe_context *ctx,
    uint32_t handle = (unsigned long)vss;
    struct graw_context *grctx = (struct graw_context *)ctx;
 
-   graw_encode_bind_object(grctx, handle, GRAW_OBJECT_FS);
+   graw_encode_bind_object(grctx, handle, VIRGL_OBJECT_FS);
 }
 
 static void graw_clear(struct pipe_context *ctx,
@@ -580,7 +584,7 @@ static void graw_destroy_sampler_view(struct pipe_context *ctx,
    struct graw_context *grctx = (struct graw_context *)ctx;
    struct graw_sampler_view *grview = (struct graw_sampler_view *)view;
 
-   graw_encode_delete_object(grctx, grview->handle, GRAW_OBJECT_SAMPLER_VIEW);
+   graw_encode_delete_object(grctx, grview->handle, VIRGL_OBJECT_SAMPLER_VIEW);
    pipe_resource_reference(&view->texture, NULL);
    FREE(view);
 }
@@ -603,7 +607,7 @@ static void graw_delete_sampler_state(struct pipe_context *ctx,
    struct graw_context *grctx = (struct graw_context *)ctx;
    uint32_t handle = (unsigned long)ss;
 
-   graw_encode_delete_object(grctx, handle, GRAW_OBJECT_SAMPLER_STATE);
+   graw_encode_delete_object(grctx, handle, VIRGL_OBJECT_SAMPLER_STATE);
 }
 
 static void graw_bind_fragment_sampler_states(struct pipe_context *ctx,
@@ -813,7 +817,6 @@ void graw_flush_frontbuffer(struct pipe_screen *screen,
    void *alloced = malloc(size);
    int i;
 
-   grend_flush_frontbuffer(gres->base.res_handle);
    if (!alloced) {
       fprintf(stderr,"Failed to malloc\n");
    }

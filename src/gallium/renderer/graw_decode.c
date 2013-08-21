@@ -7,7 +7,6 @@
 #include "util/u_memory.h"
 #include "pipe/p_state.h"
 #include "pipe/p_shader_tokens.h"
-#include "graw_protocol.h"
 #include "graw_decode.h"
 #include "graw_renderer.h"
 #include "graw_object.h"
@@ -67,7 +66,7 @@ static int graw_decode_create_shader(struct grend_decode_ctx *ctx, uint32_t type
 
    state->tokens = tokens;
 
-   if (type == GRAW_OBJECT_FS)
+   if (type == VIRGL_OBJECT_FS)
       grend_create_fs(ctx->grctx, handle, state);
    else
       grend_create_vs(ctx->grctx, handle, state);
@@ -252,7 +251,7 @@ static void graw_decode_create_blend(struct grend_decode_ctx *ctx, uint32_t hand
    }
 
    graw_renderer_object_insert(ctx->grctx, blend_state, sizeof(struct pipe_blend_state), handle,
-                      GRAW_OBJECT_BLEND);
+                      VIRGL_OBJECT_BLEND);
 }
 
 static void graw_decode_create_dsa(struct grend_decode_ctx *ctx, uint32_t handle, uint16_t length)
@@ -284,7 +283,7 @@ static void graw_decode_create_dsa(struct grend_decode_ctx *ctx, uint32_t handle
    dsa_state->alpha.ref_value = uif(tmp);
 
    graw_renderer_object_insert(ctx->grctx, dsa_state, sizeof(struct pipe_depth_stencil_alpha_state), handle,
-                      GRAW_OBJECT_DSA);
+                      VIRGL_OBJECT_DSA);
 }
 
 static void graw_decode_create_rasterizer(struct grend_decode_ctx *ctx, uint32_t handle, uint16_t length)
@@ -337,7 +336,7 @@ static void graw_decode_create_rasterizer(struct grend_decode_ctx *ctx, uint32_t
    
    
    graw_renderer_object_insert(ctx->grctx, rs_state, sizeof(struct pipe_rasterizer_state), handle,
-                      GRAW_OBJECT_RASTERIZER);
+                      VIRGL_OBJECT_RASTERIZER);
 }
 
 static void graw_decode_create_surface(struct grend_decode_ctx *ctx, uint32_t handle)
@@ -382,7 +381,7 @@ static void graw_decode_create_sampler_state(struct grend_decode_ctx *ctx, uint3
    state->min_lod = uif(ctx->ds->buf[ctx->ds->buf_offset + 4]);
    state->max_lod = uif(ctx->ds->buf[ctx->ds->buf_offset + 5]);
    graw_renderer_object_insert(ctx->grctx, state, sizeof(struct pipe_sampler_state), handle,
-                      GRAW_OBJECT_SAMPLER_STATE);
+                      VIRGL_OBJECT_SAMPLER_STATE);
 }
 
 static void graw_decode_create_ve(struct grend_decode_ctx *ctx, uint32_t handle, uint16_t length)
@@ -430,35 +429,35 @@ static void graw_decode_create_object(struct grend_decode_ctx *ctx)
    length = header >> 16;
 
    switch (obj_type){
-   case GRAW_OBJECT_BLEND:
+   case VIRGL_OBJECT_BLEND:
       graw_decode_create_blend(ctx, handle, length);
       break;
-   case GRAW_OBJECT_DSA:
+   case VIRGL_OBJECT_DSA:
       graw_decode_create_dsa(ctx, handle, length);
       break;
-   case GRAW_OBJECT_RASTERIZER:
+   case VIRGL_OBJECT_RASTERIZER:
       graw_decode_create_rasterizer(ctx, handle, length);
       break;
-   case GRAW_OBJECT_VS:
-   case GRAW_OBJECT_FS:
+   case VIRGL_OBJECT_VS:
+   case VIRGL_OBJECT_FS:
       graw_decode_create_shader(ctx, obj_type, handle, length);
       break;
-   case GRAW_OBJECT_VERTEX_ELEMENTS:
+   case VIRGL_OBJECT_VERTEX_ELEMENTS:
       graw_decode_create_ve(ctx, handle, length);
       break;
-   case GRAW_SURFACE:
+   case VIRGL_OBJECT_SURFACE:
       graw_decode_create_surface(ctx, handle);
       break;
-   case GRAW_OBJECT_SAMPLER_VIEW:
+   case VIRGL_OBJECT_SAMPLER_VIEW:
       graw_decode_create_sampler_view(ctx, handle);
       break;
-   case GRAW_OBJECT_SAMPLER_STATE:
+   case VIRGL_OBJECT_SAMPLER_STATE:
       graw_decode_create_sampler_state(ctx, handle, length);
       break;
-   case GRAW_QUERY:
+   case VIRGL_OBJECT_QUERY:
       graw_decode_create_query(ctx, handle);
       break;
-   case GRAW_STREAMOUT_TARGET:
+   case VIRGL_OBJECT_STREAMOUT_TARGET:
       graw_decode_create_stream_output_target(ctx, handle);
       break;
    }
@@ -474,22 +473,22 @@ static void graw_decode_bind_object(struct grend_decode_ctx *ctx)
    length = header >> 16;
 
    switch (obj_type) {
-   case GRAW_OBJECT_BLEND:
+   case VIRGL_OBJECT_BLEND:
       grend_object_bind_blend(ctx->grctx, handle);
       break;
-   case GRAW_OBJECT_DSA:
+   case VIRGL_OBJECT_DSA:
       grend_object_bind_dsa(ctx->grctx, handle);
       break;
-   case GRAW_OBJECT_RASTERIZER:
+   case VIRGL_OBJECT_RASTERIZER:
       grend_object_bind_rasterizer(ctx->grctx, handle);
       break;
-   case GRAW_OBJECT_VS:
+   case VIRGL_OBJECT_VS:
       grend_bind_vs(ctx->grctx, handle);
       break;
-   case GRAW_OBJECT_FS:
+   case VIRGL_OBJECT_FS:
       grend_bind_fs(ctx->grctx, handle);
       break;
-   case GRAW_OBJECT_VERTEX_ELEMENTS:
+   case VIRGL_OBJECT_VERTEX_ELEMENTS:
       grend_bind_vertex_elements_state(ctx->grctx, handle);
       break;
    }
@@ -756,79 +755,79 @@ static void graw_decode_block(uint32_t ctx_id, uint32_t *block, int ndw)
 //      fprintf(stderr,"[%d] cmd is %d (obj %d) len %d\n", gdctx->ds->buf_offset, header & 0xff, (header >> 8 & 0xff), (header >> 16));
       
       switch (header & 0xff) {
-      case GRAW_CREATE_OBJECT:
+      case VIRGL_CCMD_CREATE_OBJECT:
          graw_decode_create_object(gdctx);
          break;
-      case GRAW_BIND_OBJECT:
+      case VIRGL_CCMD_BIND_OBJECT:
          graw_decode_bind_object(gdctx);
          break;
-      case GRAW_DESTROY_OBJECT:
+      case VIRGL_CCMD_DESTROY_OBJECT:
          graw_decode_destroy_object(gdctx);
          break;
-      case GRAW_CLEAR:
+      case VIRGL_CCMD_CLEAR:
          graw_decode_clear(gdctx);
          break;
-      case GRAW_DRAW_VBO:
+      case VIRGL_CCMD_DRAW_VBO:
          graw_decode_draw_vbo(gdctx);
          break;
-      case GRAW_SET_FRAMEBUFFER_STATE:
+      case VIRGL_CCMD_SET_FRAMEBUFFER_STATE:
          graw_decode_set_framebuffer_state(gdctx);
          break;
-      case GRAW_SET_VERTEX_BUFFERS:
+      case VIRGL_CCMD_SET_VERTEX_BUFFERS:
          graw_decode_set_vertex_buffers(gdctx, header >> 16);
          break;
-      case GRAW_RESOURCE_INLINE_WRITE:
+      case VIRGL_CCMD_RESOURCE_INLINE_WRITE:
          graw_decode_resource_inline_write(gdctx, header >> 16);
          break;
-      case GRAW_SET_VIEWPORT_STATE:
+      case VIRGL_CCMD_SET_VIEWPORT_STATE:
          graw_decode_set_viewport_state(gdctx);
          break;
-      case GRAW_SET_SAMPLER_VIEWS:
+      case VIRGL_CCMD_SET_SAMPLER_VIEWS:
          graw_decode_set_sampler_views(gdctx, header >> 16);
          break;
-      case GRAW_SET_INDEX_BUFFER:
+      case VIRGL_CCMD_SET_INDEX_BUFFER:
          graw_decode_set_index_buffer(gdctx);
          break;
-      case GRAW_SET_CONSTANT_BUFFER:
+      case VIRGL_CCMD_SET_CONSTANT_BUFFER:
          graw_decode_set_constant_buffer(gdctx, header >> 16);
          break;
-      case GRAW_SET_STENCIL_REF:
+      case VIRGL_CCMD_SET_STENCIL_REF:
          graw_decode_set_stencil_ref(gdctx);
          break;
-      case GRAW_SET_BLEND_COLOR:
+      case VIRGL_CCMD_SET_BLEND_COLOR:
          graw_decode_set_blend_color(gdctx);
          break;
-      case GRAW_SET_SCISSOR_STATE:
+      case VIRGL_CCMD_SET_SCISSOR_STATE:
          graw_decode_set_scissor_state(gdctx);
          break;
-      case GRAW_BLIT:
+      case VIRGL_CCMD_BLIT:
          graw_decode_blit(gdctx);
          break;
-      case GRAW_RESOURCE_COPY_REGION:
+      case VIRGL_CCMD_RESOURCE_COPY_REGION:
          graw_decode_resource_copy_region(gdctx);
          break;
-      case GRAW_BIND_SAMPLER_STATES:
+      case VIRGL_CCMD_BIND_SAMPLER_STATES:
          graw_decode_bind_sampler_states(gdctx, header >> 16);
          break;
-      case GRAW_BEGIN_QUERY:
+      case VIRGL_CCMD_BEGIN_QUERY:
          graw_decode_begin_query(gdctx);
          break;
-      case GRAW_END_QUERY:
+      case VIRGL_CCMD_END_QUERY:
          graw_decode_end_query(gdctx);
          break;
-      case GRAW_GET_QUERY_RESULT:
+      case VIRGL_CCMD_GET_QUERY_RESULT:
          graw_decode_get_query_result(gdctx);
          break;
-      case GRAW_SET_POLYGON_STIPPLE:
+      case VIRGL_CCMD_SET_POLYGON_STIPPLE:
          graw_decode_set_polygon_stipple(gdctx);
          break;
-      case GRAW_SET_CLIP_STATE:
+      case VIRGL_CCMD_SET_CLIP_STATE:
          graw_decode_set_clip_state(gdctx);
          break;
-      case GRAW_SET_SAMPLE_MASK:
+      case VIRGL_CCMD_SET_SAMPLE_MASK:
          graw_decode_set_sample_mask(gdctx);
          break;
-      case GRAW_SET_STREAMOUT_TARGETS:
+      case VIRGL_CCMD_SET_STREAMOUT_TARGETS:
          graw_decode_set_streamout_targets(gdctx, header >> 16);
          break;
       }

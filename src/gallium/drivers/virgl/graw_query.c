@@ -31,7 +31,7 @@ static struct pipe_query *graw_create_query(struct pipe_context *ctx,
       return NULL;
 
    query->buf = (struct graw_resource *)pipe_buffer_create(ctx->screen, PIPE_BIND_CUSTOM,
-                                                           PIPE_USAGE_STAGING, sizeof(struct graw_host_query_state));
+                                                           PIPE_USAGE_STAGING, sizeof(struct virgl_host_query_state));
    
    if (!query->buf) {
       FREE(query);
@@ -53,7 +53,7 @@ static void graw_destroy_query(struct pipe_context *ctx,
    struct graw_context *grctx = (struct graw_context *)ctx;
    struct graw_query *query = (struct graw_query *)q;
 
-   graw_encode_delete_object(grctx, query->handle, GRAW_QUERY);
+   graw_encode_delete_object(grctx, query->handle, VIRGL_OBJECT_QUERY);
 
    pipe_resource_reference((struct pipe_resource **)&query->buf, NULL);
    FREE(query);
@@ -75,7 +75,7 @@ static void graw_end_query(struct pipe_context *ctx,
    struct graw_context *grctx = (struct graw_context *)ctx;
    struct graw_query *query = (struct graw_query *)q;
    struct pipe_transfer *transfer;
-   struct graw_host_query_state *host_state;
+   struct virgl_host_query_state *host_state;
 
    host_state = pipe_buffer_map(ctx, &query->buf->base,
                                PIPE_TRANSFER_READ, &transfer);
@@ -93,7 +93,7 @@ static boolean graw_get_query_result(struct pipe_context *ctx,
    struct graw_context *grctx = (struct graw_context *)ctx;
    struct graw_query *query = (struct graw_query *)q;
    struct pipe_transfer *transfer;
-   struct graw_host_query_state *host_state;
+   struct virgl_host_query_state *host_state;
 
    /* ask host for query result */
    if (!query->result_gotten_sent) {

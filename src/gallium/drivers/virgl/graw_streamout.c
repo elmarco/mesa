@@ -35,7 +35,7 @@ static void graw_destroy_so_target(struct pipe_context *ctx,
    struct graw_so_target *t = (struct graw_so_target *)target;
 
    pipe_resource_reference(&t->base.buffer, NULL);
-   graw_encode_delete_object(grctx, t->handle, GRAW_STREAMOUT_TARGET);
+   graw_encode_delete_object(grctx, t->handle, VIRGL_OBJECT_STREAMOUT_TARGET);
    FREE(t);
 }
 

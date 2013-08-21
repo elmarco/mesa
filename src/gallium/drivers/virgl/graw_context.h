@@ -3,7 +3,7 @@
 
 #include "pipe/p_state.h"
 #include "pipe/p_context.h"
-#include "graw_protocol.h"
+#include "virgl_protocol.h"
 
 #include "virgl.h"
 #include "util/u_slab.h"

@@ -361,8 +361,6 @@ virgl_create_screen(struct virgl_winsys *vws)
    screen->base.destroy = virgl_destroy_screen;
    screen->base.resource_from_handle = virgl_resource_from_handle;
 
-   graw_renderer_init();
-   
    screen->base.context_create = graw_context_create;
    screen->base.resource_create = graw_resource_create;
    screen->base.resource_destroy = graw_resource_destroy;

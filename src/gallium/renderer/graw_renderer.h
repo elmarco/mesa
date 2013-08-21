@@ -3,7 +3,7 @@
 
 #include "pipe/p_state.h"
 #include "util/u_inlines.h"
-#include "graw_protocol.h"
+#include "virgl_protocol.h"
 #include "graw_iov.h"
 #include "virgl_hw.h"
 struct grend_context;
@@ -28,6 +28,8 @@ struct grend_format_table {
    GLenum gltype;
    uint32_t bindings;
 };
+
+void graw_renderer_init(void);
 
 void grend_insert_format(struct grend_format_table *entry);
 void grend_create_vs(struct grend_context *ctx,
@@ -216,7 +218,7 @@ void grend_stop_current_queries(void);
 int swap_buffers(void);
 void grend_hw_switch_context(struct grend_context *ctx);
 void graw_renderer_object_insert(struct grend_context *ctx, void *data,
-                                 uint32_t size, uint32_t handle, enum graw_object_type type);
+                                 uint32_t size, uint32_t handle, enum virgl_object_type type);
 void graw_renderer_object_destroy(struct grend_context *ctx, uint32_t handle);
 
 void grend_create_query(struct grend_context *ctx, uint32_t handle,

@@ -4,6 +4,15 @@
 
 #include "graw_object.h"
 
+struct vrend_object_types {
+   void (*unref)(void *);
+} obj_types[VIRGL_MAX_OBJECTS];
+
+void vrend_object_set_destroy_callback(int type, void (*cb)(void *)) 
+{
+   obj_types[type].unref = cb;
+}
+
 static unsigned
 hash_func(void *key)
 {
@@ -23,71 +32,55 @@ compare(void *key1, void *key2)
 }
 
 static struct util_hash_table *res_hash;
-static uint32_t next_handle;
 
-struct graw_object {
-   enum graw_object_type type;
+struct vrend_object {
+   enum virgl_object_type type;
    uint32_t handle;
    void *data;
 };
 
-struct util_hash_table *graw_init_ctx_hash(void)
+struct util_hash_table *vrend_object_init_ctx_table(void)
 {
    struct util_hash_table *ctx_hash;
    ctx_hash = util_hash_table_create(hash_func, compare);
    return ctx_hash;
 }
 
-static void graw_free_object(struct grend_context *ctx, struct graw_object *obj)
+static void vrend_object_free(struct vrend_object *obj)
 {
-   switch (obj->type) {
-   case GRAW_QUERY:
-      grend_destroy_query((struct grend_query *)obj->data);
-      break;
-   case GRAW_SURFACE:
-      grend_destroy_surface(ctx, (struct grend_surface *)obj->data);
-      break;
-   case GRAW_OBJECT_VS:
-   case GRAW_OBJECT_FS:
-      grend_destroy_shader((struct grend_shader_state *)obj->data);
-      break;
-   case GRAW_OBJECT_SAMPLER_VIEW:
-      grend_destroy_sampler_view(ctx, (struct grend_sampler_view *)obj->data);
-      break;
-   case GRAW_STREAMOUT_TARGET:
-      grend_destroy_so_target(ctx, (struct grend_so_target *)obj->data);
-   default:
-      break;
+   if (obj_types[obj->type].unref)
+      obj_types[obj->type].unref(obj->data);
+   else {
+      /* for objects with no callback just free them */
+      free(obj->data);
    }
-   free(obj->data);
    free(obj);
 }
 
 static enum pipe_error free_cb(void *key, void *value, void *data)
 {
-   struct graw_object *obj = value;
-   struct grend_context *ctx = data;
-   graw_free_object(ctx, obj);
+   struct vrend_object *obj = value;
+   vrend_object_free(obj);
    return PIPE_OK;
 }
 
-void graw_fini_ctx_hash(struct util_hash_table *ctx_hash, struct grend_context *ctx)
+void vrend_object_fini_ctx_table(struct util_hash_table *ctx_hash)
 {
    if (!ctx_hash)
       return;
    
-   util_hash_table_foreach(ctx_hash, free_cb, ctx);
+   util_hash_table_foreach(ctx_hash, free_cb, NULL);
    util_hash_table_destroy(ctx_hash);
 }
 
 void
-graw_object_init_resource_hash(void)
+vrend_object_init_resource_table(void)
 {
    if (!res_hash)
       res_hash = util_hash_table_create(hash_func, compare);
 }
 
-void graw_object_fini_resource_hash(void)
+void vrend_object_fini_resource_table(void)
 {
    if (res_hash)
       util_hash_table_destroy(res_hash);
@@ -95,25 +88,10 @@ void graw_object_fini_resource_hash(void)
 }
 
 uint32_t
-graw_object_create(struct util_hash_table *handle_hash,
-                   void *data, uint32_t length, enum graw_object_type type)
+vrend_object_insert(struct util_hash_table *handle_hash,
+                    void *data, uint32_t length, uint32_t handle, enum virgl_object_type type)
 {
-   struct graw_object *obj = CALLOC_STRUCT(graw_object);
-
-   if (!obj)
-      return 0;
-   obj->handle = next_handle++;
-   obj->data = data;
-   obj->type = type;
-   util_hash_table_set(handle_hash, intptr_to_pointer(obj->handle), obj);
-   return obj->handle;
-}
-
-uint32_t
-graw_object_insert(struct util_hash_table *handle_hash,
-                   void *data, uint32_t length, uint32_t handle, enum graw_object_type type)
-{
-   struct graw_object *obj = CALLOC_STRUCT(graw_object);
+   struct vrend_object *obj = CALLOC_STRUCT(vrend_object);
 
    if (!obj)
       return 0;
@@ -125,23 +103,24 @@ graw_object_insert(struct util_hash_table *handle_hash,
 }
 
 void
-graw_object_destroy(struct grend_context *ctx,
-                    struct util_hash_table *handle_hash,
-                    uint32_t handle, enum graw_object_type type)
+vrend_object_remove(struct util_hash_table *handle_hash,
+                    uint32_t handle, enum virgl_object_type type)
 {
-   struct graw_object *obj;
+   struct vrend_object *obj;
 
    obj = util_hash_table_get(handle_hash, intptr_to_pointer(handle));
    if (!obj)
       return;
    util_hash_table_remove(handle_hash, intptr_to_pointer(handle));
-   graw_free_object(ctx, obj);
+
+   
+   vrend_object_free(obj);
 }
 
-void *graw_object_lookup(struct util_hash_table *handle_hash,
-                         uint32_t handle, enum graw_object_type type)
+void *vrend_object_lookup(struct util_hash_table *handle_hash,
+                         uint32_t handle, enum virgl_object_type type)
 {
-   struct graw_object *obj;
+   struct vrend_object *obj;
 
    obj = util_hash_table_get(handle_hash, intptr_to_pointer(handle));
    if (!obj) {
@@ -153,39 +132,32 @@ void *graw_object_lookup(struct util_hash_table *handle_hash,
    return obj->data;
 }
 
-uint32_t graw_object_assign_handle(void)
+void *vrend_resource_insert(void *data, uint32_t length, uint32_t handle)
 {
-   return next_handle++;
-}
-
-void *graw_insert_resource(void *data, uint32_t length, uint32_t handle)
-{
-   struct graw_object *obj = CALLOC_STRUCT(graw_object);
+   struct vrend_object *obj = CALLOC_STRUCT(vrend_object);
 
    if (!obj)
       return 0;
    obj->handle = handle;
    obj->data = data;
-   obj->type = GRAW_RESOURCE;
    util_hash_table_set(res_hash, intptr_to_pointer(obj->handle), obj);
    return obj->handle;
 }
 
-void graw_destroy_resource(uint32_t handle)
+void vrend_resource_remove(uint32_t handle)
 {
-   struct graw_object *obj;
+   struct vrend_object *obj;
 
    obj = util_hash_table_get(res_hash, intptr_to_pointer(handle));
    if (!obj)
       return;
    util_hash_table_remove(res_hash, intptr_to_pointer(handle));
-   free(obj->data);
    free(obj);
 }
 
-void *graw_lookup_resource(uint32_t handle, uint32_t ctx_id)
+void *vrend_resource_lookup(uint32_t handle, uint32_t ctx_id)
 {
-   struct graw_object *obj;
+   struct vrend_object *obj;
    obj = util_hash_table_get(res_hash, intptr_to_pointer(handle));
    if (!obj)
       return NULL;

@@ -92,7 +92,7 @@ int graw_renderer_paint_cursor(struct graw_cursor_info *cursor,
    if (!cursor->res_handle)
       return 0;
 
-   cursor_res = graw_lookup_resource(cursor->res_handle, 0);
+   cursor_res = vrend_resource_lookup(cursor->res_handle, 0);
    if (!cursor_res)
       return 0;
 

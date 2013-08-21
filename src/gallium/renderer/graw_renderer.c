@@ -938,8 +938,15 @@ void grend_set_single_vbo(struct grend_context *ctx,
 
 void grend_set_num_vbo(struct grend_context *ctx,
                       int num_vbo)
-{
+{                                              
+   int old_num = ctx->num_vbos;
+   int i;
    ctx->num_vbos = num_vbo;
+
+   for (i = num_vbo; i < old_num; i++) {
+      grend_resource_reference((struct grend_resource **)&ctx->vbo[i].buffer, NULL);
+   }
+
 }
 
 void grend_set_single_sampler_view(struct grend_context *ctx,
@@ -1951,6 +1958,7 @@ bool grend_destroy_context(struct grend_context *ctx)
    grend_set_num_sampler_views(ctx, PIPE_SHADER_FRAGMENT, 0);
 
    grend_set_streamout_targets(ctx, 0, 0, NULL);
+   grend_set_num_vbo(ctx, 0);
 
    if (ctx->fb_id)
       glDeleteFramebuffers(1, &ctx->fb_id);

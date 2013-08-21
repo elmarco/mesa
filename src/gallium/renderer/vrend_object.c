@@ -2,7 +2,7 @@
 #include "util/u_memory.h"
 #include "util/u_hash_table.h"
 
-#include "graw_object.h"
+#include "vrend_object.h"
 
 struct vrend_object_types {
    void (*unref)(void *);

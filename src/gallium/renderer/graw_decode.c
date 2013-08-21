@@ -13,7 +13,7 @@
 #include "tgsi/tgsi_text.h"
 
 /* decode side */
-#define DECODE_MAX_TOKENS 300
+#define DECODE_MAX_TOKENS 8000
 
 struct grend_decode_ctx {
    struct graw_decoder_state ids, *ds;
@@ -31,21 +31,27 @@ static int graw_decode_create_shader(struct grend_decode_ctx *ctx, uint32_t type
    struct tgsi_token *tokens;
    int i;
    uint32_t shader_offset;
+   unsigned num_tokens;
    if (!state)
       return NULL;
    
-   tokens = calloc(DECODE_MAX_TOKENS, sizeof(struct tgsi_token));
+   num_tokens = ctx->ds->buf[ctx->ds->buf_offset + 2];
+
+   if (num_tokens == 0)
+      num_tokens = 300;
+
+   tokens = calloc(num_tokens + 10, sizeof(struct tgsi_token));
    if (!tokens) {
       free(state);
       return -1;
    }
 
-   state->stream_output.num_outputs = ctx->ds->buf[ctx->ds->buf_offset + 2];
+   state->stream_output.num_outputs = ctx->ds->buf[ctx->ds->buf_offset + 3];
    if (state->stream_output.num_outputs) {
       for (i = 0; i < 4; i++)
-         state->stream_output.stride[i] = ctx->ds->buf[ctx->ds->buf_offset + 3 + i];
+         state->stream_output.stride[i] = ctx->ds->buf[ctx->ds->buf_offset + 4 + i];
       for (i = 0; i < state->stream_output.num_outputs; i++) {
-         uint32_t tmp = ctx->ds->buf[ctx->ds->buf_offset + 7 + i];
+         uint32_t tmp = ctx->ds->buf[ctx->ds->buf_offset + 8 + i];
       
          state->stream_output.output[i].register_index = tmp & 0xff;
          state->stream_output.output[i].start_component = (tmp >> 8) & 0x3;
@@ -53,10 +59,10 @@ static int graw_decode_create_shader(struct grend_decode_ctx *ctx, uint32_t type
          state->stream_output.output[i].output_buffer = (tmp >> 13) & 0x7;
          state->stream_output.output[i].dst_offset = (tmp >> 16) & 0xffff;         
       }
-      shader_offset = 7 + state->stream_output.num_outputs;
+      shader_offset = 8 + state->stream_output.num_outputs;
    } else
-      shader_offset = 3;
-   fprintf(stderr,"shader\n%s\n", &ctx->ds->buf[ctx->ds->buf_offset + shader_offset]);
+      shader_offset = 4;
+//   fprintf(stderr,"shader\n%s\n", &ctx->ds->buf[ctx->ds->buf_offset + shader_offset]);
    if (!tgsi_text_translate(&ctx->ds->buf[ctx->ds->buf_offset + shader_offset], tokens, DECODE_MAX_TOKENS)) {
       fprintf(stderr,"failed to translate\n %s\n",&ctx->ds->buf[ctx->ds->buf_offset + shader_offset]);
       free(tokens);

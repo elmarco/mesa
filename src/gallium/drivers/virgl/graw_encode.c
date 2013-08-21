@@ -6,6 +6,7 @@
 #include "pipe/p_state.h"
 #include "graw_encode.h"
 #include "tgsi/tgsi_dump.h"
+#include "tgsi/tgsi_parse.h"
 
 static unsigned uif(float f)
 {
@@ -173,15 +174,17 @@ int graw_encode_shader_state(struct graw_context *ctx,
    uint32_t shader_len, len;
    int i;
    uint32_t tmp;
+   int num_tokens = tgsi_num_tokens(shader->tokens);
 
    memset(str, 0, 65536);
    tgsi_dump_str(shader->tokens, 0, str, sizeof(str));
 
    shader_len = strlen(str) + 1;
-   len = ((shader_len + 3) / 4) + 2 + (shader->stream_output.num_outputs ? shader->stream_output.num_outputs + 4 : 0);
+   len = ((shader_len + 3) / 4) + 3 + (shader->stream_output.num_outputs ? shader->stream_output.num_outputs + 4 : 0);
 
    graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_CREATE_OBJECT, type, len));
    graw_encoder_write_dword(ctx->cbuf, handle);
+   graw_encoder_write_dword(ctx->cbuf, num_tokens);
    graw_encoder_write_dword(ctx->cbuf, shader->stream_output.num_outputs);
    if (shader->stream_output.num_outputs) {
       for (i = 0; i < 4; i++)

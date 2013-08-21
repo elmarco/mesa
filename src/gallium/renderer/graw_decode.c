@@ -9,7 +9,7 @@
 #include "pipe/p_shader_tokens.h"
 #include "graw_decode.h"
 #include "graw_renderer.h"
-#include "graw_object.h"
+#include "vrend_object.h"
 #include "tgsi/tgsi_text.h"
 
 /* decode side */

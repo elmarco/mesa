@@ -2,7 +2,7 @@
 #include <GL/gl.h>
 #include <stdio.h>
 #include "graw_renderer.h"
-#include "graw_object.h"
+#include "vrend_object.h"
 #include "graw_cursor.h"
 
 static const GLchar *cursor_vs_shader = 

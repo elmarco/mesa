@@ -17,7 +17,7 @@
 
 #include "state_tracker/graw.h"
 
-#include "graw_object.h"
+#include "vrend_object.h"
 #include "graw_shader.h"
 
 #include "graw_renderer.h"

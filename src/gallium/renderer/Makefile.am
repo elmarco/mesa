@@ -26,7 +26,7 @@ AM_CFLAGS = \
 libgrend_la_SOURCES = \
         graw_renderer.c \
         graw_shader.c \
-        graw_object.c \
+        vrend_object.c \
         graw_decode.c \
 	graw_cursor.c \
         graw_formats.c \

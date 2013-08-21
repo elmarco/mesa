@@ -1,5 +1,5 @@
-#ifndef GRAW_OBJECT_H
-#define GRAW_OBJECT_H
+#ifndef VREND_OBJECT_H
+#define VREND_OBJECT_H
 
 #include "virgl_protocol.h"
 

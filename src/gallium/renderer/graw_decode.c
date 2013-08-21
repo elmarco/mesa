@@ -63,7 +63,7 @@ static int graw_decode_create_shader(struct grend_decode_ctx *ctx, uint32_t type
    } else
       shader_offset = 4;
 //   fprintf(stderr,"shader\n%s\n", &ctx->ds->buf[ctx->ds->buf_offset + shader_offset]);
-   if (!tgsi_text_translate(&ctx->ds->buf[ctx->ds->buf_offset + shader_offset], tokens, DECODE_MAX_TOKENS)) {
+   if (!tgsi_text_translate(&ctx->ds->buf[ctx->ds->buf_offset + shader_offset], tokens, num_tokens + 10)) {
       fprintf(stderr,"failed to translate\n %s\n",&ctx->ds->buf[ctx->ds->buf_offset + shader_offset]);
       free(tokens);
       free(state);

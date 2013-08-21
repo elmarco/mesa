@@ -270,6 +270,7 @@ static void __report_resource_error(const char *fname, int res_handle, const cha
 static void grend_destroy_surface(struct grend_surface *surf)
 {
    grend_resource_reference(&surf->texture, NULL);
+   free(surf);
 }
 
 static INLINE void

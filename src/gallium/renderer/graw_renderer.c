@@ -3040,6 +3040,7 @@ static void grend_destroy_query(struct grend_query *query)
       glDeleteQueries(1, &hwq->id);
       FREE(hwq);
    }
+   free(query);
 }
 
 static void grend_destroy_query_object(void *obj_ptr)

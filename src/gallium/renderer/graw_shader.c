@@ -632,7 +632,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
       else if (inst->Texture.Texture == TGSI_TEXTURE_1D_ARRAY)
          snprintf(buf, 255, "%s = texture(%s, %s.xy)%s;\n", dsts[0], srcs[1], srcs[0], writemask);
       else
-         snprintf(buf, 255, "%s = textureProj(%s, %s)%s;\n", dsts[0], srcs[1], srcs[0], writemask);
+         snprintf(buf, 255, "%s = %s(textureProj(%s, %s)%s);\n", dsts[0], dstconv, srcs[1], srcs[0], writemask);
 
       strcat(ctx->glsl_main, buf);
       break;

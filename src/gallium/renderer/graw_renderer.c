@@ -142,6 +142,7 @@ struct grend_sampler {
 };
 
 struct grend_so_target {
+   struct pipe_reference reference;
    GLuint res_handle;
    unsigned buffer_offset;
    unsigned buffer_size;
@@ -298,6 +299,22 @@ grend_sampler_view_reference(struct grend_sampler_view **ptr, struct grend_sampl
    if (pipe_reference(&(*ptr)->reference, &view->reference))
       grend_destroy_sampler_view(old_view);
    *ptr = view;
+}
+
+static void grend_destroy_so_target(struct grend_so_target *target)
+{
+   grend_resource_reference(&target->buffer, NULL);
+   free(target);
+}
+
+static INLINE void
+grend_so_target_reference(struct grend_so_target **ptr, struct grend_so_target *target)
+{
+   struct grend_so_target *old_target = *ptr;
+
+   if (pipe_reference(&(*ptr)->reference, &target->reference))
+      grend_destroy_so_target(old_target);
+   *ptr = target;
 }
 
 void
@@ -546,16 +563,11 @@ static void grend_destroy_sampler_view_object(void *obj_ptr)
    grend_sampler_view_reference(&samp, NULL);
 }
 
-static void grend_destroy_so_target(struct grend_so_target *target)
-{
-   grend_resource_reference(&target->buffer, NULL);
-   free(target);
-}
-
 static void grend_destroy_so_target_object(void *obj_ptr)
 {
    struct grend_so_target *target = obj_ptr;
-   grend_destroy_so_target(target);
+
+   grend_so_target_reference(&target, NULL);
 }
 
 static inline GLenum to_gl_swizzle(int swizzle)
@@ -1938,6 +1950,8 @@ bool grend_destroy_context(struct grend_context *ctx)
    grend_set_num_sampler_views(ctx, PIPE_SHADER_VERTEX, 0);
    grend_set_num_sampler_views(ctx, PIPE_SHADER_FRAGMENT, 0);
 
+   grend_set_streamout_targets(ctx, 0, 0, NULL);
+
    if (ctx->fb_id)
       glDeleteFramebuffers(1, &ctx->fb_id);
 
@@ -2477,6 +2491,7 @@ void grend_set_streamout_targets(struct grend_context *ctx,
 {
    struct grend_so_target *target;
    int i;
+   int old_num = ctx->num_so_targets;
 
    ctx->num_so_targets = num_targets;
    for (i = 0; i < num_targets; i++) {
@@ -2485,8 +2500,12 @@ void grend_set_streamout_targets(struct grend_context *ctx,
          fprintf(stderr,"can't find so target %d\n", i);
          return;
       }
-      ctx->so_targets[i] = target;
+      grend_so_target_reference(&ctx->so_targets[i], target);
    }
+
+   for (i = num_targets; i < old_num; i++)
+      grend_so_target_reference(&ctx->so_targets[i], NULL);
+
    grend_hw_emit_streamout_targets(ctx);
 }
 
@@ -3111,6 +3130,7 @@ void grend_create_so_target(struct grend_context *ctx,
    if (!target)
       return;
 
+   pipe_reference_init(&target->reference, 1);
    target->res_handle = res_handle;
    target->buffer_offset = buffer_offset;
    target->buffer_size = buffer_size;

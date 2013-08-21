@@ -194,7 +194,8 @@ struct grend_shader_view {
 struct grend_context {
    int ctx_id;
    GLuint vaoid;
-   GLuint num_enabled_attribs;
+
+   uint32_t enabled_attribs_bitmask;
 
    struct util_hash_table *object_hash;
    struct grend_vertex_element_array *ve;
@@ -1207,6 +1208,8 @@ void grend_draw_vbo(struct grend_context *ctx,
    bool new_program = FALSE;
    uint32_t shader_type;
    uint32_t num_enable;
+   uint32_t enable_bitmask;
+   uint32_t disable_bitmask;
 
    if (ctx->stencil_state_dirty)
       grend_update_stencil_state(ctx);
@@ -1303,6 +1306,8 @@ void grend_draw_vbo(struct grend_context *ctx,
    }
 
    num_enable = ctx->ve->count;
+   enable_bitmask = 0;
+   disable_bitmask = ~((1ull << num_enable) - 1);
    for (i = 0; i < ctx->ve->count; i++) {
       struct grend_vertex_element *ve = &ctx->ve->elements[i];
       int vbo_index = ctx->ve->elements[i].base.vertex_buffer_index;
@@ -1318,7 +1323,7 @@ void grend_draw_vbo(struct grend_context *ctx,
 
       if (!buf) {
            fprintf(stderr,"cannot find vbo buf %d %d %d\n", i, ctx->ve->count, ctx->prog->vs->num_inputs);
-           return;
+           continue;
       }
       glBindBuffer(GL_ARRAY_BUFFER, buf->base.id);
 
@@ -1339,20 +1344,27 @@ void grend_draw_vbo(struct grend_context *ctx,
           continue;
         }
       }
+
+      enable_bitmask |= (1 << loc);
       glVertexAttribPointer(loc, ve->nr_chan, ve->type, ve->norm, ctx->vbo[vbo_index].stride, (void *)(unsigned long)(ctx->ve->elements[i].base.src_offset + ctx->vbo[vbo_index].buffer_offset));
-      glVertexAttribDivisorARB(i, ctx->ve->elements[i].base.instance_divisor);
+      glVertexAttribDivisorARB(loc, ctx->ve->elements[i].base.instance_divisor);
    }
 
+   if (ctx->enabled_attribs_bitmask != enable_bitmask) {
+      uint32_t mask = ctx->enabled_attribs_bitmask & disable_bitmask;
 
-   if (ctx->num_enabled_attribs != num_enable) {
-      if (num_enable > ctx->num_enabled_attribs) {
-         for (i = ctx->num_enabled_attribs; i < num_enable; i++)
-            glEnableVertexAttribArray(i);
-      } else if (num_enable < ctx->num_enabled_attribs) {
-         for (i = num_enable; i < ctx->num_enabled_attribs; i++)
-            glDisableVertexAttribArray(i);
+      while (mask) {
+         i = u_bit_scan(&mask);
+         glDisableVertexAttribArray(i);
       }
-      ctx->num_enabled_attribs = num_enable;
+
+      mask = enable_bitmask;
+      while (mask) {
+         i = u_bit_scan(&mask);
+         glEnableVertexAttribArray(i);
+      }
+
+      ctx->enabled_attribs_bitmask = enable_bitmask;
    }
 
    if (info->indexed) {
@@ -1969,8 +1981,11 @@ bool grend_destroy_context(struct grend_context *ctx)
 
    glBindVertexArray(ctx->vaoid);
 
-   for (i = 0; i < ctx->num_enabled_attribs; i++)
+   while (ctx->enabled_attribs_bitmask) {
+      i = u_bit_scan(&ctx->enabled_attribs_bitmask);
+      
       glDisableVertexAttribArray(i);
+   }
 
    glDeleteVertexArrays(1, &ctx->vaoid);
 

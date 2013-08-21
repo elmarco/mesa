@@ -817,7 +817,11 @@ void grend_create_vertex_elements_state(struct grend_context *ctx,
 
       desc = util_format_description(elements[i].src_format);
 
-      if (desc->channel[0].type == UTIL_FORMAT_TYPE_FLOAT) {
+      if (elements[i].src_format == PIPE_FORMAT_R10G10B10A2_SSCALED) {
+         type = GL_INT_2_10_10_10_REV;
+      } else if (elements[i].src_format == PIPE_FORMAT_R10G10B10A2_USCALED) {
+         type = GL_UNSIGNED_INT_2_10_10_10_REV;
+      } else if (desc->channel[0].type == UTIL_FORMAT_TYPE_FLOAT) {
 	 if (desc->channel[0].size == 32)
 	    type = GL_FLOAT;
 	 else if (desc->channel[0].size == 64)

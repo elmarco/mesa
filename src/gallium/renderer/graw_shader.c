@@ -287,6 +287,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
    char dstconv[6] = {0};
    char writemask[6] = {0};
    char *twm;
+   char bias[64] = {0};
    boolean is_shad = FALSE;
    if (instno == 0)
       strcat(ctx->glsl_main, "void main(void)\n{\n");
@@ -570,6 +571,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_TEX:
+   case TGSI_OPCODE_TXB:
       ctx->samplers[sreg_index].tgsi_sampler_type = inst->Texture.Texture;
       switch (inst->Texture.Texture) {
       case TGSI_TEXTURE_1D:
@@ -595,6 +597,12 @@ iter_instruction(struct tgsi_iterate_context *iter,
          twm = "";
          break;
       }
+
+      if (inst->Instruction.Opcode == TGSI_OPCODE_TXB)
+         snprintf(bias, 64, ", %s.w", srcs[0]);
+      else
+         bias[0] = 0;
+
       /* rect is special in GLSL 1.30 */
       if (inst->Texture.Texture == TGSI_TEXTURE_RECT)
          snprintf(buf, 255, "%s = texture2DRect(%s, %s.xy)%s;\n", dsts[0], srcs[1], srcs[0], writemask);
@@ -603,7 +611,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
       else if (is_shad) /* TGSI returns 1.0 in alpha */
          snprintf(buf, 255, "%s = %s(vec4(vec3(texture(%s, %s%s)), 1.0)%s);\n", dsts[0], dstconv, srcs[1], srcs[0], twm, writemask);
       else
-         snprintf(buf, 255, "%s = %s(texture(%s, %s%s)%s);\n", dsts[0], dstconv, srcs[1], srcs[0], twm, writemask);
+         snprintf(buf, 255, "%s = %s(texture(%s, %s%s%s)%s);\n", dsts[0], dstconv, srcs[1], srcs[0], twm, bias, writemask);
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_TXP:
@@ -619,11 +627,6 @@ iter_instruction(struct tgsi_iterate_context *iter,
       else
          snprintf(buf, 255, "%s = textureProj(%s, %s)%s;\n", dsts[0], srcs[1], srcs[0], writemask);
 
-      strcat(ctx->glsl_main, buf);
-      break;
-   case TGSI_OPCODE_TXB:
-      ctx->samplers[sreg_index].tgsi_sampler_type = inst->Texture.Texture;
-      snprintf(buf, 255, "%s = texture(%s, %s.xy, %s.w)%s;\n", dsts[0], srcs[1], srcs[0], srcs[0], writemask);
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_TXL:
@@ -681,6 +684,9 @@ iter_instruction(struct tgsi_iterate_context *iter,
       if (ctx->so)
          emit_so_movs(ctx);
       strcat(ctx->glsl_main, "}\n");
+      break;
+   case TGSI_OPCODE_RET:
+      strcat(ctx->glsl_main, "return;\n");
       break;
    case TGSI_OPCODE_ARL:
       snprintf(buf, 255, "addr0 = int(floor(%s)%s);\n", srcs[0], writemask);

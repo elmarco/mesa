@@ -149,6 +149,7 @@ struct grend_so_target {
 };
 
 struct grend_sampler_view {
+   struct pipe_reference reference;
    GLuint id;
    GLuint res_handle;
    GLuint format;
@@ -281,6 +282,22 @@ grend_surface_reference(struct grend_surface **ptr, struct grend_surface *surf)
    if (pipe_reference(&(*ptr)->reference, &surf->reference))
       grend_destroy_surface(old_surf);
    *ptr = surf;
+}
+
+static void grend_destroy_sampler_view(struct grend_sampler_view *samp)
+{
+   grend_resource_reference(&samp->texture, NULL);
+   free(samp);
+}
+
+static INLINE void
+grend_sampler_view_reference(struct grend_sampler_view **ptr, struct grend_sampler_view *view)
+{
+   struct grend_sampler_view *old_view = *ptr;
+
+   if (pipe_reference(&(*ptr)->reference, &view->reference))
+      grend_destroy_sampler_view(old_view);
+   *ptr = view;
 }
 
 void
@@ -522,16 +539,11 @@ static void grend_destroy_surface_object(void *obj_ptr)
    grend_surface_reference(&surface, NULL);
 }
 
-static void grend_destroy_sampler_view(struct grend_sampler_view *samp)
-{
-   grend_resource_reference(&samp->texture, NULL);
-   free(samp);
-}
-
 static void grend_destroy_sampler_view_object(void *obj_ptr)
 {
    struct grend_sampler_view *samp = obj_ptr;
-   grend_destroy_sampler_view(samp);
+
+   grend_sampler_view_reference(&samp, NULL);
 }
 
 static void grend_destroy_so_target(struct grend_so_target *target)
@@ -574,6 +586,7 @@ void grend_create_sampler_view(struct grend_context *ctx,
    }
    
    view = CALLOC_STRUCT(grend_sampler_view);
+   pipe_reference_init(&view->reference, 1);
    view->res_handle = res_handle;
    view->format = format;
    view->val0 = val0;
@@ -700,6 +713,7 @@ void grend_set_framebuffer_state(struct grend_context *ctx,
    struct grend_surface *surf, *zsurf;
    int i;
    int old_num;
+
    if (zsurf_handle) {
       zsurf = vrend_object_lookup(ctx->object_hash, zsurf_handle, VIRGL_OBJECT_SURFACE);
       if (!zsurf) {
@@ -923,6 +937,7 @@ void grend_set_single_sampler_view(struct grend_context *ctx,
 {
    struct grend_sampler_view *view = NULL;
    struct grend_texture *tex;
+
    if (handle) {
       view = vrend_object_lookup(ctx->object_hash, handle, VIRGL_OBJECT_SAMPLER_VIEW);
       if (!view) {
@@ -965,13 +980,18 @@ void grend_set_single_sampler_view(struct grend_context *ctx,
       }
    }
 
-   ctx->views[shader_type].views[index] = view;
+   grend_sampler_view_reference(&ctx->views[shader_type].views[index], view);
 }
 
 void grend_set_num_sampler_views(struct grend_context *ctx,
                                     uint32_t shader_type,
                                     int num_sampler_views)
 {
+   if (num_sampler_views < ctx->views[shader_type].num_views) {
+      int i;
+      for (i = num_sampler_views; i < ctx->views[shader_type].num_views; i++)
+         grend_sampler_view_reference(&ctx->views[shader_type].views[i], NULL);
+   }
    ctx->views[shader_type].num_views = num_sampler_views;
 }
 
@@ -1912,12 +1932,11 @@ bool grend_destroy_context(struct grend_context *ctx)
    if (switch_0)
       grend_state.current_ctx = NULL;
 
-   if (ctx->zsurf)
-      grend_surface_reference(&ctx->zsurf, NULL);
+   /* reset references on framebuffers */
+   grend_set_framebuffer_state(ctx, 0, NULL, 0);
 
-   for (i = 0; i < ctx->nr_cbufs; i++) {
-      grend_surface_reference(&ctx->surf[i], NULL);
-   }
+   grend_set_num_sampler_views(ctx, PIPE_SHADER_VERTEX, 0);
+   grend_set_num_sampler_views(ctx, PIPE_SHADER_FRAGMENT, 0);
 
    if (ctx->fb_id)
       glDeleteFramebuffers(1, &ctx->fb_id);

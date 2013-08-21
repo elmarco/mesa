@@ -712,8 +712,8 @@ static void grend_hw_emit_framebuffer_state(struct grend_context *ctx)
          glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, buffers[i],
                                    tex->target, tex->id, ctx->surf[i]->val0);
 
-      if (i == 0 && tex->base.height0 != ctx->fb_height) {
-         ctx->fb_height = tex->base.height0;
+      if (i == 0 && u_minify(tex->base.height0, ctx->surf[i]->val0) != ctx->fb_height) {
+         ctx->fb_height = u_minify(tex->base.height0, ctx->surf[i]->val0);
          ctx->scissor_state_dirty = TRUE;
          ctx->viewport_state_dirty = TRUE;
       }

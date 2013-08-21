@@ -652,11 +652,13 @@ static void grend_hw_emit_framebuffer_state(struct grend_context *ctx)
       GL_COLOR_ATTACHMENT7_EXT,
    };
 
-   if (!ctx->zsurf && !ctx->nr_cbufs) {
+#if 0
+   if (!ctx->zsurf && !ctx->nr_cbufs && !ctx->fb_id) {
       glBindFramebuffer(GL_FRAMEBUFFER_EXT, 0);
       glDrawBuffers(0, buffers);
       return;
    }
+#endif
 
    if (ctx->fb_id)
       glDeleteFramebuffers(1, &ctx->fb_id);

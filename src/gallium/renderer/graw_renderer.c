@@ -808,20 +808,19 @@ void grend_create_vertex_elements_state(struct grend_context *ctx,
 {
    struct grend_vertex_element_array *v = CALLOC_STRUCT(grend_vertex_element_array);
    const struct util_format_description *desc;
-   GLenum type = GL_FALSE;
+   GLenum type;
    int i;
+   boolean bgra;
 
    v->count = num_elements;
    for (i = 0; i < num_elements; i++) {
       memcpy(&v->elements[i].base, &elements[i], sizeof(struct pipe_vertex_element));
 
       desc = util_format_description(elements[i].src_format);
-
-      if (elements[i].src_format == PIPE_FORMAT_R10G10B10A2_SSCALED) {
-         type = GL_INT_2_10_10_10_REV;
-      } else if (elements[i].src_format == PIPE_FORMAT_R10G10B10A2_USCALED) {
-         type = GL_UNSIGNED_INT_2_10_10_10_REV;
-      } else if (desc->channel[0].type == UTIL_FORMAT_TYPE_FLOAT) {
+      
+      type = GL_FALSE;
+      bgra = GL_FALSE;
+      if (desc->channel[0].type == UTIL_FORMAT_TYPE_FLOAT) {
 	 if (desc->channel[0].size == 32)
 	    type = GL_FLOAT;
 	 else if (desc->channel[0].size == 64)
@@ -844,10 +843,33 @@ void grend_create_vertex_elements_state(struct grend_context *ctx,
       else if (desc->channel[0].type == UTIL_FORMAT_TYPE_SIGNED &&
                desc->channel[0].size == 32) 
          type = GL_INT;
+      else if (elements[i].src_format == PIPE_FORMAT_R10G10B10A2_SSCALED ||
+               elements[i].src_format == PIPE_FORMAT_R10G10B10A2_SNORM) {
+         type = GL_INT_2_10_10_10_REV;
+      } else if (elements[i].src_format == PIPE_FORMAT_R10G10B10A2_USCALED ||
+                 elements[i].src_format == PIPE_FORMAT_R10G10B10A2_UNORM) {
+         type = GL_UNSIGNED_INT_2_10_10_10_REV;
+      } else if (elements[i].src_format == PIPE_FORMAT_B10G10R10A2_SNORM) {
+         type = GL_INT_2_10_10_10_REV;
+         bgra = TRUE;
+      } else if (elements[i].src_format == PIPE_FORMAT_B10G10R10A2_UNORM) {
+         type = GL_UNSIGNED_INT_2_10_10_10_REV;
+         bgra = TRUE;
+      }
+
+      if (type == GL_FALSE) {
+         fprintf(stderr,"unknown vertex format %d\n", elements[i].src_format);
+         FREE(v);
+         return;
+      }
+
       v->elements[i].type = type;
       if (desc->channel[0].normalized)
          v->elements[i].norm = GL_TRUE;
-      v->elements[i].nr_chan = desc->nr_channels;
+      if (desc->nr_channels == 4 && bgra == TRUE)
+         v->elements[i].nr_chan = GL_BGRA;
+      else
+         v->elements[i].nr_chan = desc->nr_channels;
    }
 
    vrend_object_insert(ctx->object_hash, v, sizeof(struct grend_vertex_element), handle,
@@ -1347,6 +1369,11 @@ void grend_draw_vbo(struct grend_context *ctx,
           }
           continue;
         }
+      }
+
+      if (ve->type == GL_FALSE) {
+	fprintf(stderr,"failed to translate vertex type - skipping render\n");
+	return;
       }
 
       enable_bitmask |= (1 << loc);

@@ -2191,18 +2191,21 @@ static void copy_transfer_data(struct pipe_resource *res,
                                struct pipe_box *box,
                                uint64_t offset)
 {
-   int elsize = util_format_get_blocksize(res->format);
+   int blsize = util_format_get_blocksize(res->format);
    GLuint size = graw_iov_size(iov, num_iovs);
-   GLuint send_size = box->width * box->height * box->depth * elsize;
-   uint32_t myoffset = offset;
-
+   GLuint send_size = util_format_get_nblocks(res->format, box->width,
+                                              box->height) * blsize * box->depth;
+   GLuint bwx = util_format_get_nblocksx(res->format, box->width) * blsize;
+   GLuint bh = util_format_get_nblocksy(res->format, box->height);
    int h;
-   if (send_size == size)
-      graw_iov_to_buf(iov, num_iovs, offset, data, size);
+   uint32_t myoffset = offset;
+   boolean compressed = util_format_is_compressed(res->format);
+   if (send_size == size || bh == 1)
+      graw_iov_to_buf(iov, num_iovs, offset, data, send_size);
    else {
-      for (h = 0; h < box->height; h++) {
-         void *ptr = data + (h * box->width * elsize);
-         graw_iov_to_buf(iov, num_iovs, myoffset, ptr, box->width * elsize);
+      for (h = 0; h < bh; h++) {
+         void *ptr = data + (h * bwx);
+         graw_iov_to_buf(iov, num_iovs, myoffset, ptr, bwx);
          myoffset += src_stride;
       }
    }
@@ -2250,21 +2253,26 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
       int need_temp = 0;
       int elsize = util_format_get_blocksize(res->base.format);
       int x = 0, y = 0;
+      uint32_t size;
+      boolean compressed;
       grend_use_program(0);
 
-      if (num_iovs > 1) {
+      compressed = util_format_is_compressed(res->base.format);
+      if (num_iovs > 1 || compressed) {
          need_temp = 1;
       }
 
       if (need_temp) {
-         GLuint size = graw_iov_size(iov, num_iovs);
-         GLuint send_size = box->width * box->height * box->depth * util_format_get_blocksize(res->base.format);
-//         data = malloc(size - offset);
+         GLuint send_size = util_format_get_nblocks(res->base.format, box->width,
+                                                    box->height) * util_format_get_blocksize(res->base.format) * box->depth;
          data = malloc(send_size);
          copy_transfer_data(&res->base, iov, num_iovs, data, stride,
                             box, offset);
-      } else
+         size = send_size;
+      } else {
          data = iov[0].iov_base + offset;
+         size = graw_iov_size(iov, num_iovs);
+      }
 
       if (stride && !need_temp) {
          glPixelStorei(GL_UNPACK_ROW_LENGTH, stride / elsize);
@@ -2317,17 +2325,22 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
                       data);
       } else {
          uint32_t h = u_minify(res->base.height0, level);
+
+         uint32_t comp_size;
          glBindTexture(res->target, res->id);
 
-         glformat = tex_conv_table[res->base.format].glformat;
-         gltype = tex_conv_table[res->base.format].gltype; 
+         if (compressed) {
+            glformat = tex_conv_table[res->base.format].internalformat;
+            comp_size = util_format_get_nblocks(res->base.format, box->width,
+                                                box->height) * util_format_get_blocksize(res->base.format);
+         }
+
          if (glformat == 0) {
             glformat = GL_BGRA;
             gltype = GL_UNSIGNED_BYTE;
          }
 
          x = box->x;
-
 
          if (res->renderer_flipped)
             y = h - box->y - box->height;
@@ -2353,9 +2366,15 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
             glTexSubImage1D(res->target, level, box->x, box->width,
                             glformat, gltype, data);
          } else {
-            glTexSubImage2D(res->target, level, x, res->target == GL_TEXTURE_1D_ARRAY ? box->z : y,
-                            box->width, box->height,
-                            glformat, gltype, data);
+            if (compressed) {
+               glCompressedTexSubImage2D(res->target, level, x, res->target == GL_TEXTURE_1D_ARRAY ? box->z : y,
+                                         box->width, box->height,
+                                         glformat, comp_size, data);
+            } else {
+               glTexSubImage2D(res->target, level, x, res->target == GL_TEXTURE_1D_ARRAY ? box->z : y,
+                               box->width, box->height,
+                               glformat, gltype, data);
+            }
          }
          if (res->base.format == VIRGL_FORMAT_Z24X8_UNORM) {
             glPixelTransferf(GL_DEPTH_SCALE, 1.0);
@@ -2412,6 +2431,11 @@ void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t ctx_id,
       void *data;
       boolean actually_invert, separate_invert = FALSE;
 
+      if (util_format_is_compressed(res->base.format)) {
+         fprintf(stderr,"readback from compressed will fail\n");
+         return;
+      }
+      
       grend_use_program(0);
 
       /* if we are asked to invert and reading from a front then don't */

@@ -114,6 +114,13 @@ iter_declaration(struct tgsi_iterate_context *iter,
             break;
          }
          /* fallthrough for vertex shader */
+      case TGSI_SEMANTIC_FACE:
+         if (iter->processor.Processor == TGSI_PROCESSOR_FRAGMENT) {
+            name_prefix = "gl_FrontFacing";
+            ctx->inputs[i].glsl_predefined = true;
+            ctx->inputs[i].glsl_no_index = true;
+            break;
+         }
       default:
          if (iter->processor.Processor == TGSI_PROCESSOR_FRAGMENT)
             name_prefix = "ex";

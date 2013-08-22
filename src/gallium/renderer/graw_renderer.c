@@ -810,7 +810,6 @@ void grend_create_vertex_elements_state(struct grend_context *ctx,
    const struct util_format_description *desc;
    GLenum type;
    int i;
-   boolean bgra;
 
    v->count = num_elements;
    for (i = 0; i < num_elements; i++) {
@@ -819,7 +818,6 @@ void grend_create_vertex_elements_state(struct grend_context *ctx,
       desc = util_format_description(elements[i].src_format);
       
       type = GL_FALSE;
-      bgra = GL_FALSE;
       if (desc->channel[0].type == UTIL_FORMAT_TYPE_FLOAT) {
 	 if (desc->channel[0].size == 32)
 	    type = GL_FLOAT;
@@ -844,18 +842,13 @@ void grend_create_vertex_elements_state(struct grend_context *ctx,
                desc->channel[0].size == 32) 
          type = GL_INT;
       else if (elements[i].src_format == PIPE_FORMAT_R10G10B10A2_SSCALED ||
-               elements[i].src_format == PIPE_FORMAT_R10G10B10A2_SNORM) {
+               elements[i].src_format == PIPE_FORMAT_R10G10B10A2_SNORM ||
+               elements[i].src_format == PIPE_FORMAT_B10G10R10A2_SNORM)
          type = GL_INT_2_10_10_10_REV;
-      } else if (elements[i].src_format == PIPE_FORMAT_R10G10B10A2_USCALED ||
-                 elements[i].src_format == PIPE_FORMAT_R10G10B10A2_UNORM) {
+      else if (elements[i].src_format == PIPE_FORMAT_R10G10B10A2_USCALED ||
+               elements[i].src_format == PIPE_FORMAT_R10G10B10A2_UNORM ||
+               elements[i].src_format == PIPE_FORMAT_B10G10R10A2_UNORM)
          type = GL_UNSIGNED_INT_2_10_10_10_REV;
-      } else if (elements[i].src_format == PIPE_FORMAT_B10G10R10A2_SNORM) {
-         type = GL_INT_2_10_10_10_REV;
-         bgra = TRUE;
-      } else if (elements[i].src_format == PIPE_FORMAT_B10G10R10A2_UNORM) {
-         type = GL_UNSIGNED_INT_2_10_10_10_REV;
-         bgra = TRUE;
-      }
 
       if (type == GL_FALSE) {
          fprintf(stderr,"unknown vertex format %d\n", elements[i].src_format);
@@ -866,7 +859,7 @@ void grend_create_vertex_elements_state(struct grend_context *ctx,
       v->elements[i].type = type;
       if (desc->channel[0].normalized)
          v->elements[i].norm = GL_TRUE;
-      if (desc->nr_channels == 4 && bgra == TRUE)
+      if (desc->nr_channels == 4 && desc->swizzle[0] == UTIL_FORMAT_SWIZZLE_Z)
          v->elements[i].nr_chan = GL_BGRA;
       else
          v->elements[i].nr_chan = desc->nr_channels;

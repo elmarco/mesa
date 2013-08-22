@@ -92,6 +92,19 @@ iter_declaration(struct tgsi_iterate_context *iter,
       ctx->inputs[i].glsl_no_index = false;
       ctx->inputs[i].override_no_wm = false;
       switch (ctx->inputs[i].name) {
+      case TGSI_SEMANTIC_COLOR:
+         if (iter->processor.Processor == TGSI_PROCESSOR_FRAGMENT) {
+            if (decl->Semantic.Index == 0)
+               name_prefix = "gl_Color";
+            else if (decl->Semantic.Index == 1)
+               name_prefix = "gl_SecondaryColor";
+            else
+               fprintf(stderr, "got illegal color semantic index %d\n", decl->Semantic.Index);
+            ctx->inputs[i].glsl_predefined = true;
+            ctx->inputs[i].glsl_no_index = true;
+            break;
+         }
+         /* fallthrough */
       case TGSI_SEMANTIC_POSITION:
          if (iter->processor.Processor == TGSI_PROCESSOR_FRAGMENT) {
             name_prefix = "gl_FragCoord";
@@ -146,9 +159,28 @@ iter_declaration(struct tgsi_iterate_context *iter,
          }
          break;
       case TGSI_SEMANTIC_COLOR:
+         if (iter->processor.Processor == TGSI_PROCESSOR_VERTEX) {
+            ctx->outputs[i].glsl_predefined = true;
+            ctx->outputs[i].glsl_no_index = true;
+            if (ctx->outputs[i].sid == 0)
+               name_prefix = "gl_FrontColor";
+            else if (ctx->outputs[i].sid == 1)
+               name_prefix = "gl_FrontSecondaryColor";
+            break;
+         }
+      case TGSI_SEMANTIC_BCOLOR:
+         if (iter->processor.Processor == TGSI_PROCESSOR_VERTEX) {
+            ctx->outputs[i].glsl_predefined = true;
+            ctx->outputs[i].glsl_no_index = true;
+            if (ctx->outputs[i].sid == 0)
+               name_prefix = "gl_BackColor";
+            else if (ctx->outputs[i].sid == 1)
+               name_prefix = "gl_BackSecondaryColor";
+            break;
+         }
       case TGSI_SEMANTIC_GENERIC:
          if (iter->processor.Processor == TGSI_PROCESSOR_VERTEX)
-            if (ctx->outputs[i].name == TGSI_SEMANTIC_COLOR || ctx->outputs[i].name == TGSI_SEMANTIC_GENERIC)
+            if (ctx->outputs[i].name == TGSI_SEMANTIC_GENERIC)
                color_offset = -1;
       default:
          if (iter->processor.Processor == TGSI_PROCESSOR_VERTEX)

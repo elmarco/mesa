@@ -1770,6 +1770,11 @@ static void grend_hw_emit_rs(struct grend_context *ctx)
       glEnable(GL_CULL_FACE);
    } else
       glDisable(GL_CULL_FACE);
+   
+   if (state->light_twoside)
+      glEnable(GL_VERTEX_PROGRAM_TWO_SIDE);
+   else
+      glDisable(GL_VERTEX_PROGRAM_TWO_SIDE);
 
 }
 void grend_object_bind_rasterizer(struct grend_context *ctx,

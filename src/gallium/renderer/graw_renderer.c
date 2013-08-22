@@ -2137,6 +2137,7 @@ void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target tar
       }
 
       gt->state.max_lod = -1;
+      gt->cur_swizzle_r = gt->cur_swizzle_g = gt->cur_swizzle_b = gt->cur_swizzle_a = -1;
    }
 
    vrend_resource_insert(gr, sizeof(*gr), handle);

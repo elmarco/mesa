@@ -1265,18 +1265,21 @@ void grend_draw_vbo(struct grend_context *ctx,
    for (shader_type = PIPE_SHADER_VERTEX; shader_type <= PIPE_SHADER_FRAGMENT; shader_type++) {
       if (ctx->prog->const_locs[shader_type] && (ctx->const_dirty[shader_type] || new_program)) {
          int mval;
+	 int nc;
          if (shader_type == PIPE_SHADER_VERTEX) {
             if (ctx->consts[shader_type].num_consts / 4 > ctx->vs->num_consts + 10) {
                fprintf(stderr,"possible memory corruption vs consts TODO %d %d\n", ctx->consts[0].num_consts, ctx->vs->num_consts);
                return;
             }
+	    nc = ctx->vs->num_consts;
          } else if (shader_type == PIPE_SHADER_FRAGMENT) {
             if (ctx->consts[shader_type].num_consts / 4 > ctx->fs->num_consts + 10) {
                fprintf(stderr,"possible memory corruption fs consts TODO\n");
                return;
             }
+	    nc = ctx->fs->num_consts;
          }
-         for (i = 0; i < (ctx->consts[shader_type].num_consts + 3) / 4; i++) {
+         for (i = 0; i < nc; i++) {
             if (ctx->prog->const_locs[shader_type][i] != -1 && ctx->consts[shader_type].consts)
                glUniform4fv(ctx->prog->const_locs[shader_type][i], 1, &ctx->consts[shader_type].consts[i * 4]);
          }

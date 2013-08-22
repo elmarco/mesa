@@ -1,9 +1,10 @@
+
 #include "tgsi/tgsi_info.h"
 #include "tgsi/tgsi_iterate.h"
 #include <string.h>
 #include <stdio.h>
 #include "graw_shader.h"
-
+extern int vrend_dump_shaders;
 /*
  * TODO list
  * loops
@@ -874,6 +875,8 @@ char *tgsi_convert(const struct tgsi_token *tokens,
    emit_header(&ctx, glsl_final);
    emit_ios(&ctx, glsl_final);
    strcat(glsl_final, ctx.glsl_main);
+   if (vrend_dump_shaders)
+      fprintf(stderr,"GLSL: %s\n", glsl_final);
    free(ctx.glsl_main);
    *num_samplers = ctx.num_samps;
    *num_consts = ctx.num_consts;

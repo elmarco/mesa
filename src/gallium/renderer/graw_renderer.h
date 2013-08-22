@@ -6,6 +6,8 @@
 #include "virgl_protocol.h"
 #include "graw_iov.h"
 #include "virgl_hw.h"
+
+extern int vrend_dump_shaders;
 struct grend_context;
 
 struct grend_resource {

@@ -39,6 +39,7 @@ extern int graw_shader_use_explicit;
 int localrender;
 static int have_invert_mesa = 0;
 static int draw_cursor = 0;
+int vrend_dump_shaders;
 
 struct grend_fence {
    uint32_t fence_id;

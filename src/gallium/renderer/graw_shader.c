@@ -566,7 +566,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_MOV:
-      snprintf(buf, 255, "%s = %s%s;\n", dsts[0], srcs[0], writemask);
+      snprintf(buf, 255, "%s = %s(%s%s);\n", dsts[0], dstconv, srcs[0], writemask);
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_ADD:

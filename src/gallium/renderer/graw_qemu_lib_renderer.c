@@ -56,7 +56,8 @@ static void graw_process_cmd(struct virgl_command *cmd, struct graw_iovec *iov,
 
    switch (cmd->type) {
    case VIRGL_CMD_CREATE_CONTEXT:
-      graw_renderer_context_create(cmd->u.ctx.handle);
+      graw_renderer_context_create(cmd->u.ctx.handle, cmd->u.ctx_create.nlen,
+         cmd->u.ctx_create.debug_name);
       break;
    case VIRGL_CMD_DESTROY_CONTEXT:
       graw_renderer_context_destroy(cmd->u.ctx.handle);

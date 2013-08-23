@@ -66,10 +66,10 @@ void grend_flush(struct grend_context *ctx);
 
 
 void grend_flush_frontbuffer(uint32_t res_handle);
-struct grend_context *grend_create_context(int id);
+struct grend_context *grend_create_context(int id, uint32_t nlen, const char *debug_name);
 bool grend_destroy_context(struct grend_context *ctx);
-void graw_renderer_context_create(uint32_t handle);
-void graw_renderer_context_create_internal(uint32_t handle);
+void graw_renderer_context_create(uint32_t handle, uint32_t nlen, const char *name);
+void graw_renderer_context_create_internal(uint32_t handle, uint32_t nlen, const char *name);
 void graw_renderer_context_destroy(uint32_t handle);
 
 void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target target, uint32_t format, uint32_t bind, uint32_t width, uint32_t height, uint32_t depth, uint32_t array_size, uint32_t last_level, uint32_t nr_samples);
@@ -209,6 +209,7 @@ void graw_renderer_fini(void);
 void graw_reset_decode(void);
 
 void graw_decode_block_iov(struct graw_iovec *iov, uint32_t niovs, uint32_t ctx_id, uint64_t offset, int ndw);
+struct grend_context *vrend_lookup_renderer_ctx(uint32_t ctx_id);
 
 int graw_renderer_create_fence(int client_fence_id);
 

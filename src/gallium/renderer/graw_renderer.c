@@ -69,7 +69,7 @@ struct grend_query {
 
 #define VIRGL_INVALID_RESOURCE 1
 struct global_error_state {
-   uint32_t last_error;
+   enum virgl_errors last_error;
 };
 static struct global_error_state error_state;
 
@@ -193,6 +193,8 @@ struct grend_shader_view {
 };
 
 struct grend_context {
+   char debug_name[64];
+
    int ctx_id;
    GLuint vaoid;
 
@@ -255,6 +257,10 @@ struct grend_context {
 
    struct list_head active_nontimer_query_list;
    boolean query_on_hw;
+
+   /* has this ctx gotten an error? */
+   boolean in_error;
+   enum virgl_ctx_errors last_error;
 };
 
 static struct grend_nontimer_hw_query *grend_create_hw_query(struct grend_query *query);
@@ -262,14 +268,15 @@ static struct grend_nontimer_hw_query *grend_create_hw_query(struct grend_query 
 static struct grend_resource *frontbuffer;
 static struct grend_format_table tex_conv_table[VIRGL_FORMAT_MAX];
 
-static void __report_resource_error(const char *fname, int res_handle, const char *type_str)
+static const char *vrend_ctx_error_strings[] = { "None", "Unknown", "Illegal shader", "Illegal handle", "Illegal resource", "Illegal surface", "Illegal vertex format" };
+
+static void __report_context_error(const char *fname, struct grend_context *ctx, enum virgl_ctx_errors error, uint32_t value)
 {
-   error_state.last_error = VIRGL_INVALID_RESOURCE;
-
-   fprintf(stderr,"%s: cannot find resource %d for %s\n", fname, res_handle, type_str);
+   ctx->in_error = TRUE;
+   ctx->last_error = error;
+   fprintf(stderr,"%s: context error reported %d \"%s\" %s %d\n", fname, ctx->ctx_id, ctx->debug_name, vrend_ctx_error_strings[error], value);
 }
-
-#define report_resource_error(rh, ts) __report_resource_error(__func__, rh, ts)
+#define report_context_error(ctx, error, value) __report_context_error(__func__, ctx, error, value)
 
 static void grend_destroy_surface(struct grend_surface *surf)
 {
@@ -535,7 +542,7 @@ void grend_create_surface(struct grend_context *ctx,
 
    res = vrend_resource_lookup(res_handle, ctx->ctx_id);
    if (!res) {
-      report_resource_error(res_handle, "surface");
+      report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, res_handle);
       return;
    }
 
@@ -595,7 +602,7 @@ void grend_create_sampler_view(struct grend_context *ctx,
 
    res = vrend_resource_lookup(res_handle, ctx->ctx_id);
    if (!res) {
-      report_resource_error(res_handle, "sampler view");
+      report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, res_handle);
       return;
    }
    
@@ -614,12 +621,6 @@ void grend_create_sampler_view(struct grend_context *ctx,
 
    grend_resource_reference(&view->texture, res);
 
-   if (!view->texture) {
-      fprintf(stderr,"%s: failed to find resource %d\n", __func__, res_handle);
-      FREE(view);
-      return;
-   }
-     
    if (view->swizzle_r != 0 && view->swizzle_g != 1 && view->swizzle_b != 2 && view->swizzle_a != 3)
       fprintf(stderr,"%d %d swizzles %d %d %d %d\n", view->format, view->texture->base.format, view->swizzle_r, view->swizzle_g, view->swizzle_b, view->swizzle_a);      
 
@@ -733,7 +734,7 @@ void grend_set_framebuffer_state(struct grend_context *ctx,
    if (zsurf_handle) {
       zsurf = vrend_object_lookup(ctx->object_hash, zsurf_handle, VIRGL_OBJECT_SURFACE);
       if (!zsurf) {
-         fprintf(stderr,"%s: can't find surface for Z %d\n", __func__, zsurf_handle);
+         report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_SURFACE, zsurf_handle);
          return;
       }
       grend_surface_reference(&ctx->zsurf, zsurf);
@@ -745,7 +746,7 @@ void grend_set_framebuffer_state(struct grend_context *ctx,
    for (i = 0; i < nr_cbufs; i++) {
       surf = vrend_object_lookup(ctx->object_hash, surf_handle[i], VIRGL_OBJECT_SURFACE);
       if (!surf) {
-         fprintf(stderr,"%s: can't find surface for cbuf %d %d\n", __func__, i, surf_handle[i]);
+         report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_SURFACE, surf_handle[i]);
          return;
       }
       grend_surface_reference(&ctx->surf[i], surf);
@@ -852,7 +853,7 @@ void grend_create_vertex_elements_state(struct grend_context *ctx,
          type = GL_UNSIGNED_INT_2_10_10_10_REV;
 
       if (type == GL_FALSE) {
-         fprintf(stderr,"unknown vertex format %d\n", elements[i].src_format);
+         report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_VERTEX_FORMAT, elements[i].src_format);
          FREE(v);
          return;
       }
@@ -881,7 +882,8 @@ void grend_bind_vertex_elements_state(struct grend_context *ctx,
    }
    v = vrend_object_lookup(ctx->object_hash, handle, VIRGL_OBJECT_VERTEX_ELEMENTS);
    if (!v) {
-      fprintf(stderr, "illegal ve lookup %d\n", handle);
+      report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_HANDLE, handle);
+      return;
    }
    ctx->ve = v;
 }
@@ -922,7 +924,7 @@ void grend_set_index_buffer(struct grend_context *ctx,
          if (!res) {
             grend_resource_reference((struct grend_resource **)&ctx->ib.buffer, NULL);
             ctx->index_buffer_res_id = 0;
-            report_resource_error(res_handle, "index buffer");
+            report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, res_handle);
             return;
          }
          grend_resource_reference((struct grend_resource **)&ctx->ib.buffer, res);
@@ -950,7 +952,7 @@ void grend_set_single_vbo(struct grend_context *ctx,
    } else if (ctx->vbo_res_ids[index] != res_handle) {
       res = vrend_resource_lookup(res_handle, ctx->ctx_id);
       if (!res) {
-         report_resource_error(res_handle, "vbo");
+         report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, res_handle);
          return;
       }
       grend_resource_reference((struct grend_resource **)&ctx->vbo[index].buffer, res);
@@ -984,7 +986,7 @@ void grend_set_single_sampler_view(struct grend_context *ctx,
       view = vrend_object_lookup(ctx->object_hash, handle, VIRGL_OBJECT_SAMPLER_VIEW);
       if (!view) {
          ctx->views[shader_type].views[index] = NULL;
-         fprintf(stderr,"%s: failed to find view %d\n", __func__, handle);
+         report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_HANDLE, handle);
          return;
       }
       tex = vrend_resource_lookup(view->res_handle, ctx->ctx_id);
@@ -1050,7 +1052,7 @@ void grend_transfer_inline_write(struct grend_context *ctx,
 
    res = vrend_resource_lookup(res_handle, ctx->ctx_id);
    if (!res) {
-      report_resource_error(res_handle, "inline transfer");
+      report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, res_handle);
       return;
    }
    if (res->target == GL_ELEMENT_ARRAY_BUFFER_ARB ||
@@ -1606,7 +1608,7 @@ void grend_object_bind_blend(struct grend_context *ctx,
    }
    state = vrend_object_lookup(ctx->object_hash, handle, VIRGL_OBJECT_BLEND);
    if (!state) {
-      fprintf(stderr,"%s: got illegal handle %d\n", __func__, handle);
+      report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_HANDLE, handle);
       return;
    }
 
@@ -1652,7 +1654,7 @@ void grend_object_bind_dsa(struct grend_context *ctx,
 
    state = vrend_object_lookup(ctx->object_hash, handle, VIRGL_OBJECT_DSA);
    if (!state) {
-      fprintf(stderr,"failed to find DSA state for handle %d\n", handle);
+      report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_HANDLE, handle);
       return;
    }
 
@@ -1794,7 +1796,7 @@ void grend_object_bind_rasterizer(struct grend_context *ctx,
    state = vrend_object_lookup(ctx->object_hash, handle, VIRGL_OBJECT_RASTERIZER);
    
    if (!state) {
-      fprintf(stderr,"%s: cannot find object %d\n", __func__, handle);
+      report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_HANDLE, handle);
       return;
    }
 
@@ -1977,7 +1979,7 @@ void graw_renderer_init(void)
 
    graw_cursor_init(&grend_state.cursor_info);
    /* create 0 context */
-   graw_renderer_context_create_internal(0);
+   graw_renderer_context_create_internal(0, 0, NULL);
 }
 
 void
@@ -2029,11 +2031,14 @@ bool grend_destroy_context(struct grend_context *ctx)
    return switch_0;
 }
 
-struct grend_context *grend_create_context(int id)
+struct grend_context *grend_create_context(int id, uint32_t nlen, const char *debug_name)
 {
    struct grend_context *grctx = CALLOC_STRUCT(grend_context);
    int i;
 
+   if (nlen) {
+      strncpy(grctx->debug_name, debug_name, 64);
+   }
    grctx->ctx_id = id;
    list_inithead(&grctx->programs);
    list_inithead(&grctx->active_nontimer_query_list);
@@ -2230,7 +2235,8 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
 
    res = vrend_resource_lookup(res_handle, ctx_id);
    if (res == NULL) {
-      report_resource_error(res_handle, "transfer write");
+      struct grend_context *ctx = vrend_lookup_renderer_ctx(ctx_id);
+      report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, res_handle);
       return;
    }
    if (res->target == GL_TRANSFORM_FEEDBACK_BUFFER ||
@@ -2406,7 +2412,8 @@ void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t ctx_id,
 
    res = vrend_resource_lookup(res_handle, ctx_id);
    if (!res) {
-      report_resource_error(res_handle, "transfer read");
+      struct grend_context *ctx = vrend_lookup_renderer_ctx(ctx_id);
+      report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, res_handle);
       return;
    }
 
@@ -2580,7 +2587,7 @@ void grend_set_streamout_targets(struct grend_context *ctx,
    for (i = 0; i < num_targets; i++) {
       target = vrend_object_lookup(ctx->object_hash, handles[i], VIRGL_OBJECT_STREAMOUT_TARGET);
       if (!target) {
-         fprintf(stderr,"can't find so target %d\n", i);
+         report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_HANDLE, handles[i]);
          return;
       }
       grend_so_target_reference(&ctx->so_targets[i], target);
@@ -2606,8 +2613,12 @@ void graw_renderer_resource_copy_region(struct grend_context *ctx,
    src_res = vrend_resource_lookup(src_handle, ctx->ctx_id);
    dst_res = vrend_resource_lookup(dst_handle, ctx->ctx_id);
 
-   if (!src_res || !dst_res) {
-      fprintf(stderr,"illegal handle in copy region %d %d\n", src_handle, dst_handle);
+   if (!src_res) {
+      report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, src_handle);
+      return;
+   }
+   if (!dst_res) {
+      report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, dst_handle);
       return;
    }
 
@@ -2656,7 +2667,7 @@ void graw_renderer_resource_copy_region(struct grend_context *ctx,
    glDeleteFramebuffers(2, fb_ids);
 }
 
-static void graw_renderer_blit_int(uint32_t ctx_id,
+static void graw_renderer_blit_int(struct grend_context *ctx,
                                    uint32_t dst_handle, uint32_t src_handle,
                                    const struct pipe_blit_info *info)
 {
@@ -2665,13 +2676,18 @@ static void graw_renderer_blit_int(uint32_t ctx_id,
    GLbitfield glmask = 0;
    int src_y1, src_y2, dst_y1, dst_y2;
 
-   src_res = vrend_resource_lookup(src_handle, ctx_id);
-   dst_res = vrend_resource_lookup(dst_handle, ctx_id);
+   src_res = vrend_resource_lookup(src_handle, ctx->ctx_id);
+   dst_res = vrend_resource_lookup(dst_handle, ctx->ctx_id);
 
-   if (!src_res || !dst_res) {
-      fprintf(stderr,"illegal handle in blit %d %d\n", src_handle, dst_handle);
+   if (!src_res) {
+      report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, src_handle);
       return;
    }
+   if (!dst_res) {
+      report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, dst_handle);
+      return;
+   }
+
    glGenFramebuffers(2, fb_ids);
    glBindFramebuffer(GL_FRAMEBUFFER_EXT, fb_ids[0]);
 
@@ -2709,7 +2725,7 @@ static void graw_renderer_blit_int(uint32_t ctx_id,
       dst_y2 = dst_res->base.height0 - info->dst.box.y;
    }
 
-   if (!src_res->is_front && !src_res->renderer_flipped) {
+   if ((!src_res->is_front && !src_res->renderer_flipped) && src_res->base.nr_samples < 2) {
       src_y1 = info->src.box.y + info->src.box.height;
       src_y2 = info->src.box.y;
    } else {
@@ -2739,7 +2755,7 @@ void graw_renderer_blit(struct grend_context *ctx,
                         uint32_t dst_handle, uint32_t src_handle,
                         const struct pipe_blit_info *info)
 {
-   graw_renderer_blit_int(ctx->ctx_id, dst_handle, src_handle, info);
+   graw_renderer_blit_int(ctx, dst_handle, src_handle, info);
 }
 
 int graw_renderer_set_scanout(uint32_t res_handle, uint32_t ctx_id,
@@ -2771,7 +2787,7 @@ int graw_renderer_set_scanout(uint32_t res_handle, uint32_t ctx_id,
       bi.scissor_enable = 0;
 
       res->is_front = 1;
-      graw_renderer_blit_int(0, res_handle, res_handle, &bi);
+      graw_renderer_blit_int(vrend_lookup_renderer_ctx(0), res_handle, res_handle, &bi);
       
       frontbuffer->is_front = 0;
    }
@@ -3058,7 +3074,7 @@ void grend_create_query(struct grend_context *ctx, uint32_t handle,
 
    res = vrend_resource_lookup(res_handle, ctx->ctx_id);
    if (!res) {
-      report_resource_error(res_handle, "query");
+      report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, res_handle);
       return;
    }
 
@@ -3206,7 +3222,7 @@ void grend_create_so_target(struct grend_context *ctx,
 
    res = vrend_resource_lookup(res_handle, ctx->ctx_id);
    if (!res) {
-      report_resource_error(res_handle, "streamout target");
+      report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, res_handle);
       return;
    }
 

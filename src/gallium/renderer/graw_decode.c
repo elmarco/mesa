@@ -689,7 +689,8 @@ static void graw_decode_set_streamout_targets(struct grend_decode_ctx *ctx,
    grend_set_streamout_targets(ctx->grctx, append_bitmask, num_handles, handles);
 }
 
-void graw_renderer_context_create_internal(uint32_t handle)
+void graw_renderer_context_create_internal(uint32_t handle, uint32_t nlen,
+                                           const char *debug_name)
 {
    struct grend_decode_ctx *dctx;
 
@@ -700,7 +701,7 @@ void graw_renderer_context_create_internal(uint32_t handle)
    if (!dctx)
        return;
    
-   dctx->grctx = grend_create_context(handle);
+   dctx->grctx = grend_create_context(handle, nlen, debug_name);
    if (!dctx->grctx) {
       free(dctx);
       return;
@@ -711,7 +712,7 @@ void graw_renderer_context_create_internal(uint32_t handle)
    dec_ctx[handle] = dctx;
 }
 
-void graw_renderer_context_create(uint32_t handle)
+void graw_renderer_context_create(uint32_t handle, uint32_t nlen, const char *debug_name)
 {
    if (handle > GRAW_MAX_CTX)
       return;
@@ -719,7 +720,7 @@ void graw_renderer_context_create(uint32_t handle)
    if (handle == 0)
       return;
 
-   graw_renderer_context_create_internal(handle);
+   graw_renderer_context_create_internal(handle, nlen, debug_name);
 }
 
 void graw_renderer_context_destroy(uint32_t handle)
@@ -736,6 +737,17 @@ void graw_renderer_context_destroy(uint32_t handle)
    /* switch to ctx 0 */
    if (ret)
       grend_hw_switch_context(dec_ctx[0]->grctx);      
+}
+
+struct grend_context *vrend_lookup_renderer_ctx(uint32_t ctx_id)
+{
+   if (ctx_id > GRAW_MAX_CTX)
+      return NULL;
+
+   if (dec_ctx[ctx_id] == NULL)
+      return NULL;
+
+   return dec_ctx[ctx_id]->grctx;
 }
 
 static void graw_decode_block(uint32_t ctx_id, uint32_t *block, int ndw)

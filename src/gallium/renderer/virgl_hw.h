@@ -89,6 +89,12 @@ struct virgl_cmd_context {
         uint32_t pad;
 };
 
+struct virgl_cmd_context_create {
+        uint32_t handle;
+        uint32_t nlen;
+        char debug_name[64];
+};
+
 struct virgl_cmd_resource_context {
 	uint32_t resource;
 	uint32_t ctx_id;
@@ -117,6 +123,7 @@ struct virgl_command {
 	uint64_t fence_id;
 	union virgl_cmds {
 		struct virgl_cmd_context ctx;
+		struct virgl_cmd_context_create ctx_create;
 		struct virgl_resource_create res_create;
 		struct virgl_transfer_put transfer_put;
 		struct virgl_transfer_get transfer_get;
@@ -330,4 +337,21 @@ union virgl_caps {
         uint32_t max_version;
         struct virgl_caps_v1 v1;
 };
+
+enum virgl_errors {
+        VIRGL_ERROR_NONE,
+        VIRGL_ERROR_UNKNOWN,
+        VIRGL_ERROR_UNKNOWN_RESOURCE_FORMAT,
+};
+
+enum virgl_ctx_errors {
+        VIRGL_ERROR_CTX_NONE,
+        VIRGL_ERROR_CTX_UNKNOWN,
+        VIRGL_ERROR_CTX_ILLEGAL_SHADER,
+        VIRGL_ERROR_CTX_ILLEGAL_HANDLE,
+        VIRGL_ERROR_CTX_ILLEGAL_RESOURCE,
+        VIRGL_ERROR_CTX_ILLEGAL_SURFACE,
+        VIRGL_ERROR_CTX_ILLEGAL_VERTEX_FORMAT,
+};
+
 #endif

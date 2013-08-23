@@ -219,7 +219,7 @@ void graw_renderer_check_queries(void);
 void grend_stop_current_queries(void);
 
 int swap_buffers(void);
-void grend_hw_switch_context(struct grend_context *ctx);
+boolean grend_hw_switch_context(struct grend_context *ctx);
 void graw_renderer_object_insert(struct grend_context *ctx, void *data,
                                  uint32_t size, uint32_t handle, enum virgl_object_type type);
 void graw_renderer_object_destroy(struct grend_context *ctx, uint32_t handle);

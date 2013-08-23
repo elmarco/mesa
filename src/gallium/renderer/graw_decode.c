@@ -754,7 +754,7 @@ static void graw_decode_block(uint32_t ctx_id, uint32_t *block, int ndw)
 {
    int i = 0;
    struct grend_decode_ctx *gdctx;
- 
+   boolean ret;
    if (ctx_id > GRAW_MAX_CTX)
       return;
 
@@ -763,7 +763,10 @@ static void graw_decode_block(uint32_t ctx_id, uint32_t *block, int ndw)
 
    gdctx = dec_ctx[ctx_id];
 
-   grend_hw_switch_context(gdctx->grctx);
+   ret = grend_hw_switch_context(gdctx->grctx);
+   if (ret == FALSE)
+      return;
+
    gdctx->ds->buf = block;
    gdctx->ds->buf_total = ndw;
    gdctx->ds->buf_offset = 0;

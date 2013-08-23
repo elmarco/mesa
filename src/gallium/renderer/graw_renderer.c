@@ -1168,6 +1168,10 @@ void grend_clear(struct grend_context *ctx,
                  double depth, unsigned stencil)
 {
    GLbitfield bits = 0;
+
+   if (ctx->in_error)
+      return;
+
    glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, ctx->fb_id);
 
    if (ctx->stencil_state_dirty)
@@ -1232,6 +1236,9 @@ void grend_draw_vbo(struct grend_context *ctx,
    uint32_t num_enable;
    uint32_t enable_bitmask;
    uint32_t disable_bitmask;
+
+   if (ctx->in_error)
+      return;
 
    if (ctx->stencil_state_dirty)
       grend_update_stencil_state(ctx);
@@ -2610,6 +2617,9 @@ void graw_renderer_resource_copy_region(struct grend_context *ctx,
    GLbitfield glmask = 0;
    GLint sy1, sy2, dy1, dy2;
 
+   if (ctx->in_error)
+      return;
+
    src_res = vrend_resource_lookup(src_handle, ctx->ctx_id);
    dst_res = vrend_resource_lookup(dst_handle, ctx->ctx_id);
 
@@ -2675,6 +2685,9 @@ static void graw_renderer_blit_int(struct grend_context *ctx,
    GLuint fb_ids[2];
    GLbitfield glmask = 0;
    int src_y1, src_y2, dst_y1, dst_y2;
+
+   if (ctx->in_error)
+      return;
 
    src_res = vrend_resource_lookup(src_handle, ctx->ctx_id);
    dst_res = vrend_resource_lookup(dst_handle, ctx->ctx_id);
@@ -3011,11 +3024,13 @@ void grend_stop_current_queries(void)
       grend_ctx_finish_queries(grend_state.current_ctx);
 }
 
-void grend_hw_switch_context(struct grend_context *ctx)
+boolean grend_hw_switch_context(struct grend_context *ctx)
 {
+   if (ctx->in_error)
+      return FALSE;
 
    if (ctx == grend_state.current_ctx)
-      return;
+      return TRUE;
 
    if (grend_state.current_ctx) {
       grend_ctx_finish_queries(grend_state.current_ctx);
@@ -3035,6 +3050,7 @@ void grend_hw_switch_context(struct grend_context *ctx)
    ctx->shader_dirty = TRUE;
 
    grend_state.current_ctx = ctx;
+   return TRUE;
 }
 
 

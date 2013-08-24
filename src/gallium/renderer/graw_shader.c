@@ -844,6 +844,7 @@ static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
 {
    int i;
    char buf[255];
+   char *prefix = "";
 
    for (i = 0; i < ctx->num_inputs; i++) {
       if (!ctx->inputs[i].glsl_predefined) { 
@@ -851,7 +852,21 @@ static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
             snprintf(buf, 255, "layout(location=%d) ", ctx->inputs[i].first);
             strcat(glsl_final, buf);
          }
-         snprintf(buf, 255, "in vec4 %s;\n", ctx->inputs[i].glsl_name);
+         if (ctx->prog_type == TGSI_PROCESSOR_FRAGMENT && ctx->inputs[i].interpolate && ctx->inputs[i].name == TGSI_SEMANTIC_GENERIC) {
+            switch (ctx->inputs[i].interpolate) {
+            case TGSI_INTERPOLATE_LINEAR:
+               prefix = "noperspective ";
+               break;
+            case TGSI_INTERPOLATE_PERSPECTIVE:
+               prefix = "smooth ";
+               break;
+            case TGSI_INTERPOLATE_CONSTANT:
+               prefix = "flat ";
+               break;
+            }
+         } 
+                 
+         snprintf(buf, 255, "%sin vec4 %s;\n", prefix, ctx->inputs[i].glsl_name);
          strcat(glsl_final, buf);
       }
    }

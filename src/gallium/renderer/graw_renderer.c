@@ -753,7 +753,7 @@ void grend_set_framebuffer_state(struct grend_context *ctx,
    }
 
    if (old_num > ctx->nr_cbufs) {
-      for (i = old_num; i < ctx->nr_cbufs; i++)
+      for (i = ctx->nr_cbufs; i < old_num; i++)
          grend_surface_reference(&ctx->surf[i], NULL);
    }
 

@@ -499,6 +499,16 @@ iter_instruction(struct tgsi_iterate_context *iter,
       snprintf(buf, 255, "discard;\n");
       strcat(ctx->glsl_main, buf);
       break;
+   case TGSI_OPCODE_DST:
+      snprintf(buf, 255, "%s.x = 1.0;\n", dsts[0]);
+      strcat(ctx->glsl_main, buf);
+      snprintf(buf, 255, "%s.y = %s.y * %s.y;\n", dsts[0], srcs[0], srcs[1]);
+      strcat(ctx->glsl_main, buf);
+      snprintf(buf, 255, "%s.z = %s.z;\n", dsts[0], srcs[0]);
+      strcat(ctx->glsl_main, buf);
+      snprintf(buf, 255, "%s.w = %s.w;\n", dsts[0], srcs[0]);
+      strcat(ctx->glsl_main, buf);
+      break;
    case TGSI_OPCODE_LIT:
       snprintf(buf, 255, "%s.x = 1.0;\n", dsts[0]);
       strcat(ctx->glsl_main, buf);

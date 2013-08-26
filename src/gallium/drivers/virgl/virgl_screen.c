@@ -253,7 +253,8 @@ virgl_is_format_supported( struct pipe_screen *screen,
           target == PIPE_TEXTURE_2D_ARRAY ||
           target == PIPE_TEXTURE_RECT ||
           target == PIPE_TEXTURE_3D ||
-          target == PIPE_TEXTURE_CUBE);
+          target == PIPE_TEXTURE_CUBE ||
+          target == PIPE_TEXTURE_CUBE_ARRAY);
 
    format_desc = util_format_description(format);
    if (!format_desc)

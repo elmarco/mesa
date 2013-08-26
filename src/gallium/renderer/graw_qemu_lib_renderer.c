@@ -197,7 +197,7 @@ void graw_transfer_write_tex_return(struct pipe_resource *res,
 void graw_write_fence(unsigned fence_id)
 {
    rcbs->write_fence(dev_cookie, fence_id);   
-   send_irq(4);
+   send_irq(0x20);
 }
 
 int swap_buffers(void)

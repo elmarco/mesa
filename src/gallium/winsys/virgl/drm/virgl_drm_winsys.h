@@ -13,20 +13,7 @@
 #include "pipebuffer/pb_bufmgr.h"
 
 
-
-struct virgl_bomgr;
 struct virgl_drm_winsys;
-
-struct virgl_bo {
-   struct pb_buffer base;
-   struct virgl_bomgr *mgr;
-   struct virgl_drm_winsys *qws;
-   uint32_t handle;
-   void *ptr;
-   uint32_t res_handle;
-   int num_cs_references;
-   uint32_t do_del;
-};
 
 struct virgl_hw_res {
    struct pipe_reference reference;
@@ -44,8 +31,6 @@ struct virgl_drm_winsys
 {
    struct virgl_winsys base;
    int fd;
-   struct pb_manager *kman;
-   struct pb_manager *cman;
 };
 
 struct virgl_drm_cmd_buf {

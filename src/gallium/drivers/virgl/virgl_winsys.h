@@ -23,15 +23,6 @@ struct virgl_winsys {
 
    void (*destroy)(struct virgl_winsys *vws);
 
-   /* 3d fns */
-   struct pb_buffer *(*bo_create)(struct virgl_winsys *vws,
-                                  unsigned size,
-                                  unsigned alignment);
-
-   void (*bo_wait)(struct pb_buffer *buf);
-   void *(*bo_map)(struct pb_buffer *buf);
-   unsigned int (*bo_get_handle)(struct pb_buffer *buf);
-
    int (*transfer_put)(struct virgl_winsys *vws,
                        struct virgl_hw_res *res,
                        const struct pipe_box *box,

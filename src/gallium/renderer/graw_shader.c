@@ -420,7 +420,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
                idx = src->Register.SwizzleW;
             switch (imd->type) {
             case TGSI_IMM_FLOAT32:
-               snprintf(temp, 25, "%c%.4f", negate, imd->val[idx].f);
+               snprintf(temp, 25, "%c%.8f", negate, imd->val[idx].f);
                break;
             case TGSI_IMM_UINT32:
                snprintf(temp, 25, "%c%u", negate, imd->val[idx].ui);

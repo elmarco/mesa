@@ -5,12 +5,15 @@
 #include "pipe/p_compiler.h"
 #include "drm.h"
 
+#include "os/os_thread.h"
+#include "util/u_double_list.h"
+#include "util/u_inlines.h"
 #include "pipe/p_screen.h"
+#include "pipe/p_context.h"
 #include "pipe/p_context.h"
 
 #include "virgl_hw.h"
 #include "virgl/virgl_winsys.h"
-#include "pipebuffer/pb_bufmgr.h"
 
 
 struct virgl_drm_winsys;
@@ -24,12 +27,22 @@ struct virgl_hw_res {
    uint32_t size;
    void *ptr;
    uint32_t stride;
+
+   struct list_head head;
+   uint32_t format;
+   uint32_t bind;
+   boolean cacheable;
+   int64_t start, end;
 };
   
 struct virgl_drm_winsys
 {
    struct virgl_winsys base;
    int fd;
+   struct list_head delayed;
+   int num_delayed;
+   unsigned usecs;
+   pipe_mutex mutex;
 };
 
 struct virgl_drm_cmd_buf {
@@ -41,6 +54,7 @@ struct virgl_drm_cmd_buf {
    unsigned cres;
    struct virgl_hw_res **res_bo;
    struct virgl_winsys *ws;
+   uint32_t *res_hlist;
 };
 
 static INLINE struct virgl_drm_winsys *

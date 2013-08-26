@@ -82,7 +82,7 @@ dump_enum(
 #define UID(I)          ctx->dump_printf( ctx, "%u", I )
 #define INSTID(I)       ctx->dump_printf( ctx, "% 3u", I )
 #define SID(I)          ctx->dump_printf( ctx, "%d", I )
-#define FLT(F)          ctx->dump_printf( ctx, "%10.4f", F )
+#define FLT(F)          ctx->dump_printf( ctx, "%10.8f", F )
 #define ENM(E,ENUMS)    dump_enum( ctx, E, ENUMS, sizeof( ENUMS ) / sizeof( *ENUMS ) )
 
 const char *

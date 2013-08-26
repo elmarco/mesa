@@ -69,9 +69,7 @@ static void virgl_drm_resource_reference(struct virgl_drm_winsys *qdws,
    struct virgl_hw_res *old = *dres;
    if (pipe_reference(&(*dres)->reference, &sres->reference)) {
       struct drm_gem_close args;
-      if (old->do_del) {
-         // refe
-      }
+
       if (old->ptr)
          os_munmap(old->ptr, old->size);
       args.handle = old->bo_handle;
@@ -91,14 +89,14 @@ static struct virgl_hw_res *virgl_drm_winsys_resource_create(struct virgl_winsys
                                                uint32_t depth,
                                                uint32_t array_size,
                                                uint32_t last_level,
-                                               uint32_t nr_samples)
+                                               uint32_t nr_samples,
+                                               uint32_t size)
 {
    struct virgl_drm_winsys *qdws = virgl_drm_winsys(qws);
    struct drm_virgl_resource_create createcmd;
    int ret;
    struct virgl_hw_res *res;
    uint32_t stride = width * util_format_get_blocksize(format);
-   uint32_t size = stride * height * depth * array_size * (last_level + 1) * (nr_samples ? nr_samples : 1);
    
    res = CALLOC_STRUCT(virgl_hw_res);
    if (!res)
@@ -123,7 +121,6 @@ static struct virgl_hw_res *virgl_drm_winsys_resource_create(struct virgl_winsys
       return NULL;
    }
 
-   res->do_del = 1;
    res->res_handle = createcmd.res_handle;
    res->bo_handle = createcmd.bo_handle;
    res->size = size;
@@ -151,7 +148,6 @@ static struct virgl_hw_res *virgl_drm_winsys_resource_create_handle(struct virgl
         FREE(res);
         goto fail;
    }
-   res->do_del = 0;
    res->bo_handle = open_arg.handle;
    res->name = whandle->handle;
    memset(&info_arg, 0, sizeof(info_arg));

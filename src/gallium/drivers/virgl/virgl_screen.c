@@ -277,6 +277,13 @@ virgl_is_format_supported( struct pipe_screen *screen,
       if (format_desc->block.width != 1 ||
           format_desc->block.height != 1)
          return FALSE;
+
+      {
+         int big = format / 32;
+         int small = format % 32;
+         if (!(vscreen->caps.caps.v1.render.bitmask[big] & (1 << small)))
+            return FALSE;
+      }
    }
 
    if (bind & PIPE_BIND_DEPTH_STENCIL) {
@@ -312,6 +319,12 @@ virgl_is_format_supported( struct pipe_screen *screen,
    if (format_desc->nr_channels < 4 && format_desc->channel[i].size == 4)
       return FALSE;
 
+   {
+      int big = format / 32;
+      int small = format % 32;
+      if (!(vscreen->caps.caps.v1.sampler.bitmask[big] & (1 << small)))
+         return FALSE;
+   }
    /*
     * Everything else should be supported by u_format.
     */

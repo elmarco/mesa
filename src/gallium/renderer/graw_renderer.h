@@ -23,6 +23,9 @@ struct grend_resource {
    GLuint handle;
 };
 
+/* assume every format is sampler friendly */
+#define GREND_BIND_RENDER (1 << 0)
+
 struct grend_format_table {
    enum virgl_formats format;
    GLenum internalformat;
@@ -33,7 +36,7 @@ struct grend_format_table {
 
 void graw_renderer_init(void);
 
-void grend_insert_format(struct grend_format_table *entry);
+void grend_insert_format(struct grend_format_table *entry, uint32_t bindings);
 void grend_create_vs(struct grend_context *ctx,
                      uint32_t handle,
                      const struct pipe_shader_state *vs);

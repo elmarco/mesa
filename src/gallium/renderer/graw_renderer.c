@@ -328,9 +328,10 @@ grend_so_target_reference(struct grend_so_target **ptr, struct grend_so_target *
 }
 
 void
-grend_insert_format(struct grend_format_table *entry)
+grend_insert_format(struct grend_format_table *entry, uint32_t bindings)
 {
    tex_conv_table[entry->format] = *entry;
+   tex_conv_table[entry->format].bindings = bindings;
 }
 
 static boolean grend_is_timer_query(GLenum gltype)
@@ -3372,7 +3373,8 @@ void graw_renderer_fill_caps(uint32_t set, uint32_t version,
 
       if (tex_conv_table[i].internalformat != 0) {
          caps.v1.sampler.bitmask[offset] |= (1 << index);
-         caps.v1.render.bitmask[offset] |= (1 << index);
+         if (tex_conv_table[i].bindings & GREND_BIND_RENDER)
+            caps.v1.render.bitmask[offset] |= (1 << index);
       }
    }
 

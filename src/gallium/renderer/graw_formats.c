@@ -209,8 +209,28 @@ static struct grend_format_table exponent_float_formats[] = {
 static void vrend_add_formats(struct grend_format_table *table, int num_entries)
 {
    int i;
-   for (i = 0; i < num_entries; i++)
-      grend_insert_format(&table[i]);
+   uint32_t binding = 0;
+   GLuint tex_id, fb_id;
+   for (i = 0; i < num_entries; i++) {
+      GLenum status;
+      /**/
+      glGenTextures(1, &tex_id);
+      glGenFramebuffers(1, &fb_id);
+
+      glBindTexture(GL_TEXTURE_2D, tex_id);
+      glBindFramebuffer(GL_FRAMEBUFFER, fb_id);
+      glTexImage2D(GL_TEXTURE_2D, 0, table[i].internalformat, 32, 32, 0, table[i].glformat, table[i].gltype, NULL);
+      glFramebufferTexture2D(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, tex_id, 0);
+      
+      glDrawBuffer(GL_COLOR_ATTACHMENT0);
+      status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+      if (status == GL_FRAMEBUFFER_COMPLETE)
+         binding |= GREND_BIND_RENDER;
+      
+      glDeleteTextures(1, &tex_id);
+      glDeleteFramebuffers(1, &fb_id);
+      grend_insert_format(&table[i], binding);
+   }
 }
 
 #define add_formats(x) vrend_add_formats((x), Elements((x)))

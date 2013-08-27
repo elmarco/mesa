@@ -8,6 +8,8 @@
 #include "os/os_thread.h"
 #include "util/u_double_list.h"
 #include "util/u_inlines.h"
+#include "util/u_hash_table.h"
+
 #include "pipe/p_screen.h"
 #include "pipe/p_context.h"
 #include "pipe/p_context.h"
@@ -43,6 +45,9 @@ struct virgl_drm_winsys
    int num_delayed;
    unsigned usecs;
    pipe_mutex mutex;
+
+   struct util_hash_table *bo_handles;
+   pipe_mutex bo_handles_mutex;
 };
 
 struct virgl_drm_cmd_buf {

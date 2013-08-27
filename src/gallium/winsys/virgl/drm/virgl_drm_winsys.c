@@ -23,6 +23,13 @@ static void virgl_hw_res_destroy(struct virgl_drm_winsys *qdws,
 {
       struct drm_gem_close args;
 
+      if (res->name) {
+         pipe_mutex_lock(qdws->bo_handles_mutex);
+         util_hash_table_remove(qdws->bo_handles,
+                                (void *)(uintptr_t)res->name);
+         pipe_mutex_unlock(qdws->bo_handles_mutex);
+      }
+
       if (res->ptr)
          os_munmap(res->ptr, res->size);
 
@@ -70,6 +77,11 @@ virgl_drm_winsys_destroy(struct virgl_winsys *qws)
    struct virgl_drm_winsys *qdws = virgl_drm_winsys(qws);
 
    virgl_cache_flush(qdws);
+
+   util_hash_table_destroy(qdws->bo_handles);
+   pipe_mutex_destroy(qdws->bo_handles_mutex);
+   pipe_mutex_destroy(qdws->mutex);
+
    FREE(qdws);
 }
 
@@ -325,14 +337,25 @@ static struct virgl_hw_res *virgl_drm_winsys_resource_create_handle(struct virgl
    struct virgl_hw_res *res;
 
    memset(&open_arg, 0, sizeof(open_arg));
+
+   pipe_mutex_lock(qdws->bo_handles_mutex);
+
+   res = util_hash_table_get(qdws->bo_handles, (void*)(uintptr_t)whandle->handle);
+   if (res) {
+      struct virgl_hw_res *r = NULL;
+      virgl_drm_resource_reference(qdws, &r, res);
+      goto done;
+   }      
+
    res = CALLOC_STRUCT(virgl_hw_res);
    if (!res)
-      return NULL;
+      goto done;
 
    open_arg.name = whandle->handle;
    if (drmIoctl(qdws->fd, DRM_IOCTL_GEM_OPEN, &open_arg)) {
         FREE(res);
-        goto fail;
+        res = NULL;
+        goto done;
    }
    res->bo_handle = open_arg.handle;
    res->name = whandle->handle;
@@ -342,18 +365,22 @@ static struct virgl_hw_res *virgl_drm_winsys_resource_create_handle(struct virgl
    if (drmIoctl(qdws->fd, DRM_IOCTL_VIRGL_RESOURCE_INFO, &info_arg)) {
       /* close */
       FREE(res);
-      goto fail;
+      res = NULL;
+      goto done;
    }
-
+  
    res->res_handle = info_arg.res_handle;
+
    res->size = info_arg.size;
    res->stride = info_arg.stride;
    pipe_reference_init(&res->reference, 1);
    res->num_cs_references = 0;
-   return res;  
 
- fail:
-   return NULL;
+   util_hash_table_set(qdws->bo_handles, (void *)(uintptr_t)whandle->handle, res);
+
+done:
+   pipe_mutex_unlock(qdws->bo_handles_mutex);
+   return res;  
 }
 
 static void virgl_drm_winsys_resource_unref(struct virgl_winsys *qws,
@@ -523,7 +550,8 @@ static int virgl_drm_winsys_submit_cmd(struct virgl_winsys *qws, struct virgl_cm
    eb.bo_handles = (unsigned long)(void *)cbuf->res_hlist;
 
    ret = drmIoctl(qdws->fd, DRM_IOCTL_VIRGL_EXECBUFFER, &eb);
-
+   if (ret == -1)
+      fprintf(stderr,"got error from kernel - expect bad rendering %d\n", errno);
    cbuf->base.cdw = 0;
 
    virgl_drm_release_all_res(qdws, cbuf);
@@ -563,6 +591,18 @@ static int virgl_drm_get_caps(struct virgl_winsys *vws, struct virgl_drm_caps *c
    return 0;
 }
 
+#define PTR_TO_UINT(x) ((unsigned)((intptr_t)(x)))
+
+static unsigned handle_hash(void *key)
+{
+    return PTR_TO_UINT(key);
+}
+
+static int handle_compare(void *key1, void *key2)
+{
+    return PTR_TO_UINT(key1) != PTR_TO_UINT(key2);
+}
+
 struct virgl_winsys *
 virgl_drm_winsys_create(int drmFD)
 {
@@ -578,6 +618,8 @@ virgl_drm_winsys_create(int drmFD)
    qdws->usecs = 1000000;
    LIST_INITHEAD(&qdws->delayed);
    pipe_mutex_init(qdws->mutex);
+   pipe_mutex_init(qdws->bo_handles_mutex);
+   qdws->bo_handles = util_hash_table_create(handle_hash, handle_compare);
    qdws->base.destroy = virgl_drm_winsys_destroy;
 
    qdws->base.transfer_put = virgl_bo_transfer_put;

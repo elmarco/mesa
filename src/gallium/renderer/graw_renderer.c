@@ -1728,7 +1728,7 @@ static inline GLenum translate_fill(uint32_t mode)
 static void grend_hw_emit_rs(struct grend_context *ctx)
 {
    struct pipe_rasterizer_state *state = &ctx->rs_state;
-
+   int i;
 #if 0
    if (state->depth_clip) {
       glEnable(GL_DEPTH_CLAMP);
@@ -1790,6 +1790,13 @@ static void grend_hw_emit_rs(struct grend_context *ctx)
       glEnable(GL_VERTEX_PROGRAM_TWO_SIDE);
    else
       glDisable(GL_VERTEX_PROGRAM_TWO_SIDE);
+
+   for (i = 0; i < 8; i++) {
+      if (state->clip_plane_enable & (1 << i))
+         glEnable(GL_CLIP_PLANE0 + i);
+      else
+         glDisable(GL_CLIP_PLANE0 + i);
+   }
 
 }
 void grend_object_bind_rasterizer(struct grend_context *ctx,
@@ -2574,7 +2581,14 @@ void grend_set_polygon_stipple(struct grend_context *ctx,
 
 void grend_set_clip_state(struct grend_context *ctx, struct pipe_clip_state *ucp)
 {
+   int i, j;
+   GLdouble val[4];
 
+   for (i = 0; i < 8; i++) {
+      for (j = 0; j < 4; j++)
+         val[j] = ucp->ucp[i][j];
+      glClipPlane(GL_CLIP_PLANE0 + i, val);
+   }
 }
 
 void grend_set_sample_mask(struct grend_context *ctx, unsigned sample_mask)

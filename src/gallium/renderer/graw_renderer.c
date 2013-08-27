@@ -221,6 +221,7 @@ struct grend_context {
    struct pipe_sampler_state *sampler_state[PIPE_SHADER_TYPES][PIPE_MAX_SAMPLERS];
 
    int num_sampler_states[PIPE_SHADER_TYPES];
+   boolean sampler_state_dirty;
    uint32_t fb_id;
 
    uint8_t stencil_refs[2];
@@ -1312,7 +1313,7 @@ void grend_draw_vbo(struct grend_context *ctx,
          if (texture) {
             ctx->old_targets[sampler_id] = texture->target;
             glBindTexture(texture->target, texture->id);
-            if (ctx->views[shader_type].old_ids[i] != texture->id) {
+            if (ctx->views[shader_type].old_ids[i] != texture->id || ctx->sampler_state_dirty) {
                grend_apply_sampler_state(ctx, texture, shader_type, sampler_id);
                ctx->views[shader_type].old_ids[i] = texture->id;
             }
@@ -1331,6 +1332,7 @@ void grend_draw_vbo(struct grend_context *ctx,
          }
       }
    } 
+   ctx->sampler_state_dirty = FALSE;
 
    if (!ctx->ve) {
       fprintf(stderr,"illegal VE setup - skipping renderering\n");
@@ -1847,6 +1849,7 @@ void grend_bind_sampler_states(struct grend_context *ctx,
       
       ctx->sampler_state[shader_type][i] = state;
    }
+   ctx->sampler_state_dirty = TRUE;
 }
 
 static inline GLenum convert_mag_filter(unsigned int filter)

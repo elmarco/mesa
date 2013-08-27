@@ -2425,6 +2425,116 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
 
 }
 
+static void vrend_transfer_send_getteximage(struct grend_resource *res,
+                                            uint32_t level, uint32_t stride,
+                                            struct pipe_box *box, uint64_t offset,
+                                            struct graw_iovec *iov, int num_iovs)
+{
+   void *myptr = iov[0].iov_base + offset;
+   GLenum format, type;
+   uint32_t send_size, tex_size;
+   void *data;
+
+   format = tex_conv_table[res->base.format].glformat;
+   type = tex_conv_table[res->base.format].gltype; 
+
+   tex_size = u_minify(res->base.width0, level) * u_minify(res->base.height0, level) * util_format_get_blocksize(res->base.format);
+
+   send_size = box->width * box->height * box->depth * util_format_get_blocksize(res->base.format);
+
+   data = malloc(tex_size);
+   if (!data)
+      return;
+
+   glGetTexImage(res->target, level, format, type, data);
+
+   graw_transfer_write_tex_return(&res->base, box, level, stride, offset, iov, num_iovs, data, send_size, FALSE);
+   free(data);
+}
+
+static void vrend_transfer_send_readpixels(struct grend_resource *res,
+                                           uint32_t level, uint32_t stride,
+                                           struct pipe_box *box, uint64_t offset,
+                                           struct graw_iovec *iov, int num_iovs)
+{
+   void *myptr = iov[0].iov_base + offset;
+   int need_temp = 0;
+   GLuint fb_id;
+   void *data;
+   boolean actually_invert, separate_invert = FALSE;
+   GLenum format, type;
+   GLint y1;
+   uint32_t send_size = 0;
+   uint32_t h = u_minify(res->base.height0, level);
+
+   grend_use_program(0);
+
+   format = tex_conv_table[res->base.format].glformat;
+   type = tex_conv_table[res->base.format].gltype; 
+   /* if we are asked to invert and reading from a front then don't */
+   if (res->is_front)
+      actually_invert = FALSE;
+   else
+      actually_invert = res->renderer_flipped;
+
+   if (actually_invert && !have_invert_mesa)
+      separate_invert = TRUE;
+
+   if (num_iovs > 1 || separate_invert || stride)
+      need_temp = 1;
+
+   if (need_temp) {
+      send_size = box->width * box->height * box->depth * util_format_get_blocksize(res->base.format);
+      data = malloc(send_size);
+      if (!data)
+         fprintf(stderr,"malloc failed %d\n", send_size);
+   } else
+      data = myptr;
+//      fprintf(stderr,"TEXTURE TRANSFER %d %d %d %d %d, temp:%d\n", res_handle, res->readback_fb_id, box->width, box->height, level, need_temp);
+
+   if (!res->is_front) {
+      if (res->readback_fb_id == 0 || res->readback_fb_level != level) {
+         if (res->readback_fb_id)
+            glDeleteFramebuffers(1, &res->readback_fb_id);
+         
+         glGenFramebuffers(1, &fb_id);
+         glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fb_id);
+         if (res->target == GL_TEXTURE_1D)
+            glFramebufferTexture1DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
+                                      res->target, res->id, level);
+         else
+            glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
+                                      res->target, res->id, level);
+         res->readback_fb_id = fb_id;
+         res->readback_fb_level = level;
+      } else {
+         glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, res->readback_fb_id);
+      }
+      if (res->renderer_flipped)
+         y1 = h - box->y - box->height;
+      else
+         y1 = box->y;
+      
+      if (have_invert_mesa && actually_invert)
+         glPixelStorei(GL_PACK_INVERT_MESA, 1);
+      glReadBuffer(GL_COLOR_ATTACHMENT0_EXT);      
+   } else {
+      glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
+      y1 = box->y;
+      glReadBuffer(GL_BACK);
+   }
+            
+
+   glReadPixels(box->x, y1, box->width, box->height, format, type, data);
+   
+   if (have_invert_mesa && actually_invert)
+      glPixelStorei(GL_PACK_INVERT_MESA, 0);
+   if (need_temp) {
+      graw_transfer_write_tex_return(&res->base, box, level, stride, offset, iov, num_iovs, data, send_size, separate_invert);
+      free(data);
+   }
+}
+
 void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t ctx_id,
                                      uint32_t level, uint32_t stride,
                                      uint32_t layer_stride,
@@ -2433,8 +2543,6 @@ void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t ctx_id,
                                      int num_iovs)
 {
    struct grend_resource *res;
-   void *myptr = iov[0].iov_base + offset;
-   int need_temp = 0;
 
    res = vrend_resource_lookup(res_handle, ctx_id);
    if (!res) {
@@ -2459,85 +2567,23 @@ void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t ctx_id,
          graw_transfer_write_return(data + box->x, send_size, offset, iov, num_iovs);
       glUnmapBuffer(res->target);
    } else {
-      uint32_t h = u_minify(res->base.height0, level);
-      GLenum format, type;
-      GLuint fb_id;
-      GLint  y1;
-      uint32_t send_size = 0;
-      void *data;
-      boolean actually_invert, separate_invert = FALSE;
-
+      boolean can_readpixels = TRUE;
       if (util_format_is_compressed(res->base.format)) {
          fprintf(stderr,"readback from compressed will fail\n");
          return;
       }
-      
-      grend_use_program(0);
 
-      /* if we are asked to invert and reading from a front then don't */
-      if (res->is_front)
-         actually_invert = FALSE;
-      else
-         actually_invert = res->renderer_flipped;
+      can_readpixels = tex_conv_table[res->base.format].bindings & GREND_BIND_RENDER;
 
-      if (actually_invert && !have_invert_mesa)
-         separate_invert = TRUE;
-
-      if (num_iovs > 1 || separate_invert || stride)
-         need_temp = 1;
-
-      if (need_temp) {
-         send_size = box->width * box->height * box->depth * util_format_get_blocksize(res->base.format);
-         data = malloc(send_size);
-         if (!data)
-            fprintf(stderr,"malloc failed %d\n", send_size);
-      } else
-         data = myptr;
-//      fprintf(stderr,"TEXTURE TRANSFER %d %d %d %d %d, temp:%d\n", res_handle, res->readback_fb_id, box->width, box->height, level, need_temp);
-
-      if (!res->is_front) {
-         if (res->readback_fb_id == 0 || res->readback_fb_level != level) {
-            if (res->readback_fb_id)
-               glDeleteFramebuffers(1, &res->readback_fb_id);
-            
-            glGenFramebuffers(1, &fb_id);
-            glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fb_id);
-            if (res->target == GL_TEXTURE_1D)
-               glFramebufferTexture1DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
-                                         res->target, res->id, level);
-            else
-               glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
-                                         res->target, res->id, level);
-            res->readback_fb_id = fb_id;
-            res->readback_fb_level = level;
-         } else {
-            glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, res->readback_fb_id);
-         }
-         if (res->renderer_flipped)
-            y1 = h - box->y - box->height;
-         else
-            y1 = box->y;
-
-         if (have_invert_mesa && actually_invert)
-            glPixelStorei(GL_PACK_INVERT_MESA, 1);
-         glReadBuffer(GL_COLOR_ATTACHMENT0_EXT);      
-      } else {
-         glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
-         y1 = box->y;
-         glReadBuffer(GL_BACK);
+      if (can_readpixels) {
+         vrend_transfer_send_readpixels(res, level, stride, box, offset,
+                                        iov, num_iovs);
+         return;
       }
-            
-      format = tex_conv_table[res->base.format].glformat;
-      type = tex_conv_table[res->base.format].gltype; 
 
-      glReadPixels(box->x, y1, box->width, box->height, format, type, data);
+      vrend_transfer_send_getteximage(res, level, stride, box, offset,
+                                      iov, num_iovs);
 
-      if (have_invert_mesa && actually_invert)
-         glPixelStorei(GL_PACK_INVERT_MESA, 0);
-      if (need_temp) {
-         graw_transfer_write_tex_return(&res->base, box, level, stride, offset, iov, num_iovs, data, send_size, separate_invert);
-         free(data);
-      }
    }
 }
 

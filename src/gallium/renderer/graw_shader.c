@@ -219,7 +219,10 @@ iter_declaration(struct tgsi_iterate_context *iter,
 
       break;
    case TGSI_FILE_SAMPLER:
-      ctx->num_samps++;
+      if (decl->Range.Last)
+         ctx->num_samps = decl->Range.Last + 1;
+      else
+         ctx->num_samps++;
       break;
    case TGSI_FILE_CONSTANT:
       ctx->num_consts+=decl->Range.Last + 1;
@@ -822,7 +825,7 @@ static const char *samplertypeconv(int sampler_type)
         case TGSI_TEXTURE_SHADOW2D_ARRAY: return "2DArrayShadow";
 	case TGSI_TEXTURE_CUBE_ARRAY: return "CubeArray";
 	case TGSI_TEXTURE_SHADOWCUBE_ARRAY: return "CubeArrayShadow";
-	default: return "UNK";
+	default: return NULL;
         }
 }
 
@@ -876,11 +879,16 @@ static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
       strcat(glsl_final, buf);
    }
    for (i = 0; i < ctx->num_samps; i++) {
-      if (ctx->prog_type == TGSI_PROCESSOR_VERTEX)
-         snprintf(buf, 255, "uniform sampler%s vssamp%d;\n", samplertypeconv(ctx->samplers[i].tgsi_sampler_type), i);
-      else
-         snprintf(buf, 255, "uniform sampler%s fssamp%d;\n", samplertypeconv(ctx->samplers[i].tgsi_sampler_type), i);
-      strcat(glsl_final, buf);
+      const char *stc = samplertypeconv(ctx->samplers[i].tgsi_sampler_type);
+
+      if (stc) {
+         if (ctx->prog_type == TGSI_PROCESSOR_VERTEX)
+            snprintf(buf, 255, "uniform sampler%s vssamp%d;\n", stc, i);
+         else
+            snprintf(buf, 255, "uniform sampler%s fssamp%d;\n", stc, i);
+         strcat(glsl_final, buf);
+      }
+
    }
 }
 

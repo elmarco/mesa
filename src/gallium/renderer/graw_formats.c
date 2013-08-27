@@ -199,11 +199,11 @@ static struct grend_format_table bit10_formats[] = {
 };
 
 static struct grend_format_table packed_float_formats[] = {
-      { VIRGL_FORMAT_R11G11B10_FLOAT, GL_R11F_G11F_B10F, GL_UNSIGNED_INT_10F_11F_11F_REV, GL_FLOAT},
+   { VIRGL_FORMAT_R11G11B10_FLOAT, GL_R11F_G11F_B10F, GL_RGB, GL_UNSIGNED_INT_10F_11F_11F_REV},
 };
 
 static struct grend_format_table exponent_float_formats[] = {
-   { VIRGL_FORMAT_R9G9B9E5_FLOAT, GL_RGB9_E5, GL_UNSIGNED_INT_5_9_9_9_REV, GL_FLOAT},
+   { VIRGL_FORMAT_R9G9B9E5_FLOAT, GL_RGB9_E5, GL_RGB, GL_UNSIGNED_INT_5_9_9_9_REV},
 };
 
 static void vrend_add_formats(struct grend_format_table *table, int num_entries)

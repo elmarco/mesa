@@ -683,7 +683,7 @@ static void grend_hw_emit_framebuffer_state(struct grend_context *ctx)
       if (tex->target == GL_TEXTURE_3D)
          glFramebufferTexture3DEXT(GL_FRAMEBUFFER_EXT, attachment,
                                    tex->target, tex->id, ctx->zsurf->val0, ctx->zsurf->val1 & 0xffff);
-      else if (tex->target == GL_TEXTURE_1D_ARRAY || tex->target == GL_TEXTURE_2D_ARRAY) 
+      else if (tex->target == GL_TEXTURE_1D_ARRAY || tex->target == GL_TEXTURE_2D_ARRAY || tex->target == GL_TEXTURE_CUBE_MAP_ARRAY) 
          glFramebufferTextureLayer(GL_FRAMEBUFFER_EXT, attachment,
                                    tex->id, ctx->zsurf->val0, ctx->zsurf->val1 & 0xffff);
       else
@@ -2131,14 +2131,22 @@ void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target tar
                             gltype, NULL);
             }
          }
-      } else if (gr->target == GL_TEXTURE_3D || gr->target == GL_TEXTURE_2D_ARRAY) {
-         glTexImage3D(gr->target, 0, internalformat, width, height, gr->target == GL_TEXTURE_2D_ARRAY ? array_size : depth, 0,
-                      glformat,
-                      gltype, NULL);
+      } else if (gr->target == GL_TEXTURE_3D || gr->target == GL_TEXTURE_2D_ARRAY || gr->target == GL_TEXTURE_CUBE_MAP_ARRAY) {
+         int depth_param = (gr->target == GL_TEXTURE_2D_ARRAY || gr->target == GL_TEXTURE_CUBE_MAP_ARRAY) ? array_size : depth;
+         for (level = 0; level <= last_level; level++) {
+            unsigned mwidth = u_minify(width, level);
+            unsigned mheight = u_minify(height, level);
+            glTexImage3D(gr->target, level, internalformat, mwidth, mheight, depth_param, 0,
+                         glformat,
+                         gltype, NULL);
+         }
       } else if (gr->target == GL_TEXTURE_1D) {
-         glTexImage1D(gr->target, 0, internalformat, width, 0,
-                      glformat,
-                      gltype, NULL);
+         for (level = 0; level <= last_level; level++) {
+            unsigned mwidth = u_minify(width, level);
+            glTexImage1D(gr->target, level, internalformat, mwidth, 0,
+                         glformat,
+                         gltype, NULL);
+         }
       } else {
          for (level = 0; level <= last_level; level++) {
             unsigned mwidth = u_minify(width, level);
@@ -2374,7 +2382,7 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
 
             glTexSubImage2D(ctarget, level, x, y, box->width, box->height,
                             glformat, gltype, data);
-         } else if (res->target == GL_TEXTURE_3D || res->target == GL_TEXTURE_2D_ARRAY) {
+         } else if (res->target == GL_TEXTURE_3D || res->target == GL_TEXTURE_2D_ARRAY || res->target == GL_TEXTURE_CUBE_MAP_ARRAY) {
             glTexSubImage3D(res->target, level, x, y, box->z,
                             box->width, box->height, box->depth,
                             glformat, gltype, data);

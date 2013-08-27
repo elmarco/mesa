@@ -67,6 +67,7 @@ struct dump_ctx {
    int num_address;
    
    struct pipe_stream_output_info *so;
+   boolean uses_cube_array;
 };
 
 static boolean
@@ -330,6 +331,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
    char bias[64] = {0};
    char *lod;
    boolean is_shad = FALSE;
+   int sampler_index;
    if (instno == 0)
       strcat(ctx->glsl_main, "void main(void)\n{\n");
    for (i = 0; i < inst->Instruction.NumDstRegs; i++) {
@@ -624,7 +626,13 @@ iter_instruction(struct tgsi_iterate_context *iter,
    case TGSI_OPCODE_TEX:
    case TGSI_OPCODE_TXB:
    case TGSI_OPCODE_TXL:
+   case TGSI_OPCODE_TXB2:
+   case TGSI_OPCODE_TXL2:
       ctx->samplers[sreg_index].tgsi_sampler_type = inst->Texture.Texture;
+
+      if (inst->Texture.Texture == TGSI_TEXTURE_CUBE_ARRAY || inst->Texture.Texture == TGSI_TEXTURE_SHADOWCUBE_ARRAY)
+         ctx->uses_cube_array = TRUE;
+
       switch (inst->Texture.Texture) {
       case TGSI_TEXTURE_1D:
          twm = ".x";
@@ -645,30 +653,37 @@ iter_instruction(struct tgsi_iterate_context *iter,
       case TGSI_TEXTURE_SHADOWCUBE:
       case TGSI_TEXTURE_SHADOW2D_ARRAY:
          is_shad = TRUE;
+      case TGSI_TEXTURE_CUBE_ARRAY:
+      case TGSI_TEXTURE_SHADOWCUBE_ARRAY:
       default:
          twm = "";
          break;
       }
 
-      if (inst->Instruction.Opcode == TGSI_OPCODE_TXB || inst->Instruction.Opcode == TGSI_OPCODE_TXL)
+      sampler_index = 1;
+
+      if (inst->Instruction.Opcode == TGSI_OPCODE_TXB2 || inst->Instruction.Opcode == TGSI_OPCODE_TXL2) {
+         sampler_index = 2;
+         snprintf(bias, 64, ", %s.x", srcs[1]);
+      } else if (inst->Instruction.Opcode == TGSI_OPCODE_TXB || inst->Instruction.Opcode == TGSI_OPCODE_TXL)
          snprintf(bias, 64, ", %s.w", srcs[0]);
       else
          bias[0] = 0;
 
-      if (inst->Instruction.Opcode == TGSI_OPCODE_TXL)
+      if (inst->Instruction.Opcode == TGSI_OPCODE_TXL || inst->Instruction.Opcode == TGSI_OPCODE_TXL2)
          lod = "Lod";
       else
          lod = "";
 
       /* rect is special in GLSL 1.30 */
       if (inst->Texture.Texture == TGSI_TEXTURE_RECT)
-         snprintf(buf, 255, "%s = texture2DRect(%s, %s.xy)%s;\n", dsts[0], srcs[1], srcs[0], writemask);
+         snprintf(buf, 255, "%s = texture2DRect(%s, %s.xy)%s;\n", dsts[0], srcs[sampler_index], srcs[0], writemask);
       else if (inst->Texture.Texture == TGSI_TEXTURE_SHADOWRECT)
-         snprintf(buf, 255, "%s = shadow2DRect(%s, %s.xyz)%s;\n", dsts[0], srcs[1], srcs[0], writemask);
+         snprintf(buf, 255, "%s = shadow2DRect(%s, %s.xyz)%s;\n", dsts[0], srcs[sampler_index], srcs[0], writemask);
       else if (is_shad) /* TGSI returns 1.0 in alpha */
-         snprintf(buf, 255, "%s = %s(vec4(vec3(texture%s(%s, %s%s%s)), 1.0)%s);\n", dsts[0], dstconv, lod, srcs[1], srcs[0], twm, bias, writemask);
+         snprintf(buf, 255, "%s = %s(vec4(vec3(texture%s(%s, %s%s%s)), 1.0)%s);\n", dsts[0], dstconv, lod, srcs[sampler_index], srcs[0], twm, bias, writemask);
       else
-         snprintf(buf, 255, "%s = %s(texture%s(%s, %s%s%s)%s);\n", dsts[0], dstconv, lod, srcs[1], srcs[0], twm, bias, writemask);
+         snprintf(buf, 255, "%s = %s(texture%s(%s, %s%s%s)%s);\n", dsts[0], dstconv, lod, srcs[sampler_index], srcs[0], twm, bias, writemask);
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_TXP:
@@ -786,7 +801,8 @@ static void emit_header(struct dump_ctx *ctx, char *glsl_final)
    if (ctx->prog_type == TGSI_PROCESSOR_VERTEX && graw_shader_use_explicit)
       strcat(glsl_final, "#extension GL_ARB_explicit_attrib_location : enable\n");
    strcat(glsl_final, "#extension GL_ARB_texture_rectangle : require\n");
-
+   if (ctx->uses_cube_array)
+      strcat(glsl_final, "#extension GL_ARB_texture_cube_map_array : require\n");
 }
 
 static const char *samplertypeconv(int sampler_type)
@@ -804,6 +820,8 @@ static const char *samplertypeconv(int sampler_type)
         case TGSI_TEXTURE_2D_ARRAY: return "2DArray";
         case TGSI_TEXTURE_SHADOW1D_ARRAY: return "1DArrayShadow";
         case TGSI_TEXTURE_SHADOW2D_ARRAY: return "2DArrayShadow";
+	case TGSI_TEXTURE_CUBE_ARRAY: return "CubeArray";
+	case TGSI_TEXTURE_SHADOWCUBE_ARRAY: return "CubeArrayShadow";
 	default: return "UNK";
         }
 }

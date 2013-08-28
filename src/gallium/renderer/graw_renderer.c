@@ -87,6 +87,7 @@ struct global_renderer_state {
    struct list_head waiting_query_list;
 
    struct graw_cursor_info cursor_info;
+   bool have_robustness;
 };
 
 static struct global_renderer_state grend_state;
@@ -1985,6 +1986,12 @@ void graw_renderer_init(void)
       inited = 1;
       vrend_object_init_resource_table();
    }
+
+   if (glewIsSupported("GL_ARB_robustness"))
+      grend_state.have_robustness = TRUE;
+   else
+      fprintf(stderr,"WARNING: running without ARB robustness in place may crash\n");
+
    
    /* callbacks for when we are cleaning up the object table */
    vrend_object_set_destroy_callback(VIRGL_OBJECT_QUERY, grend_destroy_query_object);
@@ -2451,7 +2458,10 @@ static void vrend_transfer_send_getteximage(struct grend_resource *res,
    if (!data)
       return;
 
-   glGetTexImage(res->target, level, format, type, data);
+   if (grend_state.have_robustness)
+      glGetnTexImageARB(res->target, level, format, type, tex_size, data);
+   else
+      glGetTexImage(res->target, level, format, type, data);
 
    graw_transfer_write_tex_return(&res->base, box, level, stride, offset, iov, num_iovs, data, send_size, FALSE);
    free(data);
@@ -2529,9 +2539,11 @@ static void vrend_transfer_send_readpixels(struct grend_resource *res,
       glReadBuffer(GL_BACK);
    }
             
+   if (grend_state.have_robustness)
+      glReadnPixelsARB(box->x, y1, box->width, box->height, format, type, send_size, data);
+   else
+      glReadPixels(box->x, y1, box->width, box->height, format, type, data);
 
-   glReadPixels(box->x, y1, box->width, box->height, format, type, data);
-   
    if (have_invert_mesa && actually_invert)
       glPixelStorei(GL_PACK_INVERT_MESA, 0);
    if (need_temp) {
@@ -2713,7 +2725,10 @@ static void vrend_resource_copy_fallback(struct grend_context *ctx,
    gltype = tex_conv_table[src_res->base.format].gltype; 
 
    glBindTexture(src_res->target, src_res->id);
-   glGetTexImage(src_res->target, src_level, glformat, gltype, tptr);
+   if (grend_state.have_robustness)
+      glGetnTexImageARB(src_res->target, src_level, glformat, gltype, transfer_size, tptr);
+   else
+      glGetTexImage(src_res->target, src_level, glformat, gltype, tptr);
 
    glBindTexture(dst_res->target, dst_res->id);
    glTexSubImage2D(dst_res->target, dst_level, dstx, dsty, src_box->width, src_box->height, glformat, gltype, tptr);

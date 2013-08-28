@@ -1935,6 +1935,8 @@ static void grend_apply_sampler_state(struct grend_context *ctx,
    if (tex->state.compare_func != state->compare_func || set_all)
       glTexParameteri(target, GL_TEXTURE_COMPARE_FUNC, GL_NEVER + state->compare_func);
 
+   if (memcmp(&tex->state.border_color, &state->border_color, 16) || set_all)
+      glTexParameterIuiv(target, GL_TEXTURE_BORDER_COLOR, &state->border_color);
    tex->state = *state;
 }
 

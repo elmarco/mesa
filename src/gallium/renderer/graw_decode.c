@@ -371,7 +371,7 @@ static void graw_decode_create_sampler_view(struct grend_decode_ctx *ctx, uint32
 static void graw_decode_create_sampler_state(struct grend_decode_ctx *ctx, uint32_t handle, uint16_t length)
 {
    struct pipe_sampler_state *state = CALLOC_STRUCT(pipe_sampler_state);
-
+   int i;
    uint32_t tmp;
 
    tmp = ctx->ds->buf[ctx->ds->buf_offset + 2];
@@ -387,6 +387,9 @@ static void graw_decode_create_sampler_state(struct grend_decode_ctx *ctx, uint3
    state->lod_bias = uif(ctx->ds->buf[ctx->ds->buf_offset + 3]);
    state->min_lod = uif(ctx->ds->buf[ctx->ds->buf_offset + 4]);
    state->max_lod = uif(ctx->ds->buf[ctx->ds->buf_offset + 5]);
+
+   for (i = 0; i < 4; i++)
+      state->border_color.ui[i] = ctx->ds->buf[ctx->ds->buf_offset + 6 + i];
    graw_renderer_object_insert(ctx->grctx, state, sizeof(struct pipe_sampler_state), handle,
                       VIRGL_OBJECT_SAMPLER_STATE);
 }

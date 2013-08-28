@@ -384,8 +384,8 @@ int graw_encode_sampler_state(struct graw_context *ctx,
                               const struct pipe_sampler_state *state)
 {
    uint32_t tmp;
-
-   graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_CREATE_OBJECT, VIRGL_OBJECT_SAMPLER_STATE , 5));
+   int i;
+   graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_CREATE_OBJECT, VIRGL_OBJECT_SAMPLER_STATE , 9));
    graw_encoder_write_dword(ctx->cbuf, handle);
 
    tmp = state->wrap_s |
@@ -401,6 +401,8 @@ int graw_encode_sampler_state(struct graw_context *ctx,
    graw_encoder_write_dword(ctx->cbuf, uif(state->lod_bias));
    graw_encoder_write_dword(ctx->cbuf, uif(state->min_lod));
    graw_encoder_write_dword(ctx->cbuf, uif(state->max_lod));
+   for (i = 0; i <  4; i++)
+      graw_encoder_write_dword(ctx->cbuf, state->border_color.ui[i]);
 }
 
 

@@ -532,6 +532,10 @@ iter_instruction(struct tgsi_iterate_context *iter,
       emit_op1("log2");
       strcat(ctx->glsl_main, buf);
       break;
+   case TGSI_OPCODE_EXP:
+      emit_op1("exp");
+      strcat(ctx->glsl_main, buf);
+      break;
    case TGSI_OPCODE_LOG:
       emit_op1("log");
       strcat(ctx->glsl_main, buf);

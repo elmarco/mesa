@@ -961,10 +961,10 @@ void grend_set_single_vbo(struct grend_context *ctx,
       res = vrend_resource_lookup(res_handle, ctx->ctx_id);
       if (!res) {
          report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, res_handle);
+         ctx->vbo_res_ids[index] = 0;
          return;
       }
       grend_resource_reference((struct grend_resource **)&ctx->vbo[index].buffer, res);
-      ctx->vbo[index].buffer = &res->base;
       ctx->vbo_res_ids[index] = res_handle;
    }
 }
@@ -978,6 +978,7 @@ void grend_set_num_vbo(struct grend_context *ctx,
 
    for (i = num_vbo; i < old_num; i++) {
       grend_resource_reference((struct grend_resource **)&ctx->vbo[i].buffer, NULL);
+      ctx->vbo_res_ids[i] = 0;
    }
 
 }

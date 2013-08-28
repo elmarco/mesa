@@ -225,7 +225,7 @@ static void vrend_add_formats(struct grend_format_table *table, int num_entries)
       glDrawBuffer(GL_COLOR_ATTACHMENT0);
       status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
       if (status == GL_FRAMEBUFFER_COMPLETE)
-         binding |= GREND_BIND_RENDER;
+         binding |= VREND_BIND_RENDER;
       
       glDeleteTextures(1, &tex_id);
       glDeleteFramebuffers(1, &fb_id);

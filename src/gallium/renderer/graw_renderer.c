@@ -269,6 +269,11 @@ static struct grend_nontimer_hw_query *grend_create_hw_query(struct grend_query 
 static struct grend_resource *frontbuffer;
 static struct grend_format_table tex_conv_table[VIRGL_FORMAT_MAX];
 
+static INLINE boolean vrend_format_can_render(enum virgl_formats format)
+{
+   return tex_conv_table[format].bindings & VREND_BIND_RENDER;
+}
+
 static const char *vrend_ctx_error_strings[] = { "None", "Unknown", "Illegal shader", "Illegal handle", "Illegal resource", "Illegal surface", "Illegal vertex format" };
 
 static void __report_context_error(const char *fname, struct grend_context *ctx, enum virgl_ctx_errors error, uint32_t value)
@@ -2573,7 +2578,7 @@ void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t ctx_id,
          return;
       }
 
-      can_readpixels = tex_conv_table[res->base.format].bindings & GREND_BIND_RENDER;
+      can_readpixels = vrend_format_can_render(res->base.format);
 
       if (can_readpixels) {
          vrend_transfer_send_readpixels(res, level, stride, box, offset,
@@ -2678,6 +2683,44 @@ void grend_set_streamout_targets(struct grend_context *ctx,
    grend_hw_emit_streamout_targets(ctx);
 }
 
+static void vrend_resource_copy_fallback(struct grend_context *ctx,
+                                         struct grend_resource *src_res,
+                                         struct grend_resource *dst_res,
+                                         uint32_t dst_level,
+                                         uint32_t dstx, uint32_t dsty,
+                                         uint32_t dstz, uint32_t src_level,
+                                         const struct pipe_box *src_box)
+{
+   void *tptr;
+   uint32_t transfer_size;
+   GLenum glformat, gltype;
+
+   if (src_res->base.format != dst_res->base.format) {
+      fprintf(stderr, "copy fallback failed due to mismatched formats %d %d\n", src_res->base.format, dst_res->base.format);
+      return;
+   }
+
+   /* this is ugly need to do a full GetTexImage */
+   transfer_size = u_minify(src_res->base.width0, src_level) *
+      u_minify(src_res->base.height0, src_level) *
+      u_minify(src_res->base.depth0, src_level) * util_format_get_blocksize(src_res->base.format);
+
+   tptr = malloc(transfer_size);
+   if (!tptr)
+      return;
+
+   glformat = tex_conv_table[src_res->base.format].glformat;
+   gltype = tex_conv_table[src_res->base.format].gltype; 
+
+   glBindTexture(src_res->target, src_res->id);
+   glGetTexImage(src_res->target, src_level, glformat, gltype, tptr);
+
+   glBindTexture(dst_res->target, dst_res->id);
+   glTexSubImage2D(dst_res->target, dst_level, dstx, dsty, src_box->width, src_box->height, glformat, gltype, tptr);
+
+   free(tptr);
+}
+
 void graw_renderer_resource_copy_region(struct grend_context *ctx,
                                         uint32_t dst_handle, uint32_t dst_level,
                                         uint32_t dstx, uint32_t dsty, uint32_t dstz,
@@ -2701,6 +2744,14 @@ void graw_renderer_resource_copy_region(struct grend_context *ctx,
    }
    if (!dst_res) {
       report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, dst_handle);
+      return;
+   }
+
+   if (!vrend_format_can_render(src_res->base.format) ||
+       !vrend_format_can_render(dst_res->base.format)) {
+      vrend_resource_copy_fallback(ctx, src_res, dst_res, dst_level, dstx,
+                                   dsty, dstz, src_level, src_box);
+
       return;
    }
 
@@ -3419,7 +3470,7 @@ void graw_renderer_fill_caps(uint32_t set, uint32_t version,
 
       if (tex_conv_table[i].internalformat != 0) {
          caps.v1.sampler.bitmask[offset] |= (1 << index);
-         if (tex_conv_table[i].bindings & GREND_BIND_RENDER)
+         if (vrend_format_can_render(i))
             caps.v1.render.bitmask[offset] |= (1 << index);
       }
    }

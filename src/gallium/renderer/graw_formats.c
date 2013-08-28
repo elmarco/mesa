@@ -224,6 +224,7 @@ static void vrend_add_formats(struct grend_format_table *table, int num_entries)
       
       glDrawBuffer(GL_COLOR_ATTACHMENT0);
       status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+      binding = 0;
       if (status == GL_FRAMEBUFFER_COMPLETE)
          binding |= VREND_BIND_RENDER;
       

@@ -781,14 +781,15 @@ void grend_set_viewport_state(struct grend_context *ctx,
    GLsizei width, height;
    GLclampd near_val, far_val;
    GLboolean view_flipped = state->scale[1] < 0 ? GL_TRUE : GL_FALSE;
-   
+   GLfloat abs_s1 = fabsf(state->scale[1]);
+
    width = state->scale[0] * 2.0f;
-   height = abs(state->scale[1]) * 2.0f;
+   height = abs_s1 * 2.0f;
    x = state->translate[0] - state->scale[0];
-   y = state->translate[1] - abs(state->scale[1]);
+   y = state->translate[1] - abs_s1;
 
    near_val = state->translate[2] - state->scale[2];
-   far_val = near_val + (state->scale[2] * 2.0f);
+   far_val = near_val + (state->scale[2] * 2.0);
 
    if (ctx->view_cur_x != x ||
        ctx->view_cur_y != y ||

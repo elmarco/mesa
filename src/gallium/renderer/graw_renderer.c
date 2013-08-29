@@ -280,6 +280,7 @@ static struct grend_nontimer_hw_query *grend_create_hw_query(struct grend_query 
 
 static struct grend_resource *frontbuffer;
 static struct pipe_box front_box;
+static GLuint front_fb_id;
 static struct grend_format_table tex_conv_table[VIRGL_FORMAT_MAX];
 
 static INLINE boolean vrend_format_can_render(enum virgl_formats format)
@@ -3059,13 +3060,14 @@ int graw_renderer_flush_buffer_res(struct grend_resource *res,
    GLuint fb_id;
 
    if (!res->is_front) {
-      glGenFramebuffers(1, &fb_id);
+      if (!front_fb_id)
+         glGenFramebuffers(1, &front_fb_id);
 
-      glBindFramebuffer(GL_FRAMEBUFFER_EXT, fb_id);
+      glBindFramebuffer(GL_FRAMEBUFFER_EXT, front_fb_id);
       glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
                                 res->target, res->id, 0);
 
-      glBindFramebuffer(GL_READ_FRAMEBUFFER, fb_id);
+      glBindFramebuffer(GL_READ_FRAMEBUFFER, front_fb_id);
       glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
       
       /* force full scissor and viewport - should probably use supplied box */
@@ -3078,7 +3080,6 @@ int graw_renderer_flush_buffer_res(struct grend_resource *res,
       glBlitFramebuffer(box->x, box->y, box->x + box->width, box->y + box->height,
                         box->x, front_box.height - box->y, box->x + box->width, front_box.height - box->y - box->height,
                         GL_COLOR_BUFFER_BIT, GL_NEAREST);
-      glDeleteFramebuffers(1, &fb_id);
 
       if (draw_cursor)
          graw_renderer_paint_cursor(&grend_state.cursor_info,

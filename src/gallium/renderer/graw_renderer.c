@@ -34,7 +34,7 @@ static void grend_update_viewport_state(struct grend_context *ctx);
 static void grend_update_scissor_state(struct grend_context *ctx);
 static void grend_ctx_restart_queries(struct grend_context *ctx);
 static void grend_destroy_query_object(void *obj_ptr);
-
+static void grend_finish_context_switch(struct grend_context *ctx);
 extern int graw_shader_use_explicit;
 int localrender;
 static int have_invert_mesa = 0;
@@ -83,7 +83,7 @@ struct global_renderer_state {
    GLuint program_id;
    struct list_head fence_list;
    struct grend_context *current_ctx;
-
+   struct grend_context *current_hw_ctx;
    struct list_head waiting_query_list;
 
    struct graw_cursor_info cursor_info;
@@ -91,6 +91,11 @@ struct global_renderer_state {
 
    GLuint vaoid;
    GLuint current_idx_buffer;
+
+   struct pipe_rasterizer_state hw_rs_state;
+   struct pipe_depth_stencil_alpha_state hw_dsa_state;
+   struct pipe_blend_state hw_blend_state;
+
 };
 
 static struct global_renderer_state grend_state;
@@ -266,6 +271,8 @@ struct grend_context {
    /* has this ctx gotten an error? */
    boolean in_error;
    enum virgl_ctx_errors last_error;
+
+   boolean ctx_switch_pending;
 };
 
 static struct grend_nontimer_hw_query *grend_create_hw_query(struct grend_query *query);
@@ -1217,6 +1224,9 @@ void grend_clear(struct grend_context *ctx,
    if (ctx->in_error)
       return;
 
+   if (ctx->ctx_switch_pending)
+      grend_finish_context_switch(ctx);
+
    glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, ctx->fb_id);
 
    if (ctx->stencil_state_dirty)
@@ -1284,6 +1294,9 @@ void grend_draw_vbo(struct grend_context *ctx,
 
    if (ctx->in_error)
       return;
+
+   if (ctx->ctx_switch_pending)
+      grend_finish_context_switch(ctx);
 
    if (ctx->stencil_state_dirty)
       grend_update_stencil_state(ctx);
@@ -1598,11 +1611,14 @@ static void grend_hw_emit_blend(struct grend_context *ctx)
 {
    struct pipe_blend_state *state = &ctx->blend_state;
 
-   if (state->logicop_enable) {
-      glEnable(GL_COLOR_LOGIC_OP);
-      glLogicOp(translate_logicop(state->logicop_func));
-   } else
-      glDisable(GL_COLOR_LOGIC_OP);
+   if (state->logicop_enable != grend_state.hw_blend_state.logicop_enable) {
+      grend_state.hw_blend_state.logicop_enable = state->logicop_enable;
+      if (state->logicop_enable) {
+         glEnable(GL_COLOR_LOGIC_OP);
+         glLogicOp(translate_logicop(state->logicop_func));
+      } else
+         glDisable(GL_COLOR_LOGIC_OP);
+   }
 
    if (state->independent_blend_enable) {
       /* ARB_draw_buffers_blend is required for this */
@@ -1620,10 +1636,13 @@ static void grend_hw_emit_blend(struct grend_context *ctx)
          } else
             glDisableIndexedEXT(GL_BLEND, i);
 
-         glColorMaskIndexedEXT(i, state->rt[i].colormask & PIPE_MASK_R ? GL_TRUE : GL_FALSE,
-                            state->rt[i].colormask & PIPE_MASK_G ? GL_TRUE : GL_FALSE,
-                            state->rt[i].colormask & PIPE_MASK_B ? GL_TRUE : GL_FALSE,
-                            state->rt[i].colormask & PIPE_MASK_A ? GL_TRUE : GL_FALSE);
+         if (state->rt[i].colormask != grend_state.hw_blend_state.rt[i].colormask) {
+            grend_state.hw_blend_state.rt[i].colormask = state->rt[i].colormask;
+            glColorMaskIndexedEXT(i, state->rt[i].colormask & PIPE_MASK_R ? GL_TRUE : GL_FALSE,
+                                  state->rt[i].colormask & PIPE_MASK_G ? GL_TRUE : GL_FALSE,
+                                  state->rt[i].colormask & PIPE_MASK_B ? GL_TRUE : GL_FALSE,
+                                  state->rt[i].colormask & PIPE_MASK_A ? GL_TRUE : GL_FALSE);
+         }
       }
    } else {
       if (state->rt[0].blend_enable) {
@@ -1638,10 +1657,13 @@ static void grend_hw_emit_blend(struct grend_context *ctx)
       else
          grend_blend_enable(GL_FALSE);
 
-      glColorMask(state->rt[0].colormask & PIPE_MASK_R ? GL_TRUE : GL_FALSE,
-                  state->rt[0].colormask & PIPE_MASK_G ? GL_TRUE : GL_FALSE,
-                  state->rt[0].colormask & PIPE_MASK_B ? GL_TRUE : GL_FALSE,
-                  state->rt[0].colormask & PIPE_MASK_A ? GL_TRUE : GL_FALSE);
+      if (state->rt[0].colormask != grend_state.hw_blend_state.rt[0].colormask) {
+         grend_state.hw_blend_state.rt[0].colormask = state->rt[0].colormask;
+         glColorMask(state->rt[0].colormask & PIPE_MASK_R ? GL_TRUE : GL_FALSE,
+                     state->rt[0].colormask & PIPE_MASK_G ? GL_TRUE : GL_FALSE,
+                     state->rt[0].colormask & PIPE_MASK_B ? GL_TRUE : GL_FALSE,
+                     state->rt[0].colormask & PIPE_MASK_A ? GL_TRUE : GL_FALSE);
+      }
    }
 
 }
@@ -1777,26 +1799,38 @@ static void grend_hw_emit_rs(struct grend_context *ctx)
       glDisable(GL_DEPTH_CLAMP);
    }
 #endif
-   if (state->point_size)
+   if (state->point_size != grend_state.hw_rs_state.point_size) {
+      grend_state.hw_rs_state.point_size = state->point_size;
       glPointSize(state->point_size);
+   }
 
-   if (state->rasterizer_discard)
-      glEnable(GL_RASTERIZER_DISCARD);
-   else
-      glDisable(GL_RASTERIZER_DISCARD);
+   if (state->rasterizer_discard != grend_state.hw_rs_state.rasterizer_discard) {
+      grend_state.hw_rs_state.rasterizer_discard = state->rasterizer_discard;
+      if (state->rasterizer_discard)
+         glEnable(GL_RASTERIZER_DISCARD);
+      else
+         glDisable(GL_RASTERIZER_DISCARD);
+   }
 
    glPolygonMode(GL_FRONT, translate_fill(state->fill_front));
    glPolygonMode(GL_BACK, translate_fill(state->fill_back));
-   if (state->flatshade) {
-      glShadeModel(GL_FLAT);
-   } else {
-      glShadeModel(GL_SMOOTH);
+
+   if (state->flatshade != grend_state.hw_rs_state.flatshade) {
+      grend_state.hw_rs_state.flatshade = state->flatshade;
+      if (state->flatshade) {
+         glShadeModel(GL_FLAT);
+      } else {
+         glShadeModel(GL_SMOOTH);
+      }
    }
 
-   if (state->front_ccw)
-      glFrontFace(GL_CCW);
-   else
-      glFrontFace(GL_CW);
+   if (state->front_ccw != grend_state.hw_rs_state.front_ccw) {
+      grend_state.hw_rs_state.front_ccw = state->front_ccw;
+      if (state->front_ccw)
+         glFrontFace(GL_CCW);
+      else
+         glFrontFace(GL_CW);
+   }
 
    if (state->scissor)
       glEnable(GL_SCISSOR_TEST);
@@ -1832,11 +1866,14 @@ static void grend_hw_emit_rs(struct grend_context *ctx)
    else
       glDisable(GL_VERTEX_PROGRAM_TWO_SIDE);
 
-   for (i = 0; i < 8; i++) {
-      if (state->clip_plane_enable & (1 << i))
-         glEnable(GL_CLIP_PLANE0 + i);
-      else
-         glDisable(GL_CLIP_PLANE0 + i);
+   if (state->clip_plane_enable != grend_state.hw_rs_state.clip_plane_enable) {
+      grend_state.hw_rs_state.clip_plane_enable = state->clip_plane_enable;
+      for (i = 0; i < 8; i++) {
+         if (state->clip_plane_enable & (1 << i))
+            glEnable(GL_CLIP_PLANE0 + i);
+         else
+            glDisable(GL_CLIP_PLANE0 + i);
+      }
    }
 
 }
@@ -2064,8 +2101,10 @@ bool grend_destroy_context(struct grend_context *ctx)
    bool switch_0 = (ctx == grend_state.current_ctx);
    int i;
 
-   if (switch_0)
+   if (switch_0) {
       grend_state.current_ctx = NULL;
+      grend_state.current_hw_ctx = NULL;
+   }
 
    /* reset references on framebuffers */
    grend_set_framebuffer_state(ctx, 0, NULL, 0);
@@ -3240,6 +3279,22 @@ boolean grend_hw_switch_context(struct grend_context *ctx)
    if (grend_state.current_ctx) {
       grend_ctx_finish_queries(grend_state.current_ctx);
    }
+   ctx->ctx_switch_pending = TRUE;
+   grend_state.current_ctx = ctx;
+}
+
+static void grend_finish_context_switch(struct grend_context *ctx)
+{
+
+   if (ctx->ctx_switch_pending == FALSE)
+      return;
+   ctx->ctx_switch_pending = FALSE;
+
+   if (grend_state.current_hw_ctx == ctx)
+      return;
+
+   grend_state.current_hw_ctx = ctx;
+
    /* re-emit all the state */
    grend_hw_emit_framebuffer_state(ctx);
    grend_hw_emit_depth_range(ctx);
@@ -3254,8 +3309,6 @@ boolean grend_hw_switch_context(struct grend_context *ctx)
    ctx->viewport_state_dirty = TRUE;
    ctx->shader_dirty = TRUE;
 
-   grend_state.current_ctx = ctx;
-   return TRUE;
 }
 
 

@@ -273,6 +273,7 @@ struct grend_context {
    enum virgl_ctx_errors last_error;
 
    boolean ctx_switch_pending;
+   GLuint blit_fb_ids[2];
 };
 
 static struct grend_nontimer_hw_query *grend_create_hw_query(struct grend_query *query);
@@ -2118,6 +2119,9 @@ bool grend_destroy_context(struct grend_context *ctx)
    if (ctx->fb_id)
       glDeleteFramebuffers(1, &ctx->fb_id);
 
+   if (ctx->blit_fb_ids[0])
+      glDeleteFramebuffers(2, ctx->blit_fb_ids);
+
    if (ctx->ib.buffer) {
       struct grend_resource *res = (struct grend_resource *)ctx->ib.buffer;
       if (grend_state.current_idx_buffer == res->id)
@@ -2158,7 +2162,7 @@ struct grend_context *grend_create_context(int id, uint32_t nlen, const char *de
    list_inithead(&grctx->active_nontimer_query_list);
    glGenVertexArrays(1, &grctx->vaoid);
    glGenFramebuffers(1, &grctx->fb_id);
-
+   glGenFramebuffers(2, grctx->blit_fb_ids);
    grctx->object_hash = vrend_object_init_ctx_table();
 
    return grctx;
@@ -2849,7 +2853,6 @@ void graw_renderer_resource_copy_region(struct grend_context *ctx,
                                         const struct pipe_box *src_box)
 {
    struct grend_resource *src_res, *dst_res;   
-   GLuint fb_ids[2];
    GLbitfield glmask = 0;
    GLint sy1, sy2, dy1, dy2;
 
@@ -2876,20 +2879,19 @@ void graw_renderer_resource_copy_region(struct grend_context *ctx,
       return;
    }
 
-   glGenFramebuffers(2, fb_ids);
-   glBindFramebuffer(GL_FRAMEBUFFER_EXT, fb_ids[0]);
+   glBindFramebuffer(GL_FRAMEBUFFER_EXT, ctx->blit_fb_ids[0]);
    glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
                              src_res->target, src_res->id, src_level);
       
    if (!dst_res->is_front) {
-      glBindFramebuffer(GL_FRAMEBUFFER_EXT, fb_ids[1]);
+      glBindFramebuffer(GL_FRAMEBUFFER_EXT, ctx->blit_fb_ids[1]);
       glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
                                 dst_res->target, dst_res->id, dst_level);
-      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fb_ids[1]);
+      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, ctx->blit_fb_ids[1]);
    } else
       glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 
-   glBindFramebuffer(GL_READ_FRAMEBUFFER, fb_ids[0]);
+   glBindFramebuffer(GL_READ_FRAMEBUFFER, ctx->blit_fb_ids[0]);
 
    glmask = GL_COLOR_BUFFER_BIT;
    glDisable(GL_SCISSOR_TEST);
@@ -2918,7 +2920,6 @@ void graw_renderer_resource_copy_region(struct grend_context *ctx,
                      dy2,
                      glmask, GL_NEAREST);
 
-   glDeleteFramebuffers(2, fb_ids);
 }
 
 static void graw_renderer_blit_int(struct grend_context *ctx,
@@ -2926,7 +2927,6 @@ static void graw_renderer_blit_int(struct grend_context *ctx,
                                    const struct pipe_blit_info *info)
 {
    struct grend_resource *src_res, *dst_res;
-   GLuint fb_ids[2];
    GLbitfield glmask = 0;
    int src_y1, src_y2, dst_y1, dst_y2;
 
@@ -2945,8 +2945,7 @@ static void graw_renderer_blit_int(struct grend_context *ctx,
       return;
    }
 
-   glGenFramebuffers(2, fb_ids);
-   glBindFramebuffer(GL_FRAMEBUFFER_EXT, fb_ids[0]);
+   glBindFramebuffer(GL_FRAMEBUFFER_EXT, ctx->blit_fb_ids[0]);
 
    if (src_res->target == GL_TEXTURE_CUBE_MAP) {
       glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
@@ -2957,15 +2956,15 @@ static void graw_renderer_blit_int(struct grend_context *ctx,
 
 
    if (!dst_res->is_front) {
-      glBindFramebuffer(GL_FRAMEBUFFER_EXT, fb_ids[1]);
+      glBindFramebuffer(GL_FRAMEBUFFER_EXT, ctx->blit_fb_ids[1]);
       glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
                                 dst_res->target, dst_res->id, info->dst.level);
       
-      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fb_ids[1]);
+      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, ctx->blit_fb_ids[1]);
    } else
       glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 
-   glBindFramebuffer(GL_READ_FRAMEBUFFER, fb_ids[0]);
+   glBindFramebuffer(GL_READ_FRAMEBUFFER, ctx->blit_fb_ids[0]);
 
    if (info->mask & PIPE_MASK_Z)
       glmask |= GL_DEPTH_BUFFER_BIT;
@@ -3005,7 +3004,6 @@ static void graw_renderer_blit_int(struct grend_context *ctx,
                      dst_y2,
                      glmask, convert_mag_filter(info->filter));
 
-   glDeleteFramebuffers(2, fb_ids);
 }
 
 void graw_renderer_blit(struct grend_context *ctx,

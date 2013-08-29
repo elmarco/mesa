@@ -2428,9 +2428,14 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
          }
          if (res->target == GL_TEXTURE_CUBE_MAP) {
             GLenum ctarget = GL_TEXTURE_CUBE_MAP_POSITIVE_X + box->z;
-
-            glTexSubImage2D(ctarget, level, x, y, box->width, box->height,
-                            glformat, gltype, data);
+            if (compressed) {
+               glCompressedTexSubImage2D(ctarget, level, x, y,
+                                         box->width, box->height,
+                                         glformat, comp_size, data);
+            } else {
+               glTexSubImage2D(ctarget, level, x, y, box->width, box->height,
+                               glformat, gltype, data);
+            }
          } else if (res->target == GL_TEXTURE_3D || res->target == GL_TEXTURE_2D_ARRAY || res->target == GL_TEXTURE_CUBE_MAP_ARRAY) {
             glTexSubImage3D(res->target, level, x, y, box->z,
                             box->width, box->height, box->depth,

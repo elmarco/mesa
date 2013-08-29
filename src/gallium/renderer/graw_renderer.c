@@ -1409,7 +1409,6 @@ void grend_draw_vbo(struct grend_context *ctx,
            fprintf(stderr,"cannot find vbo buf %d %d %d\n", i, ctx->ve->count, ctx->prog->vs->num_inputs);
            continue;
       }
-      glBindBuffer(GL_ARRAY_BUFFER, buf->base.id);
 
       if (graw_shader_use_explicit) {
          loc = i;
@@ -1434,9 +1433,22 @@ void grend_draw_vbo(struct grend_context *ctx,
 	return;
       }
 
-      enable_bitmask |= (1 << loc);
-      glVertexAttribPointer(loc, ve->nr_chan, ve->type, ve->norm, ctx->vbo[vbo_index].stride, (void *)(unsigned long)(ctx->ve->elements[i].base.src_offset + ctx->vbo[vbo_index].buffer_offset));
-      glVertexAttribDivisorARB(loc, ctx->ve->elements[i].base.instance_divisor);
+      glBindBuffer(GL_ARRAY_BUFFER, buf->base.id);
+
+      if (ctx->vbo[vbo_index].stride == 0) {
+         void *data;
+         /* for 0 stride we are kinda screwed */
+         data = glMapBufferRange(GL_ARRAY_BUFFER, 0, 4 * sizeof(GLfloat), GL_MAP_READ_BIT);
+         
+         glVertexAttrib4fv(loc, data);
+
+         glUnmapBuffer(GL_ARRAY_BUFFER);
+         disable_bitmask |= (1 << loc);
+      } else {
+         enable_bitmask |= (1 << loc);
+         glVertexAttribPointer(loc, ve->nr_chan, ve->type, ve->norm, ctx->vbo[vbo_index].stride, (void *)(unsigned long)(ctx->ve->elements[i].base.src_offset + ctx->vbo[vbo_index].buffer_offset));
+         glVertexAttribDivisorARB(loc, ctx->ve->elements[i].base.instance_divisor);
+      }
    }
 
    if (ctx->enabled_attribs_bitmask != enable_bitmask) {
@@ -3270,8 +3282,6 @@ void grend_stop_current_queries(void)
 
 boolean grend_hw_switch_context(struct grend_context *ctx)
 {
-   if (ctx->in_error)
-      return FALSE;
 
    if (ctx == grend_state.current_ctx)
       return TRUE;
@@ -3279,6 +3289,11 @@ boolean grend_hw_switch_context(struct grend_context *ctx)
    if (grend_state.current_ctx) {
       grend_ctx_finish_queries(grend_state.current_ctx);
    }
+
+   if (ctx->ctx_id != 0 && ctx->in_error)
+      return FALSE;
+
+
    ctx->ctx_switch_pending = TRUE;
    grend_state.current_ctx = ctx;
 }

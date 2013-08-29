@@ -167,6 +167,13 @@ iter_declaration(struct tgsi_iterate_context *iter,
             ctx->outputs[i].override_no_wm = true;
          }
          break;
+      case TGSI_SEMANTIC_CLIPVERTEX:
+         name_prefix = "gl_ClipVertex";
+         ctx->outputs[i].glsl_predefined = true;
+         ctx->outputs[i].glsl_no_index = true;
+         ctx->outputs[i].override_no_wm = true;
+         break;
+
       case TGSI_SEMANTIC_COLOR:
          if (iter->processor.Processor == TGSI_PROCESSOR_VERTEX) {
             ctx->outputs[i].glsl_predefined = true;

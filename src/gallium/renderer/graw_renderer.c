@@ -2205,7 +2205,8 @@ void graw_renderer_resource_destroy(struct grend_resource *res)
    } else
       glDeleteTextures(1, &res->id);
 
-   vrend_resource_remove(res->handle);
+   if (res->handle)
+      vrend_resource_remove(res->handle);
    free(res);
 }
 
@@ -2217,6 +2218,9 @@ void graw_renderer_resource_unref(uint32_t res_handle)
    res = vrend_resource_lookup(res_handle, 0);
    if (!res)
       return;
+
+   vrend_resource_remove(res->handle);
+   res->handle = 0;
 
    grend_resource_reference(&res, NULL);
 }

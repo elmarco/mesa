@@ -525,7 +525,6 @@ static void graw_set_sampler_views(struct pipe_context *ctx,
                                    struct pipe_sampler_view **views)
 {
    struct graw_context *grctx = (struct graw_context *)ctx;
-   uint32_t handles[32];
    int i;
    uint32_t disable_mask = ~((1ull << num_views) - 1);
    struct graw_textures_info *tinfo = &grctx->samplers[shader_type];
@@ -544,12 +543,9 @@ static void graw_set_sampler_views(struct pipe_context *ctx,
    for (i = 0; i < num_views; i++) {
       struct graw_sampler_view *grview = (struct graw_sampler_view *)views[i];
 
-      if (views[i] == (struct pipe_sampler_view *)tinfo->views[i]) {
-         handles[i] = grview ? grview->handle : 0;
+      if (views[i] == (struct pipe_sampler_view *)tinfo->views[i])
          continue;
-      }
 
-      handles[i] = grview ? grview->handle : 0;
       if (grview) {
          new_mask |= 1 << i;
          pipe_sampler_view_reference((struct pipe_sampler_view **)&tinfo->views[i], views[i]);
@@ -561,7 +557,7 @@ static void graw_set_sampler_views(struct pipe_context *ctx,
 
    tinfo->enabled_mask &= ~disable_mask;
    tinfo->enabled_mask |= new_mask;
-   graw_encode_set_sampler_views(grctx, shader_type, num_views, handles);
+   graw_encode_set_sampler_views(grctx, shader_type, num_views, tinfo->views);
 }
 
 static void graw_set_vertex_sampler_views(struct pipe_context *ctx,	

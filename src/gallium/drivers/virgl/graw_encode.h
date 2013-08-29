@@ -120,8 +120,8 @@ int graw_encode_sampler_view(struct graw_context *ctx,
 
 int graw_encode_set_sampler_views(struct graw_context *ctx,
                                   uint32_t shader_type,
-                                  uint32_t num_res,
-                                  uint32_t *handles);
+                                  uint32_t num_views,
+                                  struct graw_sampler_view **views);
 
 int graw_encode_bind_sampler_states(struct graw_context *ctx,
                                     uint32_t shader_type,

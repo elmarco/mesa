@@ -39,6 +39,15 @@ static void graw_encoder_write_res(struct graw_context *ctx,
    }
 }
 
+static void graw_encoder_attach_res(struct graw_context *ctx,
+                                    struct graw_resource *res)
+{
+   struct virgl_winsys *vws = virgl_screen(ctx->base.screen)->vws;
+
+   if (res && res->hw_res)
+      vws->emit_res(vws, ctx->cbuf, res->hw_res, FALSE);
+}
+
 int graw_encode_bind_object(struct graw_context *ctx,
 			    uint32_t handle, uint32_t object)
 {
@@ -232,7 +241,12 @@ int graw_encoder_set_framebuffer_state(struct graw_context *ctx,
    for (i = 0; i < state->nr_cbufs; i++) {
       struct graw_surface *surf = (struct graw_surface *)state->cbufs[i];
       graw_encoder_write_dword(ctx->cbuf, surf->handle);
+      graw_encoder_attach_res(ctx, (struct graw_resource *)surf->base.texture);
    }
+
+   if (zsurf)
+      graw_encoder_attach_res(ctx, (struct graw_resource *)zsurf->base.texture);
+
    return 0;
 }
 
@@ -427,14 +441,19 @@ int graw_encode_sampler_view(struct graw_context *ctx,
 
 int graw_encode_set_sampler_views(struct graw_context *ctx,
                                   uint32_t shader_type,
-                                  uint32_t num_handles,
-                                  uint32_t *handles)
+                                  uint32_t num_views,
+                                  struct graw_sampler_view **views)
 {
    int i;
-   graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_SET_SAMPLER_VIEWS, 0, num_handles + 1));
+   graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_SET_SAMPLER_VIEWS, 0, num_views + 1));
    graw_encoder_write_dword(ctx->cbuf, shader_type);
-   for (i = 0; i < num_handles; i++)
-      graw_encoder_write_dword(ctx->cbuf, handles[i]);
+   for (i = 0; i < num_views; i++) {
+      uint32_t handle = views[i] ? views[i]->handle : 0;
+      graw_encoder_write_dword(ctx->cbuf, handle);
+
+      if (views[i])
+         graw_encoder_attach_res(ctx, (struct grend_resource *)views[i]->base.texture);
+   }
    return 0;
 }
 

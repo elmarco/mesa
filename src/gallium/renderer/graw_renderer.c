@@ -223,7 +223,6 @@ struct grend_context {
 
    int num_sampler_states[PIPE_SHADER_TYPES];
    boolean sampler_state_dirty;
-   uint32_t fb_id;
 
    uint8_t stencil_refs[2];
 
@@ -242,7 +241,8 @@ struct grend_context {
    boolean viewport_state_dirty;
    uint32_t fb_height;
 
-   int nr_cbufs;
+   uint32_t fb_id;
+   int nr_cbufs, old_nr_cbufs;
    struct grend_surface *zsurf;
    struct grend_surface *surf[8];
    
@@ -648,37 +648,16 @@ void grend_create_sampler_view(struct grend_context *ctx,
    vrend_object_insert(ctx->object_hash, view, sizeof(*view), handle, VIRGL_OBJECT_SAMPLER_VIEW);
 }
 
-static void grend_hw_emit_framebuffer_state(struct grend_context *ctx)
+static void grend_hw_set_framebuffer_state(struct grend_context *ctx)
 {
    int i;
    struct grend_resource *tex;
-   static const GLenum buffers[8] = {
-      GL_COLOR_ATTACHMENT0_EXT,
-      GL_COLOR_ATTACHMENT1_EXT,
-      GL_COLOR_ATTACHMENT2_EXT,
-      GL_COLOR_ATTACHMENT3_EXT,
-      GL_COLOR_ATTACHMENT4_EXT,
-      GL_COLOR_ATTACHMENT5_EXT,
-      GL_COLOR_ATTACHMENT6_EXT,
-      GL_COLOR_ATTACHMENT7_EXT,
-   };
-
-#if 0
-   if (!ctx->zsurf && !ctx->nr_cbufs && !ctx->fb_id) {
-      glBindFramebuffer(GL_FRAMEBUFFER_EXT, 0);
-      glDrawBuffers(0, buffers);
-      return;
-   }
-#endif
-
-   if (ctx->fb_id)
-      glDeleteFramebuffers(1, &ctx->fb_id);
-   glGenFramebuffers(1, &ctx->fb_id);
+   GLenum attachment;
 
    glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, ctx->fb_id);
 
    if (ctx->zsurf) {
-      GLenum attachment;
+
       tex = ctx->zsurf->texture;
       if (!tex)
          return;
@@ -697,29 +676,36 @@ static void grend_hw_emit_framebuffer_state(struct grend_context *ctx)
       else
          glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, attachment,
                                    tex->target, tex->id, ctx->zsurf->val0);
-   }
+   } else
+      glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_STENCIL_ATTACHMENT,
+                                GL_TEXTURE_2D, 0, 0);
 
    for (i = 0; i < ctx->nr_cbufs; i++) {
-      if (!ctx->surf[i])
+      attachment = GL_COLOR_ATTACHMENT0 + i;
+
+      if (!ctx->surf[i]) {
+         glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, attachment,
+                                   GL_TEXTURE_2D, 0, 0);
          continue;
+      }
 
       tex = ctx->surf[i]->texture;
 
       if (tex->target == GL_TEXTURE_CUBE_MAP) {
-         glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, buffers[i],
+         glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, attachment,
                                    GL_TEXTURE_CUBE_MAP_POSITIVE_X + (ctx->surf[i]->val1 & 0xffff), tex->id, ctx->surf[i]->val0);
       } else if (tex->target == GL_TEXTURE_1D_ARRAY ||
                  tex->target == GL_TEXTURE_2D_ARRAY) {
-         glFramebufferTextureLayer(GL_FRAMEBUFFER_EXT, buffers[i],
+         glFramebufferTextureLayer(GL_FRAMEBUFFER_EXT, attachment,
                                    tex->id, ctx->surf[i]->val0, ctx->surf[i]->val1 & 0xffff);
       } else if (tex->target == GL_TEXTURE_3D) {
-         glFramebufferTexture3DEXT(GL_FRAMEBUFFER_EXT, buffers[i],
+         glFramebufferTexture3DEXT(GL_FRAMEBUFFER_EXT, attachment,
                                    tex->target, tex->id, ctx->surf[i]->val0, ctx->surf[i]->val1 & 0xffff);
       } else if (tex->target == GL_TEXTURE_1D) {
-         glFramebufferTexture1DEXT(GL_FRAMEBUFFER_EXT, buffers[i],
+         glFramebufferTexture1DEXT(GL_FRAMEBUFFER_EXT, attachment,
                                    tex->target, tex->id, ctx->surf[i]->val0);
       } else
-         glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, buffers[i],
+         glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, attachment,
                                    tex->target, tex->id, ctx->surf[i]->val0);
 
       if (i == 0 && u_minify(tex->base.height0, ctx->surf[i]->val0) != ctx->fb_height) {
@@ -728,6 +714,28 @@ static void grend_hw_emit_framebuffer_state(struct grend_context *ctx)
          ctx->viewport_state_dirty = TRUE;
       }
    }
+
+   for (i = ctx->nr_cbufs; i < ctx->old_nr_cbufs; i++) {
+      attachment = GL_COLOR_ATTACHMENT0 + i;
+      glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, attachment,
+                                GL_TEXTURE_2D, 0, 0);
+   }
+}
+
+static void grend_hw_emit_framebuffer_state(struct grend_context *ctx)
+{
+   static const GLenum buffers[8] = {
+      GL_COLOR_ATTACHMENT0_EXT,
+      GL_COLOR_ATTACHMENT1_EXT,
+      GL_COLOR_ATTACHMENT2_EXT,
+      GL_COLOR_ATTACHMENT3_EXT,
+      GL_COLOR_ATTACHMENT4_EXT,
+      GL_COLOR_ATTACHMENT5_EXT,
+      GL_COLOR_ATTACHMENT6_EXT,
+      GL_COLOR_ATTACHMENT7_EXT,
+   };
+   glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, ctx->fb_id);
+
    glDrawBuffers(ctx->nr_cbufs, buffers);
 }
 
@@ -751,6 +759,8 @@ void grend_set_framebuffer_state(struct grend_context *ctx,
 
    old_num = ctx->nr_cbufs;
    ctx->nr_cbufs = nr_cbufs;
+   ctx->old_nr_cbufs = old_num;
+
    for (i = 0; i < nr_cbufs; i++) {
       surf = vrend_object_lookup(ctx->object_hash, surf_handle[i], VIRGL_OBJECT_SURFACE);
       if (!surf) {
@@ -764,6 +774,8 @@ void grend_set_framebuffer_state(struct grend_context *ctx,
       for (i = ctx->nr_cbufs; i < old_num; i++)
          grend_surface_reference(&ctx->surf[i], NULL);
    }
+
+   grend_hw_set_framebuffer_state(ctx);
 
    grend_hw_emit_framebuffer_state(ctx);
 }
@@ -2078,6 +2090,7 @@ struct grend_context *grend_create_context(int id, uint32_t nlen, const char *de
    list_inithead(&grctx->programs);
    list_inithead(&grctx->active_nontimer_query_list);
    glGenVertexArrays(1, &grctx->vaoid);
+   glGenFramebuffers(1, &grctx->fb_id);
 
    grctx->object_hash = vrend_object_init_ctx_table();
 

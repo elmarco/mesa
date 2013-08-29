@@ -648,77 +648,71 @@ void grend_create_sampler_view(struct grend_context *ctx,
    vrend_object_insert(ctx->object_hash, view, sizeof(*view), handle, VIRGL_OBJECT_SAMPLER_VIEW);
 }
 
-static void grend_hw_set_framebuffer_state(struct grend_context *ctx)
+static void grend_hw_set_zsurf_texture(struct grend_context *ctx)
 {
-   int i;
    struct grend_resource *tex;
    GLenum attachment;
 
-   glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, ctx->fb_id);
-
-   if (ctx->zsurf) {
-
-      tex = ctx->zsurf->texture;
-      if (!tex)
-         return;
-      if (tex->base.format == PIPE_FORMAT_S8_UINT)
-         attachment = GL_STENCIL_ATTACHMENT;
-      else if (tex->base.format == PIPE_FORMAT_Z24X8_UNORM || tex->base.format == PIPE_FORMAT_Z32_UNORM || tex->base.format == PIPE_FORMAT_Z16_UNORM || tex->base.format == PIPE_FORMAT_Z32_FLOAT)
-         attachment = GL_DEPTH_ATTACHMENT;
-      else
-         attachment = GL_DEPTH_STENCIL_ATTACHMENT;
-      if (tex->target == GL_TEXTURE_3D)
-         glFramebufferTexture3DEXT(GL_FRAMEBUFFER_EXT, attachment,
-                                   tex->target, tex->id, ctx->zsurf->val0, ctx->zsurf->val1 & 0xffff);
-      else if (tex->target == GL_TEXTURE_1D_ARRAY || tex->target == GL_TEXTURE_2D_ARRAY || tex->target == GL_TEXTURE_CUBE_MAP_ARRAY) 
-         glFramebufferTextureLayer(GL_FRAMEBUFFER_EXT, attachment,
-                                   tex->id, ctx->zsurf->val0, ctx->zsurf->val1 & 0xffff);
-      else
-         glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, attachment,
-                                   tex->target, tex->id, ctx->zsurf->val0);
-   } else
+   if (!ctx->zsurf) {
       glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_STENCIL_ATTACHMENT,
                                 GL_TEXTURE_2D, 0, 0);
+      return;
 
-   for (i = 0; i < ctx->nr_cbufs; i++) {
-      attachment = GL_COLOR_ATTACHMENT0 + i;
-
-      if (!ctx->surf[i]) {
-         glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, attachment,
-                                   GL_TEXTURE_2D, 0, 0);
-         continue;
-      }
-
-      tex = ctx->surf[i]->texture;
-
-      if (tex->target == GL_TEXTURE_CUBE_MAP) {
-         glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, attachment,
-                                   GL_TEXTURE_CUBE_MAP_POSITIVE_X + (ctx->surf[i]->val1 & 0xffff), tex->id, ctx->surf[i]->val0);
-      } else if (tex->target == GL_TEXTURE_1D_ARRAY ||
-                 tex->target == GL_TEXTURE_2D_ARRAY) {
-         glFramebufferTextureLayer(GL_FRAMEBUFFER_EXT, attachment,
-                                   tex->id, ctx->surf[i]->val0, ctx->surf[i]->val1 & 0xffff);
-      } else if (tex->target == GL_TEXTURE_3D) {
-         glFramebufferTexture3DEXT(GL_FRAMEBUFFER_EXT, attachment,
-                                   tex->target, tex->id, ctx->surf[i]->val0, ctx->surf[i]->val1 & 0xffff);
-      } else if (tex->target == GL_TEXTURE_1D) {
-         glFramebufferTexture1DEXT(GL_FRAMEBUFFER_EXT, attachment,
-                                   tex->target, tex->id, ctx->surf[i]->val0);
-      } else
-         glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, attachment,
-                                   tex->target, tex->id, ctx->surf[i]->val0);
-
-      if (i == 0 && u_minify(tex->base.height0, ctx->surf[i]->val0) != ctx->fb_height) {
-         ctx->fb_height = u_minify(tex->base.height0, ctx->surf[i]->val0);
-         ctx->scissor_state_dirty = TRUE;
-         ctx->viewport_state_dirty = TRUE;
-      }
    }
+   tex = ctx->zsurf->texture;
+   if (!tex)
+      return;
+   if (tex->base.format == PIPE_FORMAT_S8_UINT)
+      attachment = GL_STENCIL_ATTACHMENT;
+   else if (tex->base.format == PIPE_FORMAT_Z24X8_UNORM || tex->base.format == PIPE_FORMAT_Z32_UNORM || tex->base.format == PIPE_FORMAT_Z16_UNORM || tex->base.format == PIPE_FORMAT_Z32_FLOAT)
+      attachment = GL_DEPTH_ATTACHMENT;
+   else
+      attachment = GL_DEPTH_STENCIL_ATTACHMENT;
+   if (tex->target == GL_TEXTURE_3D)
+      glFramebufferTexture3DEXT(GL_FRAMEBUFFER_EXT, attachment,
+                                tex->target, tex->id, ctx->zsurf->val0, ctx->zsurf->val1 & 0xffff);
+   else if (tex->target == GL_TEXTURE_1D_ARRAY || tex->target == GL_TEXTURE_2D_ARRAY || tex->target == GL_TEXTURE_CUBE_MAP_ARRAY) 
+      glFramebufferTextureLayer(GL_FRAMEBUFFER_EXT, attachment,
+                                tex->id, ctx->zsurf->val0, ctx->zsurf->val1 & 0xffff);
+   else
+      glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, attachment,
+                                tex->target, tex->id, ctx->zsurf->val0);
 
-   for (i = ctx->nr_cbufs; i < ctx->old_nr_cbufs; i++) {
-      attachment = GL_COLOR_ATTACHMENT0 + i;
+}
+
+static void grend_hw_set_color_surface(struct grend_context *ctx, int index)
+{
+   struct grend_resource *tex;
+   GLenum attachment = GL_COLOR_ATTACHMENT0 + index;
+
+   if (!ctx->surf[index]) {
       glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, attachment,
                                 GL_TEXTURE_2D, 0, 0);
+      return;
+   }
+
+   tex = ctx->surf[index]->texture;
+   if (tex->target == GL_TEXTURE_CUBE_MAP) {
+      glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, attachment,
+                                GL_TEXTURE_CUBE_MAP_POSITIVE_X + (ctx->surf[index]->val1 & 0xffff), tex->id, ctx->surf[index]->val0);
+   } else if (tex->target == GL_TEXTURE_1D_ARRAY ||
+              tex->target == GL_TEXTURE_2D_ARRAY) {
+      glFramebufferTextureLayer(GL_FRAMEBUFFER_EXT, attachment,
+                                tex->id, ctx->surf[index]->val0, ctx->surf[index]->val1 & 0xffff);
+   } else if (tex->target == GL_TEXTURE_3D) {
+      glFramebufferTexture3DEXT(GL_FRAMEBUFFER_EXT, attachment,
+                                tex->target, tex->id, ctx->surf[index]->val0, ctx->surf[index]->val1 & 0xffff);
+   } else if (tex->target == GL_TEXTURE_1D) {
+      glFramebufferTexture1DEXT(GL_FRAMEBUFFER_EXT, attachment,
+                                tex->target, tex->id, ctx->surf[index]->val0);
+   } else
+      glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, attachment,
+                                tex->target, tex->id, ctx->surf[index]->val0);
+   
+   if (index == 0 && u_minify(tex->base.height0, ctx->surf[index]->val0) != ctx->fb_height) {
+      ctx->fb_height = u_minify(tex->base.height0, ctx->surf[index]->val0);
+      ctx->scissor_state_dirty = TRUE;
+      ctx->viewport_state_dirty = TRUE;
    }
 }
 
@@ -747,15 +741,21 @@ void grend_set_framebuffer_state(struct grend_context *ctx,
    int i;
    int old_num;
 
+   glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, ctx->fb_id);
+
    if (zsurf_handle) {
       zsurf = vrend_object_lookup(ctx->object_hash, zsurf_handle, VIRGL_OBJECT_SURFACE);
       if (!zsurf) {
          report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_SURFACE, zsurf_handle);
          return;
       }
-      grend_surface_reference(&ctx->zsurf, zsurf);
    } else
-      grend_surface_reference(&ctx->zsurf, NULL);
+      zsurf = NULL;
+
+   if (ctx->zsurf != zsurf) {
+      grend_surface_reference(&ctx->zsurf, zsurf);
+      grend_hw_set_zsurf_texture(ctx);
+   }
 
    old_num = ctx->nr_cbufs;
    ctx->nr_cbufs = nr_cbufs;
@@ -767,15 +767,18 @@ void grend_set_framebuffer_state(struct grend_context *ctx,
          report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_SURFACE, surf_handle[i]);
          return;
       }
-      grend_surface_reference(&ctx->surf[i], surf);
+      if (ctx->surf[i] != surf) {
+         grend_surface_reference(&ctx->surf[i], surf);
+         grend_hw_set_color_surface(ctx, i);
+      }
    }
 
    if (old_num > ctx->nr_cbufs) {
-      for (i = ctx->nr_cbufs; i < old_num; i++)
+      for (i = ctx->nr_cbufs; i < old_num; i++) {
          grend_surface_reference(&ctx->surf[i], NULL);
+         grend_hw_set_color_surface(ctx, i);
+      }
    }
-
-   grend_hw_set_framebuffer_state(ctx);
 
    grend_hw_emit_framebuffer_state(ctx);
 }

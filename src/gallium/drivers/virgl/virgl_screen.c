@@ -381,6 +381,8 @@ virgl_create_screen(struct virgl_winsys *vws)
    screen->base.flush_frontbuffer = virgl_flush_frontbuffer;
 
    vws->get_caps(vws, &screen->caps);
+
+   util_format_s3tc_init();
    return &screen->base;
 }
   

@@ -268,6 +268,7 @@ struct grend_context {
 static struct grend_nontimer_hw_query *grend_create_hw_query(struct grend_query *query);
 
 static struct grend_resource *frontbuffer;
+static struct pipe_box front_box;
 static struct grend_format_table tex_conv_table[VIRGL_FORMAT_MAX];
 
 static INLINE boolean vrend_format_can_render(enum virgl_formats format)
@@ -2969,7 +2970,7 @@ int graw_renderer_set_scanout(uint32_t res_handle, uint32_t ctx_id,
    }
 #endif
    grend_resource_reference(&frontbuffer, res);
-
+   front_box = *box;
    fprintf(stderr,"setting frontbuffer to %d\n", res_handle);
    return 0;
 }
@@ -2991,13 +2992,13 @@ int graw_renderer_flush_buffer_res(struct grend_resource *res,
       
       /* force full scissor and viewport - should probably use supplied box */
       glViewport(0, 0, res->base.width0, res->base.height0);
-      glScissor(box->x, box->y, box->width, box->height);
+      glScissor(0, 0, front_box.width, front_box.height);
 
       grend_state.viewport_dirty = TRUE;
       grend_state.scissor_dirty = TRUE;
       /* justification for inversion here required */
-      glBlitFramebuffer(0, 0, res->base.width0, res->base.height0,
-                        0, res->base.height0, res->base.width0, 0,
+      glBlitFramebuffer(box->x, box->y, box->x + box->width, box->y + box->height,
+                        box->x, front_box.height - box->y, box->x + box->width, front_box.height - box->y - box->height,
                         GL_COLOR_BUFFER_BIT, GL_NEAREST);
       glDeleteFramebuffers(1, &fb_id);
 

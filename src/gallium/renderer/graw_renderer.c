@@ -2437,12 +2437,24 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
                                glformat, gltype, data);
             }
          } else if (res->target == GL_TEXTURE_3D || res->target == GL_TEXTURE_2D_ARRAY || res->target == GL_TEXTURE_CUBE_MAP_ARRAY) {
-            glTexSubImage3D(res->target, level, x, y, box->z,
-                            box->width, box->height, box->depth,
-                            glformat, gltype, data);
+            if (compressed) {
+               glCompressedTexSubImage3D(res->target, level, x, y, box->z,
+                                         box->width, box->height, box->depth,
+                                         glformat, comp_size, data);
+            } else {
+               glTexSubImage3D(res->target, level, x, y, box->z,
+                               box->width, box->height, box->depth,
+                               glformat, gltype, data);
+            }
          } else if (res->target == GL_TEXTURE_1D) {
-            glTexSubImage1D(res->target, level, box->x, box->width,
-                            glformat, gltype, data);
+            if (compressed) {
+               glCompressedTexSubImage1D(res->target, level, box->x,
+                                         box->width,
+                                         glformat, comp_size, data);
+            } else {
+               glTexSubImage1D(res->target, level, box->x, box->width,
+                               glformat, gltype, data);
+            }
          } else {
             if (compressed) {
                glCompressedTexSubImage2D(res->target, level, x, res->target == GL_TEXTURE_1D_ARRAY ? box->z : y,

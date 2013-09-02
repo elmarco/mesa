@@ -1484,9 +1484,6 @@ void grend_draw_vbo(struct grend_context *ctx,
       glEndTransformFeedback();
 
    glBindVertexArray(0);
-   
-   glActiveTexture(GL_TEXTURE0);
-      
 }
 
 static GLenum translate_blend_func(uint32_t pipe_blend)

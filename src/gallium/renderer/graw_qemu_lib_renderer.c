@@ -62,20 +62,26 @@ static void graw_process_cmd(struct virgl_command *cmd, struct graw_iovec *iov,
    case VIRGL_CMD_DESTROY_CONTEXT:
       graw_renderer_context_destroy(cmd->u.ctx.handle);
       break;
-   case VIRGL_CMD_CREATE_RESOURCE:
+   case VIRGL_CMD_CREATE_RESOURCE: {
+      struct graw_renderer_resource_create_args args;
+
+      args.handle = cmd->u.res_create.handle;
+      args.target = cmd->u.res_create.target;
+      args.format = cmd->u.res_create.format;
+      args.bind = cmd->u.res_create.bind;
+      args.width = cmd->u.res_create.width;
+      args.height = cmd->u.res_create.height;
+      args.depth = cmd->u.res_create.depth;
+      args.array_size = cmd->u.res_create.array_size;
+      args.last_level = cmd->u.res_create.last_level;
+      args.nr_samples = cmd->u.res_create.nr_samples;
+         
 //         fprintf(stderr,"got res create %d %d\n", cmd->u.res_create.width,
 //                 cmd->u.res_create.height);
-      graw_renderer_resource_create(cmd->u.res_create.handle,
-                                    cmd->u.res_create.target,
-                                    cmd->u.res_create.format,
-                                    cmd->u.res_create.bind,
-                                    cmd->u.res_create.width,
-                                    cmd->u.res_create.height,
-                                    cmd->u.res_create.depth,
-                                    cmd->u.res_create.array_size,
-                                    cmd->u.res_create.last_level,
-                                    cmd->u.res_create.nr_samples);
+      graw_renderer_resource_create(&args);
+
       break;
+   }
    case VIRGL_CMD_SUBMIT:
 //         fprintf(stderr,"cmd submit %lx %d\n", cmd->u.cmd_submit.data, cmd->u.cmd_submit.size);
       

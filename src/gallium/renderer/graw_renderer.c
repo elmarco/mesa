@@ -2159,66 +2159,66 @@ struct grend_context *grend_create_context(int id, uint32_t nlen, const char *de
 }
 
 
-void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target target, uint32_t format, uint32_t bind, uint32_t width, uint32_t height, uint32_t depth, uint32_t array_size, uint32_t last_level, uint32_t nr_samples)
+void graw_renderer_resource_create(struct graw_renderer_resource_create_args *args)
 {
    struct grend_resource *gr = (struct grend_resource *)CALLOC_STRUCT(grend_texture);
    int level;
 
-   gr->handle = handle;
-   gr->base.width0 = width;
-   gr->base.height0 = height;
-   gr->base.depth0 = depth;
-   gr->base.format = format;
-   gr->base.target = target;
-   gr->base.last_level = last_level;
-   gr->base.nr_samples = nr_samples;
-   gr->base.array_size = array_size;
+   gr->handle = args->handle;
+   gr->base.width0 = args->width;
+   gr->base.height0 = args->height;
+   gr->base.depth0 = args->depth;
+   gr->base.format = args->format;
+   gr->base.target = args->target;
+   gr->base.last_level = args->last_level;
+   gr->base.nr_samples = args->nr_samples;
+   gr->base.array_size = args->array_size;
    pipe_reference_init(&gr->base.reference, 1);
 
-   if (bind == PIPE_BIND_CUSTOM) {
+   if (args->bind == PIPE_BIND_CUSTOM) {
       /* custom shuold only be for buffers */
-      gr->ptr = malloc(width);
-   } else if (bind == PIPE_BIND_INDEX_BUFFER) {
+      gr->ptr = malloc(args->width);
+   } else if (args->bind == PIPE_BIND_INDEX_BUFFER) {
       gr->target = GL_ELEMENT_ARRAY_BUFFER_ARB;
       glGenBuffersARB(1, &gr->id);
       glBindBufferARB(gr->target, gr->id);
-      glBufferData(gr->target, width, NULL, GL_STREAM_DRAW);
-   } else if (bind == PIPE_BIND_STREAM_OUTPUT) {
+      glBufferData(gr->target, args->width, NULL, GL_STREAM_DRAW);
+   } else if (args->bind == PIPE_BIND_STREAM_OUTPUT) {
       gr->target = GL_TRANSFORM_FEEDBACK_BUFFER;
       glGenBuffersARB(1, &gr->id);
       glBindBuffer(gr->target, gr->id);
-      glBufferData(gr->target, width, NULL, GL_STREAM_DRAW);
-   } else if (target == PIPE_BUFFER) {
+      glBufferData(gr->target, args->width, NULL, GL_STREAM_DRAW);
+   } else if (args->target == PIPE_BUFFER) {
       gr->target = GL_ARRAY_BUFFER_ARB;
       glGenBuffersARB(1, &gr->id);
       glBindBufferARB(gr->target, gr->id);
-      glBufferData(gr->target, width, NULL, GL_STREAM_DRAW);
+      glBufferData(gr->target, args->width, NULL, GL_STREAM_DRAW);
    } else {
       struct grend_texture *gt = (struct grend_texture *)gr;
       GLenum internalformat, glformat, gltype;
-      gr->target = tgsitargettogltarget(target, nr_samples);
+      gr->target = tgsitargettogltarget(args->target, args->nr_samples);
       glGenTextures(1, &gr->id);
       glBindTexture(gr->target, gr->id);
 
-      internalformat = tex_conv_table[format].internalformat;
-      glformat = tex_conv_table[format].glformat;
-      gltype = tex_conv_table[format].gltype;
+      internalformat = tex_conv_table[args->format].internalformat;
+      glformat = tex_conv_table[args->format].glformat;
+      gltype = tex_conv_table[args->format].gltype;
       if (internalformat == 0) {
-         fprintf(stderr,"unknown format is %d\n", format);
+         fprintf(stderr,"unknown format is %d\n", args->format);
          return 0;
          internalformat = GL_RGBA;
          glformat = GL_RGBA;
          gltype = GL_UNSIGNED_BYTE;
       }
 
-      if (nr_samples > 1) {
+      if (args->nr_samples > 1) {
          if (gr->target == GL_TEXTURE_2D_MULTISAMPLE) {
-            glTexImage2DMultisample(gr->target, nr_samples,
-                                    internalformat, width, height,
+            glTexImage2DMultisample(gr->target, args->nr_samples,
+                                    internalformat, args->width, args->height,
                                     TRUE);
          } else {
-            glTexImage3DMultisample(gr->target, nr_samples,
-                                    internalformat, width, height, array_size,
+            glTexImage3DMultisample(gr->target, args->nr_samples,
+                                    internalformat, args->width, args->height, args->array_size,
                                     TRUE);
          }
 
@@ -2226,34 +2226,34 @@ void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target tar
          int i;
          for (i = 0; i < 6; i++) {
             GLenum ctarget = GL_TEXTURE_CUBE_MAP_POSITIVE_X + i;
-            for (level = 0; level <= last_level; level++) {
-               unsigned mwidth = u_minify(width, level);
-               unsigned mheight = u_minify(height, level);
+            for (level = 0; level <= args->last_level; level++) {
+               unsigned mwidth = u_minify(args->width, level);
+               unsigned mheight = u_minify(args->height, level);
                glTexImage2D(ctarget, level, internalformat, mwidth, mheight, 0, glformat,
                             gltype, NULL);
             }
          }
       } else if (gr->target == GL_TEXTURE_3D || gr->target == GL_TEXTURE_2D_ARRAY || gr->target == GL_TEXTURE_CUBE_MAP_ARRAY) {
-         int depth_param = (gr->target == GL_TEXTURE_2D_ARRAY || gr->target == GL_TEXTURE_CUBE_MAP_ARRAY) ? array_size : depth;
-         for (level = 0; level <= last_level; level++) {
-            unsigned mwidth = u_minify(width, level);
-            unsigned mheight = u_minify(height, level);
+         for (level = 0; level <= args->last_level; level++) {
+            unsigned depth_param = (gr->target == GL_TEXTURE_2D_ARRAY || gr->target == GL_TEXTURE_CUBE_MAP_ARRAY) ? args->array_size : u_minify(args->depth, level);
+            unsigned mwidth = u_minify(args->width, level);
+            unsigned mheight = u_minify(args->height, level);
             glTexImage3D(gr->target, level, internalformat, mwidth, mheight, depth_param, 0,
                          glformat,
                          gltype, NULL);
          }
       } else if (gr->target == GL_TEXTURE_1D) {
-         for (level = 0; level <= last_level; level++) {
-            unsigned mwidth = u_minify(width, level);
+         for (level = 0; level <= args->last_level; level++) {
+            unsigned mwidth = u_minify(args->width, level);
             glTexImage1D(gr->target, level, internalformat, mwidth, 0,
                          glformat,
                          gltype, NULL);
          }
       } else {
-         for (level = 0; level <= last_level; level++) {
-            unsigned mwidth = u_minify(width, level);
-            unsigned mheight = u_minify(height, level);
-            glTexImage2D(gr->target, level, internalformat, mwidth, gr->target == GL_TEXTURE_1D_ARRAY ? array_size : mheight, 0, glformat,
+         for (level = 0; level <= args->last_level; level++) {
+            unsigned mwidth = u_minify(args->width, level);
+            unsigned mheight = u_minify(args->height, level);
+            glTexImage2D(gr->target, level, internalformat, mwidth, gr->target == GL_TEXTURE_1D_ARRAY ? args->array_size : mheight, 0, glformat,
                          gltype, NULL);
          }
       }
@@ -2262,7 +2262,7 @@ void graw_renderer_resource_create(uint32_t handle, enum pipe_texture_target tar
       gt->cur_swizzle_r = gt->cur_swizzle_g = gt->cur_swizzle_b = gt->cur_swizzle_a = -1;
    }
 
-   vrend_resource_insert(gr, sizeof(*gr), handle);
+   vrend_resource_insert(gr, sizeof(*gr), args->handle);
 }
 
 void graw_renderer_resource_destroy(struct grend_resource *res)

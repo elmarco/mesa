@@ -20,6 +20,8 @@ struct graw_renderer_callbacks {
    void (*swap_buffers)(void *cookie);
    void (*resize_front)(void *cookie, int width, int height);
    void (*write_fence)(void *cookie, uint32_t fence);
+
+   void (*map_iov)(struct graw_iovec *iov, uint64_t addr);
 };
 
 GREND_EXPORT void graw_lib_renderer_init(void *cookie, struct graw_renderer_callbacks *cb);

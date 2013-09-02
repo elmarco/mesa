@@ -49,6 +49,46 @@ void graw_process_vcmd(void *cmd, struct graw_iovec *iov, unsigned int niovs)
    graw_renderer_check_fences();
 }
 
+static void virgl_cmd_create_resource(struct virgl_command *cmd, struct graw_iovec *iov, unsigned int niovs)
+{
+   struct graw_renderer_resource_create_args args;
+   struct graw_iovec *res_iovs;
+   uint32_t gsize = graw_iov_size(iov, niovs);
+   void *data;
+   int i;
+
+   res_iovs = malloc(cmd->u.res_create.nr_sg_entries * sizeof(struct graw_iovec));
+
+   if (niovs > 1) {
+      data = malloc(gsize);
+      graw_iov_to_buf(iov, niovs, 0, data, gsize);
+   } else
+      data = (iov[0].iov_base);
+   
+   for (i = 0; i < cmd->u.res_create.nr_sg_entries; i++) {
+      struct virgl_iov_entry *ent = ((struct virgl_iov_entry *)data) + i;
+
+      res_iovs[i].iov_len = ent->length;
+      rcbs->map_iov(&res_iovs[i], ent->addr);
+   }
+
+   args.handle = cmd->u.res_create.handle;
+   args.target = cmd->u.res_create.target;
+   args.format = cmd->u.res_create.format;
+   args.bind = cmd->u.res_create.bind;
+   args.width = cmd->u.res_create.width;
+   args.height = cmd->u.res_create.height;
+   args.depth = cmd->u.res_create.depth;
+   args.array_size = cmd->u.res_create.array_size;
+   args.last_level = cmd->u.res_create.last_level;
+   args.nr_samples = cmd->u.res_create.nr_samples;
+      
+   graw_renderer_resource_create(&args, res_iovs, cmd->u.res_create.nr_sg_entries);
+
+   if (niovs > 1)
+      free(data);
+}
+
 static void graw_process_cmd(struct virgl_command *cmd, struct graw_iovec *iov,
                              unsigned int niovs)
 {
@@ -62,26 +102,9 @@ static void graw_process_cmd(struct virgl_command *cmd, struct graw_iovec *iov,
    case VIRGL_CMD_DESTROY_CONTEXT:
       graw_renderer_context_destroy(cmd->u.ctx.handle);
       break;
-   case VIRGL_CMD_CREATE_RESOURCE: {
-      struct graw_renderer_resource_create_args args;
-
-      args.handle = cmd->u.res_create.handle;
-      args.target = cmd->u.res_create.target;
-      args.format = cmd->u.res_create.format;
-      args.bind = cmd->u.res_create.bind;
-      args.width = cmd->u.res_create.width;
-      args.height = cmd->u.res_create.height;
-      args.depth = cmd->u.res_create.depth;
-      args.array_size = cmd->u.res_create.array_size;
-      args.last_level = cmd->u.res_create.last_level;
-      args.nr_samples = cmd->u.res_create.nr_samples;
-         
-//         fprintf(stderr,"got res create %d %d\n", cmd->u.res_create.width,
-//                 cmd->u.res_create.height);
-      graw_renderer_resource_create(&args);
-
+   case VIRGL_CMD_CREATE_RESOURCE:
+      virgl_cmd_create_resource(cmd, iov, niovs);
       break;
-   }
    case VIRGL_CMD_SUBMIT:
 //         fprintf(stderr,"cmd submit %lx %d\n", cmd->u.cmd_submit.data, cmd->u.cmd_submit.size);
       
@@ -92,8 +115,6 @@ static void graw_process_cmd(struct virgl_command *cmd, struct graw_iovec *iov,
    break;
    case VIRGL_CMD_TRANSFER_GET:
 //         fprintf(stderr,"got transfer get %d\n", cmd->u.transfer_get.res_handle);
-      if (!niovs)
-         return;
       grend_stop_current_queries();
       graw_renderer_transfer_send_iov(cmd->u.transfer_get.res_handle,
                                       cmd->u.transfer_get.ctx_id,
@@ -105,8 +126,6 @@ static void graw_process_cmd(struct virgl_command *cmd, struct graw_iovec *iov,
                                       niovs);
       break;
    case VIRGL_CMD_TRANSFER_PUT:
-      if (!niovs)
-         return;
       grend_stop_current_queries();
       graw_renderer_transfer_write_iov(cmd->u.transfer_put.res_handle,
                                        cmd->u.transfer_put.ctx_id,

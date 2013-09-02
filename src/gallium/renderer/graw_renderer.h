@@ -21,6 +21,9 @@ struct grend_resource {
    GLboolean renderer_flipped;
    void *ptr;
    GLuint handle;
+
+   struct graw_iovec *iov;
+   uint32_t num_iovs;
 };
 
 /* assume every format is sampler friendly */
@@ -88,7 +91,7 @@ struct graw_renderer_resource_create_args {
    uint32_t nr_samples;
 };
      
-void graw_renderer_resource_create(struct graw_renderer_resource_create_args *args);
+void graw_renderer_resource_create(struct graw_renderer_resource_create_args *args, struct graw_iovec *iov, uint32_t num_iovs);
 
 void graw_renderer_resource_unref(uint32_t handle);
 

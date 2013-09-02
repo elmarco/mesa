@@ -2159,12 +2159,14 @@ struct grend_context *grend_create_context(int id, uint32_t nlen, const char *de
 }
 
 
-void graw_renderer_resource_create(struct graw_renderer_resource_create_args *args)
+void graw_renderer_resource_create(struct graw_renderer_resource_create_args *args, struct graw_iovec *iov, uint32_t num_iovs)
 {
    struct grend_resource *gr = (struct grend_resource *)CALLOC_STRUCT(grend_texture);
    int level;
 
    gr->handle = args->handle;
+   gr->iov = iov;
+   gr->num_iovs = num_iovs;
    gr->base.width0 = args->width;
    gr->base.height0 = args->height;
    gr->base.depth0 = args->depth;
@@ -2359,6 +2361,11 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
       struct grend_context *ctx = vrend_lookup_renderer_ctx(ctx_id);
       report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, res_handle);
       return;
+   }
+
+   if (res->iov && !iov || num_iovs == 0) {
+      iov = res->iov;
+      num_iovs = res->num_iovs;
    }
    if (res->target == GL_TRANSFORM_FEEDBACK_BUFFER ||
        res->target == GL_ELEMENT_ARRAY_BUFFER_ARB ||
@@ -2666,6 +2673,11 @@ void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t ctx_id,
       struct grend_context *ctx = vrend_lookup_renderer_ctx(ctx_id);
       report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, res_handle);
       return;
+   }
+
+   if (res->iov && !iov || num_iovs == 0) {
+      iov = res->iov;
+      num_iovs = res->num_iovs;
    }
 
    if (res->target == 0 && res->ptr) {

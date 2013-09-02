@@ -869,7 +869,10 @@ vrend_resource_layout(struct pipe_screen *screen,
       depth = u_minify(depth, 1);
    }
 
-   *total_size = buffer_size;
+   if (pt->nr_samples <= 1)
+      *total_size = buffer_size;
+   else /* don't create guest backing store for MSAA */
+      *total_size = 0;
    return TRUE;
 }
 

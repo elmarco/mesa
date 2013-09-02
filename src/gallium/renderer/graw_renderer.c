@@ -1954,7 +1954,7 @@ static void grend_apply_sampler_state(struct grend_context *ctx,
       glTexParameteri(target, GL_TEXTURE_COMPARE_FUNC, GL_NEVER + state->compare_func);
 
    if (memcmp(&tex->state.border_color, &state->border_color, 16) || set_all)
-      glTexParameterIuiv(target, GL_TEXTURE_BORDER_COLOR, &state->border_color);
+      glTexParameterIuiv(target, GL_TEXTURE_BORDER_COLOR, state->border_color.ui);
    tex->state = *state;
 }
 

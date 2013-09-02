@@ -13,7 +13,6 @@ struct graw_surface {
 static inline void graw_encoder_write_dword(struct virgl_cmd_buf *state,
                                             uint32_t dword)
 {
-//   fprintf(stderr,"[%d] 0x%x\n", state->cdw, dword);
    state->buf[state->cdw++] = dword;
 }
 

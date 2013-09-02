@@ -50,7 +50,7 @@ void graw_cursor_init(struct graw_cursor_info *cursor)
 
    glGenVertexArrays(1, &cursor->vaoid);
 
-   glBindVertexArray(cursor->vaoid);
+   grend_bind_va(cursor->vaoid);
 
    glVertexAttribPointer(cursor->attrib_locs[0], 2, GL_FLOAT, GL_FALSE, 16, 0);
    glVertexAttribDivisorARB(cursor->attrib_locs[0], 0);
@@ -122,7 +122,8 @@ int graw_renderer_paint_cursor(struct graw_cursor_info *cursor,
    glTexParameterf(cursor_res->target, GL_TEXTURE_MAX_LOD, 0);
    glTexParameterf(cursor_res->target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
    glTexParameterf(cursor_res->target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-   glBindVertexArray(cursor->vaoid);
+
+   grend_bind_va(cursor->vaoid);
 
    glBindBufferARB(GL_ARRAY_BUFFER_ARB, cursor->vbo_id);
 

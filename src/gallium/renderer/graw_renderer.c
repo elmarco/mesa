@@ -89,6 +89,7 @@ struct global_renderer_state {
    struct graw_cursor_info cursor_info;
    bool have_robustness;
 
+   GLuint vaoid;
    GLuint current_idx_buffer;
 };
 
@@ -362,6 +363,14 @@ static void grend_bind_index_buffer(GLuint idx_buffer_id)
    if (grend_state.current_idx_buffer != idx_buffer_id) {
       grend_state.current_idx_buffer = idx_buffer_id;
       glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, idx_buffer_id);
+   }
+}
+
+void grend_bind_va(GLuint vaoid)
+{
+   if (grend_state.vaoid != vaoid) {
+      grend_state.vaoid = vaoid;
+      glBindVertexArray(vaoid);
    }
 }
 
@@ -1305,7 +1314,7 @@ void grend_draw_vbo(struct grend_context *ctx,
    
    grend_use_program(ctx->prog->id);
 
-   glBindVertexArray(ctx->vaoid);
+   grend_bind_va(ctx->vaoid);
 
    for (shader_type = PIPE_SHADER_VERTEX; shader_type <= PIPE_SHADER_FRAGMENT; shader_type++) {
       if (ctx->prog->const_locs[shader_type] && (ctx->const_dirty[shader_type] || new_program)) {
@@ -1483,7 +1492,7 @@ void grend_draw_vbo(struct grend_context *ctx,
    if (ctx->num_so_targets)
       glEndTransformFeedback();
 
-   glBindVertexArray(0);
+   grend_bind_va(0);
 }
 
 static GLenum translate_blend_func(uint32_t pipe_blend)
@@ -2078,13 +2087,15 @@ bool grend_destroy_context(struct grend_context *ctx)
 
    grend_free_programs(ctx);
 
-   glBindVertexArray(ctx->vaoid);
+   grend_bind_va(ctx->vaoid);
 
    while (ctx->enabled_attribs_bitmask) {
       i = u_bit_scan(&ctx->enabled_attribs_bitmask);
       
       glDisableVertexAttribArray(i);
    }
+
+   grend_bind_va(0);
 
    glDeleteVertexArrays(1, &ctx->vaoid);
 

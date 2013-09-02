@@ -241,7 +241,7 @@ void grend_set_cursor_info(uint32_t cursor_handle, int x, int y);
 void grend_use_program(GLuint program_id);
 void grend_blend_enable(GLboolean blend_enable);
 void grend_depth_test_enable(GLboolean depth_test_enable);
-
+void grend_bind_va(GLuint vaoid);
 int graw_renderer_flush_buffer_res(struct grend_resource *res,
                                    struct pipe_box *box);
 

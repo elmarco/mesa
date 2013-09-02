@@ -90,7 +90,6 @@ struct global_renderer_state {
    bool have_robustness;
 
    GLuint vaoid;
-   GLuint current_idx_buffer;
 
    struct pipe_rasterizer_state hw_rs_state;
    struct pipe_depth_stencil_alpha_state hw_dsa_state;
@@ -364,14 +363,6 @@ void grend_use_program(GLuint program_id)
    if (grend_state.program_id != program_id) {
       glUseProgram(program_id);
       grend_state.program_id = program_id;
-   }
-}
-
-static void grend_bind_index_buffer(GLuint idx_buffer_id)
-{
-   if (grend_state.current_idx_buffer != idx_buffer_id) {
-      grend_state.current_idx_buffer = idx_buffer_id;
-      glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, idx_buffer_id);
    }
 }
 
@@ -1467,9 +1458,9 @@ void grend_draw_vbo(struct grend_context *ctx,
 
    if (info->indexed) {
       struct grend_resource *res = (struct grend_resource *)ctx->ib.buffer;
-      grend_bind_index_buffer(res->id);
+      glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, res->id);
    } else
-      grend_bind_index_buffer(0);
+      glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
    grend_ctx_restart_queries(ctx);
 
@@ -2117,21 +2108,17 @@ bool grend_destroy_context(struct grend_context *ctx)
    grend_set_streamout_targets(ctx, 0, 0, NULL);
    grend_set_num_vbo(ctx, 0);
 
+   grend_set_index_buffer(ctx, 0, 0, 0);
+
    if (ctx->fb_id)
       glDeleteFramebuffers(1, &ctx->fb_id);
 
    if (ctx->blit_fb_ids[0])
       glDeleteFramebuffers(2, ctx->blit_fb_ids);
 
-   if (ctx->ib.buffer) {
-      struct grend_resource *res = (struct grend_resource *)ctx->ib.buffer;
-      if (grend_state.current_idx_buffer == res->id)
-         grend_bind_index_buffer(0);
-   }
-
-   grend_free_programs(ctx);
-
    grend_bind_va(ctx->vaoid);
+
+   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
    while (ctx->enabled_attribs_bitmask) {
       i = u_bit_scan(&ctx->enabled_attribs_bitmask);
@@ -2142,6 +2129,8 @@ bool grend_destroy_context(struct grend_context *ctx)
    grend_bind_va(0);
 
    glDeleteVertexArrays(1, &ctx->vaoid);
+
+   grend_free_programs(ctx);
 
    /* need to free any objects still in hash table - TODO */
    vrend_object_fini_ctx_table(ctx->object_hash);

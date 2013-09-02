@@ -88,6 +88,8 @@ struct global_renderer_state {
 
    struct graw_cursor_info cursor_info;
    bool have_robustness;
+
+   GLuint current_idx_buffer;
 };
 
 static struct global_renderer_state grend_state;
@@ -352,6 +354,14 @@ void grend_use_program(GLuint program_id)
    if (grend_state.program_id != program_id) {
       glUseProgram(program_id);
       grend_state.program_id = program_id;
+   }
+}
+
+static void grend_bind_index_buffer(GLuint idx_buffer_id)
+{
+   if (grend_state.current_idx_buffer != idx_buffer_id) {
+      grend_state.current_idx_buffer = idx_buffer_id;
+      glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, idx_buffer_id);
    }
 }
 
@@ -1433,8 +1443,9 @@ void grend_draw_vbo(struct grend_context *ctx,
 
    if (info->indexed) {
       struct grend_resource *res = (struct grend_resource *)ctx->ib.buffer;
-      glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, res->id);
-   }
+      grend_bind_index_buffer(res->id);
+   } else
+      grend_bind_index_buffer(0);
 
    grend_ctx_restart_queries(ctx);
 
@@ -1472,7 +1483,6 @@ void grend_draw_vbo(struct grend_context *ctx,
    if (ctx->num_so_targets)
       glEndTransformFeedback();
 
-   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
    glBindVertexArray(0);
    
    glActiveTexture(GL_TEXTURE0);
@@ -2062,6 +2072,12 @@ bool grend_destroy_context(struct grend_context *ctx)
 
    if (ctx->fb_id)
       glDeleteFramebuffers(1, &ctx->fb_id);
+
+   if (ctx->ib.buffer) {
+      struct grend_resource *res = (struct grend_resource *)ctx->ib.buffer;
+      if (grend_state.current_idx_buffer == res->id)
+         grend_bind_index_buffer(0);
+   }
 
    grend_free_programs(ctx);
 

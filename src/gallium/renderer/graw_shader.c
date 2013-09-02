@@ -682,7 +682,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
 
       if (inst->Instruction.Opcode == TGSI_OPCODE_TXL || inst->Instruction.Opcode == TGSI_OPCODE_TXL2)
          tex_ext = "Lod";
-      if (inst->Instruction.Opcode == TGSI_OPCODE_TXD)
+      else if (inst->Instruction.Opcode == TGSI_OPCODE_TXD)
          tex_ext = "Grad";
       else
          tex_ext = "";

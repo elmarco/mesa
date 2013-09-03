@@ -56,8 +56,6 @@ virgl_dri_la_LIBADD = \
 	$(top_builddir)/src/gallium/drivers/trace/libtrace.la \
 	$(top_builddir)/src/gallium/drivers/rbug/librbug.la \
 	$(top_builddir)/src/gallium/drivers/noop/libnoop.la \
-        $(top_builddir)/src/gallium/winsys/sw/wrapper/libwsw.la \
-        $(top_builddir)/src/gallium/drivers/softpipe/libsoftpipe.la \
 	$(top_builddir)/src/gallium/drivers/virgl/libvirgl.la \
 	$(GALLIUM_DRI_LIB_DEPS) \
 	$(LIBDRM_LIBS)

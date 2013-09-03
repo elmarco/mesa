@@ -484,7 +484,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
       emit_op1("abs");
       strcat(ctx->glsl_main, buf);
       break;
-   case TGSI_OPCODE_KIL:
+   case TGSI_OPCODE_KILL_IF:
       snprintf(buf, 255, "if (any(lessThan(%s, vec4(0.0))))\ndiscard;\n", srcs[0]);
       strcat(ctx->glsl_main, buf);
       break;
@@ -500,7 +500,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
       snprintf(buf, 255, "}\n");
       strcat(ctx->glsl_main, buf);
       break;
-   case TGSI_OPCODE_KILP:
+   case TGSI_OPCODE_KILL:
       snprintf(buf, 255, "discard;\n");
       strcat(ctx->glsl_main, buf);
       break;

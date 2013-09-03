@@ -304,7 +304,7 @@ static void graw_decode_create_rasterizer(struct grend_decode_ctx *ctx, uint32_t
 
    ebit(flatshade, 0);
    ebit(depth_clip, 1);
-   ebit(gl_rasterization_rules, 2);
+   ebit(clip_halfz, 2);
    ebit(rasterizer_discard, 3);
    ebit(flatshade_first, 4);
    ebit(light_twoside, 5);
@@ -328,7 +328,8 @@ static void graw_decode_create_rasterizer(struct grend_decode_ctx *ctx, uint32_t
    ebit(line_smooth, 26);
    ebit(line_stipple_enable, 27);
    ebit(line_last_pixel, 28);
-   
+   ebit(half_pixel_center, 29);
+   ebit(bottom_edge_rule, 30);
    rs_state->point_size = uif(ctx->ds->buf[ctx->ds->buf_offset + 3]);
    rs_state->sprite_coord_enable = ctx->ds->buf[ctx->ds->buf_offset + 4];
    tmp = ctx->ds->buf[ctx->ds->buf_offset + 5];

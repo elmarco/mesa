@@ -66,4 +66,8 @@ endif
 if HAVE_GALLIUM_SVGA
 SUBDIRS += svga/drm
 endif
+
+if HAVE_GALLIUM_VIRGL
+SUBDIRS += virgl/drm
+endif
 endif

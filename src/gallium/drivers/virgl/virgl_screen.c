@@ -131,7 +131,6 @@ virgl_get_param(struct pipe_screen *screen, enum pipe_cap param)
       return vscreen->caps.caps.v1.bset.streamout_pause_resume;
    case PIPE_CAP_START_INSTANCE:
       return vscreen->caps.caps.v1.bset.start_instance;
-   case PIPE_CAP_TGSI_CAN_COMPACT_VARYINGS:
    case PIPE_CAP_TGSI_CAN_COMPACT_CONSTANTS:
    case PIPE_CAP_VERTEX_BUFFER_OFFSET_4BYTE_ALIGNED_ONLY:
    case PIPE_CAP_VERTEX_BUFFER_STRIDE_4BYTE_ALIGNED_ONLY:
@@ -183,6 +182,8 @@ virgl_get_shader_param(struct pipe_screen *screen, unsigned shader, enum pipe_sh
          return 16;
       case PIPE_SHADER_CAP_MAX_CONSTS:
          return 4096;
+      case PIPE_SHADER_CAP_MAX_TEMPS:
+         return 256;
       case PIPE_SHADER_CAP_MAX_CONST_BUFFERS:
          return PIPE_MAX_CONSTANT_BUFFERS;
       case PIPE_SHADER_CAP_MAX_ADDRS:

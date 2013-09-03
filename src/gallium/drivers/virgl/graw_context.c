@@ -196,7 +196,9 @@ static void graw_set_framebuffer_state(struct pipe_context *ctx,
    graw_encoder_set_framebuffer_state(grctx, state);
 }
 
-static void graw_set_viewport_state(struct pipe_context *ctx,
+static void graw_set_viewport_states(struct pipe_context *ctx,
+                                     unsigned start_slot,
+                                     unsigned num_viewports,
                                      const struct pipe_viewport_state *state)
 {
    struct graw_context *grctx = (struct graw_context *)ctx;
@@ -639,7 +641,9 @@ static void graw_set_polygon_stipple(struct pipe_context *ctx,
    graw_encoder_set_polygon_stipple(grctx, ps);
 }
 
-static void graw_set_scissor_state(struct pipe_context *ctx,
+static void graw_set_scissor_states(struct pipe_context *ctx,
+                                    unsigned start_slot,
+                                    unsigned num_scissor,
                                    const struct pipe_scissor_state *ss)
 {
    struct graw_context *grctx = (struct graw_context *)ctx;
@@ -737,7 +741,7 @@ struct pipe_context *graw_context_create(struct pipe_screen *pscreen,
    grctx->base.bind_rasterizer_state = graw_bind_rasterizer_state;
    grctx->base.delete_rasterizer_state = graw_delete_rasterizer_state;
 
-   grctx->base.set_viewport_state = graw_set_viewport_state;
+   grctx->base.set_viewport_states = graw_set_viewport_states;
    grctx->base.create_vertex_elements_state = graw_create_vertex_elements_state;
    grctx->base.bind_vertex_elements_state = graw_bind_vertex_elements_state;
    grctx->base.delete_vertex_elements_state = graw_delete_vertex_elements_state;
@@ -767,7 +771,7 @@ struct pipe_context *graw_context_create(struct pipe_screen *pscreen,
    grctx->base.bind_vertex_sampler_states = graw_bind_vertex_sampler_states;
 
    grctx->base.set_polygon_stipple = graw_set_polygon_stipple;
-   grctx->base.set_scissor_state = graw_set_scissor_state;
+   grctx->base.set_scissor_states = graw_set_scissor_states;
    grctx->base.set_sample_mask = graw_set_sample_mask;
    grctx->base.set_stencil_ref = graw_set_stencil_ref;
    grctx->base.set_clip_state = graw_set_clip_state;

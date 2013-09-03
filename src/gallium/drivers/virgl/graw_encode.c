@@ -139,7 +139,7 @@ int graw_encode_rasterizer_state(struct graw_context *ctx,
 
    tmp = (state->flatshade << 0) |
       (state->depth_clip << 1) |
-      (state->gl_rasterization_rules << 2) |
+      (state->clip_halfz << 2) |
       (state->rasterizer_discard << 3) |
       (state->flatshade_first << 4) |
       (state->light_twoside << 5) |
@@ -162,7 +162,9 @@ int graw_encode_rasterizer_state(struct graw_context *ctx,
       (state->multisample << 25) |
       (state->line_smooth << 26) |
       (state->line_stipple_enable << 27) |
-      (state->line_last_pixel << 28);
+      (state->line_last_pixel << 28) |
+      (state->half_pixel_center << 29) |
+      (state->bottom_edge_rule << 30);
    
    graw_encoder_write_dword(ctx->cbuf, tmp);
    graw_encoder_write_dword(ctx->cbuf, uif(state->point_size));

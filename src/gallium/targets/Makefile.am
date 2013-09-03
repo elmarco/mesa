@@ -135,3 +135,9 @@ endif
 if HAVE_GALLIUM_EGL
 SUBDIRS += egl-static
 endif
+
+if HAVE_GALLIUM_VIRGL
+if HAVE_DRI
+SUBDIRS += dri-virgl
+endif
+endif

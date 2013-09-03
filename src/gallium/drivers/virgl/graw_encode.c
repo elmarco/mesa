@@ -674,3 +674,9 @@ int graw_encoder_set_so_targets(struct graw_context *ctx,
    return 0;
 }
 
+int graw_encoder_set_query_state(struct graw_context *ctx,
+                                 boolean query_enabled)
+{
+   graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_SET_QUERY_STATE, 0, 1));
+   graw_encoder_write_dword(ctx->cbuf, query_enabled ? (1 << 0) : 0);
+}

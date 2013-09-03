@@ -252,7 +252,8 @@ void grend_begin_query(struct grend_context *ctx, uint32_t handle);
 void grend_end_query(struct grend_context *ctx, uint32_t handle);
 void grend_get_query_result(struct grend_context *ctx, uint32_t handle,
                             uint32_t wait);
-
+void grend_set_query_state(struct grend_context *ctx,
+                           boolean enabled);
 void grend_set_cursor_info(uint32_t cursor_handle, int x, int y);
 
 void grend_use_program(GLuint program_id);

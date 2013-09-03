@@ -184,4 +184,7 @@ int graw_encoder_end_query(struct graw_context *ctx,
                            uint32_t handle);
 int graw_encoder_get_query_result(struct graw_context *ctx,
                                   uint32_t handle, boolean wait);
+
+int graw_encoder_set_query_state(struct graw_context *ctx,
+                                 boolean query_enabled);
 #endif

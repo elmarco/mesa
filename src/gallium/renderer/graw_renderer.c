@@ -3475,6 +3475,12 @@ void grend_get_query_result(struct grend_context *ctx, uint32_t handle,
       list_addtail(&q->waiting_queries, &grend_state.waiting_query_list);
 }
 
+void grend_set_query_state(struct grend_context *ctx,
+                           boolean enabled)
+{
+
+}
+
 void grend_set_cursor_info(uint32_t cursor_handle, int x, int y)
 {
    grend_state.cursor_info.res_handle = cursor_handle;

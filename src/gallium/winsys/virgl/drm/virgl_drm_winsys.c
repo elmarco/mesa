@@ -467,26 +467,43 @@ static void virgl_drm_cmd_buf_destroy(struct virgl_cmd_buf *_cbuf)
 
 }
 
-static boolean virgl_drm_lookup_res(struct virgl_drm_cmd_buf *cbuf, struct virgl_hw_res *res)
+static boolean virgl_drm_lookup_res(struct virgl_drm_cmd_buf *cbuf,
+                                    struct virgl_hw_res *res)
 {
+   unsigned hash = res->res_handle & (sizeof(cbuf->is_handle_added)-1);
    int i;
 
-   for (i = 0; i < cbuf->cres; i++)
+   if (cbuf->is_handle_added[hash]) {
+      i = cbuf->reloc_indices_hashlist[hash];
       if (cbuf->res_bo[i] == res)
-         return TRUE;
-   return FALSE;
+         return true;
+
+      for (i = 0; i < cbuf->cres; i++) {
+         if (cbuf->res_bo[i] == res) {
+            cbuf->reloc_indices_hashlist[hash] = i;
+            return true;
+         }
+      }
+   }
+   return false;
 }
 
 static void virgl_drm_add_res(struct virgl_drm_winsys *qdws,
                             struct virgl_drm_cmd_buf *cbuf, struct virgl_hw_res *res)
 {
-   if (cbuf->cres > cbuf->nres)
-      assert(0);
+   unsigned hash = res->res_handle & (sizeof(cbuf->is_handle_added)-1);
+
+   if (cbuf->cres > cbuf->nres) {
+      fprintf(stderr,"failure to add relocation\n");
+      return;
+   }
 
    cbuf->res_bo[cbuf->cres] = NULL;
    virgl_drm_resource_reference(qdws, &cbuf->res_bo[cbuf->cres], res);
    cbuf->res_hlist[cbuf->cres] = res->bo_handle;
+   cbuf->is_handle_added[hash] = TRUE;
 
+   cbuf->reloc_indices_hashlist[hash] = cbuf->cres;
    p_atomic_inc(&res->num_cs_references);
    cbuf->cres++;
 }
@@ -555,6 +572,8 @@ static int virgl_drm_winsys_submit_cmd(struct virgl_winsys *qws, struct virgl_cm
    cbuf->base.cdw = 0;
 
    virgl_drm_release_all_res(qdws, cbuf);
+
+   memset(cbuf->is_handle_added, 0, sizeof(cbuf->is_handle_added));
    return ret;
 }
 

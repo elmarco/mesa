@@ -517,23 +517,12 @@ iter_instruction(struct tgsi_iterate_context *iter,
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_DST:
-      snprintf(buf, 255, "%s.x = 1.0;\n", dsts[0]);
-      strcat(ctx->glsl_main, buf);
-      snprintf(buf, 255, "%s.y = %s.y * %s.y;\n", dsts[0], srcs[0], srcs[1]);
-      strcat(ctx->glsl_main, buf);
-      snprintf(buf, 255, "%s.z = %s.z;\n", dsts[0], srcs[0]);
-      strcat(ctx->glsl_main, buf);
-      snprintf(buf, 255, "%s.w = %s.w;\n", dsts[0], srcs[0]);
+      snprintf(buf, 255, "%s = vec4(1.0, %s.y * %s.y, %s.z, %s.w);\n", dsts[0],
+               srcs[0], srcs[1], srcs[0], srcs[0]);
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_LIT:
-      snprintf(buf, 255, "%s.x = 1.0;\n", dsts[0]);
-      strcat(ctx->glsl_main, buf);
-      snprintf(buf, 255, "%s.y = max(%s.x, 0.0);\n", dsts[0], srcs[0]);
-      strcat(ctx->glsl_main, buf);
-      snprintf(buf, 255, "%s.z = pow(max(0.0, %s.y) * step(0.0, %s.x), clamp(%s.w, -128.0, 128.0));\n", dsts[0], srcs[0], srcs[0], srcs[0]);
-      strcat(ctx->glsl_main, buf);
-      snprintf(buf, 255, "%s.w = 1.0;\n", dsts[0]);
+      snprintf(buf, 255, "%s = vec4(1.0, max(%s.x, 0.0), pow(max(0.0, %s.y) * step(0.0, %s.x), clamp(%s.w, -128.0, 128.0)), 1.0);\n", dsts[0], srcs[0], srcs[0], srcs[0], srcs[0]);
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_EX2:

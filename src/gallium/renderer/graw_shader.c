@@ -374,36 +374,48 @@ iter_instruction(struct tgsi_iterate_context *iter,
       
    for (i = 0; i < inst->Instruction.NumSrcRegs; i++) {
       const struct tgsi_full_src_register *src = &inst->Src[i];
-      char swizzle[6] = {0};
+      char swizzle[8] = {0};
+      char prefix[6] = {0};
       char negate = src->Register.Negate ? '-' : ' ';
+      int swz_idx = 0, pre_idx = 0;
+      boolean isabsolute = src->Register.Absolute;
+      
+      if (isabsolute)
+         swizzle[swz_idx++] = ')';
+
+      if (src->Register.Negate)
+         prefix[pre_idx++] = '-';
+      if (isabsolute)
+         strcpy(&prefix[pre_idx++], "abs(");
+
       if (src->Register.SwizzleX != TGSI_SWIZZLE_X ||
           src->Register.SwizzleY != TGSI_SWIZZLE_Y ||
           src->Register.SwizzleZ != TGSI_SWIZZLE_Z ||
           src->Register.SwizzleW != TGSI_SWIZZLE_W) {
-         swizzle[0] = '.';
-         swizzle[1] = get_swiz_char(src->Register.SwizzleX);
-         swizzle[2] = get_swiz_char(src->Register.SwizzleY);
-         swizzle[3] = get_swiz_char(src->Register.SwizzleZ);
-         swizzle[4] = get_swiz_char(src->Register.SwizzleW);
+         swizzle[swz_idx++] = '.';
+         swizzle[swz_idx++] = get_swiz_char(src->Register.SwizzleX);
+         swizzle[swz_idx++] = get_swiz_char(src->Register.SwizzleY);
+         swizzle[swz_idx++] = get_swiz_char(src->Register.SwizzleZ);
+         swizzle[swz_idx++] = get_swiz_char(src->Register.SwizzleW);
       }
       if (src->Register.File == TGSI_FILE_INPUT) {
          for (j = 0; j < ctx->num_inputs; j++)
             if (ctx->inputs[j].first == src->Register.Index) {
-               snprintf(srcs[i], 255, "%c%s%s", negate, ctx->inputs[j].glsl_name, swizzle);
+               snprintf(srcs[i], 255, "%s%s%s", prefix, ctx->inputs[j].glsl_name, swizzle);
                break;
             }
       }
       else if (src->Register.File == TGSI_FILE_TEMPORARY) {
          if (src->Register.Indirect) {
-            snprintf(srcs[i], 255, "%ctemps[addr0 + %d]%s", negate, src->Register.Index, swizzle);
+            snprintf(srcs[i], 255, "%stemps[addr0 + %d]%s", prefix, src->Register.Index, swizzle);
          } else
-             snprintf(srcs[i], 255, "%ctemps[%d]%s", negate, src->Register.Index, swizzle);
+             snprintf(srcs[i], 255, "%stemps[%d]%s", prefix, src->Register.Index, swizzle);
       } else if (src->Register.File == TGSI_FILE_CONSTANT) {
 	  const char *cname = ctx->prog_type == TGSI_PROCESSOR_VERTEX ? "vsconst" : "fsconst";
           if (src->Register.Indirect) {
-             snprintf(srcs[i], 255, "%c%s[addr0 + %d]%s", negate, cname, src->Register.Index, swizzle);
+             snprintf(srcs[i], 255, "%s%s[addr0 + %d]%s", prefix, cname, src->Register.Index, swizzle);
           } else
-             snprintf(srcs[i], 255, "%c%s[%d]%s", negate, cname, src->Register.Index, swizzle);
+             snprintf(srcs[i], 255, "%s%s[%d]%s", prefix, cname, src->Register.Index, swizzle);
       } else if (src->Register.File == TGSI_FILE_SAMPLER) {
 	  const char *cname = ctx->prog_type == TGSI_PROCESSOR_VERTEX ? "vssamp" : "fssamp";
           snprintf(srcs[i], 255, "%s%d%s", cname, src->Register.Index, swizzle);

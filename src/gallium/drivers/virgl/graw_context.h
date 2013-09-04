@@ -128,6 +128,9 @@ struct pipe_resource *
 virgl_resource_from_handle(struct pipe_screen *screen,
                              const struct pipe_resource *templat,
                              struct winsys_handle *whandle);
+boolean virgl_resource_get_handle(struct pipe_screen *screen,
+                                  struct pipe_resource *pt,
+                                  struct winsys_handle *whandle);
 
 void graw_init_blit_functions(struct graw_context *grctx);
 

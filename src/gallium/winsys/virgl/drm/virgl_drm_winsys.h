@@ -35,6 +35,8 @@ struct virgl_hw_res {
    uint32_t bind;
    boolean cacheable;
    int64_t start, end;
+   boolean flinked;
+   uint32_t flink;
 };
   
 struct virgl_drm_winsys

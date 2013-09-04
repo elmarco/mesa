@@ -49,7 +49,12 @@ struct virgl_winsys {
    void (*resource_wait)(struct virgl_winsys *vws, struct virgl_hw_res *res);
 
    struct virgl_hw_res *(*resource_create_from_handle)(struct virgl_winsys *vws,
-                                                     struct winsys_handle *whandle);
+                                                       struct winsys_handle *whandle);
+   boolean (*resource_get_handle)(struct virgl_winsys *vws,
+                                  struct virgl_hw_res *res,
+                                  uint32_t stride,
+                                  struct winsys_handle *whandle);
+
    struct virgl_cmd_buf *(*cmd_buf_create)(struct virgl_winsys *ws);
    void (*cmd_buf_destroy)(struct virgl_cmd_buf *buf);
 

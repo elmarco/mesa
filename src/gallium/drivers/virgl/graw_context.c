@@ -922,7 +922,6 @@ virgl_resource_from_handle(struct pipe_screen *screen,
                              const struct pipe_resource *template,
                              struct winsys_handle *whandle)
 {
-   struct sw_winsys *winsys = virgl_screen(screen)->winsys;
    struct virgl_screen *rs = virgl_screen(screen);
    struct graw_texture *rpr = CALLOC_STRUCT(graw_texture);
    uint32_t handle;
@@ -936,6 +935,17 @@ virgl_resource_from_handle(struct pipe_screen *screen,
    rpr->base.hw_res = rs->vws->resource_create_from_handle(rs->vws, whandle);
    return &rpr->base.base;
 }   
+
+boolean virgl_resource_get_handle(struct pipe_screen *screen,
+                                  struct pipe_resource *pt,
+                                  struct winsys_handle *whandle)
+{
+   struct virgl_screen *rs = virgl_screen(screen);
+
+   struct graw_resource *res = (struct graw_resource *)pt;
+
+   return rs->vws->resource_get_handle(rs->vws, res->hw_res, res->stride[0], whandle);
+}
 
 void
 graw_resource_destroy(struct pipe_screen *pscreen,

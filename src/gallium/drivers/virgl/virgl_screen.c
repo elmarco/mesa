@@ -375,7 +375,7 @@ virgl_create_screen(struct virgl_winsys *vws)
    screen->base.is_format_supported = virgl_is_format_supported;
    screen->base.destroy = virgl_destroy_screen;
    screen->base.resource_from_handle = virgl_resource_from_handle;
-
+   screen->base.resource_get_handle = virgl_resource_get_handle;
    screen->base.context_create = graw_context_create;
    screen->base.resource_create = graw_resource_create;
    screen->base.resource_destroy = graw_resource_destroy;

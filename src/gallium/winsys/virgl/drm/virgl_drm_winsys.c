@@ -383,6 +383,38 @@ done:
    return res;  
 }
 
+static boolean virgl_drm_winsys_resource_get_handle(struct virgl_winsys *qws,
+                                                    struct virgl_hw_res *res,
+                                                    uint32_t stride,
+                                                    struct winsys_handle *whandle)
+ {
+   struct virgl_drm_winsys *qdws = virgl_drm_winsys(qws);
+   struct drm_gem_flink flink;
+
+   memset(&flink, 0, sizeof(flink));
+
+   if (whandle->type == DRM_API_HANDLE_TYPE_SHARED) {
+      if (!res->flinked) {
+         flink.handle = res->bo_handle;
+
+         if (drmIoctl(qdws->fd, DRM_IOCTL_GEM_FLINK, &flink)) {
+            return FALSE;
+         }
+         res->flinked = TRUE;
+         res->flink = flink.name;
+
+         pipe_mutex_lock(qdws->bo_handles_mutex);
+         util_hash_table_set(qdws->bo_handles, (void *)(uintptr_t)res->flink, res);
+         pipe_mutex_unlock(qdws->bo_handles_mutex);         
+      }
+      whandle->handle = res->flink;
+   } else if (whandle->type == DRM_API_HANDLE_TYPE_KMS) {
+      whandle->handle = res->bo_handle;
+   }
+   whandle->stride = stride;
+   return TRUE;
+}
+
 static void virgl_drm_winsys_resource_unref(struct virgl_winsys *qws,
                                           struct virgl_hw_res *hres)
 {
@@ -646,6 +678,7 @@ virgl_drm_winsys_create(int drmFD)
    qdws->base.resource_create = virgl_drm_winsys_resource_cache_create;
    qdws->base.resource_unref = virgl_drm_winsys_resource_unref;
    qdws->base.resource_create_from_handle = virgl_drm_winsys_resource_create_handle;
+   qdws->base.resource_get_handle = virgl_drm_winsys_resource_get_handle;
    qdws->base.resource_map = virgl_drm_resource_map;
    qdws->base.resource_wait = virgl_drm_resource_wait;
    qdws->base.cmd_buf_create = virgl_drm_cmd_buf_create;

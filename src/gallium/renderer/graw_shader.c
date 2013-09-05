@@ -859,6 +859,7 @@ static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
             snprintf(buf, 255, "layout(location=%d) ", ctx->inputs[i].first);
             strcat(glsl_final, buf);
          }
+#if 0
          if (ctx->prog_type == TGSI_PROCESSOR_FRAGMENT && ctx->inputs[i].interpolate && ctx->inputs[i].name == TGSI_SEMANTIC_GENERIC) {
             switch (ctx->inputs[i].interpolate) {
             case TGSI_INTERPOLATE_LINEAR:
@@ -871,7 +872,8 @@ static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
                prefix = "flat ";
                break;
             }
-         } 
+         }
+#endif
                  
          snprintf(buf, 255, "%sin vec4 %s;\n", prefix, ctx->inputs[i].glsl_name);
          strcat(glsl_final, buf);

@@ -117,11 +117,9 @@ struct grend_linked_shader_program {
 struct grend_shader_state {
    GLuint id;
    unsigned type;
-   char *glsl_prog;
-   int num_samplers;
-   int num_consts;
-   int num_inputs;
-   struct pipe_stream_output_info so_info;
+   boolean compiled;
+   GLchar *glsl_prog;
+   struct vrend_shader_info sinfo;
 };
 
 struct grend_buffer {
@@ -449,9 +447,19 @@ static struct grend_linked_shader_program *add_shader_program(struct grend_conte
   GLuint prog_id;
   GLenum ret;
 
+  /* need to rewrite VS code to add interpolation params */
+  if (!vs->compiled) {
+     vrend_patch_vertex_shader_interpolants(vs->glsl_prog,
+                                            &vs->sinfo,
+                                            &fs->sinfo);
+     glShaderSource(vs->id, 1, (const char **)&vs->glsl_prog, NULL);
+     glCompileShader(vs->id);
+     vs->compiled = TRUE;
+  }
+
   prog_id = glCreateProgram();
   glAttachShader(prog_id, vs->id);
-  set_stream_out_varyings(prog_id, &vs->so_info);
+  set_stream_out_varyings(prog_id, &vs->sinfo.so_info);
   glAttachShader(prog_id, fs->id);
   ret = glGetError();
   glLinkProgram(prog_id);
@@ -465,33 +473,33 @@ static struct grend_linked_shader_program *add_shader_program(struct grend_conte
   sprog->id = prog_id;
   list_add(&sprog->head, &ctx->programs);
 
-  if (vs->num_samplers) {
-    sprog->samp_locs[PIPE_SHADER_VERTEX] = calloc(vs->num_samplers, sizeof(uint32_t));
+  if (vs->sinfo.num_samplers) {
+    sprog->samp_locs[PIPE_SHADER_VERTEX] = calloc(vs->sinfo.num_samplers, sizeof(uint32_t));
     if (sprog->samp_locs[PIPE_SHADER_VERTEX]) {
-      for (i = 0; i < vs->num_samplers; i++) {
+      for (i = 0; i < vs->sinfo.num_samplers; i++) {
 	snprintf(name, 10, "vssamp%d", i);
 	sprog->samp_locs[PIPE_SHADER_VERTEX][i] = glGetUniformLocation(prog_id, name);
       }
     }
   } else
     sprog->samp_locs[PIPE_SHADER_VERTEX] = NULL;
-  sprog->num_samplers[PIPE_SHADER_VERTEX] = vs->num_samplers;
-  if (fs->num_samplers) {
-    sprog->samp_locs[PIPE_SHADER_FRAGMENT] = calloc(fs->num_samplers, sizeof(uint32_t));
+  sprog->num_samplers[PIPE_SHADER_VERTEX] = vs->sinfo.num_samplers;
+  if (fs->sinfo.num_samplers) {
+    sprog->samp_locs[PIPE_SHADER_FRAGMENT] = calloc(fs->sinfo.num_samplers, sizeof(uint32_t));
     if (sprog->samp_locs[PIPE_SHADER_FRAGMENT]) {
-      for (i = 0; i < fs->num_samplers; i++) {
+      for (i = 0; i < fs->sinfo.num_samplers; i++) {
 	snprintf(name, 10, "fssamp%d", i);
 	sprog->samp_locs[PIPE_SHADER_FRAGMENT][i] = glGetUniformLocation(prog_id, name);
       }
     }
   } else
     sprog->samp_locs[PIPE_SHADER_FRAGMENT] = NULL;
-  sprog->num_samplers[PIPE_SHADER_FRAGMENT] = fs->num_samplers;
+  sprog->num_samplers[PIPE_SHADER_FRAGMENT] = fs->sinfo.num_samplers;
   
-  if (vs->num_consts) {
-    sprog->const_locs[PIPE_SHADER_VERTEX] = calloc(vs->num_consts, sizeof(uint32_t));
+  if (vs->sinfo.num_consts) {
+    sprog->const_locs[PIPE_SHADER_VERTEX] = calloc(vs->sinfo.num_consts, sizeof(uint32_t));
     if (sprog->const_locs[PIPE_SHADER_VERTEX]) {
-      for (i = 0; i < vs->num_consts; i++) {
+      for (i = 0; i < vs->sinfo.num_consts; i++) {
 	snprintf(name, 16, "vsconst[%d]", i);
 	sprog->const_locs[PIPE_SHADER_VERTEX][i] = glGetUniformLocation(prog_id, name);
       }
@@ -499,10 +507,10 @@ static struct grend_linked_shader_program *add_shader_program(struct grend_conte
   } else
     sprog->const_locs[PIPE_SHADER_VERTEX] = NULL;
 
-  if (fs->num_consts) {
-    sprog->const_locs[PIPE_SHADER_FRAGMENT] = calloc(fs->num_consts, sizeof(uint32_t));
+  if (fs->sinfo.num_consts) {
+    sprog->const_locs[PIPE_SHADER_FRAGMENT] = calloc(fs->sinfo.num_consts, sizeof(uint32_t));
     if (sprog->const_locs[PIPE_SHADER_FRAGMENT]) {
-      for (i = 0; i < fs->num_consts; i++) {
+      for (i = 0; i < fs->sinfo.num_consts; i++) {
 	snprintf(name, 16, "fsconst[%d]", i);
 	sprog->const_locs[PIPE_SHADER_FRAGMENT][i] = glGetUniformLocation(prog_id, name);
       }
@@ -510,10 +518,10 @@ static struct grend_linked_shader_program *add_shader_program(struct grend_conte
   } else
     sprog->const_locs[PIPE_SHADER_FRAGMENT] = NULL;
 
-  if (vs->num_inputs) {
-    sprog->attrib_locs = calloc(vs->num_inputs, sizeof(uint32_t));
+  if (vs->sinfo.num_inputs) {
+    sprog->attrib_locs = calloc(vs->sinfo.num_inputs, sizeof(uint32_t));
     if (sprog->attrib_locs) {
-      for (i = 0; i < vs->num_inputs; i++) {
+      for (i = 0; i < vs->sinfo.num_inputs; i++) {
 	snprintf(name, 10, "in_%d", i);
 	sprog->attrib_locs[i] = glGetAttribLocation(prog_id, name);
       }
@@ -1119,6 +1127,8 @@ void grend_transfer_inline_write(struct grend_context *ctx,
 static void grend_destroy_shader(struct grend_shader_state *state)
 {
    glDeleteShader(state->id);
+   free(state->sinfo.interpinfo);
+   free(state->glsl_prog);
    free(state);
 }
 
@@ -1133,24 +1143,12 @@ void grend_create_vs(struct grend_context *ctx,
                      const struct pipe_shader_state *vs)
 {
    struct grend_shader_state *state = CALLOC_STRUCT(grend_shader_state);
-   const GLchar *glsl_prog;
+   GLchar *glsl_prog;
    GLenum ret;
    state->id = glCreateShader(GL_VERTEX_SHADER);
-   glsl_prog = tgsi_convert(vs->tokens, 0, &state->num_samplers, &state->num_consts, &state->num_inputs, &vs->stream_output);
-   if (glsl_prog) {
-      glShaderSource(state->id, 1, &glsl_prog, NULL);
-      ret = glGetError();
-      glCompileShader(state->id);
-      ret = glGetError();
-      if (ret) {
-         fprintf(stderr,"got error compiling %d\n", ret);
-         fprintf(stderr,"VS:\n%s\n", glsl_prog);
-      }
-   } else
-     fprintf(stderr,"failed to convert VS prog\n");
-
-   /* copy over stream out info */
-   state->so_info = vs->stream_output;
+   state->sinfo.so_info = vs->stream_output;
+   state->glsl_prog = tgsi_convert(vs->tokens, 0, &state->sinfo);
+   state->compiled = FALSE;
 
    vrend_object_insert(ctx->object_hash, state, sizeof(*state), handle, VIRGL_OBJECT_VS);
 
@@ -1165,7 +1163,8 @@ void grend_create_fs(struct grend_context *ctx,
    GLchar *glsl_prog;
    GLenum ret;
    state->id = glCreateShader(GL_FRAGMENT_SHADER);
-   glsl_prog = tgsi_convert(fs->tokens, 0, &state->num_samplers, &state->num_consts, &state->num_inputs, NULL);
+   state->glsl_prog = tgsi_convert(fs->tokens, 0, &state->sinfo);
+   glsl_prog = (const GLchar *)state->glsl_prog;
    if (glsl_prog) {
       glShaderSource(state->id, 1, (const char **)&glsl_prog, NULL);
       ret = glGetError();
@@ -1327,17 +1326,17 @@ void grend_draw_vbo(struct grend_context *ctx,
          int mval;
 	 int nc;
          if (shader_type == PIPE_SHADER_VERTEX) {
-            if (ctx->consts[shader_type].num_consts / 4 > ctx->vs->num_consts + 10) {
-               fprintf(stderr,"possible memory corruption vs consts TODO %d %d\n", ctx->consts[0].num_consts, ctx->vs->num_consts);
+            if (ctx->consts[shader_type].num_consts / 4 > ctx->vs->sinfo.num_consts + 10) {
+               fprintf(stderr,"possible memory corruption vs consts TODO %d %d\n", ctx->consts[0].num_consts, ctx->vs->sinfo.num_consts);
                return;
             }
-	    nc = ctx->vs->num_consts;
+	    nc = ctx->vs->sinfo.num_consts;
          } else if (shader_type == PIPE_SHADER_FRAGMENT) {
-            if (ctx->consts[shader_type].num_consts / 4 > ctx->fs->num_consts + 10) {
+            if (ctx->consts[shader_type].num_consts / 4 > ctx->fs->sinfo.num_consts + 10) {
                fprintf(stderr,"possible memory corruption fs consts TODO\n");
                return;
             }
-	    nc = ctx->fs->num_consts;
+	    nc = ctx->fs->sinfo.num_consts;
          }
          for (i = 0; i < nc; i++) {
             if (ctx->prog->const_locs[shader_type][i] != -1 && ctx->consts[shader_type].consts)
@@ -1398,15 +1397,15 @@ void grend_draw_vbo(struct grend_context *ctx,
       struct grend_buffer *buf;
       GLint loc;
 
-      if (i >= ctx->prog->vs->num_inputs) {
+      if (i >= ctx->prog->vs->sinfo.num_inputs) {
          /* XYZZY: debug this? */
-         num_enable = ctx->prog->vs->num_inputs;
+         num_enable = ctx->prog->vs->sinfo.num_inputs;
          break;
       }
       buf = (struct grend_buffer *)ctx->vbo[vbo_index].buffer;
 
       if (!buf) {
-           fprintf(stderr,"cannot find vbo buf %d %d %d\n", i, ctx->ve->count, ctx->prog->vs->num_inputs);
+           fprintf(stderr,"cannot find vbo buf %d %d %d\n", i, ctx->ve->count, ctx->prog->vs->sinfo.num_inputs);
            continue;
       }
 
@@ -1418,7 +1417,7 @@ void grend_draw_vbo(struct grend_context *ctx,
 	} else loc = -1;
 
 	if (loc == -1) {
-           fprintf(stderr,"cannot find loc %d %d %d\n", i, ctx->ve->count, ctx->prog->vs->num_inputs);
+           fprintf(stderr,"cannot find loc %d %d %d\n", i, ctx->ve->count, ctx->prog->vs->sinfo.num_inputs);
           num_enable--;
           if (i == 0) {
              fprintf(stderr,"shader probably didn't compile - skipping rendering\n");

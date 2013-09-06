@@ -2,7 +2,31 @@
 #define GRAW_SHADER_H
 
 #include "pipe/p_state.h"
+
+/* need to store patching info for interpolation */
+struct vrend_interp_info {
+   int semantic_name;
+   int semantic_index;
+   int interpolate;
+};
+
+struct vrend_shader_info {
+   int num_samplers;
+   int num_consts;
+   int num_inputs;
+   int num_interps;
+
+   struct pipe_stream_output_info so_info;
+
+   struct vrend_interp_info *interpinfo;
+};
+   
+      
+boolean vrend_patch_vertex_shader_interpolants(char *program,
+                                               struct vrend_shader_info *vs_info,
+                                               struct vrend_shader_info *fs_info);
+
 char *tgsi_convert(const struct tgsi_token *tokens,
-                   int flags, int *num_samplers, int *num_consts, int *num_inputs, const struct pipe_stream_output_info *so_info);
+                   int flags, struct vrend_shader_info *sinfo);
 
 #endif

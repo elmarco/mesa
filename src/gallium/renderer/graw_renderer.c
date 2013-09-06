@@ -172,6 +172,7 @@ struct grend_sampler_view {
    GLuint gl_swizzle_a;
    GLuint cur_base, cur_max;
    struct grend_resource *texture;
+   GLenum depth_texture_mode;
 };
 
 struct grend_vertex_element {
@@ -665,7 +666,7 @@ void grend_create_sampler_view(struct grend_context *ctx,
       /* hack to make tfp work for now */
       view->gl_swizzle_a = GL_ONE;
    } else {
-      if (util_format_has_alpha(format))
+      if (util_format_has_alpha(format) || util_format_is_depth_or_stencil(format))
          view->gl_swizzle_a = to_gl_swizzle(view->swizzle_a);
       else
          view->gl_swizzle_a = GL_ONE;
@@ -1050,6 +1051,13 @@ void grend_set_single_sampler_view(struct grend_context *ctx,
       glBindTexture(view->texture->target, view->texture->id);
       if (view->texture->target != PIPE_BUFFER) {
          tex = (struct grend_texture *)view->texture;
+         if (util_format_is_depth_or_stencil(view->format)) {
+            if (view->depth_texture_mode != GL_RED) {
+               glTexParameteri(view->texture->target, GL_DEPTH_TEXTURE_MODE, GL_RED);
+               view->depth_texture_mode = GL_RED;
+            }
+         }
+
          if (view->cur_base != (view->val1 & 0xff)) {
             glTexParameteri(view->texture->target, GL_TEXTURE_BASE_LEVEL, (view->val1) & 0xff);
             view->cur_base = view->val1 & 0xff;

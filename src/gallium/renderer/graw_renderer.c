@@ -3303,6 +3303,7 @@ boolean grend_hw_switch_context(struct grend_context *ctx)
 
    ctx->ctx_switch_pending = TRUE;
    grend_state.current_ctx = ctx;
+   return TRUE;
 }
 
 static void grend_finish_context_switch(struct grend_context *ctx)

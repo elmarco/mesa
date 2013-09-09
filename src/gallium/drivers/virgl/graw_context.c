@@ -31,7 +31,7 @@
 static uint32_t next_handle;
 uint32_t graw_object_assign_handle(void)
 {
-   return next_handle++;
+   return ++next_handle;
 }
 
 static void graw_buffer_flush(struct graw_context *grctx,

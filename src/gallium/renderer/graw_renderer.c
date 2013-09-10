@@ -2382,9 +2382,14 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
       return;
    }
 
-   if (res->iov && !iov || num_iovs == 0) {
+   if ((res->iov && !iov) || num_iovs == 0) {
       iov = res->iov;
       num_iovs = res->num_iovs;
+   }
+
+   if (res->target == 0 && res->ptr) {
+      graw_iov_to_buf(iov, num_iovs, offset, res->ptr, box->width);
+      return;
    }
    if (res->target == GL_TRANSFORM_FEEDBACK_BUFFER ||
        res->target == GL_ELEMENT_ARRAY_BUFFER_ARB ||

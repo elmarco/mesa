@@ -2577,6 +2577,7 @@ static void vrend_transfer_send_getteximage(struct grend_resource *res,
    GLenum format, type;
    uint32_t send_size, tex_size;
    void *data;
+   int elsize = util_format_get_blocksize(res->base.format);
 
    format = tex_conv_table[res->base.format].glformat;
    type = tex_conv_table[res->base.format].gltype; 
@@ -2589,10 +2590,25 @@ static void vrend_transfer_send_getteximage(struct grend_resource *res,
    if (!data)
       return;
 
+   switch (elsize) {
+   case 1:
+      glPixelStorei(GL_PACK_ALIGNMENT, 1);
+      break;
+   case 2:
+      glPixelStorei(GL_PACK_ALIGNMENT, 2);
+      break;
+   case 4:
+   default:
+      glPixelStorei(GL_PACK_ALIGNMENT, 4);
+      break;
+   }
+
    if (grend_state.have_robustness)
       glGetnTexImageARB(res->target, level, format, type, tex_size, data);
    else
       glGetTexImage(res->target, level, format, type, data);
+
+   glPixelStorei(GL_PACK_ALIGNMENT, 4);
 
    graw_transfer_write_tex_return(&res->base, box, level, stride, offset, iov, num_iovs, data, send_size, FALSE);
    free(data);
@@ -2861,12 +2877,25 @@ static void vrend_resource_copy_fallback(struct grend_context *ctx,
    glformat = tex_conv_table[src_res->base.format].glformat;
    gltype = tex_conv_table[src_res->base.format].gltype; 
 
+   switch (elsize) {
+   case 1:
+      glPixelStorei(GL_PACK_ALIGNMENT, 1);
+      break;
+   case 2:
+      glPixelStorei(GL_PACK_ALIGNMENT, 2);
+      break;
+   case 4:
+   default:
+      glPixelStorei(GL_PACK_ALIGNMENT, 4);
+      break;
+   }
    glBindTexture(src_res->target, src_res->id);
    if (grend_state.have_robustness)
       glGetnTexImageARB(src_res->target, src_level, glformat, gltype, transfer_size, tptr);
    else
       glGetTexImage(src_res->target, src_level, glformat, gltype, tptr);
 
+   glPixelStorei(GL_PACK_ALIGNMENT, 4);
    switch (elsize) {
    case 1:
       glPixelStorei(GL_UNPACK_ALIGNMENT, 1);

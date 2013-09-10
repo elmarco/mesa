@@ -2842,6 +2842,7 @@ static void vrend_resource_copy_fallback(struct grend_context *ctx,
    void *tptr;
    uint32_t transfer_size;
    GLenum glformat, gltype;
+   int elsize = util_format_get_blocksize(dst_res->base.format);
 
    if (src_res->base.format != dst_res->base.format) {
       fprintf(stderr, "copy fallback failed due to mismatched formats %d %d\n", src_res->base.format, dst_res->base.format);
@@ -2866,9 +2867,23 @@ static void vrend_resource_copy_fallback(struct grend_context *ctx,
    else
       glGetTexImage(src_res->target, src_level, glformat, gltype, tptr);
 
+   switch (elsize) {
+   case 1:
+      glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+      break;
+   case 2:
+      glPixelStorei(GL_UNPACK_ALIGNMENT, 2);
+      break;
+   case 4:
+   default:
+      glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+      break;
+   }
+
    glBindTexture(dst_res->target, dst_res->id);
    glTexSubImage2D(dst_res->target, dst_level, dstx, dsty, src_box->width, src_box->height, glformat, gltype, tptr);
 
+   glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
    free(tptr);
 }
 

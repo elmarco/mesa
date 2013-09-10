@@ -287,6 +287,11 @@ static INLINE boolean vrend_format_can_render(enum virgl_formats format)
    return tex_conv_table[format].bindings & VREND_BIND_RENDER;
 }
 
+static INLINE boolean vrend_format_is_ds(enum virgl_formats format)
+{
+   return tex_conv_table[format].bindings & VREND_BIND_DEPTHSTENCIL;
+}
+
 static const char *vrend_ctx_error_strings[] = { "None", "Unknown", "Illegal shader", "Illegal handle", "Illegal resource", "Illegal surface", "Illegal vertex format" };
 
 static void __report_context_error(const char *fname, struct grend_context *ctx, enum virgl_ctx_errors error, uint32_t value)
@@ -2676,7 +2681,14 @@ static void vrend_transfer_send_readpixels(struct grend_resource *res,
 //      fprintf(stderr,"TEXTURE TRANSFER %d %d %d %d %d, temp:%d\n", res_handle, res->readback_fb_id, box->width, box->height, level, need_temp);
 
    if (!res->is_front) {
+     GLenum attachment = GL_COLOR_ATTACHMENT0_EXT;
+
+     if (vrend_format_is_ds(res->base.format))
+       attachment = GL_DEPTH_STENCIL_ATTACHMENT;
+            
+
       if (res->readback_fb_id == 0 || res->readback_fb_level != level || res->readback_fb_z != box->z) {
+
          if (res->readback_fb_id)
             glDeleteFramebuffers(1, &res->readback_fb_id);
          
@@ -2684,19 +2696,19 @@ static void vrend_transfer_send_readpixels(struct grend_resource *res,
          glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fb_id);
 
          if (res->target == GL_TEXTURE_1D_ARRAY || res->target == GL_TEXTURE_2D_ARRAY || res->target == GL_TEXTURE_CUBE_MAP_ARRAY) 
-            glFramebufferTextureLayer(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
+            glFramebufferTextureLayer(GL_FRAMEBUFFER_EXT, attachment,
                                       res->id, level, box->z);
          else if (res->target == GL_TEXTURE_3D) {
-            glFramebufferTexture3DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
+            glFramebufferTexture3DEXT(GL_FRAMEBUFFER_EXT, attachment,
                                       res->target, res->id, level, box->z);
          } else if (res->target == GL_TEXTURE_CUBE_MAP) {
-            glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
+            glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, attachment,
                                       GL_TEXTURE_CUBE_MAP_POSITIVE_X + box->z, res->id, 0);
          } else if (res->target == GL_TEXTURE_1D)
-            glFramebufferTexture1DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
+            glFramebufferTexture1DEXT(GL_FRAMEBUFFER_EXT, attachment,
                                       res->target, res->id, level);
          else
-            glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
+            glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, attachment,
                                       res->target, res->id, level);
          res->readback_fb_id = fb_id;
          res->readback_fb_level = level;
@@ -2711,7 +2723,8 @@ static void vrend_transfer_send_readpixels(struct grend_resource *res,
       
       if (have_invert_mesa && actually_invert)
          glPixelStorei(GL_PACK_INVERT_MESA, 1);
-      glReadBuffer(GL_COLOR_ATTACHMENT0_EXT);      
+      if (attachment == GL_COLOR_ATTACHMENT0_EXT)
+        glReadBuffer(GL_COLOR_ATTACHMENT0_EXT);  
    } else {
       glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
       y1 = box->y;
@@ -2790,7 +2803,7 @@ void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t ctx_id,
          return;
       }
 
-      can_readpixels = vrend_format_can_render(res->base.format);
+      can_readpixels = vrend_format_can_render(res->base.format) || vrend_format_is_ds(res->base.format);
 
       if (can_readpixels) {
          vrend_transfer_send_readpixels(res, level, stride, box, offset,

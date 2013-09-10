@@ -3,7 +3,7 @@
 
 #include "graw_renderer.h"
 #include "util/u_memory.h"
-
+#include "util/u_format.h"
 /* fill the format table */
 static struct grend_format_table base_rgba_formats[] = 
 {
@@ -33,7 +33,7 @@ static struct grend_format_table base_rgba_formats[] =
 
 static struct grend_format_table base_depth_formats[] = 
 {
-   { VIRGL_FORMAT_S8_UINT, GL_DEPTH24_STENCIL8_EXT, GL_DEPTH_STENCIL, GL_UNSIGNED_BYTE, 0 },
+   { VIRGL_FORMAT_S8_UINT, GL_DEPTH24_STENCIL8_EXT, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, 0 },
    { VIRGL_FORMAT_Z16_UNORM, GL_DEPTH_COMPONENT16, GL_DEPTH_COMPONENT, GL_UNSIGNED_SHORT, 0 },
    { VIRGL_FORMAT_Z32_UNORM, GL_DEPTH_COMPONENT32, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, 0 },
    { VIRGL_FORMAT_Z24_UNORM_S8_UINT, GL_DEPTH24_STENCIL8_EXT, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, 0 },
@@ -227,20 +227,37 @@ static void vrend_add_formats(struct grend_format_table *table, int num_entries)
    GLuint tex_id, fb_id;
    for (i = 0; i < num_entries; i++) {
       GLenum status;
+      boolean is_depth = FALSE;
       /**/
       glGenTextures(1, &tex_id);
       glGenFramebuffers(1, &fb_id);
 
       glBindTexture(GL_TEXTURE_2D, tex_id);
       glBindFramebuffer(GL_FRAMEBUFFER, fb_id);
+
       glTexImage2D(GL_TEXTURE_2D, 0, table[i].internalformat, 32, 32, 0, table[i].glformat, table[i].gltype, NULL);
-      glFramebufferTexture2D(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, tex_id, 0);
+
+      if (util_format_is_depth_or_stencil(table[i].format)) {
+         GLenum attachment;
+
+         if (table[i].format == PIPE_FORMAT_Z24X8_UNORM || table[i].format == PIPE_FORMAT_Z32_UNORM || table[i].format == PIPE_FORMAT_Z16_UNORM || table[i].format == PIPE_FORMAT_Z32_FLOAT)
+            attachment = GL_DEPTH_ATTACHMENT;
+         else
+            attachment = GL_DEPTH_STENCIL_ATTACHMENT;
+         glFramebufferTexture2D(GL_FRAMEBUFFER_EXT, attachment, GL_TEXTURE_2D, tex_id, 0);
+
+         is_depth = TRUE;
+         glDrawBuffer(GL_NONE);
+      } else {
+         glFramebufferTexture2D(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, tex_id, 0);
+
+         glDrawBuffer(GL_COLOR_ATTACHMENT0);
+      }
       
-      glDrawBuffer(GL_COLOR_ATTACHMENT0);
       status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
       binding = 0;
       if (status == GL_FRAMEBUFFER_COMPLETE)
-         binding |= VREND_BIND_RENDER;
+         binding |= (is_depth ? VREND_BIND_DEPTHSTENCIL : VREND_BIND_RENDER);
       
       glDeleteTextures(1, &tex_id);
       glDeleteFramebuffers(1, &fb_id);

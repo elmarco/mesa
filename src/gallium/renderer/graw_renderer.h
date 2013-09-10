@@ -29,6 +29,7 @@ struct grend_resource {
 
 /* assume every format is sampler friendly */
 #define VREND_BIND_RENDER (1 << 0)
+#define VREND_BIND_DEPTHSTENCIL (1 << 1)
 
 struct grend_format_table {
    enum virgl_formats format;

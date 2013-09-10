@@ -2655,13 +2655,23 @@ static void vrend_transfer_send_readpixels(struct grend_resource *res,
 //      fprintf(stderr,"TEXTURE TRANSFER %d %d %d %d %d, temp:%d\n", res_handle, res->readback_fb_id, box->width, box->height, level, need_temp);
 
    if (!res->is_front) {
-      if (res->readback_fb_id == 0 || res->readback_fb_level != level) {
+      if (res->readback_fb_id == 0 || res->readback_fb_level != level || res->readback_fb_z != box->z) {
          if (res->readback_fb_id)
             glDeleteFramebuffers(1, &res->readback_fb_id);
          
          glGenFramebuffers(1, &fb_id);
          glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fb_id);
-         if (res->target == GL_TEXTURE_1D)
+
+         if (res->target == GL_TEXTURE_1D_ARRAY || res->target == GL_TEXTURE_2D_ARRAY || res->target == GL_TEXTURE_CUBE_MAP_ARRAY) 
+            glFramebufferTextureLayer(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
+                                      res->id, level, box->z);
+         else if (res->target == GL_TEXTURE_3D) {
+            glFramebufferTexture3DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
+                                      res->target, res->id, level, box->z);
+         } else if (res->target == GL_TEXTURE_CUBE_MAP) {
+            glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
+                                      GL_TEXTURE_CUBE_MAP_POSITIVE_X + box->z, res->id, 0);
+         } else if (res->target == GL_TEXTURE_1D)
             glFramebufferTexture1DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
                                       res->target, res->id, level);
          else
@@ -2669,6 +2679,7 @@ static void vrend_transfer_send_readpixels(struct grend_resource *res,
                                       res->target, res->id, level);
          res->readback_fb_id = fb_id;
          res->readback_fb_level = level;
+         res->readback_fb_z = box->z;
       } else {
          glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, res->readback_fb_id);
       }

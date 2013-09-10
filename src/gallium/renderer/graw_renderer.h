@@ -17,6 +17,7 @@ struct grend_resource {
    /* fb id if we need to readback this resource */
    GLuint readback_fb_id;
    GLuint readback_fb_level;
+   GLuint readback_fb_z;
    int is_front;
    GLboolean renderer_flipped;
    void *ptr;

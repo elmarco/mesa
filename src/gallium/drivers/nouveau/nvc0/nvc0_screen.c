@@ -728,7 +728,8 @@ nvc0_screen_create(struct nouveau_device *dev)
       PUSH_DATA (push, 0x17);
    }
 
-   IMMED_NVC0(push, NVC0_3D(ZETA_COMP_ENABLE), dev->drm_version >= 0x01000101);
+   IMMED_NVC0(push, NVC0_3D(ZETA_COMP_ENABLE), 0);
+ //dev->drm_version >= 0x01000101);
    BEGIN_NVC0(push, NVC0_3D(RT_COMP_ENABLE(0)), 8);
    for (i = 0; i < 8; ++i)
            PUSH_DATA(push, dev->drm_version >= 0x01000101);

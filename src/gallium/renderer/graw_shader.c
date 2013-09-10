@@ -71,6 +71,8 @@ struct dump_ctx {
    
    struct pipe_stream_output_info *so;
    boolean uses_cube_array;
+
+   uint32_t shadow_samp_mask;
 };
 
 static boolean
@@ -700,9 +702,12 @@ iter_instruction(struct tgsi_iterate_context *iter,
          snprintf(buf, 255, "%s = texture2DRect(%s, %s.xy)%s;\n", dsts[0], srcs[sampler_index], srcs[0], writemask);
       else if (inst->Texture.Texture == TGSI_TEXTURE_SHADOWRECT)
          snprintf(buf, 255, "%s = shadow2DRect(%s, %s.xyz)%s;\n", dsts[0], srcs[sampler_index], srcs[0], writemask);
-      else if (is_shad) /* TGSI returns 1.0 in alpha */
-         snprintf(buf, 255, "%s = %s(vec4(vec3(texture%s(%s, %s%s%s)), 1.0)%s);\n", dsts[0], dstconv, tex_ext, srcs[sampler_index], srcs[0], twm, bias, writemask);
-      else
+      else if (is_shad) { /* TGSI returns 1.0 in alpha */
+         const char *mname = ctx->prog_type == TGSI_PROCESSOR_VERTEX ? "vsshadmask" : "fsshadmask";
+         const char *cname = ctx->prog_type == TGSI_PROCESSOR_VERTEX ? "vsshadadd" : "fsshadadd";
+         const struct tgsi_full_src_register *src = &inst->Src[sampler_index];
+         snprintf(buf, 255, "%s = %s(vec4(vec4(texture%s(%s, %s%s%s)) * %s%d + %s%d)%s);\n", dsts[0], dstconv, tex_ext, srcs[sampler_index], srcs[0], twm, bias, mname, src->Register.Index, cname, src->Register.Index, writemask);
+      } else
          snprintf(buf, 255, "%s = %s(texture%s(%s, %s%s%s)%s);\n", dsts[0], dstconv, tex_ext, srcs[sampler_index], srcs[0], twm, bias, writemask);
       strcat(ctx->glsl_main, buf);
       break;
@@ -826,7 +831,7 @@ static void emit_header(struct dump_ctx *ctx, char *glsl_final)
       strcat(glsl_final, "#extension GL_ARB_texture_cube_map_array : require\n");
 }
 
-static const char *samplertypeconv(int sampler_type)
+static const char *samplertypeconv(int sampler_type, int *is_shad)
 {
 	switch (sampler_type) {
 	case TGSI_TEXTURE_1D: return "1D";
@@ -834,15 +839,15 @@ static const char *samplertypeconv(int sampler_type)
 	case TGSI_TEXTURE_3D: return "3D";
 	case TGSI_TEXTURE_CUBE: return "Cube";
 	case TGSI_TEXTURE_RECT: return "2DRect";
-	case TGSI_TEXTURE_SHADOW1D: return "1DShadow";
-	case TGSI_TEXTURE_SHADOW2D: return "2DShadow";
-	case TGSI_TEXTURE_SHADOWRECT: return "2DRectShadow";
+	case TGSI_TEXTURE_SHADOW1D: *is_shad = 1; return "1DShadow";
+	case TGSI_TEXTURE_SHADOW2D: *is_shad = 1; return "2DShadow";
+	case TGSI_TEXTURE_SHADOWRECT: *is_shad = 1; return "2DRectShadow";
         case TGSI_TEXTURE_1D_ARRAY: return "1DArray";
         case TGSI_TEXTURE_2D_ARRAY: return "2DArray";
-        case TGSI_TEXTURE_SHADOW1D_ARRAY: return "1DArrayShadow";
-        case TGSI_TEXTURE_SHADOW2D_ARRAY: return "2DArrayShadow";
+        case TGSI_TEXTURE_SHADOW1D_ARRAY: *is_shad = 1; return "1DArrayShadow";
+        case TGSI_TEXTURE_SHADOW2D_ARRAY: *is_shad = 1; return "2DArrayShadow";
 	case TGSI_TEXTURE_CUBE_ARRAY: return "CubeArray";
-	case TGSI_TEXTURE_SHADOWCUBE_ARRAY: return "CubeArrayShadow";
+	case TGSI_TEXTURE_SHADOWCUBE_ARRAY: *is_shad = 1; return "CubeArrayShadow";
 	default: return NULL;
         }
 }
@@ -928,14 +933,24 @@ static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
       strcat(glsl_final, buf);
    }
    for (i = 0; i < ctx->num_samps; i++) {
-      const char *stc = samplertypeconv(ctx->samplers[i].tgsi_sampler_type);
+      int is_shad = 0;
+      const char *stc = samplertypeconv(ctx->samplers[i].tgsi_sampler_type, &is_shad);
 
       if (stc) {
+         char *sname = "fs";
+
          if (ctx->prog_type == TGSI_PROCESSOR_VERTEX)
-            snprintf(buf, 255, "uniform sampler%s vssamp%d;\n", stc, i);
-         else
-            snprintf(buf, 255, "uniform sampler%s fssamp%d;\n", stc, i);
+            sname = "vs";
+
+         snprintf(buf, 255, "uniform sampler%s %ssamp%d;\n", stc, sname, i);
          strcat(glsl_final, buf);
+         if (is_shad) {
+            snprintf(buf, 255, "uniform vec4 %sshadmask%d;\n", sname, i);
+            strcat(glsl_final, buf);
+            snprintf(buf, 255, "uniform vec4 %sshadadd%d;\n", sname, i);
+            strcat(glsl_final, buf);
+            ctx->shadow_samp_mask |= (1 << i);
+         }
       }
 
    }
@@ -1025,6 +1040,7 @@ char *tgsi_convert(const struct tgsi_token *tokens,
    sinfo->num_consts = ctx.num_consts;
    sinfo->num_inputs = ctx.num_inputs;
    sinfo->num_interps = ctx.num_interps;
+   sinfo->shadow_samp_mask = ctx.shadow_samp_mask;
    return glsl_final;
 }
 

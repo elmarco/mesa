@@ -78,7 +78,7 @@ static void graw_end_query(struct pipe_context *ctx,
    struct virgl_host_query_state *host_state;
 
    host_state = pipe_buffer_map(ctx, &query->buf->base,
-                               PIPE_TRANSFER_READ, &transfer);
+                                PIPE_TRANSFER_WRITE, &transfer);
    host_state->query_state = VIRGL_QUERY_STATE_WAIT_HOST;
    pipe_buffer_unmap(ctx, transfer);
    
@@ -122,6 +122,7 @@ static boolean graw_get_query_result(struct pipe_context *ctx,
       result->u64 = (uint32_t)host_state->result;
 
    pipe_buffer_unmap(ctx, transfer);
+   query->result_gotten_sent = 0;
    return TRUE;
 }
 

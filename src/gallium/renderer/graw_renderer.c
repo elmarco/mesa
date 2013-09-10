@@ -241,8 +241,6 @@ struct grend_context {
    GLclampd view_near_val, view_far_val;
    GLboolean view_flipped;
 
-   GLenum old_targets[PIPE_MAX_SAMPLERS];
-
    boolean scissor_state_dirty;
    boolean viewport_state_dirty;
    uint32_t fb_height;
@@ -1368,7 +1366,6 @@ void grend_draw_vbo(struct grend_context *ctx,
             glUniform1i(ctx->prog->samp_locs[shader_type][i], sampler_id);
          glActiveTexture(GL_TEXTURE0 + sampler_id);
          if (texture) {
-            ctx->old_targets[sampler_id] = texture->target;
             glBindTexture(texture->target, texture->id);
             if (ctx->views[shader_type].old_ids[i] != texture->id || ctx->sampler_state_dirty) {
                grend_apply_sampler_state(ctx, texture, shader_type, sampler_id);
@@ -1382,10 +1379,6 @@ void grend_draw_vbo(struct grend_context *ctx,
             }
             sampler_id++;
          
-         } else {
-            if (ctx->old_targets[sampler_id]) {
-               ctx->old_targets[sampler_id] = 0;
-            }
          }
       }
    } 

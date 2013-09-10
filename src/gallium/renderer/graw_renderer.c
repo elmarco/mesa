@@ -2450,6 +2450,9 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
       default:
          glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
          break;
+      case 8:
+         glPixelStorei(GL_UNPACK_ALIGNMENT, 8);
+         break;
       }
 
       glformat = tex_conv_table[res->base.format].glformat;
@@ -2601,6 +2604,9 @@ static void vrend_transfer_send_getteximage(struct grend_resource *res,
    default:
       glPixelStorei(GL_PACK_ALIGNMENT, 4);
       break;
+   case 8:
+      glPixelStorei(GL_PACK_ALIGNMENT, 8);
+      break;
    }
 
    if (grend_state.have_robustness)
@@ -2697,6 +2703,9 @@ static void vrend_transfer_send_readpixels(struct grend_resource *res,
    case 4:
    default:
       glPixelStorei(GL_PACK_ALIGNMENT, 4);
+      break;
+   case 8:
+      glPixelStorei(GL_PACK_ALIGNMENT, 8);
       break;
    }  
    if (grend_state.have_robustness)
@@ -2902,6 +2911,9 @@ static void vrend_resource_copy_fallback(struct grend_context *ctx,
    default:
       glPixelStorei(GL_PACK_ALIGNMENT, 4);
       break;
+   case 8:
+      glPixelStorei(GL_PACK_ALIGNMENT, 8);
+      break;
    }
    glBindTexture(src_res->target, src_res->id);
    if (grend_state.have_robustness)
@@ -2920,6 +2932,9 @@ static void vrend_resource_copy_fallback(struct grend_context *ctx,
    case 4:
    default:
       glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+      break;
+   case 8:
+      glPixelStorei(GL_UNPACK_ALIGNMENT, 8);
       break;
    }
 

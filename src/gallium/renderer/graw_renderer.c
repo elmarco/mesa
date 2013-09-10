@@ -2628,6 +2628,7 @@ static void vrend_transfer_send_readpixels(struct grend_resource *res,
    GLint y1;
    uint32_t send_size = 0;
    uint32_t h = u_minify(res->base.height0, level);
+   int elsize = util_format_get_blocksize(res->base.format);
 
    grend_use_program(0);
 
@@ -2685,7 +2686,19 @@ static void vrend_transfer_send_readpixels(struct grend_resource *res,
       y1 = box->y;
       glReadBuffer(GL_BACK);
    }
-            
+
+   switch (elsize) {
+   case 1:
+      glPixelStorei(GL_PACK_ALIGNMENT, 1);
+      break;
+   case 2:
+      glPixelStorei(GL_PACK_ALIGNMENT, 2);
+      break;
+   case 4:
+   default:
+      glPixelStorei(GL_PACK_ALIGNMENT, 4);
+      break;
+   }  
    if (grend_state.have_robustness)
       glReadnPixelsARB(box->x, y1, box->width, box->height, format, type, send_size, data);
    else
@@ -2693,6 +2706,7 @@ static void vrend_transfer_send_readpixels(struct grend_resource *res,
 
    if (have_invert_mesa && actually_invert)
       glPixelStorei(GL_PACK_INVERT_MESA, 0);
+   glPixelStorei(GL_PACK_ALIGNMENT, 4);
    if (need_temp) {
       graw_transfer_write_tex_return(&res->base, box, level, stride, offset, iov, num_iovs, data, send_size, separate_invert);
       free(data);

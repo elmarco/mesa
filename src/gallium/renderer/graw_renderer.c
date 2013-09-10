@@ -103,8 +103,7 @@ struct grend_linked_shader_program {
   struct list_head head;
   GLuint id;
 
-  struct grend_shader_state *vs;
-  struct grend_shader_state *fs;
+  struct grend_shader_state *ss[PIPE_SHADER_TYPES];
 
   GLuint num_samplers[PIPE_SHADER_TYPES];
   GLuint *samp_locs[PIPE_SHADER_TYPES];
@@ -449,6 +448,7 @@ static struct grend_linked_shader_program *add_shader_program(struct grend_conte
   int i;
   GLuint prog_id;
   GLenum ret;
+  int id;
 
   /* need to rewrite VS code to add interpolation params */
   if (!vs->compiled) {
@@ -471,91 +471,56 @@ static struct grend_linked_shader_program *add_shader_program(struct grend_conte
      fprintf(stderr,"got error linking %d\n", ret);
   }
 
-  sprog->vs = vs;
-  sprog->fs = fs;
+  sprog->ss[PIPE_SHADER_VERTEX] = vs;
+  sprog->ss[PIPE_SHADER_FRAGMENT] = fs;
   sprog->id = prog_id;
   list_add(&sprog->head, &ctx->programs);
 
-  if (vs->sinfo.num_samplers) {
-     sprog->samp_locs[PIPE_SHADER_VERTEX] = calloc(vs->sinfo.num_samplers, sizeof(uint32_t));
-     sprog->shadow_samp_mask[PIPE_SHADER_VERTEX] = vs->sinfo.shadow_samp_mask;
-     if (vs->sinfo.shadow_samp_mask) {
-        sprog->shadow_samp_mask_locs[PIPE_SHADER_VERTEX] = calloc(vs->sinfo.num_samplers, sizeof(uint32_t));
-        sprog->shadow_samp_add_locs[PIPE_SHADER_VERTEX] = calloc(vs->sinfo.num_samplers, sizeof(uint32_t));
-     } else {
-        sprog->shadow_samp_mask_locs[PIPE_SHADER_VERTEX] = sprog->shadow_samp_add_locs[PIPE_SHADER_VERTEX] = NULL;
-     }
-     if (sprog->samp_locs[PIPE_SHADER_VERTEX]) {
-        for (i = 0; i < vs->sinfo.num_samplers; i++) {
-           snprintf(name, 10, "vssamp%d", i);
-           sprog->samp_locs[PIPE_SHADER_VERTEX][i] = glGetUniformLocation(prog_id, name);
-           if (vs->sinfo.shadow_samp_mask & (1 << i)) {
-              snprintf(name, 14, "vsshadmask%d", i);
-              sprog->shadow_samp_mask_locs[PIPE_SHADER_VERTEX][i] = glGetUniformLocation(prog_id, name);
-              snprintf(name, 14, "vsshadadd%d", i);
-              sprog->shadow_samp_add_locs[PIPE_SHADER_VERTEX][i] = glGetUniformLocation(prog_id, name);
-           }
-        }
-     }
-  } else {
-     sprog->samp_locs[PIPE_SHADER_VERTEX] = NULL;
-     sprog->shadow_samp_mask_locs[PIPE_SHADER_VERTEX] = NULL;
-     sprog->shadow_samp_add_locs[PIPE_SHADER_VERTEX] = NULL;
-     sprog->shadow_samp_mask[PIPE_SHADER_VERTEX] = 0;
-  }
-
-  sprog->num_samplers[PIPE_SHADER_VERTEX] = vs->sinfo.num_samplers;
-
-  if (fs->sinfo.num_samplers) {
-    sprog->samp_locs[PIPE_SHADER_FRAGMENT] = calloc(fs->sinfo.num_samplers, sizeof(uint32_t));
-    sprog->shadow_samp_mask[PIPE_SHADER_FRAGMENT] = fs->sinfo.shadow_samp_mask;
-     if (fs->sinfo.shadow_samp_mask) {
-        sprog->shadow_samp_mask_locs[PIPE_SHADER_FRAGMENT] = calloc(vs->sinfo.num_samplers, sizeof(uint32_t));
-        sprog->shadow_samp_add_locs[PIPE_SHADER_FRAGMENT] = calloc(vs->sinfo.num_samplers, sizeof(uint32_t));
-     } else {
-        sprog->shadow_samp_mask_locs[PIPE_SHADER_FRAGMENT] = sprog->shadow_samp_add_locs[PIPE_SHADER_FRAGMENT] = NULL;
-     }
-
-    if (sprog->samp_locs[PIPE_SHADER_FRAGMENT]) {
-      for (i = 0; i < fs->sinfo.num_samplers; i++) {
-	snprintf(name, 10, "fssamp%d", i);
-	sprog->samp_locs[PIPE_SHADER_FRAGMENT][i] = glGetUniformLocation(prog_id, name);
-        if (fs->sinfo.shadow_samp_mask & (1 << i)) {
-           snprintf(name, 14, "fsshadmask%d", i);
-           sprog->shadow_samp_mask_locs[PIPE_SHADER_FRAGMENT][i] = glGetUniformLocation(prog_id, name);
-           snprintf(name, 14, "fsshadadd%d", i);
-           sprog->shadow_samp_add_locs[PIPE_SHADER_FRAGMENT][i] = glGetUniformLocation(prog_id, name);
+  for (id = PIPE_SHADER_VERTEX; id <= PIPE_SHADER_FRAGMENT; id++) {
+    if (sprog->ss[id]->sinfo.num_samplers) {
+      sprog->samp_locs[id] = calloc(sprog->ss[id]->sinfo.num_samplers, sizeof(uint32_t));
+      sprog->shadow_samp_mask[id] = sprog->ss[id]->sinfo.shadow_samp_mask;
+      if (sprog->ss[id]->sinfo.shadow_samp_mask) {
+        sprog->shadow_samp_mask_locs[id] = calloc(sprog->ss[id]->sinfo.num_samplers, sizeof(uint32_t));
+        sprog->shadow_samp_add_locs[id] = calloc(sprog->ss[id]->sinfo.num_samplers, sizeof(uint32_t));
+      } else {
+        sprog->shadow_samp_mask_locs[id] = sprog->shadow_samp_add_locs[id] = NULL;
+      }
+      if (sprog->samp_locs[id]) {
+        for (i = 0; i < sprog->ss[id]->sinfo.num_samplers; i++) {
+          const char *prefix = (id == PIPE_SHADER_VERTEX) ? "vs" : "fs";
+          snprintf(name, 10, "%ssamp%d", prefix, i);
+          sprog->samp_locs[id][i] = glGetUniformLocation(prog_id, name);
+          if (sprog->ss[id]->sinfo.shadow_samp_mask & (1 << i)) {
+            snprintf(name, 14, "%sshadmask%d", prefix, i);
+            sprog->shadow_samp_mask_locs[id][i] = glGetUniformLocation(prog_id, name);
+            snprintf(name, 14, "%sshadadd%d", prefix, i);
+            sprog->shadow_samp_add_locs[id][i] = glGetUniformLocation(prog_id, name);
+          }
         }
       }
+    } else {
+      sprog->samp_locs[id] = NULL;
+      sprog->shadow_samp_mask_locs[id] = NULL;
+      sprog->shadow_samp_add_locs[id] = NULL;
+      sprog->shadow_samp_mask[id] = 0;
     }
-  } else{
-     sprog->samp_locs[PIPE_SHADER_FRAGMENT] = NULL;
-     sprog->shadow_samp_mask_locs[PIPE_SHADER_FRAGMENT] = sprog->shadow_samp_add_locs[PIPE_SHADER_FRAGMENT] = NULL;
-     sprog->shadow_samp_mask[PIPE_SHADER_FRAGMENT] = 0;
+    sprog->num_samplers[id] = sprog->ss[id]->sinfo.num_samplers;
   }
-  sprog->num_samplers[PIPE_SHADER_FRAGMENT] = fs->sinfo.num_samplers;
-  
-  if (vs->sinfo.num_consts) {
-    sprog->const_locs[PIPE_SHADER_VERTEX] = calloc(vs->sinfo.num_consts, sizeof(uint32_t));
-    if (sprog->const_locs[PIPE_SHADER_VERTEX]) {
-      for (i = 0; i < vs->sinfo.num_consts; i++) {
-	snprintf(name, 16, "vsconst[%d]", i);
-	sprog->const_locs[PIPE_SHADER_VERTEX][i] = glGetUniformLocation(prog_id, name);
-      }
-    }
-  } else
-    sprog->const_locs[PIPE_SHADER_VERTEX] = NULL;
 
-  if (fs->sinfo.num_consts) {
-    sprog->const_locs[PIPE_SHADER_FRAGMENT] = calloc(fs->sinfo.num_consts, sizeof(uint32_t));
-    if (sprog->const_locs[PIPE_SHADER_FRAGMENT]) {
-      for (i = 0; i < fs->sinfo.num_consts; i++) {
-	snprintf(name, 16, "fsconst[%d]", i);
-	sprog->const_locs[PIPE_SHADER_FRAGMENT][i] = glGetUniformLocation(prog_id, name);
+  for (id = PIPE_SHADER_VERTEX; id <= PIPE_SHADER_FRAGMENT; id++) {
+    if (sprog->ss[id]->sinfo.num_consts) {
+      sprog->const_locs[id] = calloc(sprog->ss[id]->sinfo.num_consts, sizeof(uint32_t));
+      if (sprog->const_locs[id]) {
+        const char *prefix = (id == PIPE_SHADER_VERTEX) ? "vs" : "fs";
+        for (i = 0; i < sprog->ss[id]->sinfo.num_consts; i++) {
+          snprintf(name, 16, "%sconst[%d]", prefix, i);
+          sprog->const_locs[id][i] = glGetUniformLocation(prog_id, name);
+        }
       }
-    }
-  } else
-    sprog->const_locs[PIPE_SHADER_FRAGMENT] = NULL;
+    } else
+      sprog->const_locs[id] = NULL;
+  }
 
   if (vs->sinfo.num_inputs) {
     sprog->attrib_locs = calloc(vs->sinfo.num_inputs, sizeof(uint32_t));
@@ -576,7 +541,7 @@ static struct grend_linked_shader_program *lookup_shader_program(struct grend_co
 {
   struct grend_linked_shader_program *ent;
   LIST_FOR_EACH_ENTRY(ent, &ctx->programs, head) {
-     if (ent->vs->id == vs_id && ent->fs->id == fs_id)
+     if (ent->ss[PIPE_SHADER_VERTEX]->id == vs_id && ent->ss[PIPE_SHADER_FRAGMENT]->id == fs_id)
         return ent;
   }
   return 0;
@@ -1454,15 +1419,15 @@ void grend_draw_vbo(struct grend_context *ctx,
       struct grend_buffer *buf;
       GLint loc;
 
-      if (i >= ctx->prog->vs->sinfo.num_inputs) {
+      if (i >= ctx->prog->ss[PIPE_SHADER_VERTEX]->sinfo.num_inputs) {
          /* XYZZY: debug this? */
-         num_enable = ctx->prog->vs->sinfo.num_inputs;
+         num_enable = ctx->prog->ss[PIPE_SHADER_VERTEX]->sinfo.num_inputs;
          break;
       }
       buf = (struct grend_buffer *)ctx->vbo[vbo_index].buffer;
 
       if (!buf) {
-           fprintf(stderr,"cannot find vbo buf %d %d %d\n", i, ctx->ve->count, ctx->prog->vs->sinfo.num_inputs);
+           fprintf(stderr,"cannot find vbo buf %d %d %d\n", i, ctx->ve->count, ctx->prog->ss[PIPE_SHADER_VERTEX]->sinfo.num_inputs);
            continue;
       }
 
@@ -1474,7 +1439,7 @@ void grend_draw_vbo(struct grend_context *ctx,
 	} else loc = -1;
 
 	if (loc == -1) {
-           fprintf(stderr,"cannot find loc %d %d %d\n", i, ctx->ve->count, ctx->prog->vs->sinfo.num_inputs);
+           fprintf(stderr,"cannot find loc %d %d %d\n", i, ctx->ve->count, ctx->prog->ss[PIPE_SHADER_VERTEX]->sinfo.num_inputs);
           num_enable--;
           if (i == 0) {
              fprintf(stderr,"shader probably didn't compile - skipping rendering\n");

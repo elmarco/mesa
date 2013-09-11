@@ -163,6 +163,7 @@ enum virgl_formats {
    VIRGL_FORMAT_Z32_UNORM               = 17,
    VIRGL_FORMAT_Z32_FLOAT               = 18,
    VIRGL_FORMAT_Z24_UNORM_S8_UINT       = 19,
+   VIRGL_FORMAT_S8_UINT_Z24_UNORM       = 20,
    VIRGL_FORMAT_Z24X8_UNORM             = 21,
    VIRGL_FORMAT_S8_UINT                 = 23,   /**< ubyte stencil */
 

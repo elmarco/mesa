@@ -1799,8 +1799,9 @@ void grend_update_stencil_state(struct grend_context *ctx)
          grend_stencil_test_enable(GL_TRUE);
 
          glStencilOp(translate_stencil_op(state->stencil[0].fail_op), 
-                     translate_stencil_op(state->stencil[0].zpass_op),
-                     translate_stencil_op(state->stencil[0].zfail_op));
+                     translate_stencil_op(state->stencil[0].zfail_op),
+                     translate_stencil_op(state->stencil[0].zpass_op));
+
          glStencilFunc(GL_NEVER + state->stencil[0].func,
                        ctx->stencil_refs[0],
                        state->stencil[0].valuemask);
@@ -1812,9 +1813,11 @@ void grend_update_stencil_state(struct grend_context *ctx)
 
       for (i = 0; i < 2; i++) {
          GLenum face = (i == 1) ? GL_BACK : GL_FRONT;
-         glStencilOpSeparate(face, translate_stencil_op(state->stencil[i].fail_op), 
-                             translate_stencil_op(state->stencil[i].zpass_op),
-                             translate_stencil_op(state->stencil[i].zfail_op));
+         glStencilOpSeparate(face,
+                             translate_stencil_op(state->stencil[i].fail_op),
+                             translate_stencil_op(state->stencil[i].zfail_op),
+                             translate_stencil_op(state->stencil[i].zpass_op));
+
          glStencilFuncSeparate(face, GL_NEVER + state->stencil[i].func,
                                ctx->stencil_refs[i],
                                state->stencil[i].valuemask);

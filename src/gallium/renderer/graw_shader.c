@@ -324,7 +324,7 @@ static void emit_so_movs(struct dump_ctx *ctx)
 
 }
 
-#define emit_arit_op2(op) snprintf(buf, 255, "%s = %s(%s %s %s);\n", dsts[0], dstconv, srcs[0], op, srcs[1])
+#define emit_arit_op2(op) snprintf(buf, 255, "%s = %s((%s %s %s)%s);\n", dsts[0], dstconv, srcs[0], op, srcs[1], writemask)
 #define emit_op1(op) snprintf(buf, 255, "%s = %s(%s(%s));\n", dsts[0], dstconv, op, srcs[0])
 #define emit_compare(op) snprintf(buf, 255, "%s = %s((%s(%s, %s))%s);\n", dsts[0], dstconv, op, srcs[0], srcs[1], writemask)
 static boolean

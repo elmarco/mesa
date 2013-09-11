@@ -1875,8 +1875,11 @@ static void grend_hw_emit_rs(struct grend_context *ctx)
       glDisable(GL_DEPTH_CLAMP);
    }
 #endif
-   if (state->point_size != grend_state.hw_rs_state.point_size) {
-      grend_state.hw_rs_state.point_size = state->point_size;
+
+   if (state->point_size_per_vertex) {
+      glEnable(GL_PROGRAM_POINT_SIZE);
+   } else {
+      glDisable(GL_PROGRAM_POINT_SIZE);
       glPointSize(state->point_size);
    }
 

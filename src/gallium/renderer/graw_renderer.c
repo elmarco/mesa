@@ -687,6 +687,52 @@ void grend_create_sampler_view(struct grend_context *ctx,
    vrend_object_insert(ctx->object_hash, view, sizeof(*view), handle, VIRGL_OBJECT_SAMPLER_VIEW);
 }
 
+static void grend_fb_bind_texture(struct grend_resource *res,
+                                  int idx,
+                                  uint32_t level, uint32_t layer)
+{
+    const struct util_format_description *desc = util_format_description(res->base.format);
+    GLenum attachment = GL_COLOR_ATTACHMENT0_EXT + idx;
+
+    if (vrend_format_is_ds(res->base.format)) { {
+            if (util_format_has_stencil(desc)) {
+                if (util_format_has_depth(desc))
+                    attachment = GL_DEPTH_STENCIL_ATTACHMENT;
+                else
+                    attachment = GL_STENCIL_ATTACHMENT;
+            } else
+                attachment = GL_DEPTH_ATTACHMENT;
+        }
+    }
+
+    switch (res->target) {
+    case GL_TEXTURE_1D_ARRAY:
+    case GL_TEXTURE_2D_ARRAY:
+    case GL_TEXTURE_CUBE_MAP_ARRAY:
+        glFramebufferTextureLayer(GL_FRAMEBUFFER_EXT, attachment,
+                                  res->id, level, layer);
+        break;
+    case GL_TEXTURE_3D:
+        glFramebufferTexture3DEXT(GL_FRAMEBUFFER_EXT, attachment,
+                                  res->target, res->id, level, layer);
+        break;
+    case GL_TEXTURE_CUBE_MAP:
+        glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, attachment,
+                                  GL_TEXTURE_CUBE_MAP_POSITIVE_X + layer, res->id, 0);
+        break;
+    case GL_TEXTURE_1D:
+        glFramebufferTexture1DEXT(GL_FRAMEBUFFER_EXT, attachment,
+                                  res->target, res->id, level);
+        break;
+    case GL_TEXTURE_2D:
+    default:
+        glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, attachment,
+                                  res->target, res->id, level);
+        break;
+    }
+    
+}
+
 static void grend_hw_set_zsurf_texture(struct grend_context *ctx)
 {
    struct grend_resource *tex;
@@ -701,53 +747,26 @@ static void grend_hw_set_zsurf_texture(struct grend_context *ctx)
    tex = ctx->zsurf->texture;
    if (!tex)
       return;
-   if (tex->base.format == PIPE_FORMAT_S8_UINT)
-      attachment = GL_STENCIL_ATTACHMENT;
-   else if (tex->base.format == PIPE_FORMAT_Z24X8_UNORM || tex->base.format == PIPE_FORMAT_Z32_UNORM || tex->base.format == PIPE_FORMAT_Z16_UNORM || tex->base.format == PIPE_FORMAT_Z32_FLOAT)
-      attachment = GL_DEPTH_ATTACHMENT;
-   else
-      attachment = GL_DEPTH_STENCIL_ATTACHMENT;
-   if (tex->target == GL_TEXTURE_3D)
-      glFramebufferTexture3DEXT(GL_FRAMEBUFFER_EXT, attachment,
-                                tex->target, tex->id, ctx->zsurf->val0, ctx->zsurf->val1 & 0xffff);
-   else if (tex->target == GL_TEXTURE_1D_ARRAY || tex->target == GL_TEXTURE_2D_ARRAY || tex->target == GL_TEXTURE_CUBE_MAP_ARRAY) 
-      glFramebufferTextureLayer(GL_FRAMEBUFFER_EXT, attachment,
-                                tex->id, ctx->zsurf->val0, ctx->zsurf->val1 & 0xffff);
-   else
-      glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, attachment,
-                                tex->target, tex->id, ctx->zsurf->val0);
 
+   grend_fb_bind_texture(tex, 0, ctx->zsurf->val0, ctx->zsurf->val1 & 0xffff);
 }
 
 static void grend_hw_set_color_surface(struct grend_context *ctx, int index)
 {
    struct grend_resource *tex;
-   GLenum attachment = GL_COLOR_ATTACHMENT0 + index;
 
    if (!ctx->surf[index]) {
+      GLenum attachment = GL_COLOR_ATTACHMENT0 + index;
+
       glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, attachment,
                                 GL_TEXTURE_2D, 0, 0);
       return;
    }
 
    tex = ctx->surf[index]->texture;
-   if (tex->target == GL_TEXTURE_CUBE_MAP) {
-      glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, attachment,
-                                GL_TEXTURE_CUBE_MAP_POSITIVE_X + (ctx->surf[index]->val1 & 0xffff), tex->id, ctx->surf[index]->val0);
-   } else if (tex->target == GL_TEXTURE_1D_ARRAY ||
-              tex->target == GL_TEXTURE_2D_ARRAY) {
-      glFramebufferTextureLayer(GL_FRAMEBUFFER_EXT, attachment,
-                                tex->id, ctx->surf[index]->val0, ctx->surf[index]->val1 & 0xffff);
-   } else if (tex->target == GL_TEXTURE_3D) {
-      glFramebufferTexture3DEXT(GL_FRAMEBUFFER_EXT, attachment,
-                                tex->target, tex->id, ctx->surf[index]->val0, ctx->surf[index]->val1 & 0xffff);
-   } else if (tex->target == GL_TEXTURE_1D) {
-      glFramebufferTexture1DEXT(GL_FRAMEBUFFER_EXT, attachment,
-                                tex->target, tex->id, ctx->surf[index]->val0);
-   } else
-      glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, attachment,
-                                tex->target, tex->id, ctx->surf[index]->val0);
-   
+   grend_fb_bind_texture(tex, index, ctx->surf[index]->val0,
+                         ctx->surf[index]->val1 & 0xffff);
+
    if (index == 0 && u_minify(tex->base.height0, ctx->surf[index]->val0) != ctx->fb_height) {
       ctx->fb_height = u_minify(tex->base.height0, ctx->surf[index]->val0);
       ctx->scissor_state_dirty = TRUE;
@@ -2486,8 +2505,8 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
             
                glGenFramebuffers(1, &fb_id);
                glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fb_id);
-               glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
-                                         res->target, res->id, level);
+               grend_fb_bind_texture(res, 0, level, 0);
+
                res->readback_fb_id = fb_id;
                res->readback_fb_level = level;
             } else {
@@ -2681,15 +2700,6 @@ static void vrend_transfer_send_readpixels(struct grend_resource *res,
 //      fprintf(stderr,"TEXTURE TRANSFER %d %d %d %d %d, temp:%d\n", res_handle, res->readback_fb_id, box->width, box->height, level, need_temp);
 
    if (!res->is_front) {
-      const struct util_format_description *desc = util_format_description(res->base.format);
-     GLenum attachment = GL_COLOR_ATTACHMENT0_EXT;
-
-     if (vrend_format_is_ds(res->base.format)) {
-        if (util_format_has_stencil(desc))
-           attachment = GL_DEPTH_STENCIL_ATTACHMENT;
-        else 
-           attachment = GL_DEPTH_ATTACHMENT;
-     }
 
       if (res->readback_fb_id == 0 || res->readback_fb_level != level || res->readback_fb_z != box->z) {
 
@@ -2699,21 +2709,8 @@ static void vrend_transfer_send_readpixels(struct grend_resource *res,
          glGenFramebuffers(1, &fb_id);
          glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fb_id);
 
-         if (res->target == GL_TEXTURE_1D_ARRAY || res->target == GL_TEXTURE_2D_ARRAY || res->target == GL_TEXTURE_CUBE_MAP_ARRAY) 
-            glFramebufferTextureLayer(GL_FRAMEBUFFER_EXT, attachment,
-                                      res->id, level, box->z);
-         else if (res->target == GL_TEXTURE_3D) {
-            glFramebufferTexture3DEXT(GL_FRAMEBUFFER_EXT, attachment,
-                                      res->target, res->id, level, box->z);
-         } else if (res->target == GL_TEXTURE_CUBE_MAP) {
-            glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, attachment,
-                                      GL_TEXTURE_CUBE_MAP_POSITIVE_X + box->z, res->id, 0);
-         } else if (res->target == GL_TEXTURE_1D)
-            glFramebufferTexture1DEXT(GL_FRAMEBUFFER_EXT, attachment,
-                                      res->target, res->id, level);
-         else
-            glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, attachment,
-                                      res->target, res->id, level);
+         grend_fb_bind_texture(res, 0, level, box->z);
+
          res->readback_fb_id = fb_id;
          res->readback_fb_level = level;
          res->readback_fb_z = box->z;
@@ -2727,8 +2724,8 @@ static void vrend_transfer_send_readpixels(struct grend_resource *res,
       
       if (have_invert_mesa && actually_invert)
          glPixelStorei(GL_PACK_INVERT_MESA, 1);
-      if (attachment == GL_COLOR_ATTACHMENT0_EXT)
-        glReadBuffer(GL_COLOR_ATTACHMENT0_EXT);  
+      if (!vrend_format_is_ds(res->base.format))
+          glReadBuffer(GL_COLOR_ATTACHMENT0_EXT);  
    } else {
       glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
       y1 = box->y;
@@ -3021,13 +3018,11 @@ void graw_renderer_resource_copy_region(struct grend_context *ctx,
    }
 
    glBindFramebuffer(GL_FRAMEBUFFER_EXT, ctx->blit_fb_ids[0]);
-   glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
-                             src_res->target, src_res->id, src_level);
+   grend_fb_bind_texture(src_res, 0, src_level, src_box->z);
       
    if (!dst_res->is_front) {
       glBindFramebuffer(GL_FRAMEBUFFER_EXT, ctx->blit_fb_ids[1]);
-      glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
-                                dst_res->target, dst_res->id, dst_level);
+      grend_fb_bind_texture(dst_res, 0, dst_level, dstz);
       glBindFramebuffer(GL_DRAW_FRAMEBUFFER, ctx->blit_fb_ids[1]);
    } else
       glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
@@ -3088,19 +3083,12 @@ static void graw_renderer_blit_int(struct grend_context *ctx,
 
    glBindFramebuffer(GL_FRAMEBUFFER_EXT, ctx->blit_fb_ids[0]);
 
-   if (src_res->target == GL_TEXTURE_CUBE_MAP) {
-      glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
-                                GL_TEXTURE_CUBE_MAP_POSITIVE_X + info->src.level, src_res->id, 0);
-   } else
-      glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
-                                src_res->target, src_res->id, info->src.level);
-
+   grend_fb_bind_texture(src_res, 0, info->src.level, info->src.box.z);
 
    if (!dst_res->is_front) {
       glBindFramebuffer(GL_FRAMEBUFFER_EXT, ctx->blit_fb_ids[1]);
-      glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
-                                dst_res->target, dst_res->id, info->dst.level);
-      
+
+      grend_fb_bind_texture(dst_res, 0, info->dst.level, info->dst.box.z);
       glBindFramebuffer(GL_DRAW_FRAMEBUFFER, ctx->blit_fb_ids[1]);
    } else
       glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
@@ -3204,8 +3192,8 @@ int graw_renderer_flush_buffer_res(struct grend_resource *res,
          glGenFramebuffers(1, &front_fb_id);
 
       glBindFramebuffer(GL_FRAMEBUFFER_EXT, front_fb_id);
-      glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
-                                res->target, res->id, 0);
+
+      grend_fb_bind_texture(res, 0, 0, 0);
 
       glBindFramebuffer(GL_READ_FRAMEBUFFER, front_fb_id);
       glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);

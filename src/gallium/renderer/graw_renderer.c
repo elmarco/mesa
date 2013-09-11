@@ -2681,11 +2681,15 @@ static void vrend_transfer_send_readpixels(struct grend_resource *res,
 //      fprintf(stderr,"TEXTURE TRANSFER %d %d %d %d %d, temp:%d\n", res_handle, res->readback_fb_id, box->width, box->height, level, need_temp);
 
    if (!res->is_front) {
+      const struct util_format_description *desc = util_format_description(res->base.format);
      GLenum attachment = GL_COLOR_ATTACHMENT0_EXT;
 
-     if (vrend_format_is_ds(res->base.format))
-       attachment = GL_DEPTH_STENCIL_ATTACHMENT;
-            
+     if (vrend_format_is_ds(res->base.format)) {
+        if (util_format_has_stencil(desc))
+           attachment = GL_DEPTH_STENCIL_ATTACHMENT;
+        else 
+           attachment = GL_DEPTH_ATTACHMENT;
+     }
 
       if (res->readback_fb_id == 0 || res->readback_fb_level != level || res->readback_fb_z != box->z) {
 

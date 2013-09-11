@@ -485,7 +485,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_DPH:
-      snprintf(buf, 255, "%s = %s(dot(vec4(%s), vec4(vec3(%s), 1.0)));\n", dsts[0], dstconv, srcs[0], srcs[1]);
+      snprintf(buf, 255, "%s = %s(dot(vec4(vec3(%s), 1.0), vec4(%s)));\n", dsts[0], dstconv, srcs[0], srcs[1]);
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_MAX:
@@ -557,6 +557,11 @@ iter_instruction(struct tgsi_iterate_context *iter,
    case TGSI_OPCODE_SIN:
       emit_op1("sin");
       strcat(ctx->glsl_main, buf);
+      break;
+   case TGSI_OPCODE_SCS:
+      snprintf(buf, 255, "%s = %s(vec4(cos(%s.x), sin(%s.x), 0, 1)%s);\n", dsts[0], dstconv,
+               srcs[0], srcs[0], writemask);
+      strcat(ctx->glsl_main, buf);      
       break;
    case TGSI_OPCODE_DDX:
       emit_op1("dFdx");

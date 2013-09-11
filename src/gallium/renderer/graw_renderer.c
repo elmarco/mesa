@@ -763,18 +763,14 @@ static void grend_hw_set_color_surface(struct grend_context *ctx, int index)
 
       glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, attachment,
                                 GL_TEXTURE_2D, 0, 0);
-      return;
+   } else {
+       tex = ctx->surf[index]->texture;
+       grend_fb_bind_texture(tex, index, ctx->surf[index]->val0,
+                             ctx->surf[index]->val1 & 0xffff);
+
    }
 
-   tex = ctx->surf[index]->texture;
-   grend_fb_bind_texture(tex, index, ctx->surf[index]->val0,
-                         ctx->surf[index]->val1 & 0xffff);
 
-   if (index == 0 && u_minify(tex->base.height0, ctx->surf[index]->val0) != ctx->fb_height) {
-      ctx->fb_height = u_minify(tex->base.height0, ctx->surf[index]->val0);
-      ctx->scissor_state_dirty = TRUE;
-      ctx->viewport_state_dirty = TRUE;
-   }
 }
 
 static void grend_hw_emit_framebuffer_state(struct grend_context *ctx)
@@ -791,6 +787,8 @@ static void grend_hw_emit_framebuffer_state(struct grend_context *ctx)
    };
    glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, ctx->fb_id);
 
+   if (ctx->nr_cbufs == 0)
+       glReadBuffer(GL_NONE);
    glDrawBuffers(ctx->nr_cbufs, buffers);
 }
 
@@ -801,6 +799,8 @@ void grend_set_framebuffer_state(struct grend_context *ctx,
    struct grend_surface *surf, *zsurf;
    int i;
    int old_num;
+   GLenum status;
+   GLint new_height = -1;
 
    glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, ctx->fb_id);
 
@@ -841,7 +841,27 @@ void grend_set_framebuffer_state(struct grend_context *ctx,
       }
    }
 
+   /* find a buffer to set fb_height from */
+   if (ctx->nr_cbufs == 0 && !ctx->zsurf)
+       new_height = 0;
+   else if (ctx->nr_cbufs == 0)
+       new_height = u_minify(ctx->zsurf->texture->base.height0, ctx->zsurf->val0);
+   else 
+       new_height = u_minify(ctx->surf[0]->texture->base.height0, ctx->surf[0]->val0);
+
+   if (new_height != -1) {
+       if (ctx->fb_height != new_height) {
+           ctx->fb_height = new_height;
+           ctx->scissor_state_dirty = TRUE;
+           ctx->viewport_state_dirty = TRUE;
+       }
+   }
+
    grend_hw_emit_framebuffer_state(ctx);
+
+   status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+   if (status != GL_FRAMEBUFFER_COMPLETE)
+       fprintf(stderr,"failed to complete framebuffer 0x%x\n", status);
 }
 
 static void grend_hw_emit_depth_range(struct grend_context *ctx)

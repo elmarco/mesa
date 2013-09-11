@@ -3706,7 +3706,8 @@ void graw_renderer_fill_caps(uint32_t set, uint32_t version,
    }
 
    if (glewIsSupported("GL_ARB_texture_multisample"))
-      caps.v1.bset.texture_multisample = 1;
+       /* disable multisample until developed */
+      caps.v1.bset.texture_multisample = 0;
    if (glewIsSupported("GL_VERSION_4_0")) {
       caps.v1.bset.indep_blend_func = 1;
       caps.v1.bset.cube_map_array = 1;

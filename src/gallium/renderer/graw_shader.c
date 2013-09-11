@@ -708,7 +708,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
          const struct tgsi_full_src_register *src = &inst->Src[sampler_index];
          snprintf(buf, 255, "%s = %s(vec4(vec4(texture%s(%s, %s%s%s)) * %s%d + %s%d)%s);\n", dsts[0], dstconv, tex_ext, srcs[sampler_index], srcs[0], twm, bias, mname, src->Register.Index, cname, src->Register.Index, writemask);
       } else
-         snprintf(buf, 255, "%s = %s(texture%s(%s, %s%s%s)%s);\n", dsts[0], dstconv, tex_ext, srcs[sampler_index], srcs[0], twm, bias, writemask);
+         snprintf(buf, 255, "%s = %s(texture%s(%s, %s%s%s)%s);\n", dsts[0], dstconv, tex_ext, srcs[sampler_index], srcs[0], twm, bias, ctx->outputs[0].override_no_wm ? "" : writemask);
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_TXP:

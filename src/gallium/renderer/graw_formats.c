@@ -154,7 +154,7 @@ static struct grend_format_table integer_la_formats[] = {
 static struct grend_format_table snorm_formats[] = {
       { VIRGL_FORMAT_R8_SNORM, GL_R8_SNORM, GL_RED, GL_BYTE },
       { VIRGL_FORMAT_R8G8_SNORM, GL_RG8_SNORM, GL_RG, GL_BYTE },
-      { VIRGL_FORMAT_R8G8B8_SNORM, GL_RGB8_SNORM, GL_RGB, GL_BYTE },
+
       { VIRGL_FORMAT_R8G8B8A8_SNORM, GL_RGBA8_SNORM, GL_RGBA, GL_BYTE },
       { VIRGL_FORMAT_R8G8B8X8_SNORM, GL_RGBA8_SNORM, GL_RGB, GL_BYTE },
 

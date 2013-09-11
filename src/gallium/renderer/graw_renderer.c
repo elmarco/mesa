@@ -2773,11 +2773,20 @@ static void vrend_transfer_send_readpixels(struct grend_resource *res,
       glPixelStorei(GL_PACK_ALIGNMENT, 8);
       break;
    }  
+
+   if (res->base.format == VIRGL_FORMAT_Z24X8_UNORM) {
+      /* we get values from the guest as 24-bit scaled integers
+         but we give them to the host GL and it interprets them
+         as 32-bit scaled integers, so we need to scale them here */
+      glPixelTransferf(GL_DEPTH_SCALE, 1.0/256.0);
+   }
    if (grend_state.have_robustness)
       glReadnPixelsARB(box->x, y1, box->width, box->height, format, type, send_size, data);
    else
       glReadPixels(box->x, y1, box->width, box->height, format, type, data);
 
+   if (res->base.format == VIRGL_FORMAT_Z24X8_UNORM)
+      glPixelTransferf(GL_DEPTH_SCALE, 1.0);
    if (have_invert_mesa && actually_invert)
       glPixelStorei(GL_PACK_INVERT_MESA, 0);
    glPixelStorei(GL_PACK_ALIGNMENT, 4);

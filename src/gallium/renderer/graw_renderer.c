@@ -730,7 +730,10 @@ static void grend_fb_bind_texture(struct grend_resource *res,
                                   res->target, res->id, level);
         break;
     }
-    
+
+    if (attachment == GL_DEPTH_ATTACHMENT)
+        glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_STENCIL_ATTACHMENT,
+                                  0, 0, 0);
 }
 
 static void grend_hw_set_zsurf_texture(struct grend_context *ctx)

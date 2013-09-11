@@ -3377,6 +3377,7 @@ out_write_val:
    state->result = result;
    state->query_state = VIRGL_QUERY_STATE_DONE;
 
+   query->current_total = 0;
    return TRUE;
 }
 

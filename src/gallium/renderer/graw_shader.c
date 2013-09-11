@@ -196,6 +196,13 @@ iter_declaration(struct tgsi_iterate_context *iter,
                name_prefix = "gl_BackSecondaryColor";
             break;
          }
+      case TGSI_SEMANTIC_PSIZE:
+         if (iter->processor.Processor == TGSI_PROCESSOR_VERTEX) {
+            ctx->outputs[i].glsl_predefined_no_emit = true;
+            ctx->outputs[i].glsl_no_index = true;
+            name_prefix = "gl_PointSize";
+            break;
+         }
       case TGSI_SEMANTIC_GENERIC:
          if (iter->processor.Processor == TGSI_PROCESSOR_VERTEX)
             if (ctx->outputs[i].name == TGSI_SEMANTIC_GENERIC)
@@ -367,11 +374,14 @@ iter_instruction(struct tgsi_iterate_context *iter,
          snprintf(dstconv, 6, "vec4");
       }
       if (dst->Register.File == TGSI_FILE_OUTPUT) {
-         for (j = 0; j < ctx->num_outputs; j++)
+         for (j = 0; j < ctx->num_outputs; j++) {
             if (ctx->outputs[j].first == dst->Register.Index) {
                snprintf(dsts[i], 255, "%s%s", ctx->outputs[j].glsl_name, ctx->outputs[j].override_no_wm ? "" : writemask);
+               if (ctx->outputs[j].name == TGSI_SEMANTIC_PSIZE)
+                  snprintf(dstconv, 6, "float");
                break;
             }
+         }
       }
       else if (dst->Register.File == TGSI_FILE_TEMPORARY) {
          if (dst->Register.Indirect) {

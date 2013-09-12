@@ -1960,7 +1960,8 @@ static void grend_hw_emit_rs(struct grend_context *ctx)
       glEnable(GL_PROGRAM_POINT_SIZE);
    } else {
       glDisable(GL_PROGRAM_POINT_SIZE);
-      glPointSize(state->point_size);
+      if (state->point_size)
+          glPointSize(state->point_size);
    }
 
    if (state->rasterizer_discard != grend_state.hw_rs_state.rasterizer_discard) {

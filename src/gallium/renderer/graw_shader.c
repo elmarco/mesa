@@ -378,9 +378,10 @@ iter_instruction(struct tgsi_iterate_context *iter,
          for (j = 0; j < ctx->num_outputs; j++) {
             if (ctx->outputs[j].first == dst->Register.Index) {
                snprintf(dsts[i], 255, "%s%s", ctx->outputs[j].glsl_name, ctx->outputs[j].override_no_wm ? "" : writemask);
-               if (ctx->outputs[j].name == TGSI_SEMANTIC_PSIZE)
+               if (ctx->outputs[j].name == TGSI_SEMANTIC_PSIZE) {
                   snprintf(dstconv, 6, "float");
-               break;
+                  break;
+		}
             }
          }
       }

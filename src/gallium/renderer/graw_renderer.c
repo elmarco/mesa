@@ -1894,6 +1894,21 @@ static void grend_hw_emit_rs(struct grend_context *ctx)
    glPolygonMode(GL_FRONT, translate_fill(state->fill_front));
    glPolygonMode(GL_BACK, translate_fill(state->fill_back));
 
+   if (state->offset_tri)
+      glEnable(GL_POLYGON_OFFSET_FILL);
+   else
+      glDisable(GL_POLYGON_OFFSET_FILL);
+
+   if (state->offset_line)
+      glEnable(GL_POLYGON_OFFSET_LINE);
+   else
+      glDisable(GL_POLYGON_OFFSET_LINE);
+
+   if (state->offset_point)
+      glEnable(GL_POLYGON_OFFSET_POINT);
+   else
+      glDisable(GL_POLYGON_OFFSET_POINT);
+   
    if (state->flatshade != grend_state.hw_rs_state.flatshade) {
       grend_state.hw_rs_state.flatshade = state->flatshade;
       if (state->flatshade) {
@@ -1902,6 +1917,8 @@ static void grend_hw_emit_rs(struct grend_context *ctx)
          glShadeModel(GL_SMOOTH);
       }
    }
+
+   glPolygonOffset(state->offset_scale, state->offset_units);
 
    if (state->front_ccw != grend_state.hw_rs_state.front_ccw) {
       grend_state.hw_rs_state.front_ccw = state->front_ccw;

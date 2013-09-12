@@ -35,6 +35,7 @@ static void grend_update_scissor_state(struct grend_context *ctx);
 static void grend_ctx_restart_queries(struct grend_context *ctx);
 static void grend_destroy_query_object(void *obj_ptr);
 static void grend_finish_context_switch(struct grend_context *ctx);
+static void grend_patch_blend_func(struct grend_context *ctx);
 extern int graw_shader_use_explicit;
 int localrender;
 static int have_invert_mesa = 0;
@@ -1358,6 +1359,8 @@ void grend_draw_vbo(struct grend_context *ctx,
    if (ctx->viewport_state_dirty || grend_state.viewport_dirty)
       grend_update_viewport_state(ctx);
 
+   grend_patch_blend_func(ctx);
+
    if (ctx->shader_dirty) {
      struct grend_linked_shader_program *prog;
 
@@ -1678,6 +1681,73 @@ translate_stencil_op(GLuint op)
       return 0;
    }
 #undef CASE
+}
+
+static INLINE boolean is_dst_blend(int blend_factor)
+{
+   return (blend_factor == PIPE_BLENDFACTOR_DST_ALPHA ||
+           blend_factor == PIPE_BLENDFACTOR_INV_DST_ALPHA);
+}
+
+static INLINE int conv_dst_blend(int blend_factor)
+{
+   if (blend_factor == PIPE_BLENDFACTOR_DST_ALPHA)
+      return PIPE_BLENDFACTOR_ONE;
+   if (blend_factor == PIPE_BLENDFACTOR_INV_DST_ALPHA)
+      return PIPE_BLENDFACTOR_ZERO;
+   return blend_factor;
+}
+
+static void grend_patch_blend_func(struct grend_context *ctx)
+{
+   struct pipe_blend_state *state = &ctx->blend_state;
+   int i;
+   int rsf, rdf, asf, adf;
+   if (ctx->nr_cbufs == 0)
+      return;
+
+   for (i = 0; i < ctx->nr_cbufs; i++) {
+      if (!util_format_has_alpha(ctx->surf[i]->format))
+         break;
+   }
+
+   if (i == ctx->nr_cbufs)
+      return;
+
+   if (state->independent_blend_enable) {
+      /* ARB_draw_buffers_blend is required for this */
+      for (i = 0; i < PIPE_MAX_COLOR_BUFS; i++) {
+         if (state->rt[i].blend_enable) {
+            if (!(is_dst_blend(state->rt[i].rgb_src_factor) ||
+                  is_dst_blend(state->rt[i].rgb_dst_factor) ||
+                  is_dst_blend(state->rt[i].alpha_src_factor) ||
+                  is_dst_blend(state->rt[i].alpha_dst_factor)))
+               continue;
+            
+            rsf = translate_blend_factor(conv_dst_blend(state->rt[i].rgb_src_factor));
+            rdf = translate_blend_factor(conv_dst_blend(state->rt[i].rgb_dst_factor));
+            asf = translate_blend_factor(conv_dst_blend(state->rt[i].alpha_src_factor));
+            adf = translate_blend_factor(conv_dst_blend(state->rt[i].alpha_dst_factor));
+               
+            glBlendFuncSeparateiARB(i, rsf, rdf, asf, adf);
+         }
+      }
+   } else {
+      if (state->rt[0].blend_enable) {
+            if (!(is_dst_blend(state->rt[0].rgb_src_factor) ||
+                  is_dst_blend(state->rt[0].rgb_dst_factor) ||
+                  is_dst_blend(state->rt[0].alpha_src_factor) ||
+                  is_dst_blend(state->rt[0].alpha_dst_factor)))
+               return;
+
+            rsf = translate_blend_factor(conv_dst_blend(state->rt[i].rgb_src_factor));
+            rdf = translate_blend_factor(conv_dst_blend(state->rt[i].rgb_dst_factor));
+            asf = translate_blend_factor(conv_dst_blend(state->rt[i].alpha_src_factor));
+            adf = translate_blend_factor(conv_dst_blend(state->rt[i].alpha_dst_factor));
+
+            glBlendFuncSeparate(rsf, rdf, asf, adf);
+      }
+   }
 }
 
 static void grend_hw_emit_blend(struct grend_context *ctx)

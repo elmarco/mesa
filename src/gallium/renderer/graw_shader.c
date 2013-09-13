@@ -200,6 +200,7 @@ iter_declaration(struct tgsi_iterate_context *iter,
          if (iter->processor.Processor == TGSI_PROCESSOR_VERTEX) {
             ctx->outputs[i].glsl_predefined_no_emit = true;
             ctx->outputs[i].glsl_no_index = true;
+            ctx->outputs[i].override_no_wm = true;
             name_prefix = "gl_PointSize";
             break;
          }
@@ -339,7 +340,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
                  struct tgsi_full_instruction *inst)
 {
    struct dump_ctx *ctx = (struct dump_ctx *)iter;
-   char srcs[3][255], dsts[3][255], buf[255];
+   char srcs[3][255], dsts[3][255], buf[512];
    uint instno = ctx->instno++;
    int i;
    int j;
@@ -541,7 +542,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_LIT:
-      snprintf(buf, 255, "%s = vec4(1.0, max(%s.x, 0.0), pow(max(0.0, %s.y) * step(0.0, %s.x), clamp(%s.w, -128.0, 128.0)), 1.0);\n", dsts[0], srcs[0], srcs[0], srcs[0], srcs[0]);
+      snprintf(buf, 512, "%s = vec4(1.0, max(%s.x, 0.0), pow(max(0.0, %s.y) * step(0.0, %s.x), clamp(%s.w, -128.0, 128.0)), 1.0);\n", dsts[0], srcs[0], srcs[0], srcs[0], srcs[0]);
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_EX2:

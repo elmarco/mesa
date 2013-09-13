@@ -472,9 +472,13 @@ static struct grend_linked_shader_program *add_shader_program(struct grend_conte
   glAttachShader(prog_id, fs->id);
   ret = glGetError();
   glLinkProgram(prog_id);
-  ret = glGetError();
-  if (ret) {
+
+  glGetProgramiv(prog_id, GL_LINK_STATUS, &ret);
+  if (ret == GL_FALSE) {
      fprintf(stderr,"got error linking %d\n", ret);
+     report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_SHADER, 0);
+     glDeleteProgram(prog_id);
+     return NULL;
   }
 
   sprog->ss[PIPE_SHADER_VERTEX] = vs;
@@ -860,9 +864,11 @@ void grend_set_framebuffer_state(struct grend_context *ctx,
 
    grend_hw_emit_framebuffer_state(ctx);
 
-   status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-   if (status != GL_FRAMEBUFFER_COMPLETE)
-       fprintf(stderr,"failed to complete framebuffer 0x%x\n", status);
+   if (ctx->nr_cbufs > 0 || ctx->zsurf) {
+      status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+      if (status != GL_FRAMEBUFFER_COMPLETE)
+         fprintf(stderr,"failed to complete framebuffer 0x%x\n", status);
+   }
 }
 
 static void grend_hw_emit_depth_range(struct grend_context *ctx)
@@ -1371,6 +1377,8 @@ void grend_draw_vbo(struct grend_context *ctx,
      prog = lookup_shader_program(ctx, ctx->vs->id, ctx->fs->id);
      if (!prog) {
         prog = add_shader_program(ctx, ctx->vs, ctx->fs);
+        if (!prog)
+           return;
      }
      if (ctx->prog != prog) {
        new_program = TRUE;

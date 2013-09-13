@@ -537,7 +537,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_DST:
-      snprintf(buf, 255, "%s = vec4(1.0, %s.y * %s.y, %s.z, %s.w);\n", dsts[0],
+      snprintf(buf, 512, "%s = vec4(1.0, %s.y * %s.y, %s.z, %s.w);\n", dsts[0],
                srcs[0], srcs[1], srcs[0], srcs[0]);
       strcat(ctx->glsl_main, buf);
       break;

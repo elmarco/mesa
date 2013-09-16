@@ -72,7 +72,6 @@ struct grend_query {
 struct global_error_state {
    enum virgl_errors last_error;
 };
-static struct global_error_state error_state;
 
 struct global_renderer_state {
    bool viewport_dirty;
@@ -438,7 +437,7 @@ static void set_stream_out_varyings(int prog_id, struct pipe_stream_output_info 
    }
 
    glTransformFeedbackVaryings(prog_id, vs_so->num_outputs,
-                               varyings, GL_INTERLEAVED_ATTRIBS_EXT);
+                               (const GLchar **)varyings, GL_INTERLEAVED_ATTRIBS_EXT);
 
    for (i = 0; i < vs_so->num_outputs; i++)
       if (varyings[i])
@@ -453,7 +452,7 @@ static struct grend_linked_shader_program *add_shader_program(struct grend_conte
   char name[16];
   int i;
   GLuint prog_id;
-  GLenum ret;
+  GLint lret;
   int id;
 
   /* need to rewrite VS code to add interpolation params */
@@ -470,12 +469,11 @@ static struct grend_linked_shader_program *add_shader_program(struct grend_conte
   glAttachShader(prog_id, vs->id);
   set_stream_out_varyings(prog_id, &vs->sinfo.so_info);
   glAttachShader(prog_id, fs->id);
-  ret = glGetError();
   glLinkProgram(prog_id);
 
-  glGetProgramiv(prog_id, GL_LINK_STATUS, &ret);
-  if (ret == GL_FALSE) {
-     fprintf(stderr,"got error linking %d\n", ret);
+  glGetProgramiv(prog_id, GL_LINK_STATUS, &lret);
+  if (lret == GL_FALSE) {
+     fprintf(stderr,"got error linking\n");
      report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_SHADER, 0);
      glDeleteProgram(prog_id);
      return NULL;
@@ -744,7 +742,6 @@ static void grend_fb_bind_texture(struct grend_resource *res,
 static void grend_hw_set_zsurf_texture(struct grend_context *ctx)
 {
    struct grend_resource *tex;
-   GLenum attachment;
 
    if (!ctx->zsurf) {
       glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_STENCIL_ATTACHMENT,
@@ -1212,8 +1209,7 @@ void grend_create_vs(struct grend_context *ctx,
                      const struct pipe_shader_state *vs)
 {
    struct grend_shader_state *state = CALLOC_STRUCT(grend_shader_state);
-   GLchar *glsl_prog;
-   GLenum ret;
+
    state->id = glCreateShader(GL_VERTEX_SHADER);
    state->sinfo.so_info = vs->stream_output;
    state->glsl_prog = tgsi_convert(vs->tokens, 0, &state->sinfo);
@@ -1229,7 +1225,7 @@ void grend_create_fs(struct grend_context *ctx,
                      const struct pipe_shader_state *fs)
 {
    struct grend_shader_state *state = CALLOC_STRUCT(grend_shader_state);
-   GLchar *glsl_prog;
+   const GLchar *glsl_prog;
    GLenum ret;
    state->id = glCreateShader(GL_FRAGMENT_SHADER);
    state->glsl_prog = tgsi_convert(fs->tokens, 0, &state->sinfo);
@@ -1396,7 +1392,6 @@ void grend_draw_vbo(struct grend_context *ctx,
 
    for (shader_type = PIPE_SHADER_VERTEX; shader_type <= PIPE_SHADER_FRAGMENT; shader_type++) {
       if (ctx->prog->const_locs[shader_type] && (ctx->const_dirty[shader_type] || new_program)) {
-         int mval;
 	 int nc;
          if (shader_type == PIPE_SHADER_VERTEX) {
             if (ctx->consts[shader_type].num_consts / 4 > ctx->vs->sinfo.num_consts + 10) {
@@ -2195,11 +2190,6 @@ void grend_flush(struct grend_context *ctx)
 
 void grend_flush_frontbuffer(uint32_t res_handle)
 {
-   struct grend_resource *res;
-
-   if (!localrender)
-      return;
-
 }
 
 static GLenum tgsitargettogltarget(const enum pipe_texture_target target, int nr_samples)
@@ -2326,7 +2316,6 @@ bool grend_destroy_context(struct grend_context *ctx)
 struct grend_context *grend_create_context(int id, uint32_t nlen, const char *debug_name)
 {
    struct grend_context *grctx = CALLOC_STRUCT(grend_context);
-   int i;
 
    if (nlen) {
       strncpy(grctx->debug_name, debug_name, 64);
@@ -2391,10 +2380,7 @@ void graw_renderer_resource_create(struct graw_renderer_resource_create_args *ar
       gltype = tex_conv_table[args->format].gltype;
       if (internalformat == 0) {
          fprintf(stderr,"unknown format is %d\n", args->format);
-         return 0;
-         internalformat = GL_RGBA;
-         glformat = GL_RGBA;
-         gltype = GL_UNSIGNED_BYTE;
+         return;
       }
 
       if (args->nr_samples > 1) {
@@ -2486,16 +2472,15 @@ void graw_renderer_resource_unref(uint32_t res_handle)
 }
 
 static int use_sub_data = 0;
-static void iov_element_upload(void *cookie, uint32_t doff, void *src, int len)
-{
-   struct pipe_box *d_box = cookie;
-   glBufferSubData(GL_ELEMENT_ARRAY_BUFFER_ARB, d_box->x + doff, len, src);
-}
+struct virgl_sub_upload_data {
+   GLenum target;
+   struct pipe_box *box;
+};
 
-static void iov_vertex_upload(void *cookie, uint32_t doff, void *src, int len)
+static void iov_buffer_upload(void *cookie, uint32_t doff, void *src, int len)
 {
-   struct pipe_box *d_box = cookie;
-   glBufferSubData(GL_ARRAY_BUFFER_ARB, d_box->x + doff, len, src);
+   struct virgl_sub_upload_data *d = cookie;
+   glBufferSubData(d->target, d->box->x + doff, len, src);
 }
 
 static void copy_transfer_data(struct pipe_resource *res,
@@ -2514,7 +2499,7 @@ static void copy_transfer_data(struct pipe_resource *res,
    GLuint bh = util_format_get_nblocksy(res->format, box->height);
    int h;
    uint32_t myoffset = offset;
-   boolean compressed = util_format_is_compressed(res->format);
+
    if (send_size == size || bh == 1)
       graw_iov_to_buf(iov, num_iovs, offset, data, send_size);
    else {
@@ -2538,7 +2523,6 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
 {
    struct grend_resource *res;
    void *data;
-   int need_temp;
 
    res = vrend_resource_lookup(res_handle, ctx_id);
    if (res == NULL) {
@@ -2559,15 +2543,18 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
    if (res->target == GL_TRANSFORM_FEEDBACK_BUFFER ||
        res->target == GL_ELEMENT_ARRAY_BUFFER_ARB ||
        res->target == GL_ARRAY_BUFFER_ARB) {
-      glBindBufferARB(res->target, res->id);
+      struct virgl_sub_upload_data d;
+      d.box = box;
+      d.target = res->target;
 
+      glBindBufferARB(res->target, res->id);
       if (use_sub_data == 1) {
-         graw_iov_to_buf_cb(iov, num_iovs, offset, box->width, &iov_element_upload, (void *)box);
+         graw_iov_to_buf_cb(iov, num_iovs, offset, box->width, &iov_buffer_upload, &d);
       } else {
          data = glMapBufferRange(res->target, box->x, box->width, GL_MAP_INVALIDATE_RANGE_BIT | GL_MAP_UNSYNCHRONIZED_BIT | GL_MAP_WRITE_BIT);
          if (data == NULL) {
             fprintf(stderr,"map failed for element buffer\n");
-            graw_iov_to_buf_cb(iov, num_iovs, offset, box->width, &iov_element_upload, (void *)box);
+            graw_iov_to_buf_cb(iov, num_iovs, offset, box->width, &iov_buffer_upload, &d);
          } else {
             graw_iov_to_buf(iov, num_iovs, offset, data, box->width);
             glUnmapBuffer(res->target);
@@ -2579,7 +2566,6 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
       int need_temp = 0;
       int elsize = util_format_get_blocksize(res->base.format);
       int x = 0, y = 0;
-      uint32_t size;
       boolean compressed;
       grend_use_program(0);
 
@@ -2594,10 +2580,8 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
          data = malloc(send_size);
          copy_transfer_data(&res->base, iov, num_iovs, data, stride,
                             box, offset);
-         size = send_size;
       } else {
          data = iov[0].iov_base + offset;
-         size = graw_iov_size(iov, num_iovs);
       }
 
       if (stride && !need_temp) {
@@ -2676,7 +2660,7 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
          else
             y = box->y;
 
-         if (res->base.format == VIRGL_FORMAT_Z24X8_UNORM) {
+         if (res->base.format == (enum pipe_format)VIRGL_FORMAT_Z24X8_UNORM) {
             /* we get values from the guest as 24-bit scaled integers
                but we give them to the host GL and it interprets them
                as 32-bit scaled integers, so we need to scale them here */
@@ -2722,7 +2706,7 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
                                glformat, gltype, data);
             }
          }
-         if (res->base.format == VIRGL_FORMAT_Z24X8_UNORM) {
+         if (res->base.format == (enum pipe_format)VIRGL_FORMAT_Z24X8_UNORM) {
             glPixelTransferf(GL_DEPTH_SCALE, 1.0);
          }
       }
@@ -2741,7 +2725,6 @@ static void vrend_transfer_send_getteximage(struct grend_resource *res,
                                             struct pipe_box *box, uint64_t offset,
                                             struct graw_iovec *iov, int num_iovs)
 {
-   void *myptr = iov[0].iov_base + offset;
    GLenum format, type;
    uint32_t send_size, tex_size;
    void *data;
@@ -2875,7 +2858,7 @@ static void vrend_transfer_send_readpixels(struct grend_resource *res,
       break;
    }  
 
-   if (res->base.format == VIRGL_FORMAT_Z24X8_UNORM) {
+   if (res->base.format == (enum pipe_format)VIRGL_FORMAT_Z24X8_UNORM) {
       /* we get values from the guest as 24-bit scaled integers
          but we give them to the host GL and it interprets them
          as 32-bit scaled integers, so we need to scale them here */
@@ -2886,7 +2869,7 @@ static void vrend_transfer_send_readpixels(struct grend_resource *res,
    else
       glReadPixels(box->x, y1, box->width, box->height, format, type, data);
 
-   if (res->base.format == VIRGL_FORMAT_Z24X8_UNORM)
+   if (res->base.format == (enum pipe_format)VIRGL_FORMAT_Z24X8_UNORM)
       glPixelTransferf(GL_DEPTH_SCALE, 1.0);
    if (have_invert_mesa && actually_invert)
       glPixelStorei(GL_PACK_INVERT_MESA, 0);
@@ -2913,7 +2896,7 @@ void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t ctx_id,
       return;
    }
 
-   if (res->iov && !iov || num_iovs == 0) {
+   if (res->iov && (!iov || num_iovs == 0)) {
       iov = res->iov;
       num_iovs = res->num_iovs;
    }
@@ -3321,8 +3304,6 @@ int graw_renderer_set_scanout(uint32_t res_handle, uint32_t ctx_id,
 int graw_renderer_flush_buffer_res(struct grend_resource *res,
                                    struct pipe_box *box)
 {
-   GLuint fb_id;
-
    if (!res->is_front) {
       if (!front_fb_id)
          glGenFramebuffers(1, &front_fb_id);
@@ -3443,9 +3424,7 @@ static boolean graw_get_one_query_result(GLuint query_id, bool use_64, uint64_t 
 
 static boolean graw_check_query(struct grend_query *query)
 {
-   GLint ready;
    uint64_t result;
-   boolean use_64 = FALSE;
    struct virgl_host_query_state *state;
    struct grend_nontimer_hw_query *hwq, *stor;
    boolean ret;
@@ -3683,7 +3662,6 @@ static void grend_destroy_query_object(void *obj_ptr)
 void grend_begin_query(struct grend_context *ctx, uint32_t handle)
 {
    struct grend_query *q;
-   GLenum qtype;
    struct grend_nontimer_hw_query *hwq;
 
    q = vrend_object_lookup(ctx->object_hash, handle, VIRGL_OBJECT_QUERY);
@@ -3792,10 +3770,11 @@ void grend_create_so_target(struct grend_context *ctx,
 static void vrender_get_glsl_version(int *major, int *minor)
 {
    int major_local, minor_local;
-   const char *version_str;
+   const GLubyte *version_str;
    int c;
+
    version_str = glGetString(GL_SHADING_LANGUAGE_VERSION);
-   c = sscanf(version_str, "%i.%i",
+   c = sscanf((const char *)version_str, "%i.%i",
               &major_local, &minor_local);
    assert(c == 2);
 

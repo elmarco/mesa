@@ -2721,13 +2721,17 @@ static void vrend_transfer_send_getteximage(struct grend_resource *res,
    uint32_t send_size, tex_size;
    void *data;
    int elsize = util_format_get_blocksize(res->base.format);
+   int compressed = util_format_is_compressed(res->base.format);
 
    format = tex_conv_table[res->base.format].glformat;
    type = tex_conv_table[res->base.format].gltype; 
 
-   tex_size = u_minify(res->base.width0, level) * u_minify(res->base.height0, level) * util_format_get_blocksize(res->base.format);
+   if (compressed)
+      format = tex_conv_table[res->base.format].internalformat;
 
-   send_size = box->width * box->height * box->depth * util_format_get_blocksize(res->base.format);
+   tex_size = util_format_get_nblocks(res->base.format, u_minify(res->base.width0, level), u_minify(res->base.height0, level)) * util_format_get_blocksize(res->base.format);
+
+   send_size = util_format_get_nblocks(res->base.format, box->width, box->height) * util_format_get_blocksize(res->base.format);
 
    data = malloc(tex_size);
    if (!data)
@@ -2749,11 +2753,18 @@ static void vrend_transfer_send_getteximage(struct grend_resource *res,
       break;
    }
 
-   if (grend_state.have_robustness)
-      glGetnTexImageARB(res->target, level, format, type, tex_size, data);
-   else
-      glGetTexImage(res->target, level, format, type, data);
-
+   if (compressed) {
+      if (grend_state.have_robustness)
+         glGetnCompressedTexImageARB(res->target, level, tex_size, data);
+      else
+         glGetCompressedTexImage(res->target, level, data);
+   } else {
+      if (grend_state.have_robustness)
+         glGetnTexImageARB(res->target, level, format, type, tex_size, data);
+      else
+         glGetTexImage(res->target, level, format, type, data);
+   }
+      
    glPixelStorei(GL_PACK_ALIGNMENT, 4);
 
    graw_transfer_write_tex_return(&res->base, box, level, stride, offset, iov, num_iovs, data, send_size, FALSE);
@@ -2910,10 +2921,6 @@ void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t ctx_id,
       glUnmapBuffer(res->target);
    } else {
       boolean can_readpixels = TRUE;
-      if (util_format_is_compressed(res->base.format)) {
-         fprintf(stderr,"readback from compressed will fail\n");
-         return;
-      }
 
       can_readpixels = vrend_format_can_render(res->base.format) || vrend_format_is_ds(res->base.format);
 
@@ -3032,6 +3039,7 @@ static void vrend_resource_copy_fallback(struct grend_context *ctx,
    uint32_t transfer_size;
    GLenum glformat, gltype;
    int elsize = util_format_get_blocksize(dst_res->base.format);
+   int compressed = util_format_is_compressed(dst_res->base.format);
 
    if (src_res->base.format != dst_res->base.format) {
       fprintf(stderr, "copy fallback failed due to mismatched formats %d %d\n", src_res->base.format, dst_res->base.format);
@@ -3039,8 +3047,7 @@ static void vrend_resource_copy_fallback(struct grend_context *ctx,
    }
 
    /* this is ugly need to do a full GetTexImage */
-   transfer_size = u_minify(src_res->base.width0, src_level) *
-      u_minify(src_res->base.height0, src_level) *
+   transfer_size = util_format_get_nblocks(src_res->base.format, u_minify(src_res->base.width0, src_level), u_minify(src_res->base.height0, src_level)) *
       u_minify(src_res->base.depth0, src_level) * util_format_get_blocksize(src_res->base.format);
 
    tptr = malloc(transfer_size);
@@ -3050,6 +3057,9 @@ static void vrend_resource_copy_fallback(struct grend_context *ctx,
    glformat = tex_conv_table[src_res->base.format].glformat;
    gltype = tex_conv_table[src_res->base.format].gltype; 
 
+   if (compressed)
+      glformat = tex_conv_table[src_res->base.format].internalformat;
+      
    switch (elsize) {
    case 1:
       glPixelStorei(GL_PACK_ALIGNMENT, 1);
@@ -3066,10 +3076,17 @@ static void vrend_resource_copy_fallback(struct grend_context *ctx,
       break;
    }
    glBindTexture(src_res->target, src_res->id);
-   if (grend_state.have_robustness)
-      glGetnTexImageARB(src_res->target, src_level, glformat, gltype, transfer_size, tptr);
-   else
-      glGetTexImage(src_res->target, src_level, glformat, gltype, tptr);
+   if (compressed) {
+      if (grend_state.have_robustness)
+         glGetnCompressedTexImageARB(src_res->target, src_level, transfer_size, tptr);
+      else
+         glGetCompressedTexImage(src_res->target, src_level, tptr);
+   } else {
+      if (grend_state.have_robustness)
+         glGetnTexImageARB(src_res->target, src_level, glformat, gltype, transfer_size, tptr);
+      else
+         glGetTexImage(src_res->target, src_level, glformat, gltype, tptr);
+   }
 
    glPixelStorei(GL_PACK_ALIGNMENT, 4);
    switch (elsize) {
@@ -3089,7 +3106,13 @@ static void vrend_resource_copy_fallback(struct grend_context *ctx,
    }
 
    glBindTexture(dst_res->target, dst_res->id);
-   glTexSubImage2D(dst_res->target, dst_level, dstx, dsty, src_box->width, src_box->height, glformat, gltype, tptr);
+   if (compressed) {
+      glCompressedTexSubImage2D(dst_res->target, dst_level, dstx, dsty,
+                                src_box->width, src_box->height,
+                                glformat, transfer_size, tptr);
+   } else {
+      glTexSubImage2D(dst_res->target, dst_level, dstx, dsty, src_box->width, src_box->height, glformat, gltype, tptr);
+   }
 
    glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
    free(tptr);

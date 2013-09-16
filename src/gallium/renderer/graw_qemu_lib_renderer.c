@@ -200,9 +200,9 @@ void graw_transfer_write_tex_return(struct pipe_resource *res,
    int elsize = util_format_get_blocksize(res->format);
    int h;
    uint32_t myoffset = offset;
-   uint32_t stride = dst_stride ? dst_stride : box->width * elsize;
+   uint32_t stride = dst_stride ? dst_stride : util_format_get_nblocksx(res->format, box->width) * elsize;
 
-   if (!invert && (!dst_stride || dst_stride == box->width * elsize))
+   if (!invert && (!dst_stride || dst_stride == util_format_get_nblocksx(res->format, box->width) * elsize))
       graw_iov_from_buf(iov, num_iovs, offset, myptr, size);
    else if (invert) {
       for (h = box->height - 1; h >= 0; h--) {

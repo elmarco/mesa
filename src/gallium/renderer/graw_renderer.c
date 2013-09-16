@@ -120,7 +120,7 @@ struct grend_linked_shader_program {
 struct grend_shader_state {
    GLuint id;
    unsigned type;
-   boolean compiled;
+   GLuint compiled_fs_id;
    GLchar *glsl_prog;
    struct vrend_shader_info sinfo;
 };
@@ -456,13 +456,13 @@ static struct grend_linked_shader_program *add_shader_program(struct grend_conte
   int id;
 
   /* need to rewrite VS code to add interpolation params */
-  if (!vs->compiled) {
+  if (!vs->compiled_fs_id != fs->id) {
      vrend_patch_vertex_shader_interpolants(vs->glsl_prog,
                                             &vs->sinfo,
                                             &fs->sinfo);
      glShaderSource(vs->id, 1, (const char **)&vs->glsl_prog, NULL);
      glCompileShader(vs->id);
-     vs->compiled = TRUE;
+     vs->compiled_fs_id = fs->id;
   }
 
   prog_id = glCreateProgram();
@@ -1213,7 +1213,7 @@ void grend_create_vs(struct grend_context *ctx,
    state->id = glCreateShader(GL_VERTEX_SHADER);
    state->sinfo.so_info = vs->stream_output;
    state->glsl_prog = tgsi_convert(vs->tokens, 0, &state->sinfo);
-   state->compiled = FALSE;
+   state->compiled_fs_id = 0;
 
    vrend_object_insert(ctx->object_hash, state, sizeof(*state), handle, VIRGL_OBJECT_VS);
 

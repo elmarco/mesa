@@ -1394,16 +1394,8 @@ void grend_draw_vbo(struct grend_context *ctx,
       if (ctx->prog->const_locs[shader_type] && (ctx->const_dirty[shader_type] || new_program)) {
 	 int nc;
          if (shader_type == PIPE_SHADER_VERTEX) {
-            if (ctx->consts[shader_type].num_consts / 4 > ctx->vs->sinfo.num_consts + 10) {
-               fprintf(stderr,"possible memory corruption vs consts TODO %d %d\n", ctx->consts[0].num_consts, ctx->vs->sinfo.num_consts);
-               return;
-            }
 	    nc = ctx->vs->sinfo.num_consts;
          } else if (shader_type == PIPE_SHADER_FRAGMENT) {
-            if (ctx->consts[shader_type].num_consts / 4 > ctx->fs->sinfo.num_consts + 10) {
-               fprintf(stderr,"possible memory corruption fs consts TODO\n");
-               return;
-            }
 	    nc = ctx->fs->sinfo.num_consts;
          }
          for (i = 0; i < nc; i++) {

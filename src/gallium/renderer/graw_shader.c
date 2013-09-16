@@ -228,9 +228,10 @@ iter_declaration(struct tgsi_iterate_context *iter,
       }
       break;
    case TGSI_FILE_TEMPORARY:
-      if (decl->Range.Last)
-         ctx->num_temps+=decl->Range.Last + 1;
-      else
+      if (decl->Range.Last) {
+         if (decl->Range.Last + 1 > ctx->num_temps)
+            ctx->num_temps = decl->Range.Last + 1;
+      } else
          ctx->num_temps++;
 
       break;

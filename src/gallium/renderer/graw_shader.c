@@ -346,7 +346,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
    int sreg_index;
    char dstconv[6] = {0};
    char writemask[6] = {0};
-   char *twm;
+   char *twm, *gwm;
    char bias[64] = {0};
    char *tex_ext;
    boolean is_shad = FALSE;
@@ -694,6 +694,32 @@ iter_instruction(struct tgsi_iterate_context *iter,
          break;
       }
 
+      if (inst->Instruction.Opcode == TGSI_OPCODE_TXD) {
+         switch (inst->Texture.Texture) {
+         case TGSI_TEXTURE_1D:
+         case TGSI_TEXTURE_SHADOW1D:
+         case TGSI_TEXTURE_1D_ARRAY:
+         case TGSI_TEXTURE_SHADOW1D_ARRAY:
+            gwm = ".x";
+            break;
+         case TGSI_TEXTURE_2D:
+         case TGSI_TEXTURE_SHADOW2D:
+         case TGSI_TEXTURE_2D_ARRAY:
+         case TGSI_TEXTURE_SHADOW2D_ARRAY:
+            gwm = ".xy";
+            break;
+         case TGSI_TEXTURE_3D:
+         case TGSI_TEXTURE_CUBE:
+         case TGSI_TEXTURE_SHADOWCUBE:
+            gwm = ".xyz";
+            break;
+         default:
+            gwm = "";
+            break;
+         }
+      }
+
+
       sampler_index = 1;
 
       if (inst->Instruction.Opcode == TGSI_OPCODE_TXB2 || inst->Instruction.Opcode == TGSI_OPCODE_TXL2) {
@@ -701,8 +727,10 @@ iter_instruction(struct tgsi_iterate_context *iter,
          snprintf(bias, 64, ", %s.x", srcs[1]);
       } else if (inst->Instruction.Opcode == TGSI_OPCODE_TXB || inst->Instruction.Opcode == TGSI_OPCODE_TXL)
          snprintf(bias, 64, ", %s.w", srcs[0]);
-      else if (inst->Instruction.Opcode == TGSI_OPCODE_TXD)
-         snprintf(bias, 64, ", %s, %s", srcs[1], srcs[2]);
+      else if (inst->Instruction.Opcode == TGSI_OPCODE_TXD) {
+         snprintf(bias, 64, ", %s%s, %s%s", srcs[1], gwm, srcs[2], gwm);
+         sampler_index = 3;
+      }
       else
          bias[0] = 0;
 
@@ -737,7 +765,9 @@ iter_instruction(struct tgsi_iterate_context *iter,
          twm = ".xy";
          break;
       case TGSI_TEXTURE_RECT:
+      case TGSI_TEXTURE_CUBE:
       case TGSI_TEXTURE_2D:
+      case TGSI_TEXTURE_SHADOWRECT:
          twm = ".xyz";
          break;
       case TGSI_TEXTURE_SHADOW1D:
@@ -751,10 +781,9 @@ iter_instruction(struct tgsi_iterate_context *iter,
       case TGSI_TEXTURE_SHADOW1D_ARRAY:
       case TGSI_TEXTURE_SHADOWCUBE:
       case TGSI_TEXTURE_SHADOW2D_ARRAY:
-      case TGSI_TEXTURE_CUBE:
       case TGSI_TEXTURE_CUBE_ARRAY:
       case TGSI_TEXTURE_SHADOWCUBE_ARRAY:
-      case TGSI_TEXTURE_SHADOWRECT:
+
       default:
          fprintf(stderr,"failed to convert TXP opcode %d, invalid texture %d\n", inst->Instruction.Opcode, inst->Texture.Texture);
          return FALSE;

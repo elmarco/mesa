@@ -188,7 +188,7 @@ int graw_encode_shader_state(struct graw_context *ctx,
    int num_tokens = tgsi_num_tokens(shader->tokens);
 
    memset(str, 0, 65536);
-   tgsi_dump_str(shader->tokens, 0, str, sizeof(str));
+   tgsi_dump_str(shader->tokens, TGSI_DUMP_FLOAT_AS_HEX, str, sizeof(str));
 
    shader_len = strlen(str) + 1;
    len = ((shader_len + 3) / 4) + 3 + (shader->stream_output.num_outputs ? shader->stream_output.num_outputs + 4 : 0);

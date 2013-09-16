@@ -735,6 +735,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
       case TGSI_TEXTURE_1D:
          twm = ".xy";
          break;
+      case TGSI_TEXTURE_RECT:
       case TGSI_TEXTURE_2D:
          twm = ".xyz";
          break;
@@ -752,6 +753,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
       case TGSI_TEXTURE_CUBE:
       case TGSI_TEXTURE_CUBE_ARRAY:
       case TGSI_TEXTURE_SHADOWCUBE_ARRAY:
+      case TGSI_TEXTURE_SHADOWRECT:
       default:
          fprintf(stderr,"failed to convert TXP opcode %d, invalid texture %d\n", inst->Instruction.Opcode, inst->Texture.Texture);
          return FALSE;

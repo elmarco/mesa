@@ -721,7 +721,7 @@ static void grend_fb_bind_texture(struct grend_resource *res,
         break;
     case GL_TEXTURE_CUBE_MAP:
         glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, attachment,
-                                  GL_TEXTURE_CUBE_MAP_POSITIVE_X + layer, res->id, 0);
+                                  GL_TEXTURE_CUBE_MAP_POSITIVE_X + layer, res->id, level);
         break;
     case GL_TEXTURE_1D:
         glFramebufferTexture1DEXT(GL_FRAMEBUFFER_EXT, attachment,

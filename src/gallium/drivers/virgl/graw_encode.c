@@ -389,9 +389,10 @@ int graw_encoder_inline_write(struct graw_context *ctx,
                               unsigned layer_stride)
 {
    uint32_t size = (stride ? stride : box->width) * box->height;
-   uint32_t length, thispass, left;
+   uint32_t length, thispass, left_bytes;
    struct pipe_box mybox = *box;
-   length = 11 + size / 4;
+
+   length = 11 + (size + 3) / 4;
    
    if ((ctx->cbuf->cdw + length + 1) > VIRGL_MAX_CMDBUF_DWORDS) {
       if (box->height > 1 || box->depth > 1) {
@@ -400,19 +401,20 @@ int graw_encoder_inline_write(struct graw_context *ctx,
       }
    }
 
-   left = size / 4;
-   while (left) {
+   left_bytes = size;
+   while (left_bytes) {
       if (ctx->cbuf->cdw + 12 > VIRGL_MAX_CMDBUF_DWORDS)
          ctx->base.flush(&ctx->base, NULL, 0);
-      thispass = VIRGL_MAX_CMDBUF_DWORDS - ctx->cbuf->cdw - 12;
 
-      length = MIN2(thispass, left);
+      thispass = (VIRGL_MAX_CMDBUF_DWORDS - ctx->cbuf->cdw - 12) * 4;
 
-      mybox.width = length * 4;
-      graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_RESOURCE_INLINE_WRITE, 0, length + 11));
+      length = MIN2(thispass, left_bytes);
+
+      mybox.width = length;
+      graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_RESOURCE_INLINE_WRITE, 0, ((length + 3) / 4) + 11));
       graw_encoder_iw_emit_header_1d(ctx, res, level, usage, &mybox, stride, layer_stride);
-      graw_encoder_write_block(ctx->cbuf, data, length * 4);
-      left -= length;
+      graw_encoder_write_block(ctx->cbuf, data, length);
+      left_bytes -= length;
       mybox.x += length * 4;
    }
 

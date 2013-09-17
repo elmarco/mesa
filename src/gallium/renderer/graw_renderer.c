@@ -136,6 +136,7 @@ struct grend_texture {
    GLenum cur_swizzle_g;
    GLenum cur_swizzle_b;
    GLenum cur_swizzle_a;
+   GLuint srgb_decode;
 };
 
 struct grend_surface {
@@ -176,6 +177,7 @@ struct grend_sampler_view {
    GLuint cur_base, cur_max;
    struct grend_resource *texture;
    GLenum depth_texture_mode;
+   GLuint srgb_decode;
 };
 
 struct grend_vertex_element {
@@ -674,19 +676,20 @@ void grend_create_sampler_view(struct grend_context *ctx,
    if (view->swizzle_r != 0 && view->swizzle_g != 1 && view->swizzle_b != 2 && view->swizzle_a != 3)
       fprintf(stderr,"%d %d swizzles %d %d %d %d\n", view->format, view->texture->base.format, view->swizzle_r, view->swizzle_g, view->swizzle_b, view->swizzle_a);      
 
+   view->srgb_decode = GL_DECODE_EXT;
    if (view->format != view->texture->base.format) {
-      fprintf(stderr,"%d %d swizzles %d %d %d %d\n", view->format, view->texture->base.format, view->swizzle_r, view->swizzle_g, view->swizzle_b, view->swizzle_a);
-      /* hack to make tfp work for now */
-      view->gl_swizzle_a = GL_ONE;
-   } else {
-      if (util_format_has_alpha(format) || util_format_is_depth_or_stencil(format))
-         view->gl_swizzle_a = to_gl_swizzle(view->swizzle_a);
-      else
-         view->gl_swizzle_a = GL_ONE;
-      view->gl_swizzle_r = to_gl_swizzle(view->swizzle_r);
-      view->gl_swizzle_g = to_gl_swizzle(view->swizzle_g);
-      view->gl_swizzle_b = to_gl_swizzle(view->swizzle_b);
+      if (util_format_is_srgb(view->texture->base.format) &&
+          !util_format_is_srgb(view->format))
+         view->srgb_decode = GL_SKIP_DECODE_EXT;
    }
+   if (util_format_has_alpha(format) || util_format_is_depth_or_stencil(format))
+      view->gl_swizzle_a = to_gl_swizzle(view->swizzle_a);
+   else
+      view->gl_swizzle_a = GL_ONE;
+   view->gl_swizzle_r = to_gl_swizzle(view->swizzle_r);
+   view->gl_swizzle_g = to_gl_swizzle(view->swizzle_g);
+   view->gl_swizzle_b = to_gl_swizzle(view->swizzle_b);
+
    vrend_object_insert(ctx->object_hash, view, sizeof(*view), handle, VIRGL_OBJECT_SAMPLER_VIEW);
 }
 
@@ -1139,6 +1142,11 @@ void grend_set_single_sampler_view(struct grend_context *ctx,
          if (tex->cur_swizzle_a != view->gl_swizzle_a) {
             glTexParameteri(view->texture->target, GL_TEXTURE_SWIZZLE_A, view->gl_swizzle_a);
             tex->cur_swizzle_a = view->gl_swizzle_a;
+         }
+         if (tex->srgb_decode != view->srgb_decode && util_format_is_srgb(tex->base.base.format)) {
+            glTexParameteri(view->texture->target, GL_TEXTURE_SRGB_DECODE_EXT,
+                            view->srgb_decode);
+            tex->srgb_decode = view->srgb_decode;
          }
       }
    }

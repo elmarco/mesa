@@ -227,6 +227,10 @@ static void graw_decode_draw_vbo(struct grend_decode_ctx *ctx)
    info.mode = ctx->ds->buf[ctx->ds->buf_offset + 3];
    info.indexed = ctx->ds->buf[ctx->ds->buf_offset + 4];
    info.instance_count = ctx->ds->buf[ctx->ds->buf_offset + 5];
+   info.index_bias = ctx->ds->buf[ctx->ds->buf_offset + 6];
+   info.start_instance = ctx->ds->buf[ctx->ds->buf_offset + 7];
+   info.primitive_restart = ctx->ds->buf[ctx->ds->buf_offset + 8];
+   info.restart_index = ctx->ds->buf[ctx->ds->buf_offset + 9];
    grend_draw_vbo(ctx->grctx, &info);
 }
 

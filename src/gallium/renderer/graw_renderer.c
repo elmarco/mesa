@@ -1569,7 +1569,9 @@ void grend_draw_vbo(struct grend_context *ctx,
          break;
       }
 
-      if (info->instance_count <= 1)
+      if (info->index_bias)
+         glDrawElementsBaseVertex(mode, info->count, elsz, (void *)(unsigned long)ctx->ib.offset, info->index_bias);
+      else if (info->instance_count <= 1)
          glDrawElements(mode, info->count, elsz, (void *)(unsigned long)ctx->ib.offset);
       else
          glDrawElementsInstancedARB(mode, info->count, elsz, (void *)(unsigned long)ctx->ib.offset, info->instance_count);

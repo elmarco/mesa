@@ -314,12 +314,17 @@ int graw_encoder_set_index_buffer(struct graw_context *ctx,
 int graw_encoder_draw_vbo(struct graw_context *ctx,
 			  const struct pipe_draw_info *info)
 {
-   graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_DRAW_VBO, 0, 5));
+   graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_DRAW_VBO, 0, 9));
    graw_encoder_write_dword(ctx->cbuf, info->start);
    graw_encoder_write_dword(ctx->cbuf, info->count);
    graw_encoder_write_dword(ctx->cbuf, info->mode);
    graw_encoder_write_dword(ctx->cbuf, info->indexed);
    graw_encoder_write_dword(ctx->cbuf, info->instance_count);
+   graw_encoder_write_dword(ctx->cbuf, info->index_bias);
+   graw_encoder_write_dword(ctx->cbuf, info->start_instance);
+   graw_encoder_write_dword(ctx->cbuf, info->primitive_restart);
+   graw_encoder_write_dword(ctx->cbuf, info->restart_index);
+   
    return 0;
 }
 

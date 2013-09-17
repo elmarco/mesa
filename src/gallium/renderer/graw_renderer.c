@@ -1526,6 +1526,7 @@ void grend_draw_vbo(struct grend_context *ctx,
          i = u_bit_scan(&mask);
          glDisableVertexAttribArray(i);
       }
+      ctx->enabled_attribs_bitmask &= ~disable_bitmask;
 
       mask = ctx->enabled_attribs_bitmask ^ enable_bitmask;
       while (mask) {

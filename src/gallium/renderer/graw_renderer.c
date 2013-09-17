@@ -1569,12 +1569,17 @@ void grend_draw_vbo(struct grend_context *ctx,
          break;
       }
 
-      if (info->index_bias)
-         glDrawElementsBaseVertex(mode, info->count, elsz, (void *)(unsigned long)ctx->ib.offset, info->index_bias);
-      else if (info->instance_count <= 1)
-         glDrawElements(mode, info->count, elsz, (void *)(unsigned long)ctx->ib.offset);
-      else
+      if (info->index_bias) {
+         if (info->min_index != 0 || info->max_index != -1)
+            glDrawRangeElementsBaseVertex(mode, info->min_index, info->max_index, info->count, elsz, (void *)(unsigned long)ctx->ib.offset, info->index_bias);
+         else
+            glDrawElementsBaseVertex(mode, info->count, elsz, (void *)(unsigned long)ctx->ib.offset, info->index_bias);
+      } else if (info->min_index != 0 || info->max_index != -1)
+         glDrawRangeElements(mode, info->min_index, info->max_index, info->count, elsz, (void *)(unsigned long)ctx->ib.offset);                  
+      else if (info->instance_count > 1)
          glDrawElementsInstancedARB(mode, info->count, elsz, (void *)(unsigned long)ctx->ib.offset, info->instance_count);
+      else
+         glDrawElements(mode, info->count, elsz, (void *)(unsigned long)ctx->ib.offset);
    }
 
    if (ctx->num_so_targets)

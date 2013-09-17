@@ -231,6 +231,8 @@ static void graw_decode_draw_vbo(struct grend_decode_ctx *ctx)
    info.start_instance = ctx->ds->buf[ctx->ds->buf_offset + 7];
    info.primitive_restart = ctx->ds->buf[ctx->ds->buf_offset + 8];
    info.restart_index = ctx->ds->buf[ctx->ds->buf_offset + 9];
+   info.min_index = ctx->ds->buf[ctx->ds->buf_offset + 10];
+   info.max_index = ctx->ds->buf[ctx->ds->buf_offset + 11];
    grend_draw_vbo(ctx->grctx, &info);
 }
 

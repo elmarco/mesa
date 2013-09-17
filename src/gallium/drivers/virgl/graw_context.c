@@ -45,14 +45,15 @@ static void graw_buffer_flush(struct graw_context *grctx,
 
    buf->dirt_box.height = 1;
    buf->dirt_box.depth = 1;
-   buf->dirt_box.x = 0;
    buf->dirt_box.y = 0;
    buf->dirt_box.z = 0;
 
    grctx->num_transfers++;
    rs->vws->transfer_put(rs->vws, buf->base.hw_res,
-                         &buf->dirt_box, 0, 0, 0, 0);
+                         &buf->dirt_box, 0, 0, buf->dirt_box.x, 0);
 
+   buf->dirt_box.x = buf->base.base.width0+1;
+   buf->dirt_box.width = 0;
 }
 
 static struct pipe_surface *graw_create_surface(struct pipe_context *ctx,
@@ -896,7 +897,7 @@ struct pipe_resource *graw_resource_create(struct pipe_screen *pscreen,
       pipe_reference_init(&buf->base.base.reference, 1);
 
       vrend_resource_layout(pscreen, &buf->base, &size);
-
+      buf->dirt_box.x = template->width0 + 1;
       buf->base.hw_res = rs->vws->resource_create(rs->vws, template->target, template->format, template->bind, template->width0, 1, 1, 1, 0, 0, size);
 
       assert(buf->base.hw_res);

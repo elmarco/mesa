@@ -130,7 +130,7 @@ static void graw_transfer_flush_region(struct pipe_context *ctx,
 
    if (1 /*grres->backing_bo*/) {
       struct graw_buffer *buf = (struct graw_buffer *)grres;
-
+      uint32_t start, end, cstart, cend;
       if (!buf->on_list) {
          struct pipe_resource *res = NULL;
 
@@ -139,7 +139,20 @@ static void graw_transfer_flush_region(struct pipe_context *ctx,
          pipe_resource_reference(&res, &buf->base.base);
 
       }
-      buf->dirt_box.width += box->width;
+
+      start = transfer->box.x + box->x;
+      end = start + box->width;
+      cstart = buf->dirt_box.x;
+      cend = buf->dirt_box.x + buf->dirt_box.width;
+
+      if (start < cstart)
+         cstart = start;
+      if (end > cend || buf->dirt_box.width == 0)
+         cend = end;
+
+      buf->dirt_box.x = cstart;
+      buf->dirt_box.width = cend - cstart;
+
       grres->clean = FALSE;
       return;
    }

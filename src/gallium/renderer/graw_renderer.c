@@ -1506,7 +1506,7 @@ void grend_draw_vbo(struct grend_context *ctx,
       if (ctx->vbo[vbo_index].stride == 0) {
          void *data;
          /* for 0 stride we are kinda screwed */
-         data = glMapBufferRange(GL_ARRAY_BUFFER, 0, 4 * sizeof(GLfloat), GL_MAP_READ_BIT);
+         data = glMapBufferRange(GL_ARRAY_BUFFER, ctx->vbo[vbo_index].buffer_offset, 4 * sizeof(GLfloat), GL_MAP_READ_BIT);
          
          glVertexAttrib4fv(loc, data);
 

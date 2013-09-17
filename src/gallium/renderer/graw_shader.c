@@ -242,7 +242,11 @@ iter_declaration(struct tgsi_iterate_context *iter,
          ctx->num_samps++;
       break;
    case TGSI_FILE_CONSTANT:
-      ctx->num_consts+=decl->Range.Last + 1;
+      if (decl->Range.Last) {
+         if (decl->Range.Last + 1 > ctx->num_consts)
+            ctx->num_consts = decl->Range.Last + 1;
+      } else
+         ctx->num_consts++;
       break;
    case TGSI_FILE_ADDRESS:
       ctx->num_address = 1;

@@ -233,6 +233,36 @@ virgl_get_paramf(struct pipe_screen *screen, enum pipe_capf param)
    return 0.0;
 }
 
+static boolean
+virgl_is_vertex_format_supported(struct pipe_screen *screen,
+                                 enum pipe_format format)
+{
+   struct virgl_screen *vscreen = virgl_screen(screen);
+   const struct util_format_description *format_desc;
+   int i;
+
+   format_desc = util_format_description(format);
+   if (!format_desc)
+      return FALSE;
+
+   /* Find the first non-VOID channel. */
+   for (i = 0; i < 4; i++) {
+      if (format_desc->channel[i].type != UTIL_FORMAT_TYPE_VOID) {
+         break;
+      }
+   }
+
+   if (i == 4)
+      return FALSE;
+
+   if (format_desc->layout != UTIL_FORMAT_LAYOUT_PLAIN)
+      return FALSE;
+
+   if (format_desc->channel[i].type == UTIL_FORMAT_TYPE_FIXED)
+      return FALSE;
+   return TRUE;
+}
+
 /**
  * Query format support for creating a texture, drawing surface, etc.
  * \param format  the format to test
@@ -267,6 +297,10 @@ virgl_is_format_supported( struct pipe_screen *screen,
       return FALSE;
    if (sample_count > 1 && !vscreen->caps.caps.v1.bset.texture_multisample)
       return FALSE;
+
+   if (bind & PIPE_BIND_VERTEX_BUFFER) {
+      return virgl_is_vertex_format_supported(screen, format);
+   }
 
    if (bind & PIPE_BIND_RENDER_TARGET) {
       if (format_desc->colorspace == UTIL_FORMAT_COLORSPACE_ZS)

@@ -382,6 +382,12 @@ static void virgl_flush_frontbuffer(struct pipe_screen *screen,
    //grend_flush_frontbuffer(gres->res_handle);
 }
 
+static uint64_t
+virgl_get_timestamp(struct pipe_screen *_screen)
+{
+   return os_time_get_nano();
+}
+
 static void
 virgl_destroy_screen(struct pipe_screen *screen)
 {
@@ -416,7 +422,7 @@ virgl_create_screen(struct virgl_winsys *vws)
    screen->base.resource_create = graw_resource_create;
    screen->base.resource_destroy = graw_resource_destroy;
    screen->base.flush_frontbuffer = virgl_flush_frontbuffer;
-
+   screen->base.get_timestamp = virgl_get_timestamp;
    vws->get_caps(vws, &screen->caps);
 
    util_format_s3tc_init();

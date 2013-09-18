@@ -3925,3 +3925,10 @@ void graw_renderer_fill_caps(uint32_t set, uint32_t version,
  out:
    graw_iov_from_buf(iov, niovs, offset, &caps, sizeof(union virgl_caps));
 }
+
+GLint64 graw_renderer_get_timestamp(void)
+{
+   GLint64 v;
+   glGetInteger64v(GL_TIMESTAMP, &v);
+   return v;
+}

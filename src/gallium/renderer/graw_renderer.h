@@ -269,6 +269,7 @@ void graw_renderer_fill_caps(uint32_t set, uint32_t version,
                              uint32_t offset, struct graw_iovec *iov,
                              unsigned int niovs);
 
+GLint64 graw_renderer_get_timestamp(void);
 /* formats */
 void vrend_build_format_list(void);
 

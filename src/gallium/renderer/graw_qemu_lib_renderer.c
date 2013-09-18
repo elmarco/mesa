@@ -170,6 +170,11 @@ static void graw_process_cmd(struct virgl_command *cmd, struct graw_iovec *iov,
                               cmd->u.get_cap.cap_set_version,
                               cmd->u.get_cap.offset, iov, niovs);
       break;
+   case VIRGL_CMD_TIMESTAMP_GET: {
+      GLint64 ts;
+      ts = graw_renderer_get_timestamp();
+      break;
+   }
    case 0xdeadbeef:
       if (inited) {
          graw_renderer_fini();

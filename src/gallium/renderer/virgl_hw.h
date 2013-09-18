@@ -25,6 +25,7 @@ enum virgl_cmd_type {
         VIRGL_CMD_RESOURCE_ATTACH_SG_LIST,
         VIRGL_CMD_RESOURCE_INVALIDATE_SG_LIST,
         VIRGL_CMD_GET_3D_CAPABILITIES,
+        VIRGL_CMD_TIMESTAMP_GET,
 };
 
 /* put a box of data from a BO into a tex/buffer resource */
@@ -121,6 +122,10 @@ struct virgl_iov_entry {
 	uint32_t pad;
 };
 
+struct virgl_cmd_timestamp_get {
+        uint64_t timestamp;
+};
+
 #define VIRGL_COMMAND_EMIT_FENCE (1 << 0)
 
 struct virgl_command {
@@ -142,6 +147,7 @@ struct virgl_command {
                 struct virgl_cmd_resource_attach_sg attach_sg;
                 struct virgl_cmd_resource_invalidate_sg inval_sg;
                 struct virgl_cmd_get_cap get_cap;
+                struct virgl_cmd_timestamp_get get_timestamp;
 	} u;
 };
 

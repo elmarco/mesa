@@ -772,6 +772,8 @@ iter_instruction(struct tgsi_iterate_context *iter,
       case TGSI_TEXTURE_CUBE:
       case TGSI_TEXTURE_2D:
       case TGSI_TEXTURE_SHADOWRECT:
+      case TGSI_TEXTURE_1D_ARRAY:
+      case TGSI_TEXTURE_2D_ARRAY:
          twm = ".xyz";
          break;
       case TGSI_TEXTURE_SHADOW1D:
@@ -780,8 +782,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
       case TGSI_TEXTURE_3D:
          twm = "";
          break;
-      case TGSI_TEXTURE_1D_ARRAY:
-      case TGSI_TEXTURE_2D_ARRAY:
+
       case TGSI_TEXTURE_SHADOW1D_ARRAY:
       case TGSI_TEXTURE_SHADOWCUBE:
       case TGSI_TEXTURE_SHADOW2D_ARRAY:

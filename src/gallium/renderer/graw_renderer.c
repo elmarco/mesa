@@ -2740,16 +2740,27 @@ static void vrend_transfer_send_getteximage(struct grend_resource *res,
    void *data;
    int elsize = util_format_get_blocksize(res->base.format);
    int compressed = util_format_is_compressed(res->base.format);
-
+   GLenum target;
+   uint32_t depth = 1;
+   uint32_t send_offset = 0;
    format = tex_conv_table[res->base.format].glformat;
    type = tex_conv_table[res->base.format].gltype; 
 
    if (compressed)
       format = tex_conv_table[res->base.format].internalformat;
 
-   tex_size = util_format_get_nblocks(res->base.format, u_minify(res->base.width0, level), u_minify(res->base.height0, level)) * util_format_get_blocksize(res->base.format);
+   if (res->target == GL_TEXTURE_3D)
+      depth = u_minify(res->base.depth0, level);
+   else if (res->target == GL_TEXTURE_2D_ARRAY || res->target == GL_TEXTURE_1D_ARRAY || res->target == GL_TEXTURE_CUBE_MAP_ARRAY)
+      depth = res->base.array_size;
 
-   send_size = util_format_get_nblocks(res->base.format, box->width, box->height) * util_format_get_blocksize(res->base.format);
+   tex_size = util_format_get_nblocks(res->base.format, u_minify(res->base.width0, level), u_minify(res->base.height0, level)) * util_format_get_blocksize(res->base.format) * depth;
+   
+   send_size = util_format_get_nblocks(res->base.format, box->width, box->height) * util_format_get_blocksize(res->base.format) * box->depth;
+
+   if (box->z && res->target != GL_TEXTURE_CUBE_MAP) {
+      send_offset = util_format_get_nblocks(res->base.format, u_minify(res->base.width0, level), u_minify(res->base.height0, level)) * util_format_get_blocksize(res->base.format) * box->z;
+   }
 
    data = malloc(tex_size);
    if (!data)
@@ -2772,21 +2783,26 @@ static void vrend_transfer_send_getteximage(struct grend_resource *res,
    }
 
    glBindTexture(res->target, res->id);
+   if (res->target == GL_TEXTURE_CUBE_MAP) {
+      target = GL_TEXTURE_CUBE_MAP_POSITIVE_X + box->z;
+   } else
+      target = res->target;
+      
    if (compressed) {
       if (grend_state.have_robustness)
-         glGetnCompressedTexImageARB(res->target, level, tex_size, data);
+         glGetnCompressedTexImageARB(target, level, tex_size, data);
       else
-         glGetCompressedTexImage(res->target, level, data);
+         glGetCompressedTexImage(target, level, data);
    } else {
       if (grend_state.have_robustness)
-         glGetnTexImageARB(res->target, level, format, type, tex_size, data);
+         glGetnTexImageARB(target, level, format, type, tex_size, data);
       else
-         glGetTexImage(res->target, level, format, type, data);
+         glGetTexImage(target, level, format, type, data);
    }
       
    glPixelStorei(GL_PACK_ALIGNMENT, 4);
 
-   graw_transfer_write_tex_return(&res->base, box, level, stride, offset, iov, num_iovs, data, send_size, FALSE);
+   graw_transfer_write_tex_return(&res->base, box, level, stride, offset, iov, num_iovs, data + send_offset, send_size, FALSE);
    free(data);
 }
 

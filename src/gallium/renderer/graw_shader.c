@@ -73,6 +73,7 @@ struct dump_ctx {
    boolean uses_cube_array;
 
    uint32_t shadow_samp_mask;
+   boolean write_all_cbufs;
 };
 
 static boolean
@@ -262,6 +263,12 @@ static boolean
 iter_property(struct tgsi_iterate_context *iter,
               struct tgsi_full_property *prop)
 {
+   struct dump_ctx *ctx = (struct dump_ctx *) iter;
+   if (prop->Property.PropertyName != TGSI_PROPERTY_FS_COLOR0_WRITES_ALL_CBUFS)
+      return TRUE;
+   
+   if (prop->u[0].Data == 1)
+      ctx->write_all_cbufs = TRUE;
    return TRUE;
 }
 
@@ -296,6 +303,17 @@ static char get_swiz_char(int swiz)
    case TGSI_SWIZZLE_W: return 'w';
    }
    return 0;
+}
+
+static void emit_cbuf_writes(struct dump_ctx *ctx)
+{
+   char buf[255];
+   int i;
+
+   for (i = 1; i < 8; i++) {
+      snprintf(buf, 255, "out_c%d = out_c0;\n", i);
+      strcat(ctx->glsl_main, buf);
+   }
 }
 
 static void emit_prescale(struct dump_ctx *ctx)
@@ -871,7 +889,8 @@ iter_instruction(struct tgsi_iterate_context *iter,
          emit_prescale(ctx);
          if (ctx->so)
             emit_so_movs(ctx);
-      }
+      } else if (ctx->write_all_cbufs)
+         emit_cbuf_writes(ctx);
       strcat(ctx->glsl_main, "}\n");
       break;
    case TGSI_OPCODE_RET:
@@ -987,16 +1006,23 @@ static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
          strcat(glsl_final, buf);
       }
    }
-   for (i = 0; i < ctx->num_outputs; i++) {
-      if (!ctx->outputs[i].glsl_predefined_no_emit) {
-         if (ctx->prog_type == TGSI_PROCESSOR_VERTEX && (ctx->outputs[i].name == TGSI_SEMANTIC_GENERIC || ctx->outputs[i].name == TGSI_SEMANTIC_COLOR || ctx->outputs[i].name == TGSI_SEMANTIC_BCOLOR)) {
-            ctx->num_interps++;
-            prefix = INTERP_PREFIX;
-         } else
-            prefix = "";
-         /* ugly leave spaces to patch interp in later */
-         snprintf(buf, 255, "%sout vec4 %s;\n", prefix, ctx->outputs[i].glsl_name);
+   if (ctx->write_all_cbufs) {
+      for (i = 0; i < 8; i++) {
+         snprintf(buf, 255, "out vec4 out_c%d;\n", i);
          strcat(glsl_final, buf);
+      }
+   } else {
+      for (i = 0; i < ctx->num_outputs; i++) {
+         if (!ctx->outputs[i].glsl_predefined_no_emit) {
+            if (ctx->prog_type == TGSI_PROCESSOR_VERTEX && (ctx->outputs[i].name == TGSI_SEMANTIC_GENERIC || ctx->outputs[i].name == TGSI_SEMANTIC_COLOR || ctx->outputs[i].name == TGSI_SEMANTIC_BCOLOR)) {
+               ctx->num_interps++;
+               prefix = INTERP_PREFIX;
+            } else
+               prefix = "";
+            /* ugly leave spaces to patch interp in later */
+            snprintf(buf, 255, "%sout vec4 %s;\n", prefix, ctx->outputs[i].glsl_name);
+            strcat(glsl_final, buf);
+         }
       }
    }
 

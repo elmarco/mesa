@@ -1814,7 +1814,9 @@ static void grend_hw_emit_blend(struct grend_context *ctx)
          grend_blend_enable(GL_FALSE);
 
       if (state->rt[0].colormask != grend_state.hw_blend_state.rt[0].colormask) {
-         grend_state.hw_blend_state.rt[0].colormask = state->rt[0].colormask;
+         int i;
+         for (i = 0; i < PIPE_MAX_COLOR_BUFS; i++)
+            grend_state.hw_blend_state.rt[i].colormask = state->rt[i].colormask;
          glColorMask(state->rt[0].colormask & PIPE_MASK_R ? GL_TRUE : GL_FALSE,
                      state->rt[0].colormask & PIPE_MASK_G ? GL_TRUE : GL_FALSE,
                      state->rt[0].colormask & PIPE_MASK_B ? GL_TRUE : GL_FALSE,
@@ -2769,6 +2771,7 @@ static void vrend_transfer_send_getteximage(struct grend_resource *res,
       break;
    }
 
+   glBindTexture(res->target, res->id);
    if (compressed) {
       if (grend_state.have_robustness)
          glGetnCompressedTexImageARB(res->target, level, tex_size, data);

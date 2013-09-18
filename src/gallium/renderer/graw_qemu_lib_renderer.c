@@ -93,7 +93,7 @@ static void graw_process_cmd(struct virgl_command *cmd, struct graw_iovec *iov,
                              unsigned int niovs)
 {
    static int inited;
-
+   int fence_ctx_id = 0;
    switch (cmd->type) {
    case VIRGL_CMD_CREATE_CONTEXT:
       graw_renderer_context_create(cmd->u.ctx.handle, cmd->u.ctx_create.nlen,
@@ -110,6 +110,7 @@ static void graw_process_cmd(struct virgl_command *cmd, struct graw_iovec *iov,
       
    {
       graw_decode_block_iov(iov, niovs, cmd->u.cmd_submit.ctx_id, cmd->u.cmd_submit.phy_addr, cmd->u.cmd_submit.size / 4);
+      fence_ctx_id = cmd->u.cmd_submit.ctx_id;
    }
    
    break;
@@ -124,6 +125,7 @@ static void graw_process_cmd(struct virgl_command *cmd, struct graw_iovec *iov,
                                       (struct pipe_box *)&cmd->u.transfer_get.box,
                                       cmd->u.transfer_get.data, iov,
                                       niovs);
+      fence_ctx_id = cmd->u.transfer_get.ctx_id;
       break;
    case VIRGL_CMD_TRANSFER_PUT:
       grend_stop_current_queries();
@@ -135,6 +137,7 @@ static void graw_process_cmd(struct virgl_command *cmd, struct graw_iovec *iov,
                                    (struct pipe_box *)&cmd->u.transfer_put.box,
                                    cmd->u.transfer_put.data, iov,
                                    niovs);
+      fence_ctx_id = cmd->u.transfer_put.ctx_id;
       break;
       
    case VIRGL_CMD_SET_SCANOUT:
@@ -178,7 +181,7 @@ static void graw_process_cmd(struct virgl_command *cmd, struct graw_iovec *iov,
    }
    
    if (cmd->flags & VIRGL_COMMAND_EMIT_FENCE)
-      graw_renderer_create_fence(cmd->fence_id);
+      graw_renderer_create_fence(cmd->fence_id, fence_ctx_id);
 
 }
 

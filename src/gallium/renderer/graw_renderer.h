@@ -233,7 +233,7 @@ void graw_reset_decode(void);
 void graw_decode_block_iov(struct graw_iovec *iov, uint32_t niovs, uint32_t ctx_id, uint64_t offset, int ndw);
 struct grend_context *vrend_lookup_renderer_ctx(uint32_t ctx_id);
 
-int graw_renderer_create_fence(int client_fence_id);
+int graw_renderer_create_fence(int client_fence_id, uint32_t ctx_id);
 
 void graw_write_fence(unsigned fence_id);
 void graw_renderer_check_fences(void);

@@ -44,6 +44,7 @@ int vrend_dump_shaders;
 
 struct grend_fence {
    uint32_t fence_id;
+   uint32_t ctx_id;
    GLsync syncobj;
    struct list_head fences;
 };
@@ -3415,7 +3416,7 @@ int graw_renderer_flush_buffer(uint32_t res_handle,
    return graw_renderer_flush_buffer_res(res, box);
 }
 
-int graw_renderer_create_fence(int client_fence_id)
+int graw_renderer_create_fence(int client_fence_id, uint32_t ctx_id)
 {
    struct grend_fence *fence;
 
@@ -3423,6 +3424,7 @@ int graw_renderer_create_fence(int client_fence_id)
    if (!fence)
       return -1;
 
+   fence->ctx_id = ctx_id;
    fence->fence_id = client_fence_id;
    fence->syncobj = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
    list_addtail(&fence->fences, &grend_state.fence_list);

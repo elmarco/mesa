@@ -298,6 +298,14 @@ static char get_swiz_char(int swiz)
    return 0;
 }
 
+static void emit_prescale(struct dump_ctx *ctx)
+{
+   char buf[255];
+
+   snprintf(buf, 255, "gl_Position.z = gl_Position.z * 2.0 - gl_Position.w;\n");
+   strcat(ctx->glsl_main, buf);
+}
+
 static void emit_so_movs(struct dump_ctx *ctx)
 {
    char buf[255];
@@ -859,8 +867,11 @@ iter_instruction(struct tgsi_iterate_context *iter,
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_END:
-      if (ctx->so)
-         emit_so_movs(ctx);
+      if (iter->processor.Processor == TGSI_PROCESSOR_VERTEX) {
+         emit_prescale(ctx);
+         if (ctx->so)
+            emit_so_movs(ctx);
+      }
       strcat(ctx->glsl_main, "}\n");
       break;
    case TGSI_OPCODE_RET:

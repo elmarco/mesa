@@ -873,7 +873,7 @@ void grend_set_framebuffer_state(struct grend_context *ctx,
    if (ctx->nr_cbufs > 0 || ctx->zsurf) {
       status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
       if (status != GL_FRAMEBUFFER_COMPLETE)
-         fprintf(stderr,"failed to complete framebuffer 0x%x\n", status);
+         fprintf(stderr,"failed to complete framebuffer 0x%x %s\n", status, ctx->debug_name);
    }
 }
 

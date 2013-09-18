@@ -60,7 +60,7 @@ struct dump_ctx {
 
    int num_temps;
    struct graw_shader_sampler samplers[32];
-   int num_samps;
+   uint32_t samplers_used;
    int num_consts;
 
    int num_imm;
@@ -236,10 +236,7 @@ iter_declaration(struct tgsi_iterate_context *iter,
 
       break;
    case TGSI_FILE_SAMPLER:
-      if (decl->Range.Last)
-         ctx->num_samps = decl->Range.Last + 1;
-      else
-         ctx->num_samps++;
+      ctx->samplers_used |= (1 << decl->Range.Last);
       break;
    case TGSI_FILE_CONSTANT:
       if (decl->Range.Last) {
@@ -1019,9 +1016,14 @@ static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
          snprintf(buf, 255, "uniform vec4 fsconst[%d];\n", ctx->num_consts);
       strcat(glsl_final, buf);
    }
-   for (i = 0; i < ctx->num_samps; i++) {
+   for (i = 0; i < 32; i++) {
       int is_shad = 0;
-      const char *stc = samplertypeconv(ctx->samplers[i].tgsi_sampler_type, &is_shad);
+      const char *stc;
+
+      if ((ctx->samplers_used & (1 << i)) == 0)
+         continue;
+
+      stc = samplertypeconv(ctx->samplers[i].tgsi_sampler_type, &is_shad);
 
       if (stc) {
          char *sname = "fs";
@@ -1127,7 +1129,7 @@ char *tgsi_convert(const struct tgsi_token *tokens,
    if (vrend_dump_shaders)
       fprintf(stderr,"GLSL: %s\n", glsl_final);
    free(ctx.glsl_main);
-   sinfo->num_samplers = ctx.num_samps;
+   sinfo->samplers_used_mask = ctx.samplers_used;
    sinfo->num_consts = ctx.num_consts;
    sinfo->num_inputs = ctx.num_inputs;
    sinfo->num_interps = ctx.num_interps;

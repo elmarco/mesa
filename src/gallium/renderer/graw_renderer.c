@@ -105,7 +105,7 @@ struct grend_linked_shader_program {
 
   struct grend_shader_state *ss[PIPE_SHADER_TYPES];
 
-  GLuint num_samplers[PIPE_SHADER_TYPES];
+  uint32_t samplers_used_mask[PIPE_SHADER_TYPES];
   GLuint *samp_locs[PIPE_SHADER_TYPES];
 
   GLuint *shadow_samp_mask_locs[PIPE_SHADER_TYPES];
@@ -487,27 +487,32 @@ static struct grend_linked_shader_program *add_shader_program(struct grend_conte
   list_add(&sprog->head, &ctx->programs);
 
   for (id = PIPE_SHADER_VERTEX; id <= PIPE_SHADER_FRAGMENT; id++) {
-    if (sprog->ss[id]->sinfo.num_samplers) {
-      sprog->samp_locs[id] = calloc(sprog->ss[id]->sinfo.num_samplers, sizeof(uint32_t));
+    if (sprog->ss[id]->sinfo.samplers_used_mask) {
+       uint32_t mask = sprog->ss[id]->sinfo.samplers_used_mask;
+       int nsamp = util_bitcount(sprog->ss[id]->sinfo.samplers_used_mask);
+       int index;
       sprog->shadow_samp_mask[id] = sprog->ss[id]->sinfo.shadow_samp_mask;
       if (sprog->ss[id]->sinfo.shadow_samp_mask) {
-        sprog->shadow_samp_mask_locs[id] = calloc(sprog->ss[id]->sinfo.num_samplers, sizeof(uint32_t));
-        sprog->shadow_samp_add_locs[id] = calloc(sprog->ss[id]->sinfo.num_samplers, sizeof(uint32_t));
+        sprog->shadow_samp_mask_locs[id] = calloc(nsamp, sizeof(uint32_t));
+        sprog->shadow_samp_add_locs[id] = calloc(nsamp, sizeof(uint32_t));
       } else {
         sprog->shadow_samp_mask_locs[id] = sprog->shadow_samp_add_locs[id] = NULL;
       }
+      sprog->samp_locs[id] = calloc(nsamp, sizeof(uint32_t));
       if (sprog->samp_locs[id]) {
-        for (i = 0; i < sprog->ss[id]->sinfo.num_samplers; i++) {
-          const char *prefix = (id == PIPE_SHADER_VERTEX) ? "vs" : "fs";
-          snprintf(name, 10, "%ssamp%d", prefix, i);
-          sprog->samp_locs[id][i] = glGetUniformLocation(prog_id, name);
-          if (sprog->ss[id]->sinfo.shadow_samp_mask & (1 << i)) {
-            snprintf(name, 14, "%sshadmask%d", prefix, i);
-            sprog->shadow_samp_mask_locs[id][i] = glGetUniformLocation(prog_id, name);
-            snprintf(name, 14, "%sshadadd%d", prefix, i);
-            sprog->shadow_samp_add_locs[id][i] = glGetUniformLocation(prog_id, name);
-          }
-        }
+         const char *prefix = (id == PIPE_SHADER_VERTEX) ? "vs" : "fs";
+         index = 0;
+         while(mask) {
+            i = u_bit_scan(&mask);
+            snprintf(name, 10, "%ssamp%d", prefix, i);
+            sprog->samp_locs[id][index] = glGetUniformLocation(prog_id, name);
+            if (sprog->ss[id]->sinfo.shadow_samp_mask & (1 << i)) {
+               snprintf(name, 14, "%sshadmask%d", prefix, i);
+               sprog->shadow_samp_mask_locs[id][index] = glGetUniformLocation(prog_id, name);
+               snprintf(name, 14, "%sshadadd%d", prefix, i);
+               sprog->shadow_samp_add_locs[id][index] = glGetUniformLocation(prog_id, name);
+            }
+         }
       }
     } else {
       sprog->samp_locs[id] = NULL;
@@ -515,7 +520,7 @@ static struct grend_linked_shader_program *add_shader_program(struct grend_conte
       sprog->shadow_samp_add_locs[id] = NULL;
       sprog->shadow_samp_mask[id] = 0;
     }
-    sprog->num_samplers[id] = sprog->ss[id]->sinfo.num_samplers;
+    sprog->samplers_used_mask[id] = sprog->ss[id]->sinfo.samplers_used_mask;
   }
 
   for (id = PIPE_SHADER_VERTEX; id <= PIPE_SHADER_FRAGMENT; id++) {
@@ -1422,8 +1427,9 @@ void grend_draw_vbo(struct grend_context *ctx,
          if (ctx->views[shader_type].views[i]) {
             texture = ctx->views[shader_type].views[i]->texture;
          }
-         if (i >= ctx->prog->num_samplers[shader_type])
-             break;
+         if (!(ctx->prog->samplers_used_mask[shader_type] & (1 << i)))
+             continue;
+
          if (ctx->prog->samp_locs[shader_type])
             glUniform1i(ctx->prog->samp_locs[shader_type][i], sampler_id);
          if (ctx->prog->shadow_samp_mask[shader_type] & (1 << i)) {
@@ -1444,7 +1450,7 @@ void grend_draw_vbo(struct grend_context *ctx,
          if (texture) {
             glBindTexture(texture->target, texture->id);
             if (ctx->views[shader_type].old_ids[i] != texture->id || ctx->sampler_state_dirty) {
-               grend_apply_sampler_state(ctx, texture, shader_type, sampler_id);
+               grend_apply_sampler_state(ctx, texture, shader_type, i);
                ctx->views[shader_type].old_ids[i] = texture->id;
             }
             if (ctx->rs_state.point_quad_rasterization) {
@@ -2172,7 +2178,7 @@ static void grend_apply_sampler_state(struct grend_context *ctx,
    if (tex->state.min_img_filter != state->min_img_filter ||
        tex->state.min_mip_filter != state->min_mip_filter || set_all)
       glTexParameterf(target, GL_TEXTURE_MIN_FILTER, convert_min_filter(state->min_img_filter, state->min_mip_filter));
-   if (tex->state.min_img_filter != state->mag_img_filter || set_all)
+   if (tex->state.mag_img_filter != state->mag_img_filter || set_all)
       glTexParameterf(target, GL_TEXTURE_MAG_FILTER, convert_mag_filter(state->mag_img_filter));
    if (res->target != GL_TEXTURE_RECTANGLE) {
       if (tex->state.min_lod != state->min_lod || set_all)

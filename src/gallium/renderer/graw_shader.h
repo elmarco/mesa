@@ -11,7 +11,7 @@ struct vrend_interp_info {
 };
 
 struct vrend_shader_info {
-   int num_samplers;
+   uint32_t samplers_used_mask;
    int num_consts;
    int num_inputs;
    int num_interps;

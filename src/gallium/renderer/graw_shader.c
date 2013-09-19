@@ -320,7 +320,7 @@ static void emit_prescale(struct dump_ctx *ctx)
 {
    char buf[255];
 
-   snprintf(buf, 255, "gl_Position.z = gl_Position.z * 2.0 - gl_Position.w;\n");
+   snprintf(buf, 255, "gl_Position.z = dot(gl_Position, vec4(0.0, 0.0, winsys_adjust.zw));\n");
    strcat(ctx->glsl_main, buf);
 }
 
@@ -1026,6 +1026,11 @@ static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
       }
    }
 
+   if (ctx->prog_type == TGSI_PROCESSOR_VERTEX) {
+      snprintf(buf, 255, "uniform vec4 winsys_adjust;\n");
+      strcat(glsl_final, buf);
+   }
+   
    if (ctx->so) {
       char outtype[6] = {0};
       for (i = 0; i < ctx->so->num_outputs; i++) {

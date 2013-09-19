@@ -116,6 +116,8 @@ struct grend_linked_shader_program {
 
   GLuint *attrib_locs;
    uint32_t shadow_samp_mask[PIPE_SHADER_TYPES];
+
+   GLuint vs_ws_adjust_loc;
 };
 
 struct grend_shader_state {
@@ -246,6 +248,7 @@ struct grend_context {
    GLsizei view_width, view_height;
    GLclampd view_near_val, view_far_val;
    GLboolean view_flipped;
+   float depth_transform, depth_scale;
 
    boolean scissor_state_dirty;
    boolean viewport_state_dirty;
@@ -487,6 +490,7 @@ static struct grend_linked_shader_program *add_shader_program(struct grend_conte
   sprog->id = prog_id;
   list_add(&sprog->head, &ctx->programs);
 
+  sprog->vs_ws_adjust_loc = glGetUniformLocation(prog_id, "winsys_adjust");
   for (id = PIPE_SHADER_VERTEX; id <= PIPE_SHADER_FRAGMENT; id++) {
     if (sprog->ss[id]->sinfo.samplers_used_mask) {
        uint32_t mask = sprog->ss[id]->sinfo.samplers_used_mask;
@@ -913,6 +917,9 @@ void grend_set_viewport_state(struct grend_context *ctx,
       ctx->view_height = height;
       ctx->view_flipped = view_flipped;
    }
+
+   ctx->depth_scale = fabsf(far_val - near_val);
+   ctx->depth_transform = near_val;
 
    if (ctx->view_near_val != near_val ||
        ctx->view_far_val != far_val) {
@@ -1475,6 +1482,7 @@ void grend_draw_vbo(struct grend_context *ctx,
       fprintf(stderr,"illegal VE setup - skipping renderering\n");
       return;
    }
+   glUniform4f(ctx->prog->vs_ws_adjust_loc, 0.0, 0.0, ctx->depth_scale, ctx->depth_transform);
 
    num_enable = ctx->ve->count;
    enable_bitmask = 0;

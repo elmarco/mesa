@@ -3888,6 +3888,13 @@ void graw_renderer_fill_caps(uint32_t set, uint32_t version,
          caps.v1.bset.instanceid = 1;
    }
 
+   if (glewIsSupported("GL_VERSION_3_2")) {
+      caps.v1.bset.fragment_coord_conventions = 1;
+   } else {
+      if (glewIsSupported("GL_ARB_fragment_coord_conventions"))
+         caps.v1.bset.fragment_coord_conventions = 1;
+   }
+
    if (glewIsSupported("GL_ARB_texture_multisample"))
        /* disable multisample until developed */
       caps.v1.bset.texture_multisample = 0;

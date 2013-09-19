@@ -336,6 +336,7 @@ struct virgl_caps_bool_set1 {
         unsigned streamout_pause_resume:1;
         unsigned texture_buffer_object:1;
         unsigned texture_multisample:1;
+        unsigned fragment_coord_conventions:1;
 };
 
 /* endless expansion capabilites - current gallium has 252 formats */

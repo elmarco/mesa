@@ -78,7 +78,7 @@ virgl_get_param(struct pipe_screen *screen, enum pipe_cap param)
    case PIPE_CAP_TGSI_FS_COORD_ORIGIN_LOWER_LEFT:
    case PIPE_CAP_TGSI_FS_COORD_PIXEL_CENTER_HALF_INTEGER:
    case PIPE_CAP_TGSI_FS_COORD_PIXEL_CENTER_INTEGER:
-      return 1;
+      return vscreen->caps.caps.v1.bset.fragment_coord_conventions;
    case PIPE_CAP_DEPTH_CLIP_DISABLE:
       return 0;
    case PIPE_CAP_MAX_STREAM_OUTPUT_BUFFERS:

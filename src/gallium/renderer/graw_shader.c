@@ -74,6 +74,7 @@ struct dump_ctx {
 
    uint32_t shadow_samp_mask;
    boolean write_all_cbufs;
+   int fs_coord_origin, fs_pixel_center;
 };
 
 static boolean
@@ -264,11 +265,20 @@ iter_property(struct tgsi_iterate_context *iter,
               struct tgsi_full_property *prop)
 {
    struct dump_ctx *ctx = (struct dump_ctx *) iter;
-   if (prop->Property.PropertyName != TGSI_PROPERTY_FS_COLOR0_WRITES_ALL_CBUFS)
-      return TRUE;
-   
-   if (prop->u[0].Data == 1)
-      ctx->write_all_cbufs = TRUE;
+
+   if (prop->Property.PropertyName == TGSI_PROPERTY_FS_COLOR0_WRITES_ALL_CBUFS) {
+      if (prop->u[0].Data == 1)
+         ctx->write_all_cbufs = TRUE;
+   }
+
+   if (prop->Property.PropertyName == TGSI_PROPERTY_FS_COORD_ORIGIN) {
+      ctx->fs_coord_origin = prop->u[0].Data;
+   }
+
+   if (prop->Property.PropertyName == TGSI_PROPERTY_FS_COORD_PIXEL_CENTER) {
+      ctx->fs_pixel_center = prop->u[0].Data;
+   }
+
    return TRUE;
 }
 
@@ -940,6 +950,8 @@ static void emit_header(struct dump_ctx *ctx, char *glsl_final)
    strcat(glsl_final, "#version 130\n");
    if (ctx->prog_type == TGSI_PROCESSOR_VERTEX && graw_shader_use_explicit)
       strcat(glsl_final, "#extension GL_ARB_explicit_attrib_location : enable\n");
+   if (ctx->prog_type == TGSI_PROCESSOR_FRAGMENT && (!ctx->fs_coord_origin || ctx->fs_pixel_center))
+      strcat(glsl_final, "#extension GL_ARB_fragment_coord_conventions : enable\n");
    strcat(glsl_final, "#extension GL_ARB_texture_rectangle : require\n");
    if (ctx->uses_cube_array)
       strcat(glsl_final, "#extension GL_ARB_texture_cube_map_array : require\n");
@@ -986,6 +998,18 @@ static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
    const char *prefix = "";
 
    ctx->num_interps = 0;
+
+   if (ctx->prog_type == TGSI_PROCESSOR_FRAGMENT) {
+      if (!ctx->fs_coord_origin || ctx->fs_pixel_center) {
+         char comma = (!ctx->fs_coord_origin && ctx->fs_pixel_center) ? ',' : ' ';
+
+         snprintf(buf, 255, "layout(%s%c%s) varying vec4 gl_FragCoord;\n",
+                  ctx->fs_coord_origin ? "" : "origin_upper_left",
+                  comma,
+                  ctx->fs_pixel_center ? "pixel_center_integer" : "");
+         strcat(glsl_final, buf);
+      }
+   }
    for (i = 0; i < ctx->num_inputs; i++) {
       if (!ctx->inputs[i].glsl_predefined_no_emit) { 
          if (ctx->prog_type == TGSI_PROCESSOR_VERTEX && graw_shader_use_explicit) {

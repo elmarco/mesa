@@ -513,6 +513,7 @@ static struct grend_linked_shader_program *add_shader_program(struct grend_conte
                snprintf(name, 14, "%sshadadd%d", prefix, i);
                sprog->shadow_samp_add_locs[id][index] = glGetUniformLocation(prog_id, name);
             }
+            index++;
          }
       }
     } else {
@@ -1422,25 +1423,28 @@ void grend_draw_vbo(struct grend_context *ctx,
 
    sampler_id = 0;
    for (shader_type = PIPE_SHADER_VERTEX; shader_type <= PIPE_SHADER_FRAGMENT; shader_type++) {
+      int index = 0;
       for (i = 0; i < ctx->views[shader_type].num_views; i++) {
          struct grend_resource *texture = NULL;
 
          if (ctx->views[shader_type].views[i]) {
             texture = ctx->views[shader_type].views[i]->texture;
          }
+
          if (!(ctx->prog->samplers_used_mask[shader_type] & (1 << i)))
              continue;
 
          if (ctx->prog->samp_locs[shader_type])
-            glUniform1i(ctx->prog->samp_locs[shader_type][i], sampler_id);
+            glUniform1i(ctx->prog->samp_locs[shader_type][index], sampler_id);
+
          if (ctx->prog->shadow_samp_mask[shader_type] & (1 << i)) {
             struct grend_sampler_view *tview = ctx->views[shader_type].views[i];
-            glUniform4f(ctx->prog->shadow_samp_mask_locs[shader_type][i], 
+            glUniform4f(ctx->prog->shadow_samp_mask_locs[shader_type][index], 
                         tview->gl_swizzle_r == GL_ZERO ? 0.0 : 1.0, 
                         tview->gl_swizzle_g == GL_ZERO ? 0.0 : 1.0, 
                         tview->gl_swizzle_b == GL_ZERO ? 0.0 : 1.0, 
                         tview->gl_swizzle_a == GL_ZERO ? 0.0 : 1.0);
-            glUniform4f(ctx->prog->shadow_samp_add_locs[shader_type][i], 
+            glUniform4f(ctx->prog->shadow_samp_add_locs[shader_type][index], 
                         tview->gl_swizzle_r == GL_ONE ? 1.0 : 0.0, 
                         tview->gl_swizzle_g == GL_ONE ? 1.0 : 0.0, 
                         tview->gl_swizzle_b == GL_ONE ? 1.0 : 0.0, 
@@ -1461,8 +1465,8 @@ void grend_draw_vbo(struct grend_context *ctx,
                   glTexEnvi(GL_POINT_SPRITE_ARB, GL_COORD_REPLACE_ARB, GL_FALSE);
             }
             sampler_id++;
-         
          }
+         index++;
       }
    } 
    ctx->sampler_state_dirty = FALSE;

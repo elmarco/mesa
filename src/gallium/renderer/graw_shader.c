@@ -1003,7 +1003,7 @@ static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
       if (!ctx->fs_coord_origin || ctx->fs_pixel_center) {
          char comma = (!ctx->fs_coord_origin && ctx->fs_pixel_center) ? ',' : ' ';
 
-         snprintf(buf, 255, "layout(%s%c%s) varying vec4 gl_FragCoord;\n",
+         snprintf(buf, 255, "layout(%s%c%s) in vec4 gl_FragCoord;\n",
                   ctx->fs_coord_origin ? "" : "origin_upper_left",
                   comma,
                   ctx->fs_pixel_center ? "pixel_center_integer" : "");

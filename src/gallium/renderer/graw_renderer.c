@@ -2023,6 +2023,13 @@ static void grend_hw_emit_rs(struct grend_context *ctx)
       }
    }
 
+   if (state->flatshade_first != grend_state.hw_rs_state.flatshade_first) {
+      grend_state.hw_rs_state.flatshade_first = state->flatshade_first;
+      if (state->flatshade_first)
+         glProvokingVertexEXT(GL_FIRST_VERTEX_CONVENTION_EXT);
+      else
+         glProvokingVertexEXT(GL_LAST_VERTEX_CONVENTION_EXT);
+   }
    glPolygonOffset(state->offset_scale, state->offset_units);
 
    if (state->front_ccw != grend_state.hw_rs_state.front_ccw) {

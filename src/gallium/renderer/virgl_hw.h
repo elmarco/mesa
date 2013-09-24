@@ -61,6 +61,12 @@ struct virgl_set_scanout {
 	struct virgl_box box;
 };
 
+/* is 0,0 for this resource at the top or the bottom?
+   kernel console and X want this, 3D driver doesn't.
+   this flag should only be used with formats that are
+   renderable. otherwise the context will get locked up.
+*/
+#define VIRGL_RESOURCE_Y_0_TOP (1 << 0)
 struct virgl_resource_create {
 	uint32_t handle;
 	uint32_t target;
@@ -73,6 +79,7 @@ struct virgl_resource_create {
 	uint32_t last_level;
 	uint32_t nr_samples;
         uint32_t nr_sg_entries;
+        uint32_t flags;
 };
 
 struct virgl_resource_unref {

@@ -3,6 +3,8 @@
 
 #include "pipe/p_state.h"
 
+#define SHADER_FLAG_FS_INVERT 1
+
 /* need to store patching info for interpolation */
 struct vrend_interp_info {
    int semantic_name;

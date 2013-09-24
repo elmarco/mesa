@@ -82,7 +82,7 @@ static void virgl_cmd_create_resource(struct virgl_command *cmd, struct graw_iov
    args.array_size = cmd->u.res_create.array_size;
    args.last_level = cmd->u.res_create.last_level;
    args.nr_samples = cmd->u.res_create.nr_samples;
-      
+   args.flags = cmd->u.res_create.flags;
    graw_renderer_resource_create(&args, res_iovs, cmd->u.res_create.nr_sg_entries);
 
    if (niovs > 1)

@@ -25,6 +25,7 @@ struct grend_resource {
 
    struct graw_iovec *iov;
    uint32_t num_iovs;
+   boolean y_0_top;
 };
 
 /* assume every format is sampler friendly */
@@ -91,6 +92,7 @@ struct graw_renderer_resource_create_args {
    uint32_t array_size;
    uint32_t last_level;
    uint32_t nr_samples;
+   uint32_t flags;
 };
      
 void graw_renderer_resource_create(struct graw_renderer_resource_create_args *args, struct graw_iovec *iov, uint32_t num_iovs);

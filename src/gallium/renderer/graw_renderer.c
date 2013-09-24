@@ -104,6 +104,7 @@ struct grend_linked_shader_program {
   struct list_head head;
   GLuint id;
 
+  int fs_variant;
   struct grend_shader_state *ss[PIPE_SHADER_TYPES];
 
   uint32_t samplers_used_mask[PIPE_SHADER_TYPES];
@@ -120,12 +121,16 @@ struct grend_linked_shader_program {
    GLuint vs_ws_adjust_loc;
 };
 
-struct grend_shader_state {
+struct grend_shader_variant {
+   GLchar *glsl_prog;
    GLuint id;
+};
+
+struct grend_shader_state {
    unsigned type;
    GLuint compiled_fs_id;
-   GLchar *glsl_prog;
    struct vrend_shader_info sinfo;
+   struct grend_shader_variant variants[2];
 };
 
 struct grend_buffer {
@@ -247,9 +252,12 @@ struct grend_context {
    GLint view_cur_x, view_cur_y;
    GLsizei view_width, view_height;
    GLclampd view_near_val, view_far_val;
-   GLboolean view_flipped;
    float depth_transform, depth_scale;
-
+   /* viewport is negative */
+   GLboolean viewport_is_negative;
+   /* this is set if the contents of the FBO look upside down when viewed
+      with 0,0 as the bottom corner */
+   GLboolean inverted_fbo_content;
    boolean scissor_state_dirty;
    boolean viewport_state_dirty;
    uint32_t fb_height;
@@ -307,6 +315,16 @@ static void __report_context_error(const char *fname, struct grend_context *ctx,
    fprintf(stderr,"%s: context error reported %d \"%s\" %s %d\n", fname, ctx->ctx_id, ctx->debug_name, vrend_ctx_error_strings[error], value);
 }
 #define report_context_error(ctx, error, value) __report_context_error(__func__, ctx, error, value)
+
+static INLINE boolean should_invert_viewport(struct grend_context *ctx)
+{
+   /* if we have a negative viewport then gallium wanted to invert it,
+      however since we are rendering to GL FBOs we need to invert it
+      again unless we are rendering upside down already
+      - confused? 
+      so if gallium asks for a negative viewport */
+   return (ctx->viewport_is_negative ^ ctx->inverted_fbo_content);
+}
 
 static void grend_destroy_surface(struct grend_surface *surf)
 {
@@ -452,7 +470,7 @@ static void set_stream_out_varyings(int prog_id, struct pipe_stream_output_info 
 
 static struct grend_linked_shader_program *add_shader_program(struct grend_context *ctx,
                                                               struct grend_shader_state *vs,
-                                                              struct grend_shader_state *fs)
+                                                              struct grend_shader_state *fs, int fs_variant)
 {
   struct grend_linked_shader_program *sprog = malloc(sizeof(struct grend_linked_shader_program));
   char name[16];
@@ -462,19 +480,19 @@ static struct grend_linked_shader_program *add_shader_program(struct grend_conte
   int id;
 
   /* need to rewrite VS code to add interpolation params */
-  if (!vs->compiled_fs_id != fs->id) {
-     vrend_patch_vertex_shader_interpolants(vs->glsl_prog,
+  if (!vs->compiled_fs_id != fs->variants[fs_variant].id) {
+     vrend_patch_vertex_shader_interpolants(vs->variants[0].glsl_prog,
                                             &vs->sinfo,
                                             &fs->sinfo);
-     glShaderSource(vs->id, 1, (const char **)&vs->glsl_prog, NULL);
-     glCompileShader(vs->id);
-     vs->compiled_fs_id = fs->id;
+     glShaderSource(vs->variants[0].id, 1, (const char **)&vs->variants[0].glsl_prog, NULL);
+     glCompileShader(vs->variants[0].id);
+     vs->compiled_fs_id = fs->variants[fs_variant].id;
   }
 
   prog_id = glCreateProgram();
-  glAttachShader(prog_id, vs->id);
+  glAttachShader(prog_id, vs->variants[0].id);
   set_stream_out_varyings(prog_id, &vs->sinfo.so_info);
-  glAttachShader(prog_id, fs->id);
+  glAttachShader(prog_id, fs->variants[fs_variant].id);
   glLinkProgram(prog_id);
 
   glGetProgramiv(prog_id, GL_LINK_STATUS, &lret);
@@ -488,6 +506,7 @@ static struct grend_linked_shader_program *add_shader_program(struct grend_conte
   sprog->ss[PIPE_SHADER_VERTEX] = vs;
   sprog->ss[PIPE_SHADER_FRAGMENT] = fs;
   sprog->id = prog_id;
+  sprog->fs_variant = fs_variant;
   list_add(&sprog->head, &ctx->programs);
 
   sprog->vs_ws_adjust_loc = glGetUniformLocation(prog_id, "winsys_adjust");
@@ -562,7 +581,7 @@ static struct grend_linked_shader_program *lookup_shader_program(struct grend_co
 {
   struct grend_linked_shader_program *ent;
   LIST_FOR_EACH_ENTRY(ent, &ctx->programs, head) {
-     if (ent->ss[PIPE_SHADER_VERTEX]->id == vs_id && ent->ss[PIPE_SHADER_FRAGMENT]->id == fs_id)
+     if (ent->ss[PIPE_SHADER_VERTEX]->variants[0].id == vs_id && ent->ss[PIPE_SHADER_FRAGMENT]->variants[ent->fs_variant].id == fs_id)
         return ent;
   }
   return 0;
@@ -817,6 +836,7 @@ void grend_set_framebuffer_state(struct grend_context *ctx,
    int old_num;
    GLenum status;
    GLint new_height = -1;
+   boolean new_ibf = GL_FALSE;
 
    glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, ctx->fb_id);
 
@@ -858,19 +878,25 @@ void grend_set_framebuffer_state(struct grend_context *ctx,
    }
 
    /* find a buffer to set fb_height from */
-   if (ctx->nr_cbufs == 0 && !ctx->zsurf)
+   if (ctx->nr_cbufs == 0 && !ctx->zsurf) {
        new_height = 0;
-   else if (ctx->nr_cbufs == 0)
+       new_ibf = FALSE;
+   } else if (ctx->nr_cbufs == 0) {
        new_height = u_minify(ctx->zsurf->texture->base.height0, ctx->zsurf->val0);
-   else 
+       new_ibf = ctx->zsurf->texture->y_0_top ? TRUE : FALSE;
+   } 
+   else {
        new_height = u_minify(ctx->surf[0]->texture->base.height0, ctx->surf[0]->val0);
+       new_ibf = ctx->surf[0]->texture->y_0_top ? TRUE : FALSE;
+   }
 
    if (new_height != -1) {
-       if (ctx->fb_height != new_height) {
-           ctx->fb_height = new_height;
-           ctx->scissor_state_dirty = TRUE;
-           ctx->viewport_state_dirty = TRUE;
-       }
+      if (ctx->fb_height != new_height || ctx->inverted_fbo_content != new_ibf) {
+         ctx->fb_height = new_height;
+         ctx->inverted_fbo_content = new_ibf;
+         ctx->scissor_state_dirty = TRUE;
+         ctx->viewport_state_dirty = TRUE;
+      }
    }
 
    grend_hw_emit_framebuffer_state(ctx);
@@ -887,6 +913,10 @@ static void grend_hw_emit_depth_range(struct grend_context *ctx)
    glDepthRange(ctx->view_near_val, ctx->view_far_val);
 }
 
+/*
+ * if the viewport Y scale factor is > 0 then we are rendering to
+ * an FBO already so don't need to invert rendering?
+ */
 void grend_set_viewport_state(struct grend_context *ctx,
                               const struct pipe_viewport_state *state)
 {
@@ -894,13 +924,13 @@ void grend_set_viewport_state(struct grend_context *ctx,
    GLint x, y;
    GLsizei width, height;
    GLclampd near_val, far_val;
-   GLboolean view_flipped = state->scale[1] < 0 ? GL_TRUE : GL_FALSE;
+   GLboolean viewport_is_negative = (state->scale[1] < 0) ? GL_TRUE : GL_FALSE;
    GLfloat abs_s1 = fabsf(state->scale[1]);
 
    width = state->scale[0] * 2.0f;
    height = abs_s1 * 2.0f;
    x = state->translate[0] - state->scale[0];
-   y = state->translate[1] - abs_s1;
+   y = state->translate[1] - state->scale[1];
 
    near_val = state->translate[2] - state->scale[2];
    far_val = near_val + (state->scale[2] * 2.0);
@@ -908,15 +938,16 @@ void grend_set_viewport_state(struct grend_context *ctx,
    if (ctx->view_cur_x != x ||
        ctx->view_cur_y != y ||
        ctx->view_width != width ||
-       ctx->view_height != height ||
-      ctx->view_flipped != view_flipped) {
+       ctx->view_height != height) {
       ctx->viewport_state_dirty = TRUE;
       ctx->view_cur_x = x;
       ctx->view_cur_y = y;
       ctx->view_width = width;
       ctx->view_height = height;
-      ctx->view_flipped = view_flipped;
    }
+
+   if (ctx->viewport_is_negative != viewport_is_negative)
+      ctx->viewport_is_negative = viewport_is_negative;
 
    ctx->depth_scale = fabsf(far_val - near_val);
    ctx->depth_transform = near_val;
@@ -1214,9 +1245,12 @@ void grend_transfer_inline_write(struct grend_context *ctx,
 
 static void grend_destroy_shader(struct grend_shader_state *state)
 {
-   glDeleteShader(state->id);
+   glDeleteShader(state->variants[0].id);
+   if (state->variants[1].id)
+      glDeleteShader(state->variants[1].id);
    free(state->sinfo.interpinfo);
-   free(state->glsl_prog);
+   free(state->variants[0].glsl_prog);
+   free(state->variants[1].glsl_prog);
    free(state);
 }
 
@@ -1232,9 +1266,9 @@ void grend_create_vs(struct grend_context *ctx,
 {
    struct grend_shader_state *state = CALLOC_STRUCT(grend_shader_state);
 
-   state->id = glCreateShader(GL_VERTEX_SHADER);
+   state->variants[0].id = glCreateShader(GL_VERTEX_SHADER);
    state->sinfo.so_info = vs->stream_output;
-   state->glsl_prog = tgsi_convert(vs->tokens, 0, &state->sinfo);
+   state->variants[0].glsl_prog = tgsi_convert(vs->tokens, 0, &state->sinfo);
    state->compiled_fs_id = 0;
 
    vrend_object_insert(ctx->object_hash, state, sizeof(*state), handle, VIRGL_OBJECT_VS);
@@ -1249,21 +1283,25 @@ void grend_create_fs(struct grend_context *ctx,
    struct grend_shader_state *state = CALLOC_STRUCT(grend_shader_state);
    const GLchar *glsl_prog;
    GLenum ret;
-   state->id = glCreateShader(GL_FRAGMENT_SHADER);
-   state->glsl_prog = tgsi_convert(fs->tokens, 0, &state->sinfo);
-   glsl_prog = (const GLchar *)state->glsl_prog;
-   if (glsl_prog) {
-      glShaderSource(state->id, 1, (const char **)&glsl_prog, NULL);
-      ret = glGetError();
-      glCompileShader(state->id);
-      ret = glGetError();
-      if (ret) {
-         fprintf(stderr,"got error compiling %d\n", ret);
-         fprintf(stderr,"VS:\n%s\n", glsl_prog);
-      }
-      //      fprintf(stderr,"FS:\n%s\n", glsl_prog);
-   } else
-     fprintf(stderr,"failed to convert FS prog\n");
+   int i;
+
+   for (i = 0; i < 2; i++) {
+      state->variants[i].id = glCreateShader(GL_FRAGMENT_SHADER);
+      state->variants[i].glsl_prog = tgsi_convert(fs->tokens, i ? SHADER_FLAG_FS_INVERT : 0, &state->sinfo);
+      glsl_prog = (const GLchar *)state->variants[i].glsl_prog;
+      if (glsl_prog) {
+         glShaderSource(state->variants[i].id, 1, (const char **)&glsl_prog, NULL);
+         ret = glGetError();
+         glCompileShader(state->variants[i].id);
+         ret = glGetError();
+         if (ret) {
+            fprintf(stderr,"got error compiling %d\n", ret);
+            fprintf(stderr,"VS:\n%s\n", glsl_prog);
+         }
+         //      fprintf(stderr,"FS:\n%s\n", glsl_prog);
+      } else
+         fprintf(stderr,"failed to convert FS prog\n");
+   }
    vrend_object_insert(ctx->object_hash, state, sizeof(*state), handle, VIRGL_OBJECT_FS);
 
    return;
@@ -1340,22 +1378,15 @@ static void grend_update_scissor_state(struct grend_context *ctx)
 {
    struct pipe_scissor_state *ss = &ctx->ss;
    
-   glScissor(ss->minx, ctx->fb_height - ss->maxy, ss->maxx - ss->minx, ss->maxy - ss->miny);
+   glScissor(ss->minx, should_invert_viewport(ctx) ? ss->miny : (ctx->fb_height - ss->maxy), ss->maxx - ss->minx, ss->maxy - ss->miny);
    ctx->scissor_state_dirty = FALSE;
    grend_state.scissor_dirty = FALSE;
 }
 
 static void grend_update_viewport_state(struct grend_context *ctx)
 {
-   int i;
-   glViewport(ctx->view_cur_x, ctx->fb_height - ctx->view_height - ctx->view_cur_y, ctx->view_width, ctx->view_height);
+   glViewport(ctx->view_cur_x, ctx->viewport_is_negative ? ctx->fb_height - ctx->view_cur_y : ctx->view_cur_y, ctx->view_width, ctx->view_height);
 
-   for (i = 0; i < ctx->nr_cbufs; i++) {
-      if (ctx->surf[i])
-         ctx->surf[i]->texture->renderer_flipped = ctx->view_flipped;
-   }
-   if (ctx->zsurf)
-      ctx->zsurf->texture->renderer_flipped = ctx->view_flipped;
    ctx->viewport_state_dirty = FALSE;
    grend_state.viewport_dirty = FALSE;
 }
@@ -1389,14 +1420,22 @@ void grend_draw_vbo(struct grend_context *ctx,
 
    if (ctx->shader_dirty) {
      struct grend_linked_shader_program *prog;
+     int fs_variant;
 
      if (!ctx->vs || !ctx->fs) {
         fprintf(stderr,"dropping rendering due to missing shaders\n");
         return;
      }
-     prog = lookup_shader_program(ctx, ctx->vs->id, ctx->fs->id);
+
+     /* invert fragcoord by default as gallium is opposite to GL */
+     if (!ctx->inverted_fbo_content)
+        fs_variant = 1;
+     else
+        fs_variant = 0;
+     
+     prog = lookup_shader_program(ctx, ctx->vs->variants[0].id, ctx->fs->variants[fs_variant].id);
      if (!prog) {
-        prog = add_shader_program(ctx, ctx->vs, ctx->fs);
+        prog = add_shader_program(ctx, ctx->vs, ctx->fs, fs_variant);
         if (!prog)
            return;
      }
@@ -1482,7 +1521,7 @@ void grend_draw_vbo(struct grend_context *ctx,
       fprintf(stderr,"illegal VE setup - skipping renderering\n");
       return;
    }
-   glUniform4f(ctx->prog->vs_ws_adjust_loc, 0.0, 0.0, ctx->depth_scale, ctx->depth_transform);
+   glUniform4f(ctx->prog->vs_ws_adjust_loc, 0.0, should_invert_viewport(ctx) ? -1.0 : 1.0, ctx->depth_scale, ctx->depth_transform);
 
    num_enable = ctx->ve->count;
    enable_bitmask = 0;
@@ -2384,6 +2423,10 @@ void graw_renderer_resource_create(struct graw_renderer_resource_create_args *ar
    gr->base.last_level = args->last_level;
    gr->base.nr_samples = args->nr_samples;
    gr->base.array_size = args->array_size;
+
+   if (args->flags & VIRGL_RESOURCE_Y_0_TOP)
+      gr->y_0_top = TRUE;
+
    pipe_reference_init(&gr->base.reference, 1);
 
    if (args->bind == PIPE_BIND_CUSTOM) {
@@ -2643,8 +2686,8 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
       glformat = tex_conv_table[res->base.format].glformat;
       gltype = tex_conv_table[res->base.format].gltype; 
 
-      if (res->is_front) {
-         if (0) {// may be need later !res->is_front) {
+      if (res->is_front || res->y_0_top) {
+         if (!res->is_front) {
             if (res->readback_fb_id == 0 || res->readback_fb_level != level) {
                GLuint fb_id;
                if (res->readback_fb_id)
@@ -2661,6 +2704,7 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
             }
             glDrawBuffer(GL_COLOR_ATTACHMENT0_EXT);
          } else {
+
             glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
             glDrawBuffer(GL_BACK);
          }
@@ -2668,13 +2712,11 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
          grend_depth_test_enable(GL_FALSE);
          grend_alpha_test_enable(GL_FALSE);
          grend_stencil_test_enable(GL_FALSE);
-         glPixelZoom(1.0f, 1.0f);
-         glWindowPos2i(box->x, box->y);
+         glPixelZoom(1.0f, res->y_0_top ? -1.0f : 1.0f);
+         glWindowPos2i(box->x, res->y_0_top ? res->base.height0 - box->y : box->y);
          glDrawPixels(box->width, box->height, glformat, gltype,
                       data);
       } else {
-         uint32_t h = u_minify(res->base.height0, level);
-
          uint32_t comp_size;
          glBindTexture(res->target, res->id);
 
@@ -2690,11 +2732,7 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
          }
 
          x = box->x;
-
-         if (res->renderer_flipped)
-            y = h - box->y - box->height;
-         else
-            y = box->y;
+         y = box->y;
 
          if (res->base.format == (enum pipe_format)VIRGL_FORMAT_Z24X8_UNORM) {
             /* we get values from the guest as 24-bit scaled integers
@@ -2853,10 +2891,11 @@ static void vrend_transfer_send_readpixels(struct grend_resource *res,
    format = tex_conv_table[res->base.format].glformat;
    type = tex_conv_table[res->base.format].gltype; 
    /* if we are asked to invert and reading from a front then don't */
+
    if (res->is_front)
       actually_invert = FALSE;
    else
-      actually_invert = res->renderer_flipped;
+      actually_invert = res->y_0_top;
 
    if (actually_invert && !have_invert_mesa)
       separate_invert = TRUE;
@@ -2874,7 +2913,6 @@ static void vrend_transfer_send_readpixels(struct grend_resource *res,
 //      fprintf(stderr,"TEXTURE TRANSFER %d %d %d %d %d, temp:%d\n", res_handle, res->readback_fb_id, box->width, box->height, level, need_temp);
 
    if (!res->is_front) {
-
       if (res->readback_fb_id == 0 || res->readback_fb_level != level || res->readback_fb_z != box->z) {
 
          if (res->readback_fb_id)
@@ -2891,7 +2929,7 @@ static void vrend_transfer_send_readpixels(struct grend_resource *res,
       } else {
          glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, res->readback_fb_id);
       }
-      if (res->renderer_flipped)
+      if (actually_invert)
          y1 = h - box->y - box->height;
       else
          y1 = box->y;
@@ -3227,7 +3265,7 @@ void graw_renderer_resource_copy_region(struct grend_context *ctx,
    glmask = GL_COLOR_BUFFER_BIT;
    glDisable(GL_SCISSOR_TEST);
 
-   if (!src_res->is_front && !src_res->renderer_flipped) {
+   if (!src_res->is_front && !src_res->y_0_top) {
       sy1 = src_box->y;
       sy2 = src_box->y + src_box->height;
    } else {
@@ -3235,7 +3273,7 @@ void graw_renderer_resource_copy_region(struct grend_context *ctx,
       sy2 = src_res->base.height0 - src_box->y;
    }
 
-   if (!dst_res->is_front && !dst_res->renderer_flipped) {
+   if (!dst_res->is_front && !dst_res->y_0_top) {
       dy1 = dsty;
       dy2 = dsty + src_box->height;
    } else {
@@ -3297,7 +3335,7 @@ static void graw_renderer_blit_int(struct grend_context *ctx,
    if (info->mask & PIPE_MASK_RGBA)
       glmask |= GL_COLOR_BUFFER_BIT;
 
-   if (!dst_res->is_front && !dst_res->renderer_flipped) {
+   if (!dst_res->is_front && !dst_res->y_0_top) {
       dst_y1 = info->dst.box.y + info->dst.box.height;
       dst_y2 = info->dst.box.y;
    } else {
@@ -3305,7 +3343,7 @@ static void graw_renderer_blit_int(struct grend_context *ctx,
       dst_y2 = dst_res->base.height0 - info->dst.box.y;
    }
 
-   if ((!src_res->is_front && !src_res->renderer_flipped) && src_res->base.nr_samples < 2) {
+   if ((!src_res->is_front && !src_res->y_0_top) && src_res->base.nr_samples < 2) {
       src_y1 = info->src.box.y + info->src.box.height;
       src_y2 = info->src.box.y;
    } else {
@@ -3381,6 +3419,7 @@ int graw_renderer_flush_buffer_res(struct grend_resource *res,
                                    struct pipe_box *box)
 {
    if (!res->is_front) {
+      uint32_t y1, y2;
       if (!front_fb_id)
          glGenFramebuffers(1, &front_fb_id);
 
@@ -3398,8 +3437,17 @@ int graw_renderer_flush_buffer_res(struct grend_resource *res,
       grend_state.viewport_dirty = TRUE;
       grend_state.scissor_dirty = TRUE;
       /* justification for inversion here required */
-      glBlitFramebuffer(box->x, box->y, box->x + box->width, box->y + box->height,
-                        box->x, front_box.height - box->y, box->x + box->width, front_box.height - box->y - box->height,
+
+      if (res->y_0_top) {
+         y1 = front_box.height - box->y;
+         y2 = front_box.height - box->y - box->height;
+      } else {
+         y1 = box->y;
+         y2 = box->y + box->height;
+      }
+
+      glBlitFramebuffer(box->x, y1, box->x + box->width, y2,
+                        box->x, y1, box->x + box->width, y2,
                         GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
       if (draw_cursor)

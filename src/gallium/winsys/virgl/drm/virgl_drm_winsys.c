@@ -164,6 +164,7 @@ static struct virgl_hw_res *virgl_drm_winsys_resource_create(struct virgl_winsys
    createcmd.res_handle = 0;
    createcmd.stride = stride;
    createcmd.size = size;
+   createcmd.flags = 0;
 
    ret = drmIoctl(qdws->fd, DRM_IOCTL_VIRGL_RESOURCE_CREATE, &createcmd);
    if (ret != 0) {

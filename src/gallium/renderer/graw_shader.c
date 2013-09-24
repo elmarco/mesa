@@ -72,10 +72,26 @@ struct dump_ctx {
    struct pipe_stream_output_info *so;
    boolean uses_cube_array;
 
+   /* create a shader with lower left if upper left is primary variant
+      or vice versa */
+   boolean invert_fs_origin;
    uint32_t shadow_samp_mask;
    boolean write_all_cbufs;
    int fs_coord_origin, fs_pixel_center;
 };
+
+static inline boolean fs_emit_layout(struct dump_ctx *ctx)
+{
+   if (ctx->fs_pixel_center)
+      return TRUE;
+   /* if coord origin is 0 and invert is 0 - emit origin_upper_left,
+      if coord_origin is 0 and invert is 1 - emit nothing (lower)
+      if coord origin is 1 and invert is 0 - emit nothing (lower)
+      if coord_origin is 1 and invert is 1 - emit origin upper left */
+   if (!(ctx->fs_coord_origin ^ ctx->invert_fs_origin))
+       return TRUE;
+   return FALSE;
+}
 
 static boolean
 iter_declaration(struct tgsi_iterate_context *iter,
@@ -330,6 +346,8 @@ static void emit_prescale(struct dump_ctx *ctx)
 {
    char buf[255];
 
+   snprintf(buf, 255, "gl_Position.y = gl_Position.y * winsys_adjust.y;\n");
+   strcat(ctx->glsl_main, buf);
    snprintf(buf, 255, "gl_Position.z = dot(gl_Position, vec4(0.0, 0.0, winsys_adjust.zw));\n");
    strcat(ctx->glsl_main, buf);
 }
@@ -950,7 +968,7 @@ static void emit_header(struct dump_ctx *ctx, char *glsl_final)
    strcat(glsl_final, "#version 130\n");
    if (ctx->prog_type == TGSI_PROCESSOR_VERTEX && graw_shader_use_explicit)
       strcat(glsl_final, "#extension GL_ARB_explicit_attrib_location : enable\n");
-   if (ctx->prog_type == TGSI_PROCESSOR_FRAGMENT && (!ctx->fs_coord_origin || ctx->fs_pixel_center))
+   if (ctx->prog_type == TGSI_PROCESSOR_FRAGMENT && fs_emit_layout(ctx))
       strcat(glsl_final, "#extension GL_ARB_fragment_coord_conventions : enable\n");
    strcat(glsl_final, "#extension GL_ARB_texture_rectangle : require\n");
    if (ctx->uses_cube_array)
@@ -1000,11 +1018,12 @@ static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
    ctx->num_interps = 0;
 
    if (ctx->prog_type == TGSI_PROCESSOR_FRAGMENT) {
-      if (!ctx->fs_coord_origin || ctx->fs_pixel_center) {
-         char comma = (!ctx->fs_coord_origin && ctx->fs_pixel_center) ? ',' : ' ';
+      if (fs_emit_layout(ctx)) {
+         boolean upper_left = !(ctx->fs_coord_origin ^ ctx->invert_fs_origin); 
+         char comma = (upper_left && ctx->fs_pixel_center) ? ',' : ' ';
 
          snprintf(buf, 255, "layout(%s%c%s) in vec4 gl_FragCoord;\n",
-                  ctx->fs_coord_origin ? "" : "origin_upper_left",
+                  upper_left ? "origin_upper_left" : "",
                   comma,
                   ctx->fs_pixel_center ? "pixel_center_integer" : "");
          strcat(glsl_final, buf);
@@ -1171,7 +1190,7 @@ char *tgsi_convert(const struct tgsi_token *tokens,
    ctx.iter.iterate_immediate = iter_immediate;
    ctx.iter.iterate_property = iter_property;
    ctx.iter.epilog = NULL;
-
+   ctx.invert_fs_origin = flags & SHADER_FLAG_FS_INVERT;
    if (sinfo->so_info.num_outputs) {
       ctx.so = &sinfo->so_info;
    }

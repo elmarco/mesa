@@ -36,6 +36,7 @@ static void grend_ctx_restart_queries(struct grend_context *ctx);
 static void grend_destroy_query_object(void *obj_ptr);
 static void grend_finish_context_switch(struct grend_context *ctx);
 static void grend_patch_blend_func(struct grend_context *ctx);
+static void grend_update_frontface_state(struct grend_context *ctx);
 extern int graw_shader_use_explicit;
 int localrender;
 static int have_invert_mesa = 0;
@@ -323,7 +324,7 @@ static INLINE boolean should_invert_viewport(struct grend_context *ctx)
       again unless we are rendering upside down already
       - confused? 
       so if gallium asks for a negative viewport */
-   return (ctx->viewport_is_negative ^ ctx->inverted_fbo_content);
+   return !(ctx->viewport_is_negative ^ ctx->inverted_fbo_content);
 }
 
 static void grend_destroy_surface(struct grend_surface *surf)
@@ -1346,6 +1347,7 @@ void grend_clear(struct grend_context *ctx,
 
    glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, ctx->fb_id);
 
+   grend_update_frontface_state(ctx);
    if (ctx->stencil_state_dirty)
       grend_update_stencil_state(ctx);
    if (ctx->scissor_state_dirty || grend_state.scissor_dirty)
@@ -1385,7 +1387,12 @@ static void grend_update_scissor_state(struct grend_context *ctx)
 
 static void grend_update_viewport_state(struct grend_context *ctx)
 {
-   glViewport(ctx->view_cur_x, ctx->viewport_is_negative ? ctx->fb_height - ctx->view_cur_y : ctx->view_cur_y, ctx->view_width, ctx->view_height);
+   GLint cy;
+   if (ctx->viewport_is_negative)
+      cy = ctx->view_cur_y - ctx->view_height;
+   else
+      cy = ctx->view_cur_y;
+   glViewport(ctx->view_cur_x, cy, ctx->view_width, ctx->view_height);
 
    ctx->viewport_state_dirty = FALSE;
    grend_state.viewport_dirty = FALSE;
@@ -1408,6 +1415,7 @@ void grend_draw_vbo(struct grend_context *ctx,
    if (ctx->ctx_switch_pending)
       grend_finish_context_switch(ctx);
 
+   grend_update_frontface_state(ctx);
    if (ctx->stencil_state_dirty)
       grend_update_stencil_state(ctx);
    if (ctx->scissor_state_dirty || grend_state.scissor_dirty)
@@ -1521,7 +1529,7 @@ void grend_draw_vbo(struct grend_context *ctx,
       fprintf(stderr,"illegal VE setup - skipping renderering\n");
       return;
    }
-   glUniform4f(ctx->prog->vs_ws_adjust_loc, 0.0, should_invert_viewport(ctx) ? -1.0 : 1.0, ctx->depth_scale, ctx->depth_transform);
+   glUniform4f(ctx->prog->vs_ws_adjust_loc, 0.0, ctx->viewport_is_negative ? -1.0 : 1.0, ctx->depth_scale, ctx->depth_transform);
 
    num_enable = ctx->ve->count;
    enable_bitmask = 0;
@@ -1952,7 +1960,22 @@ void grend_object_bind_dsa(struct grend_context *ctx,
    ctx->dsa = state;
    grend_hw_emit_dsa(ctx);
 }
- 
+
+static void grend_update_frontface_state(struct grend_context *ctx)
+{
+   struct pipe_rasterizer_state *state = &ctx->rs_state;
+   int front_ccw = state->front_ccw;
+
+   front_ccw ^= (ctx->viewport_is_negative ?  1 : 0);
+//   if (front_ccw != grend_state.hw_rs_state.front_ccw) {
+//      grend_state.hw_rs_state.front_ccw = front_ccw;
+      if (front_ccw)
+         glFrontFace(GL_CCW);
+      else
+         glFrontFace(GL_CW);
+//   }
+}
+
 void grend_update_stencil_state(struct grend_context *ctx)
 {
    struct pipe_depth_stencil_alpha_state *state = ctx->dsa;
@@ -2070,14 +2093,6 @@ static void grend_hw_emit_rs(struct grend_context *ctx)
          glProvokingVertexEXT(GL_LAST_VERTEX_CONVENTION_EXT);
    }
    glPolygonOffset(state->offset_scale, state->offset_units);
-
-   if (state->front_ccw != grend_state.hw_rs_state.front_ccw) {
-      grend_state.hw_rs_state.front_ccw = state->front_ccw;
-      if (state->front_ccw)
-         glFrontFace(GL_CCW);
-      else
-         glFrontFace(GL_CW);
-   }
 
    if (state->scissor)
       glEnable(GL_SCISSOR_TEST);

@@ -1379,7 +1379,13 @@ void grend_clear(struct grend_context *ctx,
 static void grend_update_scissor_state(struct grend_context *ctx)
 {
    struct pipe_scissor_state *ss = &ctx->ss;
+   struct pipe_rasterizer_state *state = &ctx->rs_state;
    
+   if (state->scissor)
+      glEnable(GL_SCISSOR_TEST);
+   else
+      glDisable(GL_SCISSOR_TEST);
+
    glScissor(ss->minx, should_invert_viewport(ctx) ? ss->miny : (ctx->fb_height - ss->maxy), ss->maxx - ss->minx, ss->maxy - ss->miny);
    ctx->scissor_state_dirty = FALSE;
    grend_state.scissor_dirty = FALSE;
@@ -2094,11 +2100,6 @@ static void grend_hw_emit_rs(struct grend_context *ctx)
    }
    glPolygonOffset(state->offset_scale, state->offset_units);
 
-   if (state->scissor)
-      glEnable(GL_SCISSOR_TEST);
-   else
-      glDisable(GL_SCISSOR_TEST);
-
    if (state->point_quad_rasterization) {
       glEnable(GL_POINT_SPRITE);
 
@@ -2157,6 +2158,7 @@ void grend_object_bind_rasterizer(struct grend_context *ctx,
    }
 
    ctx->rs_state = *state;
+   ctx->scissor_state_dirty = TRUE;
    grend_hw_emit_rs(ctx);
 }
 
@@ -3366,9 +3368,11 @@ static void graw_renderer_blit_int(struct grend_context *ctx,
       src_y2 = src_res->base.height0 - info->src.box.y;
    }
 
-   if (info->scissor_enable)
+   if (info->scissor_enable) {
+      glScissor(info->scissor.minx, info->scissor.miny, info->scissor.maxx - info->scissor.minx, info->scissor.maxy - info->scissor.miny);
+      ctx->scissor_state_dirty = TRUE;
       glEnable(GL_SCISSOR_TEST);
-   else
+   } else
       glDisable(GL_SCISSOR_TEST);
       
    glBlitFramebuffer(info->src.box.x,

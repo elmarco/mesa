@@ -578,7 +578,7 @@ static void graw_decode_set_clip_state(struct grend_decode_ctx *ctx)
 
    for (i = 0; i < 8; i++)
       for (j = 0; j < 4; j++)
-         clip.ucp[i][j] = ctx->ds->buf[ctx->ds->buf_offset + 1 + (i * 4) + j];
+         clip.ucp[i][j] = uif(ctx->ds->buf[ctx->ds->buf_offset + 1 + (i * 4) + j]);
    grend_set_clip_state(ctx->grctx, &clip);
 }
 

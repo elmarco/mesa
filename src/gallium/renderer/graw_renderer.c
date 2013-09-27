@@ -97,6 +97,7 @@ struct global_renderer_state {
    struct pipe_depth_stencil_alpha_state hw_dsa_state;
    struct pipe_blend_state hw_blend_state;
 
+   boolean have_nv_prim_restart, have_gl_prim_restart;
 };
 
 static struct global_renderer_state grend_state;
@@ -1628,6 +1629,16 @@ void grend_draw_vbo(struct grend_context *ctx,
    if (ctx->num_so_targets) {
       glBeginTransformFeedback(info->mode);
    }
+
+   if (info->primitive_restart) {
+      if (grend_state.have_nv_prim_restart) {
+         glEnableClientState(GL_PRIMITIVE_RESTART_NV);
+         glPrimitiveRestartIndexNV(info->restart_index);
+      } else {
+         glEnable(GL_PRIMITIVE_RESTART);
+         glPrimitiveRestartIndex(info->restart_index);
+      }
+   }
    /* set the vertex state up now on a delay */
    if (!info->indexed) {
       GLenum mode = info->mode;
@@ -1666,6 +1677,12 @@ void grend_draw_vbo(struct grend_context *ctx,
    if (ctx->num_so_targets)
       glEndTransformFeedback();
 
+   if (info->primitive_restart) {
+      if (grend_state.have_nv_prim_restart)
+         glDisableClientState(GL_PRIMITIVE_RESTART_NV);
+      else if (grend_state.have_gl_prim_restart)
+         glDisable(GL_PRIMITIVE_RESTART);
+   }
    grend_bind_va(0);
 }
 
@@ -2325,6 +2342,10 @@ void graw_renderer_init(void)
    else
       fprintf(stderr,"WARNING: running without ARB robustness in place may crash\n");
 
+   if (glewIsSupported("GL_VERSION_3_1"))
+      grend_state.have_gl_prim_restart = TRUE;
+   else if (glewIsSupported("GL_NV_primitive_restart"))
+      grend_state.have_nv_prim_restart = TRUE;
    
    /* callbacks for when we are cleaning up the object table */
    vrend_object_set_destroy_callback(VIRGL_OBJECT_QUERY, grend_destroy_query_object);
@@ -4023,6 +4044,9 @@ void graw_renderer_fill_caps(uint32_t set, uint32_t version,
       if (glewIsSupported("GL_ARB_draw_instanced"))
          caps.v1.bset.instanceid = 1;
    }
+
+   if (grend_state.have_nv_prim_restart || grend_state.have_gl_prim_restart)
+      caps.v1.bset.primitive_restart = 1;
 
    if (glewIsSupported("GL_VERSION_3_2")) {
       caps.v1.bset.fragment_coord_conventions = 1;

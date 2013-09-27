@@ -685,6 +685,14 @@ static void graw_decode_get_query_result(struct grend_decode_ctx *ctx)
    grend_get_query_result(ctx->grctx, handle, wait);
 }
 
+static void graw_decode_set_render_condition(struct grend_decode_ctx *ctx)
+{
+   uint32_t handle = ctx->ds->buf[ctx->ds->buf_offset + 1];
+   boolean condition = ctx->ds->buf[ctx->ds->buf_offset + 2] & 1;
+   uint mode = ctx->ds->buf[ctx->ds->buf_offset + 3];
+   grend_render_condition(ctx->grctx, handle, condition, mode);
+}
+
 static void graw_decode_set_streamout_targets(struct grend_decode_ctx *ctx,
                                               uint16_t length)
 {
@@ -873,6 +881,9 @@ static void graw_decode_block(uint32_t ctx_id, uint32_t *block, int ndw)
       case VIRGL_CCMD_SET_QUERY_STATE:
          graw_decode_set_query_state(gdctx);
          break;
+      case VIRGL_CCMD_SET_RENDER_CONDITION:
+	 graw_decode_set_render_condition(gdctx);
+	 break;
       }
       gdctx->ds->buf_offset += (header >> 16) + 1;
       

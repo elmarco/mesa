@@ -187,4 +187,8 @@ int graw_encoder_get_query_result(struct graw_context *ctx,
 
 int graw_encoder_set_query_state(struct graw_context *ctx,
                                  boolean query_enabled);
+
+int graw_encoder_render_condition(struct graw_context *ctx,
+                                  uint32_t handle, boolean condition,
+                                  uint mode);
 #endif

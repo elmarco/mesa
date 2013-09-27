@@ -3887,6 +3887,46 @@ void grend_get_query_result(struct grend_context *ctx, uint32_t handle,
       list_addtail(&q->waiting_queries, &grend_state.waiting_query_list);
 }
 
+void grend_render_condition(struct grend_context *ctx,
+                            uint32_t handle,
+                            boolean condtion,
+                            uint mode)
+{
+   struct grend_query *q;
+   GLenum glmode;
+   struct grend_nontimer_hw_query *hwq, *last;
+
+   if (handle == 0) {
+      glEndConditionalRenderNV();
+      return;
+   }
+
+   q = vrend_object_lookup(ctx->object_hash, handle, VIRGL_OBJECT_QUERY);
+   if (!q)
+      return;
+
+   switch (mode) {
+   case PIPE_RENDER_COND_WAIT:
+      glmode = GL_QUERY_WAIT;
+      break;
+   case PIPE_RENDER_COND_NO_WAIT:
+      glmode = GL_QUERY_NO_WAIT;
+      break;
+   case PIPE_RENDER_COND_BY_REGION_WAIT:
+      glmode = GL_QUERY_BY_REGION_WAIT;
+      break;
+   case PIPE_RENDER_COND_BY_REGION_NO_WAIT:
+      glmode = GL_QUERY_BY_REGION_NO_WAIT;
+      break;
+   }
+
+   LIST_FOR_EACH_ENTRY(hwq, &q->hw_queries, query_list)
+      last = hwq;
+      
+   glBeginConditionalRender(last->id, glmode);
+   
+}
+
 void grend_set_query_state(struct grend_context *ctx,
                            boolean enabled)
 {

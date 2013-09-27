@@ -13,12 +13,17 @@ struct graw_query {
    unsigned result_gotten_sent;
 };
 
-static void graw_render_condition(struct pipe_context *pipe,
-                                  struct pipe_query *query,
+static void graw_render_condition(struct pipe_context *ctx,
+                                  struct pipe_query *q,
                                   boolean condition,
                                   uint mode)
 {
-
+   struct graw_context *grctx = (struct graw_context *)ctx;
+   struct graw_query *query = (struct graw_query *)q;
+   uint32_t handle = 0;
+   if (q)
+      handle = query->handle;
+   graw_encoder_render_condition(grctx, handle, condition, mode);
 }
 
 static struct pipe_query *graw_create_query(struct pipe_context *ctx,

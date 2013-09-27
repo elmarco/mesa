@@ -683,6 +683,17 @@ int graw_encoder_get_query_result(struct graw_context *ctx,
    return 0;
 }
 
+int graw_encoder_render_condition(struct graw_context *ctx,
+                                  uint32_t handle, boolean condition,
+                                  uint mode)
+{
+   graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_SET_RENDER_CONDITION, 0, 3));
+   graw_encoder_write_dword(ctx->cbuf, handle);
+   graw_encoder_write_dword(ctx->cbuf, condition);
+   graw_encoder_write_dword(ctx->cbuf, mode);
+   return 0;
+}
+
 int graw_encoder_set_so_targets(struct graw_context *ctx,
                                 unsigned num_targets,
                                 struct pipe_stream_output_target **targets,

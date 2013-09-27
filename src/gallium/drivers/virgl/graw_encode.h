@@ -62,7 +62,7 @@ int graw_encoder_set_so_targets(struct graw_context *ctx,
 
 int graw_encoder_create_so_target(struct graw_context *ctx,
                                   uint32_t handle,
-                                  struct graw_resource *res,
+                                  struct virgl_resource *res,
                                   unsigned buffer_offset,
                                   unsigned buffer_size);
 
@@ -87,11 +87,11 @@ int graw_encoder_draw_vbo(struct graw_context *ctx,
 
 int graw_encoder_create_surface(struct graw_context *ctx,
                                 uint32_t handle,
-                                struct graw_resource *res,
+                                struct virgl_resource *res,
 				const struct pipe_surface *templat);
 
 int graw_encoder_flush_frontbuffer(struct graw_context *ctx,
-                                   struct graw_resource *res);
+                                   struct virgl_resource *res);
 
 int graw_encoder_create_vertex_elements(struct graw_context *ctx,
                                         uint32_t handle,
@@ -104,7 +104,7 @@ int graw_encoder_set_vertex_buffers(struct graw_context *ctx,
 
 
 int graw_encoder_inline_write(struct graw_context *ctx,
-                              struct graw_resource *res,
+                              struct virgl_resource *res,
                               unsigned level, unsigned usage,
                               const struct pipe_box *box,
                               void *data, unsigned stride,
@@ -114,7 +114,7 @@ int graw_encode_sampler_state(struct graw_context *ctx,
                               const struct pipe_sampler_state *state);
 int graw_encode_sampler_view(struct graw_context *ctx,
                              uint32_t handle,
-                             struct graw_resource *res,
+                             struct virgl_resource *res,
                              const struct pipe_sampler_view *state);
 
 int graw_encode_set_sampler_views(struct graw_context *ctx,
@@ -160,22 +160,22 @@ void graw_encoder_set_clip_state(struct graw_context *ctx,
                                  const struct pipe_clip_state *clip);
 
 int graw_encode_resource_copy_region(struct graw_context *ctx,
-                                     struct graw_resource *dst_res,
+                                     struct virgl_resource *dst_res,
                                      unsigned dst_level,
                                      unsigned dstx, unsigned dsty, unsigned dstz,
-                                     struct graw_resource *src_res,
+                                     struct virgl_resource *src_res,
                                      unsigned src_level,
                                      const struct pipe_box *src_box);
 
 int graw_encode_blit(struct graw_context *ctx,
-                     struct graw_resource *dst_res,
-                     struct graw_resource *src_res,
+                     struct virgl_resource *dst_res,
+                     struct virgl_resource *src_res,
                      const struct pipe_blit_info *blit);
 
 int graw_encoder_create_query(struct graw_context *ctx,
                               uint32_t handle,
                               uint query_type,
-                              struct graw_resource *res,
+                              struct virgl_resource *res,
                               uint32_t offset);
 
 int graw_encoder_begin_query(struct graw_context *ctx,

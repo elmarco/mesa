@@ -13,6 +13,7 @@
 #include "tgsi/tgsi_exec.h"
 
 #include "virgl.h"
+#include "virgl_resource.h"
 #include "virgl_public.h"
 #include "graw_context.h"
 
@@ -402,7 +403,7 @@ virgl_destroy_screen(struct pipe_screen *screen)
 struct pipe_screen *
 virgl_create_screen(struct virgl_winsys *vws)
 {
-      struct virgl_screen *screen = CALLOC_STRUCT(virgl_screen);
+   struct virgl_screen *screen = CALLOC_STRUCT(virgl_screen);
 
    if (!screen)
       return NULL;
@@ -416,14 +417,14 @@ virgl_create_screen(struct virgl_winsys *vws)
    screen->base.get_paramf = virgl_get_paramf;
    screen->base.is_format_supported = virgl_is_format_supported;
    screen->base.destroy = virgl_destroy_screen;
-   screen->base.resource_from_handle = virgl_resource_from_handle;
-   screen->base.resource_get_handle = virgl_resource_get_handle;
    screen->base.context_create = graw_context_create;
-   screen->base.resource_create = graw_resource_create;
-   screen->base.resource_destroy = graw_resource_destroy;
    screen->base.flush_frontbuffer = virgl_flush_frontbuffer;
    screen->base.get_timestamp = virgl_get_timestamp;
+
+   virgl_init_screen_resource_functions(&screen->base);
+
    vws->get_caps(vws, &screen->caps);
+
 
    util_format_s3tc_init();
    return &screen->base;

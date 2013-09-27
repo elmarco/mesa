@@ -5,6 +5,7 @@
 #include "util/u_math.h"
 #include "pipe/p_state.h"
 #include "graw_encode.h"
+#include "virgl_resource.h"
 #include "tgsi/tgsi_dump.h"
 #include "tgsi/tgsi_parse.h"
 
@@ -28,7 +29,7 @@ static int graw_encoder_write_cmd_dword(struct graw_context *ctx,
 }
 
 static void graw_encoder_write_res(struct graw_context *ctx,
-                                   struct graw_resource *res)
+                                   struct virgl_resource *res)
 {
    struct virgl_winsys *vws = virgl_screen(ctx->base.screen)->vws;
 
@@ -40,7 +41,7 @@ static void graw_encoder_write_res(struct graw_context *ctx,
 }
 
 static void graw_encoder_attach_res(struct graw_context *ctx,
-                                    struct graw_resource *res)
+                                    struct virgl_resource *res)
 {
    struct virgl_winsys *vws = virgl_screen(ctx->base.screen)->vws;
 
@@ -243,11 +244,11 @@ int graw_encoder_set_framebuffer_state(struct graw_context *ctx,
    for (i = 0; i < state->nr_cbufs; i++) {
       struct graw_surface *surf = (struct graw_surface *)state->cbufs[i];
       graw_encoder_write_dword(ctx->cbuf, surf->handle);
-      graw_encoder_attach_res(ctx, (struct graw_resource *)surf->base.texture);
+      graw_encoder_attach_res(ctx, (struct virgl_resource *)surf->base.texture);
    }
 
    if (zsurf)
-      graw_encoder_attach_res(ctx, (struct graw_resource *)zsurf->base.texture);
+      graw_encoder_attach_res(ctx, (struct virgl_resource *)zsurf->base.texture);
 
    return 0;
 }
@@ -288,7 +289,7 @@ int graw_encoder_set_vertex_buffers(struct graw_context *ctx,
    int i;
    graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_SET_VERTEX_BUFFERS, 0, (3 * num_buffers)));
    for (i = 0; i < num_buffers; i++) {
-      struct graw_resource *res = (struct graw_resource *)buffers[i].buffer;
+      struct virgl_resource *res = (struct virgl_resource *)buffers[i].buffer;
       graw_encoder_write_dword(ctx->cbuf, buffers[i].stride);
       graw_encoder_write_dword(ctx->cbuf, buffers[i].buffer_offset);
       graw_encoder_write_res(ctx, res);
@@ -299,9 +300,9 @@ int graw_encoder_set_index_buffer(struct graw_context *ctx,
                                   const struct pipe_index_buffer *ib)
 {
    int length = 1 + (ib ? 2 : 0);
-   struct graw_resource *res = NULL;
+   struct virgl_resource *res = NULL;
    if (ib)
-      res = (struct graw_resource *)ib->buffer;
+      res = (struct virgl_resource *)ib->buffer;
 
    graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_SET_INDEX_BUFFER, 0, length));
    graw_encoder_write_res(ctx, res);
@@ -332,7 +333,7 @@ int graw_encoder_draw_vbo(struct graw_context *ctx,
 
 int graw_encoder_create_surface(struct graw_context *ctx,
 				uint32_t handle,
-				struct graw_resource *res,
+				struct virgl_resource *res,
 				const struct pipe_surface *templat)
 {
    graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_CREATE_OBJECT, VIRGL_OBJECT_SURFACE, 5));
@@ -352,7 +353,7 @@ int graw_encoder_create_surface(struct graw_context *ctx,
 
 int graw_encoder_create_so_target(struct graw_context *ctx,
                                   uint32_t handle,
-                                  struct graw_resource *res,
+                                  struct virgl_resource *res,
                                   unsigned buffer_offset,
                                   unsigned buffer_size)
 {
@@ -365,7 +366,7 @@ int graw_encoder_create_so_target(struct graw_context *ctx,
 }
 
 static void graw_encoder_iw_emit_header_1d(struct graw_context *ctx,
-                                           struct graw_resource *res,
+                                           struct virgl_resource *res,
                                            unsigned level, unsigned usage,
                                            const struct pipe_box *box,
                                            unsigned stride, unsigned layer_stride)
@@ -384,7 +385,7 @@ static void graw_encoder_iw_emit_header_1d(struct graw_context *ctx,
 }
 
 int graw_encoder_inline_write(struct graw_context *ctx,
-                              struct graw_resource *res,
+                              struct virgl_resource *res,
                               unsigned level, unsigned usage,
                               const struct pipe_box *box,
                               void *data, unsigned stride,
@@ -423,7 +424,7 @@ int graw_encoder_inline_write(struct graw_context *ctx,
 }
 
 int graw_encoder_flush_frontbuffer(struct graw_context *ctx,
-                                   struct graw_resource *res)
+                                   struct virgl_resource *res)
 {
 //   graw_encoder_write_dword(ctx->cbuf, VIRGL_CMD0(VIRGL_CCMD_FLUSH_FRONTUBFFER, 0, 1));
 //   graw_encoder_write_dword(ctx->cbuf, res_handle);
@@ -459,14 +460,14 @@ int graw_encode_sampler_state(struct graw_context *ctx,
 
 int graw_encode_sampler_view(struct graw_context *ctx,
                              uint32_t handle,
-                             struct graw_resource *res,
+                             struct virgl_resource *res,
                              const struct pipe_sampler_view *state)
 {
    graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_CREATE_OBJECT, VIRGL_OBJECT_SAMPLER_VIEW, 6));
    graw_encoder_write_dword(ctx->cbuf, handle);
    graw_encoder_write_res(ctx, res);
    graw_encoder_write_dword(ctx->cbuf, state->format);
-   if (res->base.target == PIPE_BUFFER) {
+   if (res->u.b.target == PIPE_BUFFER) {
       graw_encoder_write_dword(ctx->cbuf, state->u.buf.first_element);
       graw_encoder_write_dword(ctx->cbuf, state->u.buf.last_element);
    } else {
@@ -575,10 +576,10 @@ void graw_encoder_set_clip_state(struct graw_context *ctx,
 }
 
 int graw_encode_resource_copy_region(struct graw_context *ctx,
-                                     struct graw_resource *dst_res,
+                                     struct virgl_resource *dst_res,
                                      unsigned dst_level,
                                      unsigned dstx, unsigned dsty, unsigned dstz,
-                                     struct graw_resource *src_res,
+                                     struct virgl_resource *src_res,
                                      unsigned src_level,
                                      const struct pipe_box *src_box)
 {
@@ -600,8 +601,8 @@ int graw_encode_resource_copy_region(struct graw_context *ctx,
 }
 
 int graw_encode_blit(struct graw_context *ctx,
-                     struct graw_resource *dst_res,
-                     struct graw_resource *src_res,
+                     struct virgl_resource *dst_res,
+                     struct virgl_resource *src_res,
                      const struct pipe_blit_info *blit)
 {
    graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_BLIT, 0, 23));
@@ -636,7 +637,7 @@ int graw_encode_blit(struct graw_context *ctx,
 int graw_encoder_create_query(struct graw_context *ctx,
                               uint32_t handle,
                               uint query_type,
-                              struct graw_resource *res,
+                              struct virgl_resource *res,
                               uint32_t offset)
 {
    graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_CREATE_OBJECT, VIRGL_OBJECT_QUERY, 4));

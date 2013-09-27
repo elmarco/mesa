@@ -32,8 +32,10 @@ noinst_LTLIBRARIES = libvirgl.la
 
 libvirgl_la_SOURCES = \
 	virgl_screen.c \
+        virgl_resource.c \
+        virgl_buffer.c \
+        virgl_texture.c \
 	graw_context.c \
 	graw_encode.c \
-        graw_transfer.c \
         graw_query.c \
         graw_streamout.c

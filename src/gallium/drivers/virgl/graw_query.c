@@ -1,11 +1,12 @@
 #include "util/u_memory.h"
 #include "util/u_inlines.h"
+#include "virgl_resource.h"
 #include "graw_context.h"
 #include "graw_encode.h"
 
 struct graw_query {
    uint32_t handle;
-   struct graw_resource *buf;
+   struct virgl_resource *buf;
 
    unsigned type;
    unsigned result_size;
@@ -30,7 +31,7 @@ static struct pipe_query *graw_create_query(struct pipe_context *ctx,
    if (!query)
       return NULL;
 
-   query->buf = (struct graw_resource *)pipe_buffer_create(ctx->screen, PIPE_BIND_CUSTOM,
+   query->buf = (struct virgl_resource *)pipe_buffer_create(ctx->screen, PIPE_BIND_CUSTOM,
                                                            PIPE_USAGE_STAGING, sizeof(struct virgl_host_query_state));
    
    if (!query->buf) {
@@ -77,7 +78,7 @@ static void graw_end_query(struct pipe_context *ctx,
    struct pipe_transfer *transfer;
    struct virgl_host_query_state *host_state;
 
-   host_state = pipe_buffer_map(ctx, &query->buf->base,
+   host_state = pipe_buffer_map(ctx, &query->buf->u.b,
                                 PIPE_TRANSFER_WRITE, &transfer);
    host_state->query_state = VIRGL_QUERY_STATE_WAIT_HOST;
    pipe_buffer_unmap(ctx, transfer);
@@ -105,7 +106,7 @@ static boolean graw_get_query_result(struct pipe_context *ctx,
    /* do we  have to flush? */
    /* now we can do the transfer to get the result back? */
  remap:
-   host_state = pipe_buffer_map(ctx, &query->buf->base,
+   host_state = pipe_buffer_map(ctx, &query->buf->u.b,
                                PIPE_TRANSFER_READ, &transfer);
 
    if (host_state->query_state != VIRGL_QUERY_STATE_DONE) {

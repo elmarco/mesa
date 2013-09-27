@@ -1,6 +1,8 @@
 #ifndef VIRGL_H
 #define VIRGL_H
 
+#include "util/u_transfer.h"
+
 #include "../winsys/virgl/drm/virgl_hw.h"
 
 #include "virgl_winsys.h"
@@ -19,4 +21,5 @@ virgl_screen( struct pipe_screen *pipe )
 {
    return (struct virgl_screen *)pipe;
 }
+
 #endif

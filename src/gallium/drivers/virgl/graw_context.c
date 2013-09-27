@@ -24,6 +24,7 @@
 
 #include "graw_context.h"
 
+#include "virgl_resource.h"
 #include "virgl.h"
 #include "state_tracker/sw_winsys.h"
  struct pipe_screen encscreen;
@@ -35,25 +36,23 @@ uint32_t graw_object_assign_handle(void)
 }
 
 static void graw_buffer_flush(struct graw_context *grctx,
-                           struct graw_buffer *buf)
+                              struct virgl_buffer *vbuf)
 {
    struct virgl_screen *rs = virgl_screen(grctx->base.screen);
-   struct pipe_box hw_box;
-   struct pipe_resource *res = &buf->base.base;
 
-   assert(buf->on_list);
+   assert(vbuf->on_list);
 
-   buf->dirt_box.height = 1;
-   buf->dirt_box.depth = 1;
-   buf->dirt_box.y = 0;
-   buf->dirt_box.z = 0;
+   vbuf->dirt_box.height = 1;
+   vbuf->dirt_box.depth = 1;
+   vbuf->dirt_box.y = 0;
+   vbuf->dirt_box.z = 0;
 
    grctx->num_transfers++;
-   rs->vws->transfer_put(rs->vws, buf->base.hw_res,
-                         &buf->dirt_box, 0, 0, buf->dirt_box.x, 0);
+   rs->vws->transfer_put(rs->vws, vbuf->base.hw_res,
+                         &vbuf->dirt_box, 0, 0, vbuf->dirt_box.x, 0);
 
-   buf->dirt_box.x = buf->base.base.width0+1;
-   buf->dirt_box.width = 0;
+   vbuf->dirt_box.x = vbuf->base.u.b.width0+1;
+   vbuf->dirt_box.width = 0;
 }
 
 static struct pipe_surface *graw_create_surface(struct pipe_context *ctx,
@@ -62,8 +61,7 @@ static struct pipe_surface *graw_create_surface(struct pipe_context *ctx,
 {
    struct graw_context *grctx = (struct graw_context *)ctx;
    struct graw_surface *surf;
-   struct graw_texture *tex;
-   struct graw_resource *res = (struct graw_resource *)resource;
+   struct virgl_resource *res = virgl_resource(resource);
    uint32_t handle;
 
    surf = CALLOC_STRUCT(graw_surface);
@@ -108,7 +106,6 @@ static void *graw_create_blend_state(struct pipe_context *ctx,
                                               const struct pipe_blend_state *blend_state)
 {
    struct graw_context *grctx = (struct graw_context *)ctx;
-   struct pipe_blend_state *state = CALLOC_STRUCT(pipe_blend_state);
    uint32_t handle; 
    handle = graw_object_assign_handle();
 
@@ -314,17 +311,17 @@ static void graw_set_constant_buffer(struct pipe_context *ctx,
       graw_encoder_write_constant_buffer(grctx, shader, index, 0, NULL);
 }
 
-static void graw_transfer_inline_write(struct pipe_context *ctx,
-                                                struct pipe_resource *res,
-                                                unsigned level,
-                                                unsigned usage,
-                                                const struct pipe_box *box,
-                                                const void *data,
-                                                unsigned stride,
-                                                unsigned layer_stride)
+void graw_transfer_inline_write(struct pipe_context *ctx,
+                                struct pipe_resource *res,
+                                unsigned level,
+                                unsigned usage,
+                                const struct pipe_box *box,
+                                const void *data,
+                                unsigned stride,
+                                unsigned layer_stride)
 {
    struct graw_context *grctx = (struct graw_context *)ctx;
-   struct graw_resource *grres = (struct graw_resource *)res;
+   struct virgl_resource *grres = (struct virgl_resource *)res;
    void *ptr;
 
    grres->clean = FALSE;
@@ -461,16 +458,16 @@ static void graw_flush_eq(struct graw_context *ctx, void *closure)
    {
       struct virgl_winsys *vws = virgl_screen(ctx->base.screen)->vws;
       struct pipe_surface *surf;
-      struct graw_resource *res;
+      struct virgl_resource *res;
       surf = ctx->framebuffer.zsbuf;
       if (surf) {
-         res = (struct graw_resource *)surf->texture;
+         res = (struct virgl_resource *)surf->texture;
          vws->emit_res(vws, ctx->cbuf, res->hw_res, FALSE);
       }
       for (i = 0; i < ctx->framebuffer.nr_cbufs; i++) {
          surf = ctx->framebuffer.cbufs[i];
          if (surf) {
-            res = (struct graw_resource *)surf->texture;
+            res = (struct virgl_resource *)surf->texture;
             vws->emit_res(vws, ctx->cbuf, res->hw_res, FALSE);
          }
       }
@@ -482,10 +479,10 @@ static void graw_flush(struct pipe_context *ctx,
                        enum pipe_flush_flags flags)
 {
    struct graw_context *grctx = (struct graw_context *)ctx;
-   struct graw_buffer *buf, *tmp;
+   struct virgl_buffer *buf, *tmp;
 
    LIST_FOR_EACH_ENTRY_SAFE(buf, tmp, &grctx->to_flush_bufs, flush_list) {
-      struct pipe_resource *res = &buf->base.base;
+      struct pipe_resource *res = &buf->base.u.b;
       graw_buffer_flush(grctx, buf);
       list_del(&buf->flush_list);
       buf->on_list = FALSE;
@@ -503,12 +500,12 @@ static struct pipe_sampler_view *graw_create_sampler_view(struct pipe_context *c
    struct graw_sampler_view *grview = CALLOC_STRUCT(graw_sampler_view);
    uint32_t handle;
    int ret;
-   struct graw_resource *res;
+   struct virgl_resource *res;
 
    if (state == NULL)
       return NULL;
 
-   res = (struct graw_resource *)texture;
+   res = (struct virgl_resource *)texture;
    handle = graw_object_assign_handle();
    graw_encode_sampler_view(grctx, handle, res, state);
 
@@ -674,8 +671,8 @@ static void graw_resource_copy_region(struct pipe_context *ctx,
                                       const struct pipe_box *src_box)
 {
    struct graw_context *grctx = (struct graw_context *)ctx;
-   struct graw_resource *dres = (struct graw_resource *)dst;
-   struct graw_resource *sres = (struct graw_resource *)src;
+   struct virgl_resource *dres = (struct virgl_resource *)dst;
+   struct virgl_resource *sres = (struct virgl_resource *)src;
 
    dres->clean = FALSE;
    return graw_encode_resource_copy_region(grctx, dres,
@@ -688,8 +685,8 @@ static void graw_blit(struct pipe_context *ctx,
                       const struct pipe_blit_info *blit)
 {
    struct graw_context *grctx = (struct graw_context *)ctx;
-   struct graw_resource *dres = (struct graw_resource *)blit->dst.resource;
-   struct graw_resource *sres = (struct graw_resource *)blit->src.resource;
+   struct virgl_resource *dres = (struct virgl_resource *)blit->dst.resource;
+   struct virgl_resource *sres = (struct virgl_resource *)blit->src.resource;
 
    dres->clean = FALSE;
    return graw_encode_blit(grctx, dres, sres,
@@ -782,12 +779,12 @@ struct pipe_context *graw_context_create(struct pipe_screen *pscreen,
    grctx->base.resource_copy_region = graw_resource_copy_region;
    grctx->base.blit =  graw_blit;
 
-   graw_init_transfer_functions(grctx);
+   virgl_init_context_resource_functions(&grctx->base);
    graw_init_query_functions(grctx);
    graw_init_so_functions(grctx);
 
    list_inithead(&grctx->to_flush_bufs);
-   util_slab_create(&grctx->texture_transfer_pool, sizeof(struct graw_transfer),
+   util_slab_create(&grctx->texture_transfer_pool, sizeof(struct virgl_transfer),
                     16, UTIL_SLAB_SINGLETHREADED);
 
    grctx->uploader = u_upload_create(&grctx->base, 1024 * 1024, 256,
@@ -839,129 +836,4 @@ void graw_flush_frontbuffer(struct pipe_screen *screen,
 
 //   winsys->displaytarget_display(winsys, gres->dt, winsys_drawable_handle);
 #endif
-}
-
-static boolean
-vrend_resource_layout(struct pipe_screen *screen,
-                      struct graw_resource *res,
-                      uint32_t *total_size)
-{
-   struct pipe_resource *pt = &res->base;
-   unsigned level;
-   unsigned width = pt->width0;
-   unsigned height = pt->height0;
-   unsigned depth = pt->depth0;
-   unsigned buffer_size = 0;
-
-   for (level = 0; level <= pt->last_level; level++) {
-      unsigned slices;
-
-      if (pt->target == PIPE_TEXTURE_CUBE)
-         slices = 6;
-      else if (pt->target == PIPE_TEXTURE_3D)
-         slices = depth;
-      else
-         slices = pt->array_size;
-
-      res->stride[level] = util_format_get_stride(pt->format, width);
-      res->level_offset[level] = buffer_size;
-
-      buffer_size += (util_format_get_nblocksy(pt->format, height) *
-                      slices * res->stride[level]);
-
-      width = u_minify(width, 1);
-      height = u_minify(height, 1);
-      depth = u_minify(depth, 1);
-   }
-
-   if (pt->nr_samples <= 1)
-      *total_size = buffer_size;
-   else /* don't create guest backing store for MSAA */
-      *total_size = 0;
-   return TRUE;
-}
-
-struct pipe_resource *graw_resource_create(struct pipe_screen *pscreen,
-                                           const struct pipe_resource *template)
-{
-   struct virgl_screen *rs = virgl_screen(pscreen);
-   struct graw_buffer *buf;
-   struct graw_texture *tex;
-   uint32_t handle;
-   uint32_t size;
-   if (template->target == PIPE_BUFFER) {
-      buf = CALLOC_STRUCT(graw_buffer);
-      buf->base.clean = TRUE;
-      buf->base.base = *template;
-      buf->base.base.screen = pscreen;
-      pipe_reference_init(&buf->base.base.reference, 1);
-
-      vrend_resource_layout(pscreen, &buf->base, &size);
-      buf->dirt_box.x = template->width0 + 1;
-      buf->base.hw_res = rs->vws->resource_create(rs->vws, template->target, template->format, template->bind, template->width0, 1, 1, 1, 0, 0, size);
-
-      assert(buf->base.hw_res);
-      return &buf->base.base;
-   } else {
-      tex = CALLOC_STRUCT(graw_texture);
-      tex->base.clean = TRUE;
-      tex->base.base = *template;
-      tex->base.base.screen = pscreen;
-      pipe_reference_init(&tex->base.base.reference, 1);
-
-      vrend_resource_layout(pscreen, &tex->base, &size);
-
-      tex->base.hw_res = rs->vws->resource_create(rs->vws, template->target, template->format, template->bind, template->width0, template->height0, template->depth0, template->array_size, template->last_level, template->nr_samples, size);
-      assert(tex->base.hw_res);
-      return &tex->base.base;
-   }
-}
-
-
-struct pipe_resource *
-virgl_resource_from_handle(struct pipe_screen *screen,
-                             const struct pipe_resource *template,
-                             struct winsys_handle *whandle)
-{
-   struct virgl_screen *rs = virgl_screen(screen);
-   struct graw_texture *rpr = CALLOC_STRUCT(graw_texture);
-   uint32_t handle;
-   uint32_t size;
-
-   rpr->base.base = *template;
-   pipe_reference_init(&rpr->base.base.reference, 1);
-   rpr->base.base.screen = screen;      
-
-   vrend_resource_layout(screen, &rpr->base, &size);
-   rpr->base.hw_res = rs->vws->resource_create_from_handle(rs->vws, whandle);
-   return &rpr->base.base;
-}   
-
-boolean virgl_resource_get_handle(struct pipe_screen *screen,
-                                  struct pipe_resource *pt,
-                                  struct winsys_handle *whandle)
-{
-   struct virgl_screen *rs = virgl_screen(screen);
-
-   struct graw_resource *res = (struct graw_resource *)pt;
-
-   return rs->vws->resource_get_handle(rs->vws, res->hw_res, res->stride[0], whandle);
-}
-
-void
-graw_resource_destroy(struct pipe_screen *pscreen,
-                      struct pipe_resource *pt)
-{
-   struct virgl_screen *rs = virgl_screen(pscreen);
-
-   if (pt->target == PIPE_BUFFER) {
-      struct graw_buffer *buf = (struct graw_buffer *)pt;
-      rs->vws->resource_unref(rs->vws, buf->base.hw_res);
-      FREE(buf);
-   } else {
-      struct graw_texture *tex = (struct graw_texture *)pt;
-
-      rs->vws->resource_unref(rs->vws, tex->base.hw_res);
-      FREE(tex);
-   }
 }

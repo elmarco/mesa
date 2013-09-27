@@ -1,7 +1,8 @@
 #include "util/u_memory.h"
+#include "util/u_inlines.h"
 #include "graw_context.h"
 #include "graw_encode.h"
-#include "util/u_inlines.h"
+
 
 static struct pipe_stream_output_target *graw_create_so_target(
    struct pipe_context *ctx,

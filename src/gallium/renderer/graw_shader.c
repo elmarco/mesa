@@ -597,7 +597,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_LIT:
-      snprintf(buf, 512, "%s = %s(vec4(1.0, max(%s.x, 0.0), pow(max(0.0, %s.y) * step(0.0, %s.x), clamp(%s.w, -128.0, 128.0)), 1.0)%s);\n", dsts[0], dstconv, srcs[0], srcs[0], srcs[0], srcs[0], writemask);
+      snprintf(buf, 512, "%s = %s(vec4(1.0, max(%s.x, 0.0), step(0.0, %s.x) * pow(max(0.0, %s.y), clamp(%s.w, -128.0, 128.0)), 1.0)%s);\n", dsts[0], dstconv, srcs[0], srcs[0], srcs[0], srcs[0], writemask);
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_EX2:

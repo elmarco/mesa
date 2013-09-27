@@ -3143,6 +3143,21 @@ void grend_set_streamout_targets(struct grend_context *ctx,
    grend_hw_emit_streamout_targets(ctx);
 }
 
+static void vrend_resource_buffer_copy(struct grend_context *ctx,
+                                       struct grend_resource *src_res,
+                                       struct grend_resource *dst_res,
+                                       uint32_t dstx, uint32_t srcx,
+                                       uint32_t width)
+{
+
+   glBindBuffer(GL_COPY_READ_BUFFER, src_res->id);
+   glBindBuffer(GL_COPY_WRITE_BUFFER, dst_res->id);
+
+   glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, srcx, dstx, width);
+   glBindBuffer(GL_COPY_READ_BUFFER, 0);
+   glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
+}
+
 static void vrend_resource_copy_fallback(struct grend_context *ctx,
                                          struct grend_resource *src_res,
                                          struct grend_resource *dst_res,
@@ -3256,6 +3271,13 @@ void graw_renderer_resource_copy_region(struct grend_context *ctx,
    }
    if (!dst_res) {
       report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, dst_handle);
+      return;
+   }
+
+   if (src_res->base.target == PIPE_BUFFER && dst_res->base.target == PIPE_BUFFER) {
+      /* do a buffer copy */
+      vrend_resource_buffer_copy(ctx, src_res, dst_res, dstx,
+                                 src_box->x, src_box->width);
       return;
    }
 

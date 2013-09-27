@@ -89,7 +89,7 @@ struct global_renderer_state {
    struct list_head waiting_query_list;
 
    struct graw_cursor_info cursor_info;
-   bool have_robustness;
+   boolean have_robustness;
 
    GLuint vaoid;
 

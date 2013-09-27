@@ -500,7 +500,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
          int idx = src->Register.SwizzleX;
          char temp[25];
          /* build up a vec4 of immediates */
-         snprintf(srcs[i], 255, "vec4(");
+         snprintf(srcs[i], 255, "%svec4(", prefix);
          for (j = 0; j < 4; j++) {
             if (j == 0)
                idx = src->Register.SwizzleX;
@@ -524,8 +524,10 @@ iter_instruction(struct tgsi_iterate_context *iter,
             strncat(srcs[i], temp, 255);
             if (j < 3)
                strcat(srcs[i], ",");
-            else
-               strcat(srcs[i], ")");
+            else {
+               snprintf(temp, 3, ")%c", isabsolute ? ')' : 0);
+               strncat(srcs[i], temp, 255);
+            }
          }
       }
    }
@@ -909,7 +911,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_CMP:
-      snprintf(buf, 255, "%s = ((float(%s) >= 0) ? %s : %s)%s;\n", dsts[0], srcs[0], srcs[2], srcs[1], writemask);
+      snprintf(buf, 255, "%s = mix(%s, %s, greaterThanEqual(%s, vec4(0.0)))%s;\n", dsts[0], srcs[1], srcs[2], srcs[0], writemask);
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_END:

@@ -896,43 +896,4 @@ void graw_decode_block_iov(struct graw_iovec *iov, unsigned int niovs,
       free(data);
 
 }
-#if 0
-void graw_decode_transfer(uint32_t *data, uint32_t ndw)
-{
-   uint32_t handle = data[0];
-   struct pipe_box box, transfer_box;
-   int level;
-   box.x = data[1];
-   box.y = data[2];
-   box.z = data[3];
-   box.width = data[4];
-   box.height = data[5];
-   box.depth = data[6];
 
-   transfer_box.x = data[7];
-   transfer_box.y = data[8];
-   transfer_box.z = data[9];
-   transfer_box.width = data[10];
-   transfer_box.height = data[11];
-   transfer_box.depth = data[12];
-   level = data[13];
-
-   graw_renderer_transfer_write(handle, level, &transfer_box, &box, data+14);
-}
-
-void graw_decode_get_transfer(uint32_t *data, uint32_t ndw)
-{
-   uint32_t handle = data[0];
-   struct pipe_box box;
-   uint32_t level;
-
-   box.x = data[1];
-   box.y = data[2];
-   box.z = data[3];
-   box.width = data[4];
-   box.height = data[5];
-   box.depth = data[6];
-   level = data[7];
-   graw_renderer_transfer_send(handle, level, &box, NULL);
-}
-#endif

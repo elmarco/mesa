@@ -87,8 +87,6 @@ static void *virgl_texture_transfer_map(struct pipe_context *ctx,
       vs->vws->resource_wait(vs->vws, vtex->base.hw_res);
    }
 
-   if (!(usage & PIPE_TRANSFER_UNSYNCHRONIZED))
-      vs->vws->resource_wait(vs->vws, vtex->base.hw_res);
    trans->offset = offset;
    *transfer = &trans->base;
 

@@ -154,7 +154,12 @@ virgl_get_param(struct pipe_screen *screen, enum pipe_cap param)
       return vscreen->caps.caps.v1.bset.cube_map_array;
    case PIPE_CAP_TEXTURE_MULTISAMPLE:
       return vscreen->caps.caps.v1.bset.texture_multisample;
+   case PIPE_CAP_MAX_VIEWPORTS:
+      return 1;
    case PIPE_CAP_TEXTURE_BORDER_COLOR_QUIRK:
+   case PIPE_CAP_QUERY_PIPELINE_STATISTICS:
+   case PIPE_CAP_MAX_TEXTURE_BUFFER_SIZE:
+   case PIPE_CAP_ENDIANNESS:
       return 0;
    }
    /* should only get here on unhandled cases */
@@ -238,7 +243,6 @@ static boolean
 virgl_is_vertex_format_supported(struct pipe_screen *screen,
                                  enum pipe_format format)
 {
-   struct virgl_screen *vscreen = virgl_screen(screen);
    const struct util_format_description *format_desc;
    int i;
 
@@ -374,13 +378,6 @@ static void virgl_flush_frontbuffer(struct pipe_screen *screen,
                                       unsigned level, unsigned layer,
                                       void *winsys_drawable_handle)
 {
-   struct sw_winsys *winsys = virgl_screen(screen)->winsys;
-   struct graw_resource *gres = (struct graw_resource *)res;
-   void *map;
-
-   //   map = winsys->displaytarget_map(winsys, spr->dt, transfer->usage);
-   graw_flush_frontbuffer(screen, res, level, layer, winsys_drawable_handle);
-   //grend_flush_frontbuffer(gres->res_handle);
 }
 
 static uint64_t

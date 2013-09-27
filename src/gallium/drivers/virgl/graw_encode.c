@@ -62,6 +62,7 @@ int graw_encode_delete_object(struct graw_context *ctx,
 {
    graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_DESTROY_OBJECT, object, 1));
    graw_encoder_write_dword(ctx->cbuf, handle);
+   return 0;
 }
 
 int graw_encode_blend_state(struct graw_context *ctx,
@@ -175,6 +176,7 @@ int graw_encode_rasterizer_state(struct graw_context *ctx,
    graw_encoder_write_dword(ctx->cbuf, uif(state->offset_units));
    graw_encoder_write_dword(ctx->cbuf, uif(state->offset_scale));
    graw_encoder_write_dword(ctx->cbuf, uif(state->offset_clamp));
+   return 0;
 }
 
 int graw_encode_shader_state(struct graw_context *ctx,
@@ -211,7 +213,7 @@ int graw_encode_shader_state(struct graw_context *ctx,
          graw_encoder_write_dword(ctx->cbuf, tmp);
       }
    }
-   graw_encoder_write_block(ctx->cbuf, str, shader_len);
+   graw_encoder_write_block(ctx->cbuf, (uint8_t *)str, shader_len);
    return 0;
 }
 
@@ -230,6 +232,7 @@ int graw_encode_clear(struct graw_context *ctx,
       graw_encoder_write_dword(ctx->cbuf, color->ui[i]);
    graw_encoder_write_qword(ctx->cbuf, *(uint64_t *)&depth);
    graw_encoder_write_dword(ctx->cbuf, stencil);
+   return 0;
 }
 
 int graw_encoder_set_framebuffer_state(struct graw_context *ctx,
@@ -294,6 +297,7 @@ int graw_encoder_set_vertex_buffers(struct graw_context *ctx,
       graw_encoder_write_dword(ctx->cbuf, buffers[i].buffer_offset);
       graw_encoder_write_res(ctx, res);
    }
+   return 0;
 }
 
 int graw_encoder_set_index_buffer(struct graw_context *ctx,
@@ -310,6 +314,7 @@ int graw_encoder_set_index_buffer(struct graw_context *ctx,
       graw_encoder_write_dword(ctx->cbuf, ib->index_size);
       graw_encoder_write_dword(ctx->cbuf, ib->offset);
    }
+   return 0;
 }
 
 int graw_encoder_draw_vbo(struct graw_context *ctx,
@@ -388,7 +393,7 @@ int graw_encoder_inline_write(struct graw_context *ctx,
                               struct virgl_resource *res,
                               unsigned level, unsigned usage,
                               const struct pipe_box *box,
-                              void *data, unsigned stride,
+                              const void *data, unsigned stride,
                               unsigned layer_stride)
 {
    uint32_t size = (stride ? stride : box->width) * box->height;
@@ -420,7 +425,7 @@ int graw_encoder_inline_write(struct graw_context *ctx,
       left_bytes -= length;
       mybox.x += length;
    }
-
+   return 0;
 }
 
 int graw_encoder_flush_frontbuffer(struct graw_context *ctx,
@@ -455,6 +460,7 @@ int graw_encode_sampler_state(struct graw_context *ctx,
    graw_encoder_write_dword(ctx->cbuf, uif(state->max_lod));
    for (i = 0; i <  4; i++)
       graw_encoder_write_dword(ctx->cbuf, state->border_color.ui[i]);
+   return 0;
 }
 
 
@@ -475,6 +481,7 @@ int graw_encode_sampler_view(struct graw_context *ctx,
       graw_encoder_write_dword(ctx->cbuf, state->u.tex.first_level | state->u.tex.last_level << 8);
    }
    graw_encoder_write_dword(ctx->cbuf, state->swizzle_r | (state->swizzle_g << 3) | (state->swizzle_b << 6) | (state->swizzle_a << 9));
+   return 0;
 }
 
 int graw_encode_set_sampler_views(struct graw_context *ctx,
@@ -490,7 +497,7 @@ int graw_encode_set_sampler_views(struct graw_context *ctx,
       graw_encoder_write_dword(ctx->cbuf, handle);
 
       if (views[i])
-         graw_encoder_attach_res(ctx, (struct grend_resource *)views[i]->base.texture);
+         graw_encoder_attach_res(ctx, (struct virgl_resource *)views[i]->base.texture);
    }
    return 0;
 }
@@ -512,14 +519,14 @@ int graw_encoder_write_constant_buffer(struct graw_context *ctx,
                                        uint32_t shader,
                                        uint32_t index,
                                        uint32_t size,
-                                       void *data)
+                                       const void *data)
 {
    graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_SET_CONSTANT_BUFFER, 0, size + 2));
    graw_encoder_write_dword(ctx->cbuf, shader);
    graw_encoder_write_dword(ctx->cbuf, index);
    if (data)
       graw_encoder_write_block(ctx->cbuf, data, size * 4);
-
+   return 0;
 }
 
 int graw_encoder_set_stencil_ref(struct graw_context *ctx,
@@ -527,6 +534,7 @@ int graw_encoder_set_stencil_ref(struct graw_context *ctx,
 {
    graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_SET_STENCIL_REF, 0, 1));
    graw_encoder_write_dword(ctx->cbuf, (ref->ref_value[0] | (ref->ref_value[1] << 8)));
+   return 0;
 }
 
 int graw_encoder_set_blend_color(struct graw_context *ctx,
@@ -536,6 +544,7 @@ int graw_encoder_set_blend_color(struct graw_context *ctx,
    graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_SET_BLEND_COLOR, 0, 4));
    for (i = 0; i < 4; i++)
       graw_encoder_write_dword(ctx->cbuf, uif(color->color[i]));
+   return 0;
 }
 
 int graw_encoder_set_scissor_state(struct graw_context *ctx,
@@ -544,6 +553,7 @@ int graw_encoder_set_scissor_state(struct graw_context *ctx,
    graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_SET_SCISSOR_STATE, 0, 2));
    graw_encoder_write_dword(ctx->cbuf, (ss->minx | ss->miny << 16));
    graw_encoder_write_dword(ctx->cbuf, (ss->maxx | ss->maxy << 16));
+   return 0;
 }
 
 void graw_encoder_set_polygon_stipple(struct graw_context *ctx,
@@ -652,14 +662,16 @@ int graw_encoder_begin_query(struct graw_context *ctx,
                              uint32_t handle)
 {
    graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_BEGIN_QUERY, 0, 1));
-   graw_encoder_write_dword(ctx->cbuf, handle);   
+   graw_encoder_write_dword(ctx->cbuf, handle);
+   return 0;
 }
 
 int graw_encoder_end_query(struct graw_context *ctx,
                            uint32_t handle)
 {
    graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_END_QUERY, 0, 1));
-   graw_encoder_write_dword(ctx->cbuf, handle);   
+   graw_encoder_write_dword(ctx->cbuf, handle);
+   return 0;
 }
 
 int graw_encoder_get_query_result(struct graw_context *ctx,
@@ -668,6 +680,7 @@ int graw_encoder_get_query_result(struct graw_context *ctx,
    graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_GET_QUERY_RESULT, 0, 2));
    graw_encoder_write_dword(ctx->cbuf, handle);
    graw_encoder_write_dword(ctx->cbuf, wait ? 1 : 0);
+   return 0;
 }
 
 int graw_encoder_set_so_targets(struct graw_context *ctx,
@@ -691,4 +704,5 @@ int graw_encoder_set_query_state(struct graw_context *ctx,
 {
    graw_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_SET_QUERY_STATE, 0, 1));
    graw_encoder_write_dword(ctx->cbuf, query_enabled ? (1 << 0) : 0);
+   return 0;
 }

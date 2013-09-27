@@ -11,7 +11,7 @@ static struct pipe_stream_output_target *graw_create_so_target(
    unsigned buffer_size)
 {
    struct graw_context *grctx = (struct graw_context *)ctx;
-   struct graw_resource *res = (struct graw_resource *)buffer;
+   struct virgl_resource *res = (struct virgl_resource *)buffer;
    struct graw_so_target *t = CALLOC_STRUCT(graw_so_target);
    uint32_t handle;
 

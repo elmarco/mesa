@@ -15,6 +15,7 @@ struct graw_query {
 
 static void graw_render_condition(struct pipe_context *pipe,
                                   struct pipe_query *query,
+                                  boolean condition,
                                   uint mode)
 {
 

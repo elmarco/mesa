@@ -24,7 +24,7 @@ static inline void graw_encoder_write_qword(struct virgl_cmd_buf *state,
 }
 
 static inline void graw_encoder_write_block(struct virgl_cmd_buf *state,
-					    uint8_t *ptr, uint32_t len)
+					    const uint8_t *ptr, uint32_t len)
 {
    int x;
    memcpy(state->buf + state->cdw, ptr, len);
@@ -107,7 +107,7 @@ int graw_encoder_inline_write(struct graw_context *ctx,
                               struct virgl_resource *res,
                               unsigned level, unsigned usage,
                               const struct pipe_box *box,
-                              void *data, unsigned stride,
+                              const void *data, unsigned stride,
                               unsigned layer_stride);
 int graw_encode_sampler_state(struct graw_context *ctx,
                               uint32_t handle,
@@ -136,7 +136,7 @@ int graw_encoder_write_constant_buffer(struct graw_context *ctx,
                                        uint32_t shader,
                                        uint32_t index,
                                        uint32_t size,
-                                       void *data);
+                                       const void *data);
 int graw_encode_dsa_state(struct graw_context *ctx,
                           uint32_t handle,
                           const struct pipe_depth_stencil_alpha_state *dsa_state);

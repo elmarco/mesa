@@ -239,8 +239,6 @@ static void graw_set_vertex_buffers(struct pipe_context *ctx,
 {
    struct graw_context *grctx = (struct graw_context *)ctx;
 
-   int i;
-
    util_set_vertex_buffers_count(grctx->vertex_buffer,
                                  &grctx->num_vertex_buffers,
                                  buffers, start_slot, num_buffers);
@@ -251,10 +249,9 @@ static void graw_set_vertex_buffers(struct pipe_context *ctx,
 static void graw_hw_set_vertex_buffers(struct pipe_context *ctx)
 {
    struct graw_context *grctx = (struct graw_context *)ctx;
-   int i;
-
+ 
    if (grctx->vertex_array_dirty) {
-      graw_encoder_set_vertex_buffers(grctx, grctx->num_vertex_buffers, &grctx->vertex_buffer);
+      graw_encoder_set_vertex_buffers(grctx, grctx->num_vertex_buffers, grctx->vertex_buffer);
    }
 }
 
@@ -276,7 +273,6 @@ static void graw_set_index_buffer(struct pipe_context *ctx,
                                   const struct pipe_index_buffer *ib)
 {
         struct graw_context *grctx = (struct graw_context *)ctx;
-        uint32_t handle = 0;
 
         if (ib) {
                 pipe_resource_reference(&grctx->index_buffer.buffer, ib->buffer);
@@ -322,7 +318,6 @@ void graw_transfer_inline_write(struct pipe_context *ctx,
 {
    struct graw_context *grctx = (struct graw_context *)ctx;
    struct virgl_resource *grres = (struct virgl_resource *)res;
-   void *ptr;
 
    grres->clean = FALSE;
    graw_encoder_inline_write(grctx, grres, level, usage,
@@ -499,7 +494,6 @@ static struct pipe_sampler_view *graw_create_sampler_view(struct pipe_context *c
    struct graw_context *grctx = (struct graw_context *)ctx;
    struct graw_sampler_view *grview = CALLOC_STRUCT(graw_sampler_view);
    uint32_t handle;
-   int ret;
    struct virgl_resource *res;
 
    if (state == NULL)
@@ -590,7 +584,7 @@ static void *graw_create_sampler_state(struct pipe_context *ctx,
 {
    struct graw_context *grctx = (struct graw_context *)ctx;
    uint32_t handle;
-   int ret;
+
    handle = graw_object_assign_handle();
 
    graw_encode_sampler_state(grctx, handle, state);
@@ -675,10 +669,10 @@ static void graw_resource_copy_region(struct pipe_context *ctx,
    struct virgl_resource *sres = (struct virgl_resource *)src;
 
    dres->clean = FALSE;
-   return graw_encode_resource_copy_region(grctx, dres,
-                                           dst_level, dstx, dsty, dstz,
-                                           sres, src_level,
-                                           src_box);
+   graw_encode_resource_copy_region(grctx, dres,
+                                    dst_level, dstx, dsty, dstz,
+                                    sres, src_level,
+                                    src_box);
 }
 
 static void graw_blit(struct pipe_context *ctx,
@@ -689,9 +683,8 @@ static void graw_blit(struct pipe_context *ctx,
    struct virgl_resource *sres = (struct virgl_resource *)blit->src.resource;
 
    dres->clean = FALSE;
-   return graw_encode_blit(grctx, dres, sres,
-                           blit);
-
+   graw_encode_blit(grctx, dres, sres,
+                    blit);
 }
 
                                        
@@ -799,41 +792,4 @@ struct pipe_context *graw_context_create(struct pipe_screen *pscreen,
    return &grctx->base;
 fail:
    return NULL;
-}
-
-void graw_flush_frontbuffer(struct pipe_screen *screen,
-                            struct pipe_resource *res,
-                            unsigned level, unsigned layer,
-                            void *winsys_drawable_handle)
-{
-#if 0
-   struct sw_winsys *winsys = virgl_screen(screen)->winsys;
-   struct graw_texture *gres = (struct graw_texture *)res;
-   void *map;
-   struct pipe_box box;
-   int size = res->width0 * res->height0 * util_format_get_blocksize(res->format);
-   void *alloced = malloc(size);
-   int i;
-
-   if (!alloced) {
-      fprintf(stderr,"Failed to malloc\n");
-   }
-   map = winsys->displaytarget_map(winsys, gres->dt, 0);
-
-   box.x = box.y = box.z = 0;
-   box.width = res->width0;
-   box.height = res->height0;
-   box.depth = 1;
-   graw_transfer_get_block(gres->base.res_handle, 0, &box, alloced, size / 4);
-
-   for (i = 0; i < res->height0; i++) {
-      int offsrc = res->width0 * util_format_get_blocksize(res->format) * i;
-      int offdst = gres->stride * i;
-      memcpy(map + offdst, alloced + offsrc, res->width0 * util_format_get_blocksize(res->format));
-   }
-   free(alloced);
-   winsys->displaytarget_unmap(winsys, gres->dt);
-
-//   winsys->displaytarget_display(winsys, gres->dt, winsys_drawable_handle);
-#endif
 }

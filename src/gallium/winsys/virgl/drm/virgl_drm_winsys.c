@@ -463,7 +463,6 @@ static void virgl_drm_resource_wait(struct virgl_winsys *qws, struct virgl_hw_re
 
 static struct virgl_cmd_buf *virgl_drm_cmd_buf_create(struct virgl_winsys *qws)
 {
-   struct virgl_drm_winsys *qdws = virgl_drm_winsys(qws);
    struct virgl_drm_cmd_buf *cbuf;
 
    cbuf = CALLOC_STRUCT(virgl_drm_cmd_buf);
@@ -558,7 +557,6 @@ static void virgl_drm_emit_res(struct virgl_winsys *qws,
 {
    struct virgl_drm_winsys *qdws = virgl_drm_winsys(qws);
    struct virgl_drm_cmd_buf *cbuf = (struct virgl_drm_cmd_buf *)_cbuf;
-   int i;
    boolean already_in_list = virgl_drm_lookup_res(cbuf, res);
    
    if (write_buf)
@@ -572,9 +570,6 @@ static boolean virgl_drm_res_is_ref(struct virgl_winsys *qws,
                                struct virgl_cmd_buf *_cbuf,
                                struct virgl_hw_res *res)
 {
-   struct virgl_drm_winsys *qdws = virgl_drm_winsys(qws);
-   struct virgl_drm_cmd_buf *cbuf = (struct virgl_drm_cmd_buf *)_cbuf;
-   
    if (!res->num_cs_references)
       return FALSE;
 
@@ -586,8 +581,6 @@ static int virgl_drm_winsys_submit_cmd(struct virgl_winsys *qws, struct virgl_cm
    struct virgl_drm_winsys *qdws = virgl_drm_winsys(qws);
    struct virgl_drm_cmd_buf *cbuf = (struct virgl_drm_cmd_buf *)_cbuf;
    struct drm_virgl_execbuffer eb;
-   uint32_t *handles;
-   int i;
    int ret;
 
    if (cbuf->base.cdw == 0)
@@ -659,7 +652,6 @@ struct virgl_winsys *
 virgl_drm_winsys_create(int drmFD)
 {
    struct virgl_drm_winsys *qdws;
-   unsigned int deviceID;
 
    qdws = CALLOC_STRUCT(virgl_drm_winsys);
    if (!qdws)
@@ -691,7 +683,4 @@ virgl_drm_winsys_create(int drmFD)
    qdws->base.get_caps = virgl_drm_get_caps;
    return &qdws->base;
 
- fail:
-   FREE(qdws);
-   return NULL;
 }

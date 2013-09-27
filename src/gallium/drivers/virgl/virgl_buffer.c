@@ -102,11 +102,6 @@ static void virgl_buffer_transfer_flush_region(struct pipe_context *ctx,
 {
    struct graw_context *grctx = (struct graw_context *)ctx;
    struct virgl_buffer *vbuf = virgl_buffer(transfer->resource);
-   struct virgl_transfer *trans = (struct virgl_transfer *)transfer;
-   uint32_t offset;
-   uint32_t size;
-   struct pipe_box hw_box;
-   struct virgl_screen *vs = virgl_screen(ctx->screen);
    uint32_t start, end, cstart, cend;
    
    if (!vbuf->on_list) {
@@ -147,7 +142,6 @@ struct pipe_resource *virgl_buffer_create(struct virgl_screen *vs,
                                           const struct pipe_resource *template)
 {
    struct virgl_buffer *buf;
-   uint32_t handle;
    uint32_t size;
 
    buf = CALLOC_STRUCT(virgl_buffer);

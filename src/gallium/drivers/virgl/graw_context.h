@@ -9,7 +9,6 @@
 #include "util/u_slab.h"
 #include "util/u_double_list.h"
 
-struct graw_screen;
 struct virgl_resource;
 struct virgl_buffer;
 
@@ -81,26 +80,7 @@ struct graw_context {
 struct pipe_context *graw_context_create(struct pipe_screen *pscreen,
                                          void *priv);
 
-struct pipe_resource *graw_resource_create(struct pipe_screen *pscreen,
-                                           const struct pipe_resource *template);
-
-void
-graw_resource_destroy(struct pipe_screen *pscreen,
-                      struct pipe_resource *pt);
-
-void graw_flush_frontbuffer(struct pipe_screen *screen,
-                            struct pipe_resource *res,
-                            unsigned level, unsigned layer,
-                            void *winsys_drawable_handle);
-
-void grend_flush_frontbuffer(uint32_t res_handle);
-
-boolean virgl_resource_get_handle(struct pipe_screen *screen,
-                                  struct pipe_resource *pt,
-                                  struct winsys_handle *whandle);
-
 void graw_init_blit_functions(struct graw_context *grctx);
-
 void graw_init_query_functions(struct graw_context *grctx);
 void graw_init_so_functions(struct graw_context *grctx);
 

@@ -194,7 +194,6 @@ virgl_texture_from_handle(struct virgl_screen *vs,
                           struct winsys_handle *whandle)
 {
    struct virgl_texture *tex;
-   uint32_t handle;
    uint32_t size;
 
    tex = CALLOC_STRUCT(virgl_texture);
@@ -212,7 +211,6 @@ struct pipe_resource *virgl_texture_create(struct virgl_screen *vs,
                                            const struct pipe_resource *template)
 {
    struct virgl_texture *tex;
-   uint32_t handle;
    uint32_t size;
 
    tex = CALLOC_STRUCT(virgl_texture);

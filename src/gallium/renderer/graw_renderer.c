@@ -2120,6 +2120,11 @@ static void grend_hw_emit_rs(struct grend_context *ctx)
    }
    glPolygonOffset(state->offset_scale, state->offset_units);
 
+   if (state->poly_stipple_enable)
+      glEnable(GL_POLYGON_STIPPLE);
+   else
+      glDisable(GL_POLYGON_STIPPLE);
+   
    if (state->point_quad_rasterization) {
       glEnable(GL_POINT_SPRITE);
 
@@ -3130,7 +3135,7 @@ void grend_set_scissor_state(struct grend_context *ctx,
 void grend_set_polygon_stipple(struct grend_context *ctx,
                                struct pipe_poly_stipple *ps)
 {
-
+   glPolygonStipple((const GLubyte *)ps->stipple);
 }
 
 void grend_set_clip_state(struct grend_context *ctx, struct pipe_clip_state *ucp)

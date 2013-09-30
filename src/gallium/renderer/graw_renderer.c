@@ -2164,6 +2164,11 @@ static void grend_hw_emit_rs(struct grend_context *ctx)
       }
    }
 
+   glLineStipple(state->line_stipple_factor, state->line_stipple_pattern);
+   if (state->line_stipple_enable)
+      glEnable(GL_LINE_STIPPLE);
+   else
+      glDisable(GL_LINE_STIPPLE);
 }
 void grend_object_bind_rasterizer(struct grend_context *ctx,
                                   uint32_t handle)

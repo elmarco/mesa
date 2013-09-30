@@ -2169,6 +2169,16 @@ static void grend_hw_emit_rs(struct grend_context *ctx)
       glEnable(GL_LINE_STIPPLE);
    else
       glDisable(GL_LINE_STIPPLE);
+
+   if (state->line_smooth)
+      glEnable(GL_LINE_SMOOTH);
+   else
+      glDisable(GL_LINE_SMOOTH);
+
+   if (state->poly_smooth)
+      glEnable(GL_POLYGON_SMOOTH);
+   else
+      glDisable(GL_POLYGON_SMOOTH);
 }
 void grend_object_bind_rasterizer(struct grend_context *ctx,
                                   uint32_t handle)

@@ -1,5 +1,6 @@
 #include <GL/glew.h>
 #include <GL/gl.h>
+#include <GL/glx.h>
 
 #include <stdio.h>
 #include "pipe/p_shader_tokens.h"
@@ -37,12 +38,17 @@ static void grend_destroy_query_object(void *obj_ptr);
 static void grend_finish_context_switch(struct grend_context *ctx);
 static void grend_patch_blend_func(struct grend_context *ctx);
 static void grend_update_frontface_state(struct grend_context *ctx);
+static void setup_glx_crap(void);
 extern int graw_shader_use_explicit;
 int localrender;
 static int have_invert_mesa = 0;
 static int draw_cursor = 0;
 int vrend_dump_shaders;
 
+static XVisualInfo *myvisual;
+static Display *Dpy;
+static GLXDrawable Draw;
+static GLXContext ctx0;
 struct grend_fence {
    uint32_t fence_id;
    uint32_t ctx_id;
@@ -217,6 +223,7 @@ struct grend_shader_view {
 struct grend_context {
    char debug_name[64];
 
+   GLXContext glx_context;
    int ctx_id;
    GLuint vaoid;
 
@@ -2337,6 +2344,8 @@ void graw_renderer_init(void)
       vrend_object_init_resource_table();
    }
 
+   setup_glx_crap();
+
    if (glewIsSupported("GL_ARB_robustness"))
       grend_state.have_robustness = TRUE;
    else
@@ -2421,6 +2430,9 @@ bool grend_destroy_context(struct grend_context *ctx)
 
    /* need to free any objects still in hash table - TODO */
    vrend_object_fini_ctx_table(ctx->object_hash);
+
+   if (ctx->ctx_id != 0)
+      glXDestroyContext(Dpy, ctx->glx_context);
    FREE(ctx);
 
    return switch_0;
@@ -2433,6 +2445,12 @@ struct grend_context *grend_create_context(int id, uint32_t nlen, const char *de
    if (nlen) {
       strncpy(grctx->debug_name, debug_name, 64);
    }
+
+   if (id == 0)
+      grctx->glx_context = ctx0;
+   else
+      grctx->glx_context = glXCreateContext(Dpy, myvisual, ctx0, TRUE);
+   glXMakeCurrent(Dpy, Draw, grctx->glx_context);
    grctx->ctx_id = id;
    list_inithead(&grctx->programs);
    list_inithead(&grctx->active_nontimer_query_list);
@@ -2639,11 +2657,12 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
                                       unsigned int num_iovs)
 {
    struct grend_resource *res;
+   struct grend_context *ctx = vrend_lookup_renderer_ctx(ctx_id);
    void *data;
 
    res = vrend_resource_lookup(res_handle, ctx_id);
    if (res == NULL) {
-      struct grend_context *ctx = vrend_lookup_renderer_ctx(ctx_id);
+
       report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, res_handle);
       return;
    }
@@ -2652,6 +2671,8 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
       iov = res->iov;
       num_iovs = res->num_iovs;
    }
+
+   glXMakeCurrent(Dpy, Draw, ctx->glx_context);
 
    if (res->target == 0 && res->ptr) {
       graw_iov_to_buf(iov, num_iovs, offset, res->ptr, box->width);
@@ -3028,13 +3049,16 @@ void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t ctx_id,
                                      int num_iovs)
 {
    struct grend_resource *res;
+   struct grend_context *ctx = vrend_lookup_renderer_ctx(ctx_id);
 
    res = vrend_resource_lookup(res_handle, ctx_id);
    if (!res) {
-      struct grend_context *ctx = vrend_lookup_renderer_ctx(ctx_id);
+
       report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, res_handle);
       return;
    }
+
+   glXMakeCurrent(Dpy, Draw, ctx->glx_context);
 
    if (res->iov && (!iov || num_iovs == 0)) {
       iov = res->iov;
@@ -3482,6 +3506,8 @@ int graw_renderer_flush_buffer_res(struct grend_resource *res,
 {
    if (!res->is_front) {
       uint32_t y1, y2;
+
+      glXMakeCurrent(Dpy, Draw, ctx0);
       if (!front_fb_id)
          glGenFramebuffers(1, &front_fb_id);
 
@@ -3681,6 +3707,9 @@ static void grend_ctx_restart_queries(struct grend_context *ctx)
    struct grend_query *query;
    struct grend_nontimer_hw_query *hwq;
 
+   if (ctx->query_on_hw == TRUE)
+      return;
+
    ctx->query_on_hw = TRUE;
    LIST_FOR_EACH_ENTRY(query, &ctx->active_nontimer_query_list, ctx_queries) {
       if (query->active_hw == FALSE) {
@@ -3694,8 +3723,10 @@ static void grend_ctx_restart_queries(struct grend_context *ctx)
 /* stop all the nontimer queries running in the current context */
 void grend_stop_current_queries(void)
 {
-   if (grend_state.current_ctx && grend_state.current_ctx->query_on_hw)
+   if (grend_state.current_ctx && grend_state.current_ctx->query_on_hw) {
       grend_ctx_finish_queries(grend_state.current_ctx);
+      grend_state.current_ctx->query_on_hw = FALSE;
+   }
 }
 
 boolean grend_hw_switch_context(struct grend_context *ctx)
@@ -3708,9 +3739,11 @@ boolean grend_hw_switch_context(struct grend_context *ctx)
       grend_ctx_finish_queries(grend_state.current_ctx);
    }
 
-   if (ctx->ctx_id != 0 && ctx->in_error)
+   if (ctx->ctx_id != 0 && ctx->in_error) {
       return FALSE;
+   }
 
+   glXMakeCurrent(Dpy, Draw, ctx->glx_context);
 
    ctx->ctx_switch_pending = TRUE;
    grend_state.current_ctx = ctx;
@@ -4110,4 +4143,25 @@ GLint64 graw_renderer_get_timestamp(void)
    GLint64 v;
    glGetInteger64v(GL_TIMESTAMP, &v);
    return v;
+}
+
+
+static void setup_glx_crap(void)
+{
+   int attrib[] = { GLX_RGBA,
+		    GLX_RED_SIZE, 1,
+		    GLX_GREEN_SIZE, 1,
+		    GLX_BLUE_SIZE, 1,
+		    GLX_DOUBLEBUFFER,
+		    None };
+   int scrnum;
+
+   XVisualInfo *VisInfo;
+   Dpy = glXGetCurrentDisplay();
+   Draw = glXGetCurrentDrawable();
+
+   VisInfo = glXChooseVisual(Dpy, DefaultScreen(Dpy), attrib);
+
+   myvisual = VisInfo;
+   ctx0 = glXGetCurrentContext();
 }

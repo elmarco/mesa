@@ -81,14 +81,14 @@ static void graw_end_query(struct pipe_context *ctx,
 {
    struct graw_context *grctx = (struct graw_context *)ctx;
    struct graw_query *query = (struct graw_query *)q;
-   struct pipe_transfer *transfer;
-   struct virgl_host_query_state *host_state;
+   struct pipe_box box;
 
-   host_state = pipe_buffer_map(ctx, &query->buf->u.b,
-                                PIPE_TRANSFER_WRITE, &transfer);
-   host_state->query_state = VIRGL_QUERY_STATE_WAIT_HOST;
-   pipe_buffer_unmap(ctx, transfer);
-   
+   uint32_t qs = VIRGL_QUERY_STATE_WAIT_HOST;
+   u_box_1d(0, 4, &box);
+   graw_transfer_inline_write(ctx, &query->buf->u.b, 0, PIPE_TRANSFER_WRITE,
+                              &box, &qs, 0, 0);
+
+
    graw_encoder_end_query(grctx, query->handle);
 }
 

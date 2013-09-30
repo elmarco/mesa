@@ -1233,7 +1233,9 @@ void grend_transfer_inline_write(struct grend_context *ctx,
       report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, res_handle);
       return;
    }
-   if (res->target == GL_ELEMENT_ARRAY_BUFFER_ARB ||
+   if (res->ptr) {
+      memcpy(res->ptr + box->x, data, box->width);
+   } else if (res->target == GL_ELEMENT_ARRAY_BUFFER_ARB ||
        res->target == GL_ARRAY_BUFFER_ARB ||
        res->target == GL_TRANSFORM_FEEDBACK_BUFFER) {
       glBindBufferARB(res->target, res->id);
@@ -2670,7 +2672,7 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
    grend_hw_switch_context(vrend_lookup_renderer_ctx(0), TRUE);
 
    if (res->target == 0 && res->ptr) {
-      graw_iov_to_buf(iov, num_iovs, offset, res->ptr, box->width);
+      graw_iov_to_buf(iov, num_iovs, offset, res->ptr + box->x, box->width);
       return;
    }
    if (res->target == GL_TRANSFORM_FEEDBACK_BUFFER ||

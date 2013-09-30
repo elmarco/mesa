@@ -762,7 +762,7 @@ void graw_renderer_context_destroy(uint32_t handle)
    free(ctx);
    /* switch to ctx 0 */
    if (ret)
-      grend_hw_switch_context(dec_ctx[0]->grctx);      
+       grend_hw_switch_context(dec_ctx[0]->grctx, TRUE);
 }
 
 struct grend_context *vrend_lookup_renderer_ctx(uint32_t ctx_id)
@@ -789,7 +789,7 @@ static void graw_decode_block(uint32_t ctx_id, uint32_t *block, int ndw)
 
    gdctx = dec_ctx[ctx_id];
 
-   ret = grend_hw_switch_context(gdctx->grctx);
+   ret = grend_hw_switch_context(gdctx->grctx, TRUE);
    if (ret == FALSE)
       return;
 

@@ -406,10 +406,7 @@ void grend_use_program(GLuint program_id)
 
 void grend_bind_va(GLuint vaoid)
 {
-   if (grend_state.vaoid != vaoid) {
-      grend_state.vaoid = vaoid;
-      glBindVertexArray(vaoid);
-   }
+   glBindVertexArray(vaoid);
 }
 
 void grend_blend_enable(GLboolean blend_enable)
@@ -1471,8 +1468,6 @@ void grend_draw_vbo(struct grend_context *ctx,
    
    grend_use_program(ctx->prog->id);
 
-   grend_bind_va(ctx->vaoid);
-
    for (shader_type = PIPE_SHADER_VERTEX; shader_type <= PIPE_SHADER_FRAGMENT; shader_type++) {
       if (ctx->prog->const_locs[shader_type] && (ctx->const_dirty[shader_type] || new_program)) {
 	 int nc;
@@ -1631,7 +1626,7 @@ void grend_draw_vbo(struct grend_context *ctx,
    } else
       glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
-   grend_ctx_restart_queries(ctx);
+//   grend_ctx_restart_queries(ctx);
 
    if (ctx->num_so_targets) {
       glBeginTransformFeedback(info->mode);
@@ -1690,7 +1685,6 @@ void grend_draw_vbo(struct grend_context *ctx,
       else if (grend_state.have_gl_prim_restart)
          glDisable(GL_PRIMITIVE_RESTART);
    }
-   grend_bind_va(0);
 }
 
 static GLenum translate_blend_func(uint32_t pipe_blend)
@@ -2412,8 +2406,6 @@ bool grend_destroy_context(struct grend_context *ctx)
    if (ctx->blit_fb_ids[0])
       glDeleteFramebuffers(2, ctx->blit_fb_ids);
 
-   grend_bind_va(ctx->vaoid);
-
    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
    while (ctx->enabled_attribs_bitmask) {
@@ -2459,6 +2451,7 @@ struct grend_context *grend_create_context(int id, uint32_t nlen, const char *de
    glGenFramebuffers(2, grctx->blit_fb_ids);
    grctx->object_hash = vrend_object_init_ctx_table();
 
+   grend_bind_va(grctx->vaoid);
    return grctx;
 }
 
@@ -2579,12 +2572,14 @@ void graw_renderer_resource_destroy(struct grend_resource *res)
 
    if (res->ptr)
       free(res->ptr);
-   if (res->target == GL_ELEMENT_ARRAY_BUFFER_ARB ||
-       res->target == GL_ARRAY_BUFFER_ARB ||
-       res->target == GL_TRANSFORM_FEEDBACK_BUFFER) {
-      glDeleteBuffers(1, &res->id);
-   } else
-      glDeleteTextures(1, &res->id);
+   if (res->id) {
+      if (res->target == GL_ELEMENT_ARRAY_BUFFER_ARB ||
+          res->target == GL_ARRAY_BUFFER_ARB ||
+          res->target == GL_TRANSFORM_FEEDBACK_BUFFER) {
+         glDeleteBuffers(1, &res->id);
+      } else
+         glDeleteTextures(1, &res->id);
+   }
 
    if (res->handle)
       vrend_resource_remove(res->handle);
@@ -2657,12 +2652,12 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
                                       unsigned int num_iovs)
 {
    struct grend_resource *res;
-   struct grend_context *ctx = vrend_lookup_renderer_ctx(ctx_id);
+
    void *data;
 
    res = vrend_resource_lookup(res_handle, ctx_id);
    if (res == NULL) {
-
+      struct grend_context *ctx = vrend_lookup_renderer_ctx(ctx_id);
       report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, res_handle);
       return;
    }
@@ -2672,7 +2667,7 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
       num_iovs = res->num_iovs;
    }
 
-   glXMakeCurrent(Dpy, Draw, ctx->glx_context);
+   grend_hw_switch_context(vrend_lookup_renderer_ctx(0), TRUE);
 
    if (res->target == 0 && res->ptr) {
       graw_iov_to_buf(iov, num_iovs, offset, res->ptr, box->width);
@@ -3058,7 +3053,7 @@ void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t ctx_id,
       return;
    }
 
-   glXMakeCurrent(Dpy, Draw, ctx->glx_context);
+   grend_hw_switch_context(vrend_lookup_renderer_ctx(0), TRUE);
 
    if (res->iov && (!iov || num_iovs == 0)) {
       iov = res->iov;
@@ -3507,7 +3502,7 @@ int graw_renderer_flush_buffer_res(struct grend_resource *res,
    if (!res->is_front) {
       uint32_t y1, y2;
 
-      glXMakeCurrent(Dpy, Draw, ctx0);
+      grend_hw_switch_context(vrend_lookup_renderer_ctx(0), TRUE);
       if (!front_fb_id)
          glGenFramebuffers(1, &front_fb_id);
 
@@ -3681,6 +3676,7 @@ void graw_renderer_check_queries(void)
       return;   
    
    LIST_FOR_EACH_ENTRY_SAFE(query, stor, &grend_state.waiting_query_list, waiting_queries) {
+      grend_hw_switch_context(vrend_lookup_renderer_ctx(query->ctx_id), TRUE);
       if (graw_check_query(query) == TRUE)
          list_delinit(&query->waiting_queries);
    }
@@ -3729,30 +3725,25 @@ void grend_stop_current_queries(void)
    }
 }
 
-boolean grend_hw_switch_context(struct grend_context *ctx)
+boolean grend_hw_switch_context(struct grend_context *ctx, boolean now)
 {
-
-   if (ctx == grend_state.current_ctx)
+   if (ctx == grend_state.current_ctx && ctx->ctx_switch_pending == FALSE)
       return TRUE;
-
-   if (grend_state.current_ctx) {
-      grend_ctx_finish_queries(grend_state.current_ctx);
-   }
 
    if (ctx->ctx_id != 0 && ctx->in_error) {
       return FALSE;
    }
 
-   glXMakeCurrent(Dpy, Draw, ctx->glx_context);
-
    ctx->ctx_switch_pending = TRUE;
+   if (now == TRUE) {
+      grend_finish_context_switch(ctx);
+   }
    grend_state.current_ctx = ctx;
    return TRUE;
 }
 
 static void grend_finish_context_switch(struct grend_context *ctx)
 {
-
    if (ctx->ctx_switch_pending == FALSE)
       return;
    ctx->ctx_switch_pending = FALSE;
@@ -3762,6 +3753,9 @@ static void grend_finish_context_switch(struct grend_context *ctx)
 
    grend_state.current_hw_ctx = ctx;
 
+   glXMakeCurrent(Dpy, Draw, ctx->glx_context);
+
+#if 0
    /* re-emit all the state */
    grend_hw_emit_framebuffer_state(ctx);
    grend_hw_emit_depth_range(ctx);
@@ -3775,7 +3769,7 @@ static void grend_finish_context_switch(struct grend_context *ctx)
    ctx->scissor_state_dirty = TRUE;
    ctx->viewport_state_dirty = TRUE;
    ctx->shader_dirty = TRUE;
-
+#endif
 }
 
 
@@ -3827,6 +3821,7 @@ void grend_create_query(struct grend_context *ctx, uint32_t handle,
    list_inithead(&q->ctx_queries);
    list_inithead(&q->hw_queries);
    q->type = query_type;
+   q->ctx_id = ctx->ctx_id;
 
    grend_resource_reference(&q->res, res);
 

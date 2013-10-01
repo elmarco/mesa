@@ -2179,6 +2179,16 @@ static void grend_hw_emit_rs(struct grend_context *ctx)
       glEnable(GL_POLYGON_SMOOTH);
    else
       glDisable(GL_POLYGON_SMOOTH);
+
+   if (state->clamp_vertex_color)
+      glClampColor(GL_CLAMP_VERTEX_COLOR_ARB, GL_TRUE);
+   else
+      glClampColor(GL_CLAMP_VERTEX_COLOR_ARB, GL_FALSE);
+
+   if (state->clamp_fragment_color)
+      glClampColor(GL_CLAMP_FRAGMENT_COLOR_ARB, GL_TRUE);
+   else
+      glClampColor(GL_CLAMP_FRAGMENT_COLOR_ARB, GL_FALSE);
 }
 void grend_object_bind_rasterizer(struct grend_context *ctx,
                                   uint32_t handle)

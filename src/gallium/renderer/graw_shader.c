@@ -74,10 +74,11 @@ struct dump_ctx {
 
    /* create a shader with lower left if upper left is primary variant
       or vice versa */
-   boolean invert_fs_origin;
    uint32_t shadow_samp_mask;
    boolean write_all_cbufs;
    int fs_coord_origin, fs_pixel_center;
+
+   struct vrend_shader_key *key;
 };
 
 static inline boolean fs_emit_layout(struct dump_ctx *ctx)
@@ -88,7 +89,7 @@ static inline boolean fs_emit_layout(struct dump_ctx *ctx)
       if coord_origin is 0 and invert is 1 - emit nothing (lower)
       if coord origin is 1 and invert is 0 - emit nothing (lower)
       if coord_origin is 1 and invert is 1 - emit origin upper left */
-   if (!(ctx->fs_coord_origin ^ ctx->invert_fs_origin))
+   if (!(ctx->fs_coord_origin ^ ctx->key->invert_fs_origin))
        return TRUE;
    return FALSE;
 }
@@ -1024,7 +1025,7 @@ static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
 
    if (ctx->prog_type == TGSI_PROCESSOR_FRAGMENT) {
       if (fs_emit_layout(ctx)) {
-         boolean upper_left = !(ctx->fs_coord_origin ^ ctx->invert_fs_origin); 
+         boolean upper_left = !(ctx->fs_coord_origin ^ ctx->key->invert_fs_origin); 
          char comma = (upper_left && ctx->fs_pixel_center) ? ',' : ' ';
 
          snprintf(buf, 255, "layout(%s%c%s) in vec4 gl_FragCoord;\n",
@@ -1182,7 +1183,8 @@ static boolean fill_interpolants(struct dump_ctx *ctx, struct vrend_shader_info 
 }
 
 char *tgsi_convert(const struct tgsi_token *tokens,
-                   int flags, struct vrend_shader_info *sinfo)
+                   struct vrend_shader_key *key,
+                   struct vrend_shader_info *sinfo)
 {
    struct dump_ctx ctx;
    char *glsl_final;
@@ -1195,7 +1197,7 @@ char *tgsi_convert(const struct tgsi_token *tokens,
    ctx.iter.iterate_immediate = iter_immediate;
    ctx.iter.iterate_property = iter_property;
    ctx.iter.epilog = NULL;
-   ctx.invert_fs_origin = flags & SHADER_FLAG_FS_INVERT;
+   ctx.key = key;
    if (sinfo->so_info.num_outputs) {
       ctx.so = &sinfo->so_info;
    }

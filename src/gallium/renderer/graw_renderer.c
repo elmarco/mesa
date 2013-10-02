@@ -15,7 +15,7 @@
 #include "util/u_double_list.h"
 #include "util/u_format.h"
 #include "tgsi/tgsi_text.h"
-
+#include "tgsi/tgsi_parse.h"
 #include "state_tracker/graw.h"
 
 #include "vrend_object.h"
@@ -112,8 +112,7 @@ struct grend_linked_shader_program {
   struct list_head head;
   GLuint id;
 
-  int fs_variant;
-  struct grend_shader_state *ss[PIPE_SHADER_TYPES];
+  struct grend_shader *ss[PIPE_SHADER_TYPES];
 
   uint32_t samplers_used_mask[PIPE_SHADER_TYPES];
   GLuint *samp_locs[PIPE_SHADER_TYPES];
@@ -124,22 +123,30 @@ struct grend_linked_shader_program {
   GLuint *const_locs[PIPE_SHADER_TYPES];
 
   GLuint *attrib_locs;
-   uint32_t shadow_samp_mask[PIPE_SHADER_TYPES];
+  uint32_t shadow_samp_mask[PIPE_SHADER_TYPES];
 
-   GLuint vs_ws_adjust_loc;
+  GLuint vs_ws_adjust_loc;
 };
 
-struct grend_shader_variant {
+struct grend_shader {
+   struct grend_shader *next_variant;
+   struct grend_shader_selector *sel;
+   unsigned type;
    GLchar *glsl_prog;
    GLuint id;
+   GLuint compiled_fs_id;
+   struct vrend_shader_key key;
 };
 
-struct grend_shader_state {
+struct grend_shader_selector {
    struct pipe_reference reference;
-   unsigned type;
-   GLuint compiled_fs_id;
+   struct grend_shader *current;
+   struct tgsi_token *tokens;
+
    struct vrend_shader_info sinfo;
-   struct grend_shader_variant variants[2];
+
+   unsigned num_shaders;
+   unsigned type;
 };
 
 struct grend_buffer {
@@ -235,8 +242,8 @@ struct grend_context {
    int num_vbos;
    struct pipe_vertex_buffer vbo[PIPE_MAX_ATTRIBS];
    uint32_t vbo_res_ids[PIPE_MAX_ATTRIBS];
-   struct grend_shader_state *vs;
-   struct grend_shader_state *fs;
+   struct grend_shader_selector *vs;
+   struct grend_shader_selector *fs;
 
    bool shader_dirty;
    struct grend_linked_shader_program *prog;
@@ -384,26 +391,35 @@ grend_so_target_reference(struct grend_so_target **ptr, struct grend_so_target *
    *ptr = target;
 }
 
-static void grend_destroy_shader(struct grend_shader_state *state)
+static void grend_shader_destroy(struct grend_shader *shader)
 {
-   /* if the host is destroying the shader then we should destroy
-      the linked info about */
-   glDeleteShader(state->variants[0].id);
-   if (state->variants[1].id)
-      glDeleteShader(state->variants[1].id);
-   free(state->sinfo.interpinfo);
-   free(state->variants[0].glsl_prog);
-   free(state->variants[1].glsl_prog);
-   free(state);
+   glDeleteShader(shader->id);
+   free(shader->glsl_prog);
+   free(shader);
 }
 
-static INLINE void
-grend_shader_state_reference(struct grend_shader_state **ptr, struct grend_shader_state *shader)
+static void grend_destroy_shader_selector(struct grend_shader_selector *sel)
 {
-   struct grend_shader_state *old_shader = *ptr;
+   struct grend_shader *p = sel->current, *c;
+
+   while (p) {
+      c = p->next_variant;
+      grend_shader_destroy(p);
+      p = c;
+   }
+   free(sel->sinfo.interpinfo);
+   free(sel->tokens);
+   free(sel);
+}
+
+
+static INLINE void
+grend_shader_state_reference(struct grend_shader_selector **ptr, struct grend_shader_selector *shader)
+{
+   struct grend_shader_selector *old_shader = *ptr;
 
    if (pipe_reference(&(*ptr)->reference, &shader->reference))
-      grend_destroy_shader(old_shader);
+      grend_destroy_shader_selector(old_shader);
    *ptr = shader;
 }
 
@@ -499,8 +515,8 @@ static void set_stream_out_varyings(int prog_id, struct pipe_stream_output_info 
 }
 
 static struct grend_linked_shader_program *add_shader_program(struct grend_context *ctx,
-                                                              struct grend_shader_state *vs,
-                                                              struct grend_shader_state *fs, int fs_variant)
+                                                              struct grend_shader *vs,
+                                                              struct grend_shader *fs)
 {
   struct grend_linked_shader_program *sprog = malloc(sizeof(struct grend_linked_shader_program));
   char name[16];
@@ -510,19 +526,19 @@ static struct grend_linked_shader_program *add_shader_program(struct grend_conte
   int id;
 
   /* need to rewrite VS code to add interpolation params */
-  if (!vs->compiled_fs_id != fs->variants[fs_variant].id) {
-     vrend_patch_vertex_shader_interpolants(vs->variants[0].glsl_prog,
-                                            &vs->sinfo,
-                                            &fs->sinfo);
-     glShaderSource(vs->variants[0].id, 1, (const char **)&vs->variants[0].glsl_prog, NULL);
-     glCompileShader(vs->variants[0].id);
-     vs->compiled_fs_id = fs->variants[fs_variant].id;
+  if (!vs->compiled_fs_id != fs->id) {
+     vrend_patch_vertex_shader_interpolants(vs->glsl_prog,
+                                            &vs->sel->sinfo,
+                                            &fs->sel->sinfo);
+     glShaderSource(vs->id, 1, (const char **)&vs->glsl_prog, NULL);
+     glCompileShader(vs->id);
+     vs->compiled_fs_id = fs->id;
   }
 
   prog_id = glCreateProgram();
-  glAttachShader(prog_id, vs->variants[0].id);
-  set_stream_out_varyings(prog_id, &vs->sinfo.so_info);
-  glAttachShader(prog_id, fs->variants[fs_variant].id);
+  glAttachShader(prog_id, vs->id);
+  set_stream_out_varyings(prog_id, &vs->sel->sinfo.so_info);
+  glAttachShader(prog_id, fs->id);
   glLinkProgram(prog_id);
 
   glGetProgramiv(prog_id, GL_LINK_STATUS, &lret);
@@ -533,71 +549,70 @@ static struct grend_linked_shader_program *add_shader_program(struct grend_conte
      return NULL;
   }
 
-  sprog->ss[0] = sprog->ss[1] = NULL;
-  grend_shader_state_reference(&sprog->ss[PIPE_SHADER_VERTEX], vs);
-  grend_shader_state_reference(&sprog->ss[PIPE_SHADER_FRAGMENT], fs);
+  sprog->ss[0] = vs;
+  sprog->ss[1] = fs;
 
   sprog->id = prog_id;
-  sprog->fs_variant = fs_variant;
+
   list_add(&sprog->head, &ctx->programs);
 
   sprog->vs_ws_adjust_loc = glGetUniformLocation(prog_id, "winsys_adjust");
   for (id = PIPE_SHADER_VERTEX; id <= PIPE_SHADER_FRAGMENT; id++) {
-    if (sprog->ss[id]->sinfo.samplers_used_mask) {
-       uint32_t mask = sprog->ss[id]->sinfo.samplers_used_mask;
-       int nsamp = util_bitcount(sprog->ss[id]->sinfo.samplers_used_mask);
+    if (sprog->ss[id]->sel->sinfo.samplers_used_mask) {
+       uint32_t mask = sprog->ss[id]->sel->sinfo.samplers_used_mask;
+       int nsamp = util_bitcount(sprog->ss[id]->sel->sinfo.samplers_used_mask);
        int index;
-      sprog->shadow_samp_mask[id] = sprog->ss[id]->sinfo.shadow_samp_mask;
-      if (sprog->ss[id]->sinfo.shadow_samp_mask) {
-        sprog->shadow_samp_mask_locs[id] = calloc(nsamp, sizeof(uint32_t));
-        sprog->shadow_samp_add_locs[id] = calloc(nsamp, sizeof(uint32_t));
-      } else {
-        sprog->shadow_samp_mask_locs[id] = sprog->shadow_samp_add_locs[id] = NULL;
-      }
-      sprog->samp_locs[id] = calloc(nsamp, sizeof(uint32_t));
-      if (sprog->samp_locs[id]) {
-         const char *prefix = (id == PIPE_SHADER_VERTEX) ? "vs" : "fs";
-         index = 0;
-         while(mask) {
-            i = u_bit_scan(&mask);
-            snprintf(name, 10, "%ssamp%d", prefix, i);
-            sprog->samp_locs[id][index] = glGetUniformLocation(prog_id, name);
-            if (sprog->ss[id]->sinfo.shadow_samp_mask & (1 << i)) {
-               snprintf(name, 14, "%sshadmask%d", prefix, i);
-               sprog->shadow_samp_mask_locs[id][index] = glGetUniformLocation(prog_id, name);
-               snprintf(name, 14, "%sshadadd%d", prefix, i);
-               sprog->shadow_samp_add_locs[id][index] = glGetUniformLocation(prog_id, name);
-            }
-            index++;
-         }
-      }
+       sprog->shadow_samp_mask[id] = sprog->ss[id]->sel->sinfo.shadow_samp_mask;
+       if (sprog->ss[id]->sel->sinfo.shadow_samp_mask) {
+          sprog->shadow_samp_mask_locs[id] = calloc(nsamp, sizeof(uint32_t));
+          sprog->shadow_samp_add_locs[id] = calloc(nsamp, sizeof(uint32_t));
+       } else {
+          sprog->shadow_samp_mask_locs[id] = sprog->shadow_samp_add_locs[id] = NULL;
+       }
+       sprog->samp_locs[id] = calloc(nsamp, sizeof(uint32_t));
+       if (sprog->samp_locs[id]) {
+          const char *prefix = (id == PIPE_SHADER_VERTEX) ? "vs" : "fs";
+          index = 0;
+          while(mask) {
+             i = u_bit_scan(&mask);
+             snprintf(name, 10, "%ssamp%d", prefix, i);
+             sprog->samp_locs[id][index] = glGetUniformLocation(prog_id, name);
+             if (sprog->ss[id]->sel->sinfo.shadow_samp_mask & (1 << i)) {
+                snprintf(name, 14, "%sshadmask%d", prefix, i);
+                sprog->shadow_samp_mask_locs[id][index] = glGetUniformLocation(prog_id, name);
+                snprintf(name, 14, "%sshadadd%d", prefix, i);
+                sprog->shadow_samp_add_locs[id][index] = glGetUniformLocation(prog_id, name);
+             }
+             index++;
+          }
+       }
     } else {
-      sprog->samp_locs[id] = NULL;
-      sprog->shadow_samp_mask_locs[id] = NULL;
-      sprog->shadow_samp_add_locs[id] = NULL;
-      sprog->shadow_samp_mask[id] = 0;
+       sprog->samp_locs[id] = NULL;
+       sprog->shadow_samp_mask_locs[id] = NULL;
+       sprog->shadow_samp_add_locs[id] = NULL;
+       sprog->shadow_samp_mask[id] = 0;
     }
-    sprog->samplers_used_mask[id] = sprog->ss[id]->sinfo.samplers_used_mask;
+    sprog->samplers_used_mask[id] = sprog->ss[id]->sel->sinfo.samplers_used_mask;
   }
-
+  
   for (id = PIPE_SHADER_VERTEX; id <= PIPE_SHADER_FRAGMENT; id++) {
-    if (sprog->ss[id]->sinfo.num_consts) {
-      sprog->const_locs[id] = calloc(sprog->ss[id]->sinfo.num_consts, sizeof(uint32_t));
-      if (sprog->const_locs[id]) {
-        const char *prefix = (id == PIPE_SHADER_VERTEX) ? "vs" : "fs";
-        for (i = 0; i < sprog->ss[id]->sinfo.num_consts; i++) {
-          snprintf(name, 16, "%sconst[%d]", prefix, i);
-          sprog->const_locs[id][i] = glGetUniformLocation(prog_id, name);
+     if (sprog->ss[id]->sel->sinfo.num_consts) {
+        sprog->const_locs[id] = calloc(sprog->ss[id]->sel->sinfo.num_consts, sizeof(uint32_t));
+        if (sprog->const_locs[id]) {
+           const char *prefix = (id == PIPE_SHADER_VERTEX) ? "vs" : "fs";
+           for (i = 0; i < sprog->ss[id]->sel->sinfo.num_consts; i++) {
+              snprintf(name, 16, "%sconst[%d]", prefix, i);
+              sprog->const_locs[id][i] = glGetUniformLocation(prog_id, name);
+           }
         }
-      }
-    } else
-      sprog->const_locs[id] = NULL;
+     } else
+        sprog->const_locs[id] = NULL;
   }
-
-  if (vs->sinfo.num_inputs) {
-    sprog->attrib_locs = calloc(vs->sinfo.num_inputs, sizeof(uint32_t));
+  
+  if (vs->sel->sinfo.num_inputs) {
+    sprog->attrib_locs = calloc(vs->sel->sinfo.num_inputs, sizeof(uint32_t));
     if (sprog->attrib_locs) {
-      for (i = 0; i < vs->sinfo.num_inputs; i++) {
+      for (i = 0; i < vs->sel->sinfo.num_inputs; i++) {
 	snprintf(name, 10, "in_%d", i);
 	sprog->attrib_locs[i] = glGetAttribLocation(prog_id, name);
       }
@@ -613,7 +628,7 @@ static struct grend_linked_shader_program *lookup_shader_program(struct grend_co
 {
   struct grend_linked_shader_program *ent;
   LIST_FOR_EACH_ENTRY(ent, &ctx->programs, head) {
-     if (ent->ss[PIPE_SHADER_VERTEX]->variants[0].id == vs_id && ent->ss[PIPE_SHADER_FRAGMENT]->variants[ent->fs_variant].id == fs_id)
+     if (ent->ss[PIPE_SHADER_VERTEX]->id == vs_id && ent->ss[PIPE_SHADER_FRAGMENT]->id == fs_id)
         return ent;
   }
   return 0;
@@ -628,7 +643,7 @@ static void grend_free_programs(struct grend_context *ctx)
       list_del(&ent->head);
 
       for (i = PIPE_SHADER_VERTEX; i <= PIPE_SHADER_FRAGMENT; i++) {
-         grend_shader_state_reference(&ent->ss[i], NULL);
+//         grend_shader_state_reference(&ent->ss[i], NULL);
          free(ent->shadow_samp_mask_locs[i]);
          free(ent->shadow_samp_add_locs[i]);
          free(ent->samp_locs[i]);
@@ -1281,23 +1296,106 @@ void grend_transfer_inline_write(struct grend_context *ctx,
 
 static void grend_destroy_shader_object(void *obj_ptr)
 {
-   struct grend_shader_state *state = obj_ptr;
+   struct grend_shader_selector *state = obj_ptr;
 
    grend_shader_state_reference(&state, NULL);
+}
+
+static INLINE void vrend_fill_shader_key(struct grend_context *ctx,
+                                         struct vrend_shader_key *key)
+{
+   key->invert_fs_origin = ctx->inverted_fbo_content;
+   key->coord_replace = ctx->rs_state.point_quad_rasterization ? ctx->rs_state.sprite_coord_enable : 0;
+}
+
+static int grend_shader_create(struct grend_context *ctx,
+                               struct grend_shader *shader,
+                               struct vrend_shader_key key)
+{
+   shader->id = glCreateShader(shader->sel->type == PIPE_SHADER_VERTEX ? GL_VERTEX_SHADER : GL_FRAGMENT_SHADER);
+   shader->compiled_fs_id = 0;
+   shader->glsl_prog = tgsi_convert(shader->sel->tokens, &key, &shader->sel->sinfo);
+
+   if (shader->sel->type == PIPE_SHADER_FRAGMENT) {
+      glShaderSource(shader->id, 1, (const char **)&shader->glsl_prog, NULL);
+      glCompileShader(shader->id);
+   }
+   return 0;
+}
+
+static int grend_shader_select(struct grend_context *ctx,
+                               struct grend_shader_selector *sel,
+                               boolean *dirty)
+{
+   struct vrend_shader_key key;
+   struct grend_shader *shader = NULL;
+   int r;
+
+   memset(&key, 0, sizeof(key));
+   vrend_fill_shader_key(ctx, &key);
+
+   if (sel->current && memcmp(&sel->current->key, &key, sizeof(key)))
+      return 0;
+
+   if (sel->num_shaders > 1) {
+      struct grend_shader *p = sel->current, *c = p->next_variant;
+      while (c && memcmp(&c->key, &key, sizeof(key)) != 0) {
+         p = c;
+         c = c->next_variant;
+      }
+      if (c) {
+         p->next_variant = c->next_variant;
+         shader = c;
+      }
+   }
+
+   if (!shader) {
+      shader = CALLOC_STRUCT(grend_shader);
+      shader->sel = sel;
+
+      r = grend_shader_create(ctx, shader, key);
+      if (r) {
+         sel->current = NULL;
+         FREE(shader);
+         return r;
+      }
+      sel->num_shaders++;
+   }
+   if (dirty)
+      *dirty = true;
+
+   shader->next_variant = sel->current;
+   sel->current = shader;
+   return 0;
+}
+
+static void *grend_create_shader_state(struct grend_context *ctx,
+                                       const struct pipe_shader_state *state,
+                                       unsigned pipe_shader_type)
+{
+   struct grend_shader_selector *sel = CALLOC_STRUCT(grend_shader_selector);
+   int r;
+
+   sel->type = pipe_shader_type;
+   sel->sinfo.so_info = state->stream_output;
+   sel->tokens = tgsi_dup_tokens(state->tokens);
+   pipe_reference_init(&sel->reference, 1);
+
+   r = grend_shader_select(ctx, sel, NULL);
+   if (r)
+      return NULL;
+   return sel;
 }
 
 void grend_create_vs(struct grend_context *ctx,
                      uint32_t handle,
                      const struct pipe_shader_state *vs)
 {
-   struct grend_shader_state *state = CALLOC_STRUCT(grend_shader_state);
+   struct grend_shader_selector *sel;
 
-   state->variants[0].id = glCreateShader(GL_VERTEX_SHADER);
-   state->sinfo.so_info = vs->stream_output;
-   state->variants[0].glsl_prog = tgsi_convert(vs->tokens, 0, &state->sinfo);
-   state->compiled_fs_id = 0;
-   pipe_reference_init(&state->reference, 1);
-   vrend_object_insert(ctx->object_hash, state, sizeof(*state), handle, VIRGL_OBJECT_VS);
+   sel = grend_create_shader_state(ctx, vs, PIPE_SHADER_VERTEX);
+
+   vrend_object_insert(ctx->object_hash, sel, sizeof(*sel), handle, VIRGL_OBJECT_VS);
 
    return;
 }
@@ -1306,30 +1404,11 @@ void grend_create_fs(struct grend_context *ctx,
                      uint32_t handle,
                      const struct pipe_shader_state *fs)
 {
-   struct grend_shader_state *state = CALLOC_STRUCT(grend_shader_state);
-   const GLchar *glsl_prog;
-   GLenum ret;
-   int i;
+   struct grend_shader_selector *sel;
 
-   pipe_reference_init(&state->reference, 1);
-   for (i = 0; i < 2; i++) {
-      state->variants[i].id = glCreateShader(GL_FRAGMENT_SHADER);
-      state->variants[i].glsl_prog = tgsi_convert(fs->tokens, i ? SHADER_FLAG_FS_INVERT : 0, &state->sinfo);
-      glsl_prog = (const GLchar *)state->variants[i].glsl_prog;
-      if (glsl_prog) {
-         glShaderSource(state->variants[i].id, 1, (const char **)&glsl_prog, NULL);
-         ret = glGetError();
-         glCompileShader(state->variants[i].id);
-         ret = glGetError();
-         if (ret) {
-            fprintf(stderr,"got error compiling %d\n", ret);
-            fprintf(stderr,"VS:\n%s\n", glsl_prog);
-         }
-         //      fprintf(stderr,"FS:\n%s\n", glsl_prog);
-      } else
-         fprintf(stderr,"failed to convert FS prog\n");
-   }
-   vrend_object_insert(ctx->object_hash, state, sizeof(*state), handle, VIRGL_OBJECT_FS);
+   sel = grend_create_shader_state(ctx, fs, PIPE_SHADER_FRAGMENT);
+
+   vrend_object_insert(ctx->object_hash, sel, sizeof(*sel), handle, VIRGL_OBJECT_FS);
 
    return;
 }
@@ -1337,25 +1416,25 @@ void grend_create_fs(struct grend_context *ctx,
 void grend_bind_vs(struct grend_context *ctx,
                    uint32_t handle)
 {
-   struct grend_shader_state *state;
+   struct grend_shader_selector *sel;
 
-   state = vrend_object_lookup(ctx->object_hash, handle, VIRGL_OBJECT_VS);
+   sel = vrend_object_lookup(ctx->object_hash, handle, VIRGL_OBJECT_VS);
 
-   if (ctx->vs != state)
+   if (ctx->vs != sel)
       ctx->shader_dirty = true;
-   grend_shader_state_reference(&ctx->vs, state);
+   grend_shader_state_reference(&ctx->vs, sel);
 }
 
 void grend_bind_fs(struct grend_context *ctx,
                    uint32_t handle)
 {
-   struct grend_shader_state *state;
+   struct grend_shader_selector *sel;
 
-   state = vrend_object_lookup(ctx->object_hash, handle, VIRGL_OBJECT_FS);
+   sel = vrend_object_lookup(ctx->object_hash, handle, VIRGL_OBJECT_FS);
 
-   if (ctx->fs != state)
+   if (ctx->fs != sel)
       ctx->shader_dirty = true;
-   grend_shader_state_reference(&ctx->fs, state);
+   grend_shader_state_reference(&ctx->fs, sel);
 }
 
 void grend_clear(struct grend_context *ctx,
@@ -1461,21 +1540,19 @@ void grend_draw_vbo(struct grend_context *ctx,
    if (ctx->shader_dirty) {
      struct grend_linked_shader_program *prog;
      int fs_variant;
+     boolean fs_dirty, vs_dirty;
 
      if (!ctx->vs || !ctx->fs) {
         fprintf(stderr,"dropping rendering due to missing shaders\n");
         return;
      }
 
-     /* invert fragcoord by default as gallium is opposite to GL */
-     if (!ctx->inverted_fbo_content)
-        fs_variant = 1;
-     else
-        fs_variant = 0;
-     
-     prog = lookup_shader_program(ctx, ctx->vs->variants[0].id, ctx->fs->variants[fs_variant].id);
+     grend_shader_select(ctx, ctx->fs, &fs_dirty);
+     grend_shader_select(ctx, ctx->vs, &vs_dirty);
+
+     prog = lookup_shader_program(ctx, ctx->vs->current->id, ctx->fs->current->id);
      if (!prog) {
-        prog = add_shader_program(ctx, ctx->vs, ctx->fs, fs_variant);
+        prog = add_shader_program(ctx, ctx->vs->current, ctx->fs->current);
         if (!prog)
            return;
      }
@@ -1570,15 +1647,15 @@ void grend_draw_vbo(struct grend_context *ctx,
       struct grend_buffer *buf;
       GLint loc;
 
-      if (i >= ctx->prog->ss[PIPE_SHADER_VERTEX]->sinfo.num_inputs) {
+      if (i >= ctx->prog->ss[PIPE_SHADER_VERTEX]->sel->sinfo.num_inputs) {
          /* XYZZY: debug this? */
-         num_enable = ctx->prog->ss[PIPE_SHADER_VERTEX]->sinfo.num_inputs;
+         num_enable = ctx->prog->ss[PIPE_SHADER_VERTEX]->sel->sinfo.num_inputs;
          break;
       }
       buf = (struct grend_buffer *)ctx->vbo[vbo_index].buffer;
 
       if (!buf) {
-           fprintf(stderr,"cannot find vbo buf %d %d %d\n", i, ctx->ve->count, ctx->prog->ss[PIPE_SHADER_VERTEX]->sinfo.num_inputs);
+           fprintf(stderr,"cannot find vbo buf %d %d %d\n", i, ctx->ve->count, ctx->prog->ss[PIPE_SHADER_VERTEX]->sel->sinfo.num_inputs);
            continue;
       }
 
@@ -1590,7 +1667,7 @@ void grend_draw_vbo(struct grend_context *ctx,
 	} else loc = -1;
 
 	if (loc == -1) {
-           fprintf(stderr,"cannot find loc %d %d %d\n", i, ctx->ve->count, ctx->prog->ss[PIPE_SHADER_VERTEX]->sinfo.num_inputs);
+           fprintf(stderr,"cannot find loc %d %d %d\n", i, ctx->ve->count, ctx->prog->ss[PIPE_SHADER_VERTEX]->sel->sinfo.num_inputs);
           num_enable--;
           if (i == 0) {
              fprintf(stderr,"shader probably didn't compile - skipping rendering\n");

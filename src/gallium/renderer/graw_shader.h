@@ -23,13 +23,18 @@ struct vrend_shader_info {
 
    struct vrend_interp_info *interpinfo;
 };
-   
+
+struct vrend_shader_key {
+   uint32_t coord_replace;
+   boolean invert_fs_origin;
+};
       
 boolean vrend_patch_vertex_shader_interpolants(char *program,
                                                struct vrend_shader_info *vs_info,
                                                struct vrend_shader_info *fs_info);
 
 char *tgsi_convert(const struct tgsi_token *tokens,
-                   int flags, struct vrend_shader_info *sinfo);
+                   struct vrend_shader_key *key,
+                   struct vrend_shader_info *sinfo);
 
 #endif

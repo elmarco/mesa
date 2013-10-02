@@ -1304,7 +1304,7 @@ static void grend_destroy_shader_object(void *obj_ptr)
 static INLINE void vrend_fill_shader_key(struct grend_context *ctx,
                                          struct vrend_shader_key *key)
 {
-   key->invert_fs_origin = ctx->inverted_fbo_content;
+   key->invert_fs_origin = !ctx->inverted_fbo_content;
    key->coord_replace = ctx->rs_state.point_quad_rasterization ? ctx->rs_state.sprite_coord_enable : 0;
 }
 

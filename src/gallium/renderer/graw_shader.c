@@ -154,7 +154,9 @@ iter_declaration(struct tgsi_iterate_context *iter,
       if (ctx->inputs[i].glsl_no_index)
          snprintf(ctx->inputs[i].glsl_name, 64, "%s", name_prefix);
       else {
-         if (ctx->inputs[i].name == TGSI_SEMANTIC_COLOR)
+         if (ctx->inputs[i].name == TGSI_SEMANTIC_FOG)
+            snprintf(ctx->inputs[i].glsl_name, 64, "%s_f%d", name_prefix, ctx->inputs[i].sid);
+         else if (ctx->inputs[i].name == TGSI_SEMANTIC_COLOR)
             snprintf(ctx->inputs[i].glsl_name, 64, "%s_c%d", name_prefix, ctx->inputs[i].sid);
          else if (ctx->inputs[i].name == TGSI_SEMANTIC_GENERIC)
             snprintf(ctx->inputs[i].glsl_name, 64, "%s_g%d", name_prefix, ctx->inputs[i].sid);
@@ -236,7 +238,9 @@ iter_declaration(struct tgsi_iterate_context *iter,
       if (ctx->outputs[i].glsl_no_index)
          snprintf(ctx->outputs[i].glsl_name, 64, "%s", name_prefix);
       else {
-         if (ctx->outputs[i].name == TGSI_SEMANTIC_COLOR)
+         if (ctx->outputs[i].name == TGSI_SEMANTIC_FOG)
+            snprintf(ctx->outputs[i].glsl_name, 64, "%s_f%d", name_prefix, ctx->outputs[i].sid);
+         else if (ctx->outputs[i].name == TGSI_SEMANTIC_COLOR)
             snprintf(ctx->outputs[i].glsl_name, 64, "%s_c%d", name_prefix, ctx->outputs[i].sid);
          else if (ctx->outputs[i].name == TGSI_SEMANTIC_GENERIC)
             snprintf(ctx->outputs[i].glsl_name, 64, "%s_g%d", name_prefix, ctx->outputs[i].sid);

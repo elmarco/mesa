@@ -135,6 +135,7 @@ struct grend_shader_variant {
 };
 
 struct grend_shader_state {
+   struct pipe_reference reference;
    unsigned type;
    GLuint compiled_fs_id;
    struct vrend_shader_info sinfo;
@@ -383,6 +384,29 @@ grend_so_target_reference(struct grend_so_target **ptr, struct grend_so_target *
    *ptr = target;
 }
 
+static void grend_destroy_shader(struct grend_shader_state *state)
+{
+   /* if the host is destroying the shader then we should destroy
+      the linked info about */
+   glDeleteShader(state->variants[0].id);
+   if (state->variants[1].id)
+      glDeleteShader(state->variants[1].id);
+   free(state->sinfo.interpinfo);
+   free(state->variants[0].glsl_prog);
+   free(state->variants[1].glsl_prog);
+   free(state);
+}
+
+static INLINE void
+grend_shader_state_reference(struct grend_shader_state **ptr, struct grend_shader_state *shader)
+{
+   struct grend_shader_state *old_shader = *ptr;
+
+   if (pipe_reference(&(*ptr)->reference, &shader->reference))
+      grend_destroy_shader(old_shader);
+   *ptr = shader;
+}
+
 void
 grend_insert_format(struct grend_format_table *entry, uint32_t bindings)
 {
@@ -509,8 +533,10 @@ static struct grend_linked_shader_program *add_shader_program(struct grend_conte
      return NULL;
   }
 
-  sprog->ss[PIPE_SHADER_VERTEX] = vs;
-  sprog->ss[PIPE_SHADER_FRAGMENT] = fs;
+  sprog->ss[0] = sprog->ss[1] = NULL;
+  grend_shader_state_reference(&sprog->ss[PIPE_SHADER_VERTEX], vs);
+  grend_shader_state_reference(&sprog->ss[PIPE_SHADER_FRAGMENT], fs);
+
   sprog->id = prog_id;
   sprog->fs_variant = fs_variant;
   list_add(&sprog->head, &ctx->programs);
@@ -602,6 +628,7 @@ static void grend_free_programs(struct grend_context *ctx)
       list_del(&ent->head);
 
       for (i = PIPE_SHADER_VERTEX; i <= PIPE_SHADER_FRAGMENT; i++) {
+         grend_shader_state_reference(&ent->ss[i], NULL);
          free(ent->shadow_samp_mask_locs[i]);
          free(ent->shadow_samp_add_locs[i]);
          free(ent->samp_locs[i]);
@@ -1251,21 +1278,12 @@ void grend_transfer_inline_write(struct grend_context *ctx,
    }
 }
 
-static void grend_destroy_shader(struct grend_shader_state *state)
-{
-   glDeleteShader(state->variants[0].id);
-   if (state->variants[1].id)
-      glDeleteShader(state->variants[1].id);
-   free(state->sinfo.interpinfo);
-   free(state->variants[0].glsl_prog);
-   free(state->variants[1].glsl_prog);
-   free(state);
-}
 
 static void grend_destroy_shader_object(void *obj_ptr)
 {
    struct grend_shader_state *state = obj_ptr;
-   grend_destroy_shader(state);
+
+   grend_shader_state_reference(&state, NULL);
 }
 
 void grend_create_vs(struct grend_context *ctx,
@@ -1278,7 +1296,7 @@ void grend_create_vs(struct grend_context *ctx,
    state->sinfo.so_info = vs->stream_output;
    state->variants[0].glsl_prog = tgsi_convert(vs->tokens, 0, &state->sinfo);
    state->compiled_fs_id = 0;
-
+   pipe_reference_init(&state->reference, 1);
    vrend_object_insert(ctx->object_hash, state, sizeof(*state), handle, VIRGL_OBJECT_VS);
 
    return;
@@ -1293,6 +1311,7 @@ void grend_create_fs(struct grend_context *ctx,
    GLenum ret;
    int i;
 
+   pipe_reference_init(&state->reference, 1);
    for (i = 0; i < 2; i++) {
       state->variants[i].id = glCreateShader(GL_FRAGMENT_SHADER);
       state->variants[i].glsl_prog = tgsi_convert(fs->tokens, i ? SHADER_FLAG_FS_INVERT : 0, &state->sinfo);
@@ -1324,7 +1343,7 @@ void grend_bind_vs(struct grend_context *ctx,
 
    if (ctx->vs != state)
       ctx->shader_dirty = true;
-   ctx->vs = state;
+   grend_shader_state_reference(&ctx->vs, state);
 }
 
 void grend_bind_fs(struct grend_context *ctx,
@@ -1336,7 +1355,7 @@ void grend_bind_fs(struct grend_context *ctx,
 
    if (ctx->fs != state)
       ctx->shader_dirty = true;
-   ctx->fs = state;
+   grend_shader_state_reference(&ctx->fs, state);
 }
 
 void grend_clear(struct grend_context *ctx,

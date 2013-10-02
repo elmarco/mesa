@@ -131,7 +131,7 @@ struct grend_linked_shader_program {
 struct grend_shader {
    struct grend_shader *next_variant;
    struct grend_shader_selector *sel;
-   unsigned type;
+
    GLchar *glsl_prog;
    GLuint id;
    GLuint compiled_fs_id;
@@ -1539,7 +1539,6 @@ void grend_draw_vbo(struct grend_context *ctx,
 
    if (ctx->shader_dirty) {
      struct grend_linked_shader_program *prog;
-     int fs_variant;
      boolean fs_dirty, vs_dirty;
 
      if (!ctx->vs || !ctx->fs) {

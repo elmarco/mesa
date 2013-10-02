@@ -1610,10 +1610,23 @@ void grend_draw_vbo(struct grend_context *ctx,
       if (ctx->vbo[vbo_index].stride == 0) {
          void *data;
          /* for 0 stride we are kinda screwed */
-         data = glMapBufferRange(GL_ARRAY_BUFFER, ctx->vbo[vbo_index].buffer_offset, 4 * sizeof(GLfloat), GL_MAP_READ_BIT);
+         data = glMapBufferRange(GL_ARRAY_BUFFER, ctx->vbo[vbo_index].buffer_offset, ve->nr_chan * sizeof(GLfloat), GL_MAP_READ_BIT);
          
-         glVertexAttrib4fv(loc, data);
-
+         switch (ve->nr_chan) {
+         case 1:
+            glVertexAttrib1fv(loc, data);
+            break;
+         case 2:
+            glVertexAttrib2fv(loc, data);
+            break;
+         case 3:
+            glVertexAttrib3fv(loc, data);
+            break;
+         case 4:
+         default:
+            glVertexAttrib4fv(loc, data);
+            break;
+         }
          glUnmapBuffer(GL_ARRAY_BUFFER);
          disable_bitmask |= (1 << loc);
       } else {

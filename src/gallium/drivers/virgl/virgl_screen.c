@@ -338,13 +338,18 @@ virgl_is_format_supported( struct pipe_screen *screen,
     */
 
    if (format_desc->layout == UTIL_FORMAT_LAYOUT_S3TC) {
-      return util_format_s3tc_enabled;
+      if (util_format_s3tc_enabled)
+         goto out_lookup;
+      return FALSE;
+   }
+   if (format_desc->layout == UTIL_FORMAT_LAYOUT_RGTC) {
+      goto out_lookup;
    }
 
    if (format == PIPE_FORMAT_R11G11B10_FLOAT) {
-      return TRUE;
+      goto out_lookup;
    } else if (format == PIPE_FORMAT_R9G9B9E5_FLOAT) {
-      return TRUE;
+      goto out_lookup;
    }
 
    /* Find the first non-VOID channel. */
@@ -361,6 +366,7 @@ virgl_is_format_supported( struct pipe_screen *screen,
    if (format_desc->nr_channels < 4 && format_desc->channel[i].size == 4)
       return FALSE;
 
+ out_lookup:
    {
       int big = format / 32;
       int small = format % 32;

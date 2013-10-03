@@ -1465,8 +1465,11 @@ void grend_clear(struct grend_context *ctx,
    if (buffers & PIPE_CLEAR_COLOR)
       glClearColor(color->f[0], color->f[1], color->f[2], color->f[3]);
 
-   if (buffers & PIPE_CLEAR_DEPTH)
+   if (buffers & PIPE_CLEAR_DEPTH) {
+      /* gallium clears don't respect depth mask */
+      glDepthMask(GL_TRUE);
       glClearDepth(depth);
+   }
 
    if (buffers & PIPE_CLEAR_STENCIL)
       glClearStencil(stencil);
@@ -1479,6 +1482,9 @@ void grend_clear(struct grend_context *ctx,
       bits |= GL_STENCIL_BUFFER_BIT;
    glClear(bits);
 
+   if (buffers & PIPE_CLEAR_DEPTH)
+      if (!ctx->dsa_state.depth.writemask)
+         glDepthMask(GL_FALSE);
 }
 
 static void grend_update_scissor_state(struct grend_context *ctx)

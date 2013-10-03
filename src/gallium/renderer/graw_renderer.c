@@ -3646,7 +3646,7 @@ int graw_renderer_flush_buffer_res(struct grend_resource *res,
                                    struct pipe_box *box)
 {
    if (!res->is_front) {
-      uint32_t y1, y2;
+      uint32_t sy1, sy2, dy1, dy2;
 
       grend_hw_switch_context(vrend_lookup_renderer_ctx(0), TRUE);
       if (!front_fb_id)
@@ -3667,16 +3667,18 @@ int graw_renderer_flush_buffer_res(struct grend_resource *res,
       grend_state.scissor_dirty = TRUE;
       /* justification for inversion here required */
 
+      dy1 = front_box.height - box->y;
+      dy2 = front_box.height - box->y - box->height;
       if (res->y_0_top) {
-         y1 = front_box.height - box->y;
-         y2 = front_box.height - box->y - box->height;
+         sy1 = front_box.height - box->y;
+         sy2 = front_box.height - box->y - box->height;
       } else {
-         y1 = box->y;
-         y2 = box->y + box->height;
+         sy1 = box->y;
+         sy2 = box->y + box->height;
       }
 
-      glBlitFramebuffer(box->x, y1, box->x + box->width, y2,
-                        box->x, y1, box->x + box->width, y2,
+      glBlitFramebuffer(box->x, sy1, box->x + box->width, sy2,
+                        box->x, dy1, box->x + box->width, dy2,
                         GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
       if (draw_cursor)

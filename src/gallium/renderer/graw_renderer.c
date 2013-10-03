@@ -3568,7 +3568,7 @@ static void graw_renderer_blit_int(struct grend_context *ctx,
       dst_y2 = dst_res->base.height0 - info->dst.box.y;
    }
 
-   if ((!src_res->is_front && !src_res->y_0_top) && src_res->base.nr_samples < 2) {
+   if ((!src_res->is_front && !src_res->y_0_top)) {
       src_y1 = info->src.box.y + info->src.box.height;
       src_y2 = info->src.box.y;
    } else {

@@ -424,6 +424,7 @@ int graw_encoder_inline_write(struct graw_context *ctx,
       graw_encoder_write_block(ctx->cbuf, data, length);
       left_bytes -= length;
       mybox.x += length;
+      data += length;
    }
    return 0;
 }

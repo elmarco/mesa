@@ -15,6 +15,7 @@
 #include "util/u_double_list.h"
 #include "util/u_format.h"
 #include "tgsi/tgsi_text.h"
+#include "tgsi/tgsi_info.h"
 #include "tgsi/tgsi_parse.h"
 #include "state_tracker/graw.h"
 
@@ -103,7 +104,7 @@ struct global_renderer_state {
    struct pipe_depth_stencil_alpha_state hw_dsa_state;
    struct pipe_blend_state hw_blend_state;
 
-   boolean have_nv_prim_restart, have_gl_prim_restart;
+   boolean have_nv_prim_restart, have_gl_prim_restart, have_bit_encoding;
 };
 
 static struct global_renderer_state grend_state;
@@ -2491,6 +2492,8 @@ void graw_renderer_init(void)
    else
       fprintf(stderr,"WARNING: running without ARB robustness in place may crash\n");
 
+   if (glewIsSupported("GL_VERSION_3_3") || glewIsSupported("GL_ARB_shader_bit_encoding"))
+      grend_state.have_bit_encoding = TRUE;
    if (glewIsSupported("GL_VERSION_3_1"))
       grend_state.have_gl_prim_restart = TRUE;
    else if (glewIsSupported("GL_NV_primitive_restart"))

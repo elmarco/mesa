@@ -703,6 +703,14 @@ iter_instruction(struct tgsi_iterate_context *iter,
       emit_op1("floor");
       strcat(ctx->glsl_main, buf);
       break;
+   case TGSI_OPCODE_ROUND:
+      emit_op1("round");
+      strcat(ctx->glsl_main, buf);
+      break;
+   case TGSI_OPCODE_ISSG:
+      emit_op1("sign");
+      strcat(ctx->glsl_main, buf);
+      break;
    case TGSI_OPCODE_CEIL:
       emit_op1("ceil");
       strcat(ctx->glsl_main, buf);
@@ -945,6 +953,9 @@ iter_instruction(struct tgsi_iterate_context *iter,
          snprintf(buf, 255, "%s = %s(textureProj(%s, %s)%s);\n", dsts[0], dstconv, srcs[1], srcs[0], writemask);
 
       strcat(ctx->glsl_main, buf);
+      break;
+   case TGSI_OPCODE_TXQ:
+      fprintf(stderr,"got TXQ TODO\n");
       break;
    case TGSI_OPCODE_I2F:
       snprintf(buf, 255, "%s = %s(ivec4(%s));\n", dsts[0], dstconv, srcs[0]);

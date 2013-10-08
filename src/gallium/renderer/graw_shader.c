@@ -553,18 +553,19 @@ iter_instruction(struct tgsi_iterate_context *iter,
          int idx = src->Register.SwizzleX;
          char temp[25];
          const char *vtype = "vec4";
+         const char *imm_stypeprefix = stypeprefix;
 
          if (imd->type == TGSI_IMM_UINT32 || imd->type == TGSI_IMM_INT32) {
             vtype = "uvec4";
             if (stype == TGSI_TYPE_FLOAT || stype == TGSI_TYPE_UNTYPED)
-               stypeprefix = "uintBitsToFloat";
+               imm_stypeprefix = "uintBitsToFloat";
          }
          if ((stype == TGSI_TYPE_UNSIGNED || stype == TGSI_TYPE_SIGNED) &&
              (imd->type == TGSI_IMM_UINT32 || imd->type == TGSI_IMM_INT32))
-            stypeprefix = "";
+            imm_stypeprefix = "";
 
          /* build up a vec4 of immediates */
-         snprintf(srcs[i], 255, "%s(%s%s(", stypeprefix, prefix, vtype);
+         snprintf(srcs[i], 255, "%s(%s%s(", imm_stypeprefix, prefix, vtype);
          for (j = 0; j < 4; j++) {
             if (j == 0)
                idx = src->Register.SwizzleX;

@@ -554,6 +554,15 @@ iter_instruction(struct tgsi_iterate_context *iter,
          char temp[25];
          const char *vtype = "vec4";
 
+         if (imd->type == TGSI_IMM_UINT32 || imd->type == TGSI_IMM_INT32) {
+            vtype = "uvec4";
+            if (stype == TGSI_TYPE_FLOAT || stype == TGSI_TYPE_UNTYPED)
+               stypeprefix = "uintBitsToFloat";
+         }
+         if ((stype == TGSI_TYPE_UNSIGNED || stype == TGSI_TYPE_SIGNED) &&
+             (imd->type == TGSI_IMM_UINT32 || imd->type == TGSI_IMM_INT32))
+            stypeprefix = "";
+
          /* build up a vec4 of immediates */
          snprintf(srcs[i], 255, "%s(%s%s(", stypeprefix, prefix, vtype);
          for (j = 0; j < 4; j++) {

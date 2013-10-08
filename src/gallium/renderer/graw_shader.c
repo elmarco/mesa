@@ -966,19 +966,19 @@ iter_instruction(struct tgsi_iterate_context *iter,
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_F2I:
-      snprintf(buf, 255, "%s = %s(ivec4(%s));\n", dsts[0], dstconv, srcs[0]);      
+      snprintf(buf, 255, "%s = %s(%s(ivec4(%s)));\n", dsts[0], dstconv, dtypeprefix, srcs[0]);      
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_F2U:
-      snprintf(buf, 255, "%s = %s(uvec4(%s));\n", dsts[0], dstconv, srcs[0]);      
+      snprintf(buf, 255, "%s = %s(%s(uvec4(%s)));\n", dsts[0], dstconv, dtypeprefix, srcs[0]);      
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_NOT:
-      snprintf(buf, 255, "%s = %s(~(ivec4(%s)));\n", dsts[0], dstconv, srcs[0]);
+      snprintf(buf, 255, "%s = %s(uintBitsToFloat(~(uvec4(%s))));\n", dsts[0], dstconv, srcs[0]);
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_INEG:
-      snprintf(buf, 255, "%s = %s(-(ivec4(%s)));\n", dsts[0], dstconv, srcs[0]);
+      snprintf(buf, 255, "%s = %s(intBitsToFloat(-(ivec4(%s))));\n", dsts[0], dstconv, srcs[0]);
       strcat(ctx->glsl_main, buf);
       break;
    case TGSI_OPCODE_SEQ:

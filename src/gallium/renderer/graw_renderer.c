@@ -413,6 +413,24 @@ static void grend_destroy_shader_selector(struct grend_shader_selector *sel)
    free(sel);
 }
 
+static boolean grend_compile_shader(struct grend_context *ctx,
+                                struct grend_shader *shader)
+{
+   GLint param;
+   glShaderSource(shader->id, 1, (const char **)&shader->glsl_prog, NULL);
+   glCompileShader(shader->id);
+   glGetShaderiv(shader->id, GL_COMPILE_STATUS, &param);
+   if (param == GL_FALSE) {
+      char infolog[65536];
+      int len;
+      glGetShaderInfoLog(shader->id, 65536, &len, infolog);
+      report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_SHADER, 0);
+      fprintf(stderr,"shader failed to compile\n%s\n", infolog);
+      fprintf(stderr,"GLSL:\n%s\n", shader->glsl_prog);
+      return FALSE;
+   }
+   return TRUE;
+}
 
 static INLINE void
 grend_shader_state_reference(struct grend_shader_selector **ptr, struct grend_shader_selector *shader)
@@ -531,8 +549,13 @@ static struct grend_linked_shader_program *add_shader_program(struct grend_conte
      vrend_patch_vertex_shader_interpolants(vs->glsl_prog,
                                             &vs->sel->sinfo,
                                             &fs->sel->sinfo);
-     glShaderSource(vs->id, 1, (const char **)&vs->glsl_prog, NULL);
-     glCompileShader(vs->id);
+     boolean ret;
+     ret = grend_compile_shader(ctx, vs);
+     if (ret == FALSE) {
+        glDeleteShader(vs->id);
+        free(sprog);
+        return NULL;
+     }
      vs->compiled_fs_id = fs->id;
   }
 
@@ -544,8 +567,14 @@ static struct grend_linked_shader_program *add_shader_program(struct grend_conte
 
   glGetProgramiv(prog_id, GL_LINK_STATUS, &lret);
   if (lret == GL_FALSE) {
-     fprintf(stderr,"got error linking\n");
+     char infolog[65536];
+     int len;
+     glGetProgramInfoLog(prog_id, 65536, &len, infolog);
+     fprintf(stderr,"got error linking\n%s\n", infolog);
+     /* dump shaders */
      report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_SHADER, 0);
+     fprintf(stderr,"vert shader: GLSL\n%s\n", vs->glsl_prog);
+     fprintf(stderr,"frag shader: GLSL\n%s\n", fs->glsl_prog);
      glDeleteProgram(prog_id);
      return NULL;
   }
@@ -1318,8 +1347,14 @@ static int grend_shader_create(struct grend_context *ctx,
    shader->glsl_prog = tgsi_convert(shader->sel->tokens, &key, &shader->sel->sinfo);
 
    if (shader->sel->type == PIPE_SHADER_FRAGMENT) {
-      glShaderSource(shader->id, 1, (const char **)&shader->glsl_prog, NULL);
-      glCompileShader(shader->id);
+      boolean ret;
+
+      ret = grend_compile_shader(ctx, shader);
+      if (ret == FALSE) {
+         glDeleteShader(shader->id);
+         free(shader->glsl_prog);
+         return -1;
+      }
    }
    return 0;
 }

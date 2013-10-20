@@ -1527,13 +1527,18 @@ static void grend_update_scissor_state(struct grend_context *ctx)
 {
    struct pipe_scissor_state *ss = &ctx->ss;
    struct pipe_rasterizer_state *state = &ctx->rs_state;
-   
+   GLint y;
+
+   if (ctx->viewport_is_negative)
+      y = ss->miny;
+   else
+      y = ss->maxy;
    if (state->scissor)
       glEnable(GL_SCISSOR_TEST);
    else
       glDisable(GL_SCISSOR_TEST);
 
-   glScissor(ss->minx, should_invert_viewport(ctx) ? ss->miny : (ctx->fb_height - ss->maxy), ss->maxx - ss->minx, ss->maxy - ss->miny);
+   glScissor(ss->minx, y, ss->maxx - ss->minx, ss->maxy - ss->miny);
    ctx->scissor_state_dirty = FALSE;
    grend_state.scissor_dirty = FALSE;
 }

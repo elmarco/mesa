@@ -40,7 +40,7 @@ noinst_LTLIBRARIES = libgrend.la
 
 GM_LDFLAGS = -Wl,-Bsymbolic -version-number 0:1 -no-undefined
 
-libvirglrenderer_la_SOURCES = graw_qemu_lib_renderer.c
+libvirglrenderer_la_SOURCES = graw_qemu_lib_renderer.c graw_virtio_lib_renderer.c
 libvirglrenderer_ladir = $(libdir)
 libvirglrenderer_la_LIBADD = libgrend.la
 libvirglrenderer_la_LDFLAGS = $(GM_LDFLAGS)

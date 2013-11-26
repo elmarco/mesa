@@ -1,6 +1,5 @@
 #include <GL/glew.h>
 #include <GL/gl.h>
-#include <GL/glx.h>
 
 #include <stdio.h>
 #include "pipe/p_shader_tokens.h"
@@ -39,17 +38,17 @@ static void grend_destroy_query_object(void *obj_ptr);
 static void grend_finish_context_switch(struct grend_context *ctx);
 static void grend_patch_blend_func(struct grend_context *ctx);
 static void grend_update_frontface_state(struct grend_context *ctx);
-static void setup_glx_crap(void);
+
 extern int graw_shader_use_explicit;
 int localrender;
 static int have_invert_mesa = 0;
 static int draw_cursor = 0;
 int vrend_dump_shaders;
 
-static XVisualInfo *myvisual;
-static Display *Dpy;
-static GLXDrawable Draw;
-static GLXContext ctx0;
+static struct grend_if_cbs *clicbs;
+
+static virgl_gl_context ctx0;
+
 struct grend_fence {
    uint32_t fence_id;
    uint32_t ctx_id;
@@ -232,7 +231,8 @@ struct grend_shader_view {
 struct grend_context {
    char debug_name[64];
 
-   GLXContext glx_context;
+   virgl_gl_context gl_context;
+
    int ctx_id;
    GLuint vaoid;
 
@@ -2518,15 +2518,15 @@ static GLenum tgsitargettogltarget(const enum pipe_texture_target target, int nr
 
 static int inited;
 
-void graw_renderer_init(void)
+void graw_renderer_init(struct grend_if_cbs *cbs)
 {
    if (!inited) {
       inited = 1;
       vrend_object_init_resource_table();
+      clicbs = cbs;
    }
 
-   setup_glx_crap();
-
+   ctx0 = clicbs->get_current_context();
    if (glewIsSupported("GL_ARB_robustness"))
       grend_state.have_robustness = TRUE;
    else
@@ -2613,7 +2613,8 @@ bool grend_destroy_context(struct grend_context *ctx)
    vrend_object_fini_ctx_table(ctx->object_hash);
 
    if (ctx->ctx_id != 0)
-      glXDestroyContext(Dpy, ctx->glx_context);
+      clicbs->destroy_gl_context(ctx->gl_context);
+
    FREE(ctx);
 
    return switch_0;
@@ -2628,10 +2629,11 @@ struct grend_context *grend_create_context(int id, uint32_t nlen, const char *de
    }
 
    if (id == 0)
-      grctx->glx_context = ctx0;
+      grctx->gl_context = ctx0;
    else
-      grctx->glx_context = glXCreateContext(Dpy, myvisual, ctx0, TRUE);
-   glXMakeCurrent(Dpy, Draw, grctx->glx_context);
+      grctx->gl_context = clicbs->create_gl_context();
+   clicbs->make_current(grctx->gl_context);
+
    grctx->ctx_id = id;
    list_inithead(&grctx->programs);
    list_inithead(&grctx->active_nontimer_query_list);
@@ -2644,6 +2646,32 @@ struct grend_context *grend_create_context(int id, uint32_t nlen, const char *de
    return grctx;
 }
 
+void graw_renderer_resource_attach_iov(int res_handle, struct graw_iovec *iov,
+                                       int num_iovs)
+{
+   struct grend_resource *res;
+   res = vrend_resource_lookup(res_handle, 0);
+   if (!res)
+      return;
+
+   res->iov = iov;
+   res->num_iovs = num_iovs;
+
+}
+
+void graw_renderer_resource_invalid_iov(int res_handle, struct graw_iovec **iov,
+                                        int *num_iovs)
+{
+   struct grend_resource *res;
+   res = vrend_resource_lookup(res_handle, 0);
+   if (!res)
+      return;
+
+   *iov = res->iov;
+   *num_iovs = res->num_iovs;
+   res->num_iovs = 0;
+   res->iov = 0;
+}
 
 void graw_renderer_resource_create(struct graw_renderer_resource_create_args *args, struct graw_iovec *iov, uint32_t num_iovs)
 {
@@ -3732,7 +3760,7 @@ int graw_renderer_flush_buffer_res(struct grend_resource *res,
       glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
    }
 
-   swap_buffers();
+   clicbs->swap_buffers();
    return 0;
 }
 
@@ -3797,7 +3825,7 @@ void graw_renderer_check_fences(void)
 
    if (latest_id == 0)
       return;
-   graw_write_fence(latest_id);
+   clicbs->write_fence(latest_id);
 }
 
 static boolean graw_get_one_query_result(GLuint query_id, bool use_64, uint64_t *result)
@@ -3944,7 +3972,7 @@ static void grend_finish_context_switch(struct grend_context *ctx)
 
    grend_state.current_hw_ctx = ctx;
 
-   glXMakeCurrent(Dpy, Draw, ctx->glx_context);
+   clicbs->make_current(ctx->gl_context);
 
 #if 0
    /* re-emit all the state */
@@ -4332,22 +4360,3 @@ GLint64 graw_renderer_get_timestamp(void)
 }
 
 
-static void setup_glx_crap(void)
-{
-   int attrib[] = { GLX_RGBA,
-		    GLX_RED_SIZE, 1,
-		    GLX_GREEN_SIZE, 1,
-		    GLX_BLUE_SIZE, 1,
-		    GLX_DOUBLEBUFFER,
-		    None };
-   int scrnum;
-
-   XVisualInfo *VisInfo;
-   Dpy = glXGetCurrentDisplay();
-   Draw = glXGetCurrentDrawable();
-
-   VisInfo = glXChooseVisual(Dpy, DefaultScreen(Dpy), attrib);
-
-   myvisual = VisInfo;
-   ctx0 = glXGetCurrentContext();
-}

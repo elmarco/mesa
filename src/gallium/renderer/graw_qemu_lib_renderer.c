@@ -3,6 +3,7 @@
 
 #include <GL/glew.h>
 #include <GL/gl.h>
+#include <GL/glx.h>
 
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -20,12 +21,20 @@
 #include "graw_renderer.h"
 
 #include "virglrenderer.h"
+
+static Display *Dpy;
+static GLXDrawable Draw;
+static GLXContext ctx0;
+static XVisualInfo *myvisual;
+static void setup_glx_crap(void);
+
 static struct graw_renderer_callbacks *rcbs;
 
 static void *dev_cookie;
 extern int localrender;
 
-void graw_renderer_init(void);
+static struct grend_if_cbs graw_cbs;
+
 static void graw_process_cmd(struct virgl_command *cmd, struct graw_iovec *iov,
                              unsigned int niovs);
 
@@ -176,7 +185,8 @@ static void graw_process_cmd(struct virgl_command *cmd, struct graw_iovec *iov,
          graw_renderer_fini();
          
       }
-      graw_renderer_init();
+      setup_glx_crap();
+      graw_renderer_init(&graw_cbs);
       inited = 1;
       break;
    }
@@ -223,17 +233,38 @@ void graw_transfer_write_tex_return(struct pipe_resource *res,
    }
 }
 
-void graw_write_fence(unsigned fence_id)
+static void graw_write_fence(unsigned fence_id)
 {
    rcbs->write_fence(dev_cookie, fence_id);   
    send_irq(0x20);
 }
 
-int swap_buffers(void)
+static int swap_buffers(void)
 {
     rcbs->swap_buffers(dev_cookie);  
     return 0;
 }
+
+static virgl_gl_context create_gl_context(void)
+{
+   GLXContext *glxctx = glXCreateContext(Dpy, myvisual, ctx0, TRUE);
+   return (virgl_gl_context)glxctx;
+}
+
+static void destroy_gl_context(virgl_gl_context ctx)
+{
+   glXDestroyContext(Dpy, (GLXContext)ctx);
+}
+
+static int make_current(virgl_gl_context ctx)
+{
+   glXMakeCurrent(Dpy, Draw, (GLXContext)ctx);
+}
+
+static struct grend_if_cbs graw_cbs = {
+   graw_write_fence,
+   swap_buffers,
+};
 
 void graw_renderer_set_cursor_info(uint32_t cursor_handle, int x, int y)
 {
@@ -244,4 +275,29 @@ void graw_renderer_poll(void)
 {
    graw_renderer_check_queries();
    graw_renderer_check_fences();
+}
+
+static void setup_glx_crap(void)
+{
+   int attrib[] = { GLX_RGBA,
+		    GLX_RED_SIZE, 1,
+		    GLX_GREEN_SIZE, 1,
+		    GLX_BLUE_SIZE, 1,
+		    GLX_DOUBLEBUFFER,
+		    None };
+   int scrnum;
+
+   XVisualInfo *VisInfo;
+   Dpy = glXGetCurrentDisplay();
+   Draw = glXGetCurrentDrawable();
+
+   VisInfo = glXChooseVisual(Dpy, DefaultScreen(Dpy), attrib);
+
+   myvisual = VisInfo;
+   ctx0 = glXGetCurrentContext();
+
+   {
+      const GLubyte *name = glGetString(GL_VERSION);
+      fprintf(stderr,"name is %s\n", name);
+   }
 }

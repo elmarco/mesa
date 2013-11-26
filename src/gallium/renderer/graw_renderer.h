@@ -7,6 +7,9 @@
 #include "graw_iov.h"
 #include "virgl_hw.h"
 
+typedef void *virgl_gl_context;
+typedef void *virgl_gl_drawable;
+
 extern int vrend_dump_shaders;
 struct grend_context;
 
@@ -40,7 +43,16 @@ struct grend_format_table {
    uint32_t bindings;
 };
 
-void graw_renderer_init(void);
+struct grend_if_cbs {
+   void (*write_fence)(unsigned fence_id);
+   int (*swap_buffers)(void);
+
+   virgl_gl_context (*create_gl_context)(void);
+   void (*destroy_gl_context)(virgl_gl_context ctx);
+   int (*make_current)(virgl_gl_context ctx);
+   virgl_gl_context (*get_current_context)(void);
+};
+void graw_renderer_init(struct grend_if_cbs *cbs);
 
 void grend_insert_format(struct grend_format_table *entry, uint32_t bindings);
 void grend_create_vs(struct grend_context *ctx,
@@ -237,12 +249,10 @@ struct grend_context *vrend_lookup_renderer_ctx(uint32_t ctx_id);
 
 int graw_renderer_create_fence(int client_fence_id, uint32_t ctx_id);
 
-void graw_write_fence(unsigned fence_id);
 void graw_renderer_check_fences(void);
 void graw_renderer_check_queries(void);
 void grend_stop_current_queries(void);
 
-int swap_buffers(void);
 boolean grend_hw_switch_context(struct grend_context *ctx, boolean now);
 void graw_renderer_object_insert(struct grend_context *ctx, void *data,
                                  uint32_t size, uint32_t handle, enum virgl_object_type type);
@@ -279,6 +289,10 @@ GLint64 graw_renderer_get_timestamp(void);
 /* formats */
 void vrend_build_format_list(void);
 
+void graw_renderer_resource_attach_iov(int res_handle, struct graw_iovec *iov,
+                                       int num_iovs);
+void graw_renderer_resource_invalid_iov(int res_handle, struct graw_iovec **iov,
+                                        int *num_iovs);
 void graw_renderer_resource_destroy(struct grend_resource *res);
 
 static INLINE void

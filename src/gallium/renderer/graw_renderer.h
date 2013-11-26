@@ -234,6 +234,7 @@ void graw_transfer_write_tex_return(struct pipe_resource *res,
 				    void *myptr, int size, int invert);
 
 int graw_renderer_set_scanout(uint32_t res_handle,
+                              uint32_t scanout_id,
                               uint32_t ctx_id,
                               struct pipe_box *box);
 

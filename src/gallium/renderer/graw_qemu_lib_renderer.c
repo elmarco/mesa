@@ -148,7 +148,7 @@ static void graw_process_cmd(struct virgl_command *cmd, struct graw_iovec *iov,
       break;
       
    case VIRGL_CMD_SET_SCANOUT:
-      graw_renderer_set_scanout(cmd->u.set_scanout.res_handle,
+      graw_renderer_set_scanout(cmd->u.set_scanout.res_handle, 0,
                                 cmd->u.set_scanout.ctx_id,
                                 (struct pipe_box *)&cmd->u.set_scanout.box);
       (*rcbs->resize_window)(dev_cookie, 0, cmd->u.set_scanout.box.w,

@@ -165,18 +165,18 @@ static int graw_process_cmd(struct virtgpu_command *cmd, struct graw_iovec *iov,
       box.depth = 1;
          
 //         fprintf(stderr,"got transfer get %d\n", cmd->u.transfer_send_3d.res_handle);
-      graw_renderer_transfer_send_iov(cmd->u.transfer_send_2d.resource_id,
-                                      0,
-                                      0,
-                                      0,
-                                      0,
-                                      (struct pipe_box *)&box,
-                                      cmd->u.transfer_send_2d.offset, NULL, 0);
+      graw_renderer_transfer_write_iov(cmd->u.transfer_send_2d.resource_id,
+                                       0,
+                                       0,
+                                       0,
+                                       0,
+                                       (struct pipe_box *)&box,
+                                       cmd->u.transfer_send_2d.offset, NULL, 0);
       break;
    }
    case VIRTGPU_CMD_TRANSFER_SEND_3D:
 //         fprintf(stderr,"got transfer get %d\n", cmd->u.transfer_send_3d.res_handle);
-      graw_renderer_transfer_send_iov(cmd->u.transfer_send_3d.resource_id,
+      graw_renderer_transfer_write_iov(cmd->u.transfer_send_3d.resource_id,
                                       cmd->u.transfer_send_3d.ctx_id,
                                       cmd->u.transfer_send_3d.level,
                                       cmd->u.transfer_send_3d.stride,
@@ -186,7 +186,7 @@ static int graw_process_cmd(struct virtgpu_command *cmd, struct graw_iovec *iov,
       fence_ctx_id = cmd->u.transfer_send_3d.ctx_id;
       break;
    case VIRTGPU_CMD_TRANSFER_RECV_3D:
-      graw_renderer_transfer_write_iov(cmd->u.transfer_recv_3d.resource_id,
+      graw_renderer_transfer_send_iov(cmd->u.transfer_recv_3d.resource_id,
                                        cmd->u.transfer_recv_3d.ctx_id,
                                        cmd->u.transfer_recv_3d.level,
                                        cmd->u.transfer_recv_3d.stride,
@@ -210,7 +210,7 @@ static int graw_process_cmd(struct virtgpu_command *cmd, struct graw_iovec *iov,
       box.width = cmd->u.set_scanout.width;
       box.height = cmd->u.set_scanout.height;
       box.depth = 1;
-      graw_renderer_set_scanout(cmd->u.set_scanout.resource_id,
+      graw_renderer_set_scanout(cmd->u.set_scanout.resource_id, cmd->u.set_scanout.scanout_id,
                                 0, &box);
       (*rcbs->resize_window)(dev_cookie, cmd->u.set_scanout.scanout_id, cmd->u.set_scanout.width,
                             cmd->u.set_scanout.height);

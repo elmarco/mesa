@@ -309,9 +309,10 @@ struct grend_context {
 
 static struct grend_nontimer_hw_query *grend_create_hw_query(struct grend_query *query);
 
-static struct grend_resource *frontbuffer;
-static struct pipe_box front_box;
-static GLuint front_fb_id;
+#define MAX_SCANOUT 4
+static struct grend_resource *frontbuffer[MAX_SCANOUT];
+static struct pipe_box front_box[MAX_SCANOUT];
+static GLuint front_fb_id[MAX_SCANOUT];
 static struct grend_format_table tex_conv_table[VIRGL_FORMAT_MAX];
 
 static INLINE boolean vrend_format_can_render(enum virgl_formats format)
@@ -3673,7 +3674,7 @@ void graw_renderer_blit(struct grend_context *ctx,
    graw_renderer_blit_int(ctx, dst_handle, src_handle, info);
 }
 
-int graw_renderer_set_scanout(uint32_t res_handle, uint32_t ctx_id,
+int graw_renderer_set_scanout(uint32_t res_handle, uint32_t scanout_id, uint32_t ctx_id,
                               struct pipe_box *box)
 {
    struct grend_resource *res;
@@ -3707,51 +3708,64 @@ int graw_renderer_set_scanout(uint32_t res_handle, uint32_t ctx_id,
       frontbuffer->is_front = 0;
    }
 #endif
-   grend_resource_reference(&frontbuffer, res);
-   front_box = *box;
-   fprintf(stderr,"setting frontbuffer to %d\n", res_handle);
+   grend_resource_reference(&frontbuffer[scanout_id], res);
+   front_box[scanout_id] = *box;
+   fprintf(stderr,"setting frontbuffer %d to %d\n", scanout_id, res_handle);
    return 0;
+}
+
+static void graw_renderer_flush_scanout_res(struct grend_resource *res,
+                                           struct pipe_box *box,
+                                           int id)
+{
+   uint32_t sy1, sy2, dy1, dy2;
+   if (!front_fb_id[id])
+      glGenFramebuffers(1, &front_fb_id[id]);
+
+   glBindFramebuffer(GL_FRAMEBUFFER_EXT, front_fb_id[id]);
+
+   grend_fb_bind_texture(res, 0, 0, 0);
+
+   glBindFramebuffer(GL_READ_FRAMEBUFFER, front_fb_id[id]);
+   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+      
+   /* force full scissor and viewport - should probably use supplied box */
+   glViewport(0, 0, res->base.width0, res->base.height0);
+   glScissor(0, 0, front_box[id].width, front_box[id].height);
+
+   grend_state.viewport_dirty = TRUE;
+   grend_state.scissor_dirty = TRUE;
+   /* justification for inversion here required */
+
+   dy1 = front_box[id].height - box->y;
+   dy2 = front_box[id].height - box->y - box->height;
+   if (res->y_0_top) {
+      sy1 = front_box[id].height - box->y;
+      sy2 = front_box[id].height - box->y - box->height;
+   } else {
+      sy1 = box->y;
+      sy2 = box->y + box->height;
+   }
+
+   glBlitFramebuffer(box->x, sy1, box->x + box->width, sy2,
+                     box->x, dy1, box->x + box->width, dy2,
+                     GL_COLOR_BUFFER_BIT, GL_NEAREST);
+
+
 }
 
 int graw_renderer_flush_buffer_res(struct grend_resource *res,
                                    struct pipe_box *box)
 {
    if (!res->is_front) {
-      uint32_t sy1, sy2, dy1, dy2;
 
+      int i;
       grend_hw_switch_context(vrend_lookup_renderer_ctx(0), TRUE);
-      if (!front_fb_id)
-         glGenFramebuffers(1, &front_fb_id);
 
-      glBindFramebuffer(GL_FRAMEBUFFER_EXT, front_fb_id);
-
-      grend_fb_bind_texture(res, 0, 0, 0);
-
-      glBindFramebuffer(GL_READ_FRAMEBUFFER, front_fb_id);
-      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-      
-      /* force full scissor and viewport - should probably use supplied box */
-      glViewport(0, 0, res->base.width0, res->base.height0);
-      glScissor(0, 0, front_box.width, front_box.height);
-
-      grend_state.viewport_dirty = TRUE;
-      grend_state.scissor_dirty = TRUE;
-      /* justification for inversion here required */
-
-      dy1 = front_box.height - box->y;
-      dy2 = front_box.height - box->y - box->height;
-      if (res->y_0_top) {
-         sy1 = front_box.height - box->y;
-         sy2 = front_box.height - box->y - box->height;
-      } else {
-         sy1 = box->y;
-         sy2 = box->y + box->height;
+      for (i = 0; i < MAX_SCANOUT; i++) {
+         if (res == frontbuffer[i])
+            graw_renderer_flush_scanout_res(res, box, i);
       }
-
-      glBlitFramebuffer(box->x, sy1, box->x + box->width, sy2,
-                        box->x, dy1, box->x + box->width, dy2,
-                        GL_COLOR_BUFFER_BIT, GL_NEAREST);
-
       if (draw_cursor)
          graw_renderer_paint_cursor(&grend_state.cursor_info,
                                     res);
@@ -3769,7 +3783,8 @@ int graw_renderer_flush_buffer(uint32_t res_handle,
                                struct pipe_box *box)
 {
    struct grend_resource *res;
-
+   int i;
+   bool found = false;
    if (!localrender)
       return 0;
 
@@ -3777,8 +3792,14 @@ int graw_renderer_flush_buffer(uint32_t res_handle,
    if (!res)
       return 0;
 
-   if (res != frontbuffer) {
-      fprintf(stderr,"not the frontbuffer %d\n", res_handle);
+   for (i = 0; i < MAX_SCANOUT; i++) {
+      if (res == frontbuffer[i]) {
+         found = true;
+      }
+   }
+
+   if (found == false) {
+      fprintf(stderr,"not the frontbuffer %d\n", res_handle); 
       return 0;
    }
 
@@ -4207,8 +4228,8 @@ void grend_set_cursor_info(uint32_t cursor_handle, int x, int y)
    grend_state.cursor_info.x = x;
    grend_state.cursor_info.y = y;
 
-   if (frontbuffer && draw_cursor)
-      graw_renderer_remove_cursor(&grend_state.cursor_info, frontbuffer);
+//   if (frontbuffer && draw_cursor)
+//      graw_renderer_remove_cursor(&grend_state.cursor_info, frontbuffer);
 }
 
 void grend_create_so_target(struct grend_context *ctx,

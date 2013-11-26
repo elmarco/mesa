@@ -151,7 +151,7 @@ static void graw_process_cmd(struct virgl_command *cmd, struct graw_iovec *iov,
       graw_renderer_set_scanout(cmd->u.set_scanout.res_handle,
                                 cmd->u.set_scanout.ctx_id,
                                 (struct pipe_box *)&cmd->u.set_scanout.box);
-      (*rcbs->resize_front)(dev_cookie, cmd->u.set_scanout.box.w,
+      (*rcbs->resize_window)(dev_cookie, 0, cmd->u.set_scanout.box.w,
                             cmd->u.set_scanout.box.h);
       break;
    case VIRGL_CMD_FLUSH_BUFFER:

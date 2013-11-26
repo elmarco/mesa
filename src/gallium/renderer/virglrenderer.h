@@ -21,7 +21,7 @@ struct graw_renderer_callbacks {
    /* send IRQ to guest */
    void (*send_irq)(void *cookie, uint32_t irq);
    int (*swap_buffers)(void *cookie);
-   void (*resize_front)(void *cookie, int width, int height);
+   void (*resize_window)(void *cookie, int idx, int width, int height);
    void (*write_fence)(void *cookie, uint32_t fence);
 
    void (*map_iov)(struct graw_iovec *iov, uint64_t addr);

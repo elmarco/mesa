@@ -45,4 +45,7 @@ GREND_EXPORT void virgl_renderer_poll(void); /* force fences */
 GREND_EXPORT int virgl_renderer_process_vcmd(void *cmd, struct graw_iovec *iov, unsigned int num_iovs);
 
 GREND_EXPORT void virgl_renderer_set_cursor_info(uint32_t cursor_handle, int x, int y);
+
+/* we need to give qemu the cursor resource contents */
+GREND_EXPORT void *virgl_get_cursor_data(uint32_t resource_id, uint32_t *width, uint32_t *height);
 #endif

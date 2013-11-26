@@ -274,7 +274,7 @@ void grend_render_condition(struct grend_context *ctx,
                             boolean condtion,
                             uint mode);
 void grend_set_cursor_info(uint32_t cursor_handle, int x, int y);
-
+void *graw_renderer_get_cursor_contents(uint32_t res_handle, uint32_t *width, uint32_t *height);
 void grend_use_program(GLuint program_id);
 void grend_blend_enable(GLboolean blend_enable);
 void grend_depth_test_enable(GLboolean depth_test_enable);

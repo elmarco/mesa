@@ -4383,4 +4383,33 @@ GLint64 graw_renderer_get_timestamp(void)
    return v;
 }
 
+void *graw_renderer_get_cursor_contents(uint32_t res_handle, uint32_t *width, uint32_t *height)
+{
+   GLenum format, type;
+   struct grend_resource *res;
+   int blsize;
+   void *data;
+   int size;
 
+   res = vrend_resource_lookup(res_handle, 0);
+   if (!res)
+      return NULL;
+
+   if (res->base.width0 > 128 || res->base.height0 > 128)
+      return NULL;
+
+   if (res->target != GL_TEXTURE_2D)
+      return NULL;
+
+   *width = res->base.width0;
+   *height = res->base.height0;
+   format = tex_conv_table[res->base.format].glformat;
+   type = tex_conv_table[res->base.format].gltype; 
+   blsize = util_format_get_blocksize(res->base.format);
+   size = util_format_get_nblocks(res->base.format, res->base.width0, res->base.height0) * blsize;
+   data = malloc(size);
+
+   glBindTexture(res->target, res->id);
+   glGetnTexImageARB(res->target, 0, format, type, size, data);
+   return data;
+}

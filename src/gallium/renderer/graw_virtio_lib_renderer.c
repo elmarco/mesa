@@ -52,14 +52,14 @@ static void virgl_cmd_create_resource_2d(struct virtgpu_command *cmd)
    args.handle = cmd->u.resource_create_2d.resource_id;
    args.target = 2;
    args.format = cmd->u.resource_create_2d.format;
-   args.bind = 1;
+   args.bind = (1 << 1);
    args.width = cmd->u.resource_create_2d.width;
    args.height = cmd->u.resource_create_2d.height;
    args.depth = 1;
    args.array_size = 1;
    args.last_level = 0;
    args.nr_samples = 0;
-   args.flags = 0;
+   args.flags = VIRGL_RESOURCE_Y_0_TOP;
    graw_renderer_resource_create(&args, NULL, 0);
 }
 
@@ -154,46 +154,46 @@ static int graw_process_cmd(struct virtgpu_command *cmd, struct graw_iovec *iov,
    }
    
    break;
-   case VIRTGPU_CMD_TRANSFER_SEND_2D: {
+   case VIRTGPU_CMD_TRANSFER_TO_HOST_2D: {
       struct pipe_box box;
 
-      box.x = cmd->u.transfer_send_2d.x;
-      box.y = cmd->u.transfer_send_2d.y;
+      box.x = cmd->u.transfer_to_host_2d.x;
+      box.y = cmd->u.transfer_to_host_2d.y;
       box.z = 0;
-      box.width = cmd->u.transfer_send_2d.width;
-      box.height = cmd->u.transfer_send_2d.height;
+      box.width = cmd->u.transfer_to_host_2d.width;
+      box.height = cmd->u.transfer_to_host_2d.height;
       box.depth = 1;
          
-//         fprintf(stderr,"got transfer get %d\n", cmd->u.transfer_send_3d.res_handle);
-      graw_renderer_transfer_write_iov(cmd->u.transfer_send_2d.resource_id,
+//         fprintf(stderr,"got transfer get %d\n", cmd->u.transfer_to_host_3d.res_handle);
+      graw_renderer_transfer_write_iov(cmd->u.transfer_to_host_2d.resource_id,
                                        0,
                                        0,
                                        0,
                                        0,
                                        (struct pipe_box *)&box,
-                                       cmd->u.transfer_send_2d.offset, NULL, 0);
+                                       cmd->u.transfer_to_host_2d.offset, NULL, 0);
       break;
    }
-   case VIRTGPU_CMD_TRANSFER_SEND_3D:
-//         fprintf(stderr,"got transfer get %d\n", cmd->u.transfer_send_3d.res_handle);
-      graw_renderer_transfer_write_iov(cmd->u.transfer_send_3d.resource_id,
-                                      cmd->u.transfer_send_3d.ctx_id,
-                                      cmd->u.transfer_send_3d.level,
-                                      cmd->u.transfer_send_3d.stride,
-                                      cmd->u.transfer_send_3d.layer_stride,
-                                      (struct pipe_box *)&cmd->u.transfer_send_3d.box,
-                                      cmd->u.transfer_send_3d.data, NULL, 0);
-      fence_ctx_id = cmd->u.transfer_send_3d.ctx_id;
+   case VIRTGPU_CMD_TRANSFER_TO_HOST_3D:
+//         fprintf(stderr,"got transfer get %d\n", cmd->u.transfer_to_host_3d.res_handle);
+      graw_renderer_transfer_write_iov(cmd->u.transfer_to_host_3d.resource_id,
+                                      cmd->u.transfer_to_host_3d.ctx_id,
+                                      cmd->u.transfer_to_host_3d.level,
+                                      cmd->u.transfer_to_host_3d.stride,
+                                      cmd->u.transfer_to_host_3d.layer_stride,
+                                      (struct pipe_box *)&cmd->u.transfer_to_host_3d.box,
+                                      cmd->u.transfer_to_host_3d.data, NULL, 0);
+      fence_ctx_id = cmd->u.transfer_to_host_3d.ctx_id;
       break;
-   case VIRTGPU_CMD_TRANSFER_RECV_3D:
-      graw_renderer_transfer_send_iov(cmd->u.transfer_recv_3d.resource_id,
-                                       cmd->u.transfer_recv_3d.ctx_id,
-                                       cmd->u.transfer_recv_3d.level,
-                                       cmd->u.transfer_recv_3d.stride,
-                                       cmd->u.transfer_recv_3d.layer_stride,
-                                       (struct pipe_box *)&cmd->u.transfer_recv_3d.box,
-                                       cmd->u.transfer_recv_3d.data, NULL, 0);
-      fence_ctx_id = cmd->u.transfer_recv_3d.ctx_id;
+   case VIRTGPU_CMD_TRANSFER_FROM_HOST_3D:
+      graw_renderer_transfer_send_iov(cmd->u.transfer_from_host_3d.resource_id,
+                                       cmd->u.transfer_from_host_3d.ctx_id,
+                                       cmd->u.transfer_from_host_3d.level,
+                                       cmd->u.transfer_from_host_3d.stride,
+                                       cmd->u.transfer_from_host_3d.layer_stride,
+                                       (struct pipe_box *)&cmd->u.transfer_from_host_3d.box,
+                                       cmd->u.transfer_from_host_3d.data, NULL, 0);
+      fence_ctx_id = cmd->u.transfer_from_host_3d.ctx_id;
       break;
       
    case VIRTGPU_CMD_RESOURCE_ATTACH_BACKING:

@@ -30,12 +30,6 @@ static struct grend_if_cbs virgl_cbs;
 static int graw_process_cmd(struct virtgpu_command *cmd, struct graw_iovec *iov,
                              unsigned int niovs);
 
-
-static void send_irq(uint32_t pd)
-{
-   rcbs->send_irq(dev_cookie, pd);
-}
-
 int virgl_renderer_process_vcmd(void *cmd, struct graw_iovec *iov, unsigned int niovs)
 {
    struct virtgpu_command *qcmd = cmd;
@@ -307,7 +301,6 @@ void graw_transfer_write_tex_return(struct pipe_resource *res,
 static void virgl_write_fence(uint32_t fence_id)
 {
    rcbs->write_fence(dev_cookie, fence_id);   
-   send_irq(0x20);
 }
 
 static int swap_buffers(void)

@@ -45,11 +45,11 @@ struct grend_format_table {
 
 struct grend_if_cbs {
    void (*write_fence)(unsigned fence_id);
-   int (*swap_buffers)(void);
+   int (*swap_buffers)(int idx);
 
-   virgl_gl_context (*create_gl_context)(void);
+   virgl_gl_context (*create_gl_context)(int scanout);
    void (*destroy_gl_context)(virgl_gl_context ctx);
-   int (*make_current)(virgl_gl_context ctx);
+   int (*make_current)(int scanout, virgl_gl_context ctx);
    virgl_gl_context (*get_current_context)(void);
 };
 void graw_renderer_init(struct grend_if_cbs *cbs);

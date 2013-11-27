@@ -2632,8 +2632,8 @@ struct grend_context *grend_create_context(int id, uint32_t nlen, const char *de
    if (id == 0)
       grctx->gl_context = ctx0;
    else
-      grctx->gl_context = clicbs->create_gl_context();
-   clicbs->make_current(grctx->gl_context);
+      grctx->gl_context = clicbs->create_gl_context(0);
+   clicbs->make_current(0, grctx->gl_context);
 
    grctx->ctx_id = id;
    list_inithead(&grctx->programs);
@@ -3741,8 +3741,8 @@ static void graw_renderer_flush_scanout_res(struct grend_resource *res,
    grend_state.scissor_dirty = TRUE;
    /* justification for inversion here required */
 
-   dy1 = front_box[id].height - box->y;
-   dy2 = front_box[id].height - box->y - box->height;
+   dy1 = front_box[id].height - box->y - front_box[id].y;
+   dy2 = front_box[id].height - box->y - box->height - front_box[id].y;
    if (res->y_0_top) {
       sy1 = front_box[id].height - box->y;
       sy2 = front_box[id].height - box->y - box->height;
@@ -3752,7 +3752,7 @@ static void graw_renderer_flush_scanout_res(struct grend_resource *res,
    }
 
    glBlitFramebuffer(box->x, sy1, box->x + box->width, sy2,
-                     box->x, dy1, box->x + box->width, dy2,
+                     box->x - front_box[id].x, dy1, box->x + box->width - front_box[id].x, dy2,
                      GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
 
@@ -3767,18 +3767,20 @@ int graw_renderer_flush_buffer_res(struct grend_resource *res,
       grend_hw_switch_context(vrend_lookup_renderer_ctx(0), TRUE);
 
       for (i = 0; i < MAX_SCANOUT; i++) {
-         if (res == frontbuffer[i])
+         if (res == frontbuffer[i]) {
+            clicbs->make_current(i, ctx0);
             graw_renderer_flush_scanout_res(res, box, i);
+            clicbs->swap_buffers(i);
+         }
       }
-      if (draw_cursor)
-         graw_renderer_paint_cursor(&grend_state.cursor_info,
-                                    res);
+
    } else {
       glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
       glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+      clicbs->swap_buffers(0);
    }
 
-   clicbs->swap_buffers();
+
    return 0;
 }
 
@@ -3997,7 +3999,7 @@ static void grend_finish_context_switch(struct grend_context *ctx)
 
    grend_state.current_hw_ctx = ctx;
 
-   clicbs->make_current(ctx->gl_context);
+   clicbs->make_current(0, ctx->gl_context);
 
 #if 0
    /* re-emit all the state */

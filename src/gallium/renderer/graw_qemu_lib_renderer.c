@@ -239,13 +239,13 @@ static void graw_write_fence(unsigned fence_id)
    send_irq(0x20);
 }
 
-static int swap_buffers(void)
+static int swap_buffers(int idx)
 {
-    rcbs->swap_buffers(dev_cookie);  
+     rcbs->swap_buffers(dev_cookie, idx);  
     return 0;
 }
 
-static virgl_gl_context create_gl_context(void)
+static virgl_gl_context create_gl_context(int idx)
 {
    GLXContext *glxctx = glXCreateContext(Dpy, myvisual, ctx0, TRUE);
    return (virgl_gl_context)glxctx;
@@ -256,7 +256,7 @@ static void destroy_gl_context(virgl_gl_context ctx)
    glXDestroyContext(Dpy, (GLXContext)ctx);
 }
 
-static int make_current(virgl_gl_context ctx)
+static int make_current(int idx, virgl_gl_context ctx)
 {
    glXMakeCurrent(Dpy, Draw, (GLXContext)ctx);
 }

@@ -303,14 +303,14 @@ static void virgl_write_fence(uint32_t fence_id)
    rcbs->write_fence(dev_cookie, fence_id);   
 }
 
-static int swap_buffers(void)
+static int swap_buffers(int idx)
 {
-   return rcbs->swap_buffers(dev_cookie);  
+   return rcbs->swap_buffers(dev_cookie, idx);
 }
 
-static virgl_gl_context create_gl_context(void)
+static virgl_gl_context create_gl_context(int scanout_idx)
 {
-   return rcbs->create_gl_context(dev_cookie);
+   return rcbs->create_gl_context(dev_cookie, scanout_idx);
 }
 
 static void destroy_gl_context(virgl_gl_context ctx)
@@ -318,9 +318,9 @@ static void destroy_gl_context(virgl_gl_context ctx)
     return rcbs->destroy_gl_context(dev_cookie, ctx);
 }
 
-static int make_current(virgl_gl_context ctx)
+static int make_current(int scanout_idx, virgl_gl_context ctx)
 {
-    return rcbs->make_current(dev_cookie, ctx);
+    return rcbs->make_current(dev_cookie, scanout_idx, ctx);
 }
 
 static virgl_gl_context get_current_context(void)

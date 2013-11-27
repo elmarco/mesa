@@ -4391,8 +4391,9 @@ void *graw_renderer_get_cursor_contents(uint32_t res_handle, uint32_t *width, ui
    GLenum format, type;
    struct grend_resource *res;
    int blsize;
-   void *data;
+   void *data, *data2;
    int size;
+   int h;
 
    res = vrend_resource_lookup(res_handle, 0);
    if (!res)
@@ -4411,8 +4412,18 @@ void *graw_renderer_get_cursor_contents(uint32_t res_handle, uint32_t *width, ui
    blsize = util_format_get_blocksize(res->base.format);
    size = util_format_get_nblocks(res->base.format, res->base.width0, res->base.height0) * blsize;
    data = malloc(size);
+   data2 = malloc(size);
 
    glBindTexture(res->target, res->id);
    glGetnTexImageARB(res->target, 0, format, type, size, data);
-   return data;
+
+   for (h = 0; h < res->base.height0; h++) {
+      uint32_t doff = (res->base.height0 - h - 1) * res->base.width0 * blsize;
+      uint32_t soff = h * res->base.width0 * blsize;
+
+      memcpy(data2 + doff, data + soff, res->base.width0 * blsize);
+   }
+   free(data);
+      
+   return data2;
 }

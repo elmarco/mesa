@@ -2940,7 +2940,8 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
 
       if (stride && !need_temp) {
          glPixelStorei(GL_UNPACK_ROW_LENGTH, stride / elsize);
-      }
+      } else
+         glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
 
       switch (elsize) {
       case 1:

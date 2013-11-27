@@ -206,8 +206,8 @@ static int graw_process_cmd(struct virtgpu_command *cmd, struct graw_iovec *iov,
       box.depth = 1;
       graw_renderer_set_scanout(cmd->u.set_scanout.resource_id, cmd->u.set_scanout.scanout_id,
                                 0, &box);
-      (*rcbs->resize_window)(dev_cookie, cmd->u.set_scanout.scanout_id, cmd->u.set_scanout.width,
-                            cmd->u.set_scanout.height);
+      (*rcbs->notify_state)(dev_cookie, cmd->u.set_scanout.scanout_id, cmd->u.set_scanout.x,
+                            cmd->u.set_scanout.y, cmd->u.set_scanout.width, cmd->u.set_scanout.height);
       break;
    }
    case VIRTGPU_CMD_RESOURCE_FLUSH:

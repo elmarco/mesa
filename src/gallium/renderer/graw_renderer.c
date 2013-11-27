@@ -47,8 +47,6 @@ int vrend_dump_shaders;
 
 static struct grend_if_cbs *clicbs;
 
-static virgl_gl_context ctx0;
-
 struct grend_fence {
    uint32_t fence_id;
    uint32_t ctx_id;
@@ -2527,7 +2525,6 @@ void graw_renderer_init(struct grend_if_cbs *cbs)
       clicbs = cbs;
    }
 
-   ctx0 = clicbs->get_current_context();
    if (glewIsSupported("GL_ARB_robustness"))
       grend_state.have_robustness = TRUE;
    else
@@ -2629,10 +2626,7 @@ struct grend_context *grend_create_context(int id, uint32_t nlen, const char *de
       strncpy(grctx->debug_name, debug_name, 64);
    }
 
-   if (id == 0)
-      grctx->gl_context = ctx0;
-   else
-      grctx->gl_context = clicbs->create_gl_context(0);
+   grctx->gl_context = clicbs->create_gl_context(0);
    clicbs->make_current(0, grctx->gl_context);
 
    grctx->ctx_id = id;
@@ -3768,7 +3762,7 @@ int graw_renderer_flush_buffer_res(struct grend_resource *res,
 
       for (i = 0; i < MAX_SCANOUT; i++) {
          if (res == frontbuffer[i]) {
-            clicbs->make_current(i, ctx0);
+            clicbs->make_current(i, vrend_lookup_renderer_ctx(0)->gl_context);
             graw_renderer_flush_scanout_res(res, box, i);
             clicbs->swap_buffers(i);
          }

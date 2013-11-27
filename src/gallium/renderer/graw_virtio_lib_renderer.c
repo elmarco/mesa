@@ -125,6 +125,8 @@ static int graw_process_cmd(struct virtgpu_command *cmd, struct graw_iovec *iov,
 {
    static int inited;
    int fence_ctx_id = 0;
+
+   graw_renderer_force_ctx_0();
    switch (cmd->type) {
    case VIRTGPU_CMD_CTX_CREATE:
       graw_renderer_context_create(cmd->u.ctx_create.ctx_id, cmd->u.ctx_create.nlen,

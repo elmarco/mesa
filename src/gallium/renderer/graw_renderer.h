@@ -306,4 +306,6 @@ grend_resource_reference(struct grend_resource **ptr, struct grend_resource *tex
    *ptr = tex;
 }
 
+void graw_renderer_force_ctx_0(void);
+
 #endif

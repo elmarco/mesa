@@ -4421,3 +4421,10 @@ void *graw_renderer_get_cursor_contents(uint32_t res_handle, uint32_t *width, ui
       
    return data2;
 }
+
+void graw_renderer_force_ctx_0(void)
+{
+   grend_state.current_ctx = NULL;
+   grend_state.current_hw_ctx = NULL;
+   grend_hw_switch_context(vrend_lookup_renderer_ctx(0), TRUE);
+}

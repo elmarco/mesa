@@ -2915,7 +2915,7 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
       grend_use_program(0);
 
       if (!stride)
-         stride = util_format_get_nblocksx(res->base.format, res->base.width0) * elsize;
+         stride = util_format_get_nblocksx(res->base.format, u_minify(res->base.width0, level)) * elsize;
 
       compressed = util_format_is_compressed(res->base.format);
       if (num_iovs > 1 || compressed) {

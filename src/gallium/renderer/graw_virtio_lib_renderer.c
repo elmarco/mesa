@@ -262,7 +262,7 @@ static int graw_process_cmd(struct virtgpu_command *cmd, struct graw_iovec *iov,
    }
    
    if (cmd->flags & VIRGL_COMMAND_EMIT_FENCE)
-      graw_renderer_create_fence(cmd->rsvd, fence_ctx_id);
+      graw_renderer_create_fence(cmd->fence_id, fence_ctx_id);
    return 0;
 }
 

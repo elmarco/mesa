@@ -4280,97 +4280,94 @@ static void vrender_get_glsl_version(int *major, int *minor)
 }
 
 void graw_renderer_fill_caps(uint32_t set, uint32_t version,
-                             uint32_t offset, struct graw_iovec *iov,
-                             unsigned int niovs)
+                             union virgl_caps *caps)
 {
-   union virgl_caps caps;
    int i;
    GLint max;
    int glsl_major, glsl_minor;
+   memset(caps, 0, sizeof(*caps));
+
    if (set != 0) {
-      caps.max_version = 0;
-      goto out;
+      caps->max_version = 0;
+      return;
    }
    vrender_get_glsl_version(&glsl_major, &glsl_minor);
-   memset(&caps, 0, sizeof(caps));
-   caps.max_version = 1;
+   caps->max_version = 1;
 
-   caps.v1.bset.occlusion_query = 1;
+   caps->v1.bset.occlusion_query = 1;
    if (glewIsSupported("GL_VERSION_3_0")) {
-      caps.v1.bset.indep_blend_enable = 1;
-      caps.v1.bset.conditional_render = 1;
+      caps->v1.bset.indep_blend_enable = 1;
+      caps->v1.bset.conditional_render = 1;
    } else {
       if (glewIsSupported("GL_EXT_draw_buffers2"))
-         caps.v1.bset.indep_blend_enable = 1;
+         caps->v1.bset.indep_blend_enable = 1;
       if (glewIsSupported("GL_NV_conditional_render"))
-         caps.v1.bset.conditional_render = 1;
+         caps->v1.bset.conditional_render = 1;
    }
 
    if (glewIsSupported("GL_VERSION_3_1")) {
-      caps.v1.bset.instanceid = 1;
+      caps->v1.bset.instanceid = 1;
    } else {
       if (glewIsSupported("GL_ARB_draw_instanced"))
-         caps.v1.bset.instanceid = 1;
+         caps->v1.bset.instanceid = 1;
    }
 
    if (grend_state.have_nv_prim_restart || grend_state.have_gl_prim_restart)
-      caps.v1.bset.primitive_restart = 1;
+      caps->v1.bset.primitive_restart = 1;
 
    if (glewIsSupported("GL_VERSION_3_2")) {
-      caps.v1.bset.fragment_coord_conventions = 1;
+      caps->v1.bset.fragment_coord_conventions = 1;
    } else {
       if (glewIsSupported("GL_ARB_fragment_coord_conventions"))
-         caps.v1.bset.fragment_coord_conventions = 1;
+         caps->v1.bset.fragment_coord_conventions = 1;
    }
 
    if (glewIsSupported("GL_ARB_texture_multisample"))
        /* disable multisample until developed */
-      caps.v1.bset.texture_multisample = 0;
+      caps->v1.bset.texture_multisample = 0;
    if (glewIsSupported("GL_VERSION_4_0")) {
-      caps.v1.bset.indep_blend_func = 1;
-      caps.v1.bset.cube_map_array = 1;
+      caps->v1.bset.indep_blend_func = 1;
+      caps->v1.bset.cube_map_array = 1;
    } else {
       if (glewIsSupported("GL_ARB_draw_buffers_blend"))
-         caps.v1.bset.indep_blend_func = 1;
+         caps->v1.bset.indep_blend_func = 1;
       if (glewIsSupported("GL_ARB_texture_cube_map_array"))
-         caps.v1.bset.cube_map_array = 1;
+         caps->v1.bset.cube_map_array = 1;
    }
 
    if (glewIsSupported("GL_VERSION_4_2")) {
-      caps.v1.bset.start_instance = 1;
+      caps->v1.bset.start_instance = 1;
    } else {
       if (glewIsSupported("GL_ARB_base_instance"))      
-         caps.v1.bset.start_instance = 1;
+         caps->v1.bset.start_instance = 1;
    }         
    if (glewIsSupported("GL_ARB_shader_stencil_export"))
-      caps.v1.bset.shader_stencil_export = 1;
+      caps->v1.bset.shader_stencil_export = 1;
 
-   caps.v1.glsl_level = 120;
+   caps->v1.glsl_level = 120;
    if (glewIsSupported("GL_EXT_texture_array"))
-      caps.v1.max_texture_array_layers = 256;
-   caps.v1.max_streamout_buffers = 0;
+      caps->v1.max_texture_array_layers = 256;
+   caps->v1.max_streamout_buffers = 0;
    if (glewIsSupported("GL_ARB_blend_func_extended")) {
       glGetIntegerv(GL_MAX_DUAL_SOURCE_DRAW_BUFFERS, &max);
-      caps.v1.max_dual_source_render_targets = max;
+      caps->v1.max_dual_source_render_targets = max;
    } else
-      caps.v1.max_dual_source_render_targets = 0;
+      caps->v1.max_dual_source_render_targets = 0;
 
    glGetIntegerv(GL_MAX_DRAW_BUFFERS, &max);
-   caps.v1.max_render_targets = max;
+   caps->v1.max_render_targets = max;
 
    for (i = 0; i < VIRGL_FORMAT_MAX; i++) {
       uint32_t offset = i / 32;
       uint32_t index = i % 32;
 
       if (tex_conv_table[i].internalformat != 0) {
-         caps.v1.sampler.bitmask[offset] |= (1 << index);
+         caps->v1.sampler.bitmask[offset] |= (1 << index);
          if (vrend_format_can_render(i))
-            caps.v1.render.bitmask[offset] |= (1 << index);
+            caps->v1.render.bitmask[offset] |= (1 << index);
       }
    }
 
- out:
-   graw_iov_from_buf(iov, niovs, offset, &caps, sizeof(union virgl_caps));
 }
 
 GLint64 graw_renderer_get_timestamp(void)

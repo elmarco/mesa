@@ -234,15 +234,20 @@ static int graw_process_cmd(struct virtgpu_command *cmd, struct graw_iovec *iov,
    case VIRTGPU_CMD_CTX_DETACH_RESOURCE:
       /* TODO add security */
       break;
-#if 0
-   case VIRTGPU_CMD_GET_3D_CAPABILITIES:
+   case VIRTGPU_CMD_GET_CAPS:
       if (!niovs)
          return;
 
-      graw_renderer_fill_caps(cmd->u.get_cap.cap_set,
-                              cmd->u.get_cap.cap_set_version,
-                              cmd->u.get_cap.offset, iov, niovs);
-#endif
+      {
+         struct virtgpu_response resp;
+         graw_renderer_fill_caps(cmd->u.get_cap.cap_set,
+                                 cmd->u.get_cap.cap_set_version,
+                                 (union virgl_caps *)&resp.u.caps);
+         resp.flags = 0;
+         resp.type = VIRTGPU_CMD_GET_CAPS;
+         graw_iov_from_buf(iov, niovs, 0, &resp, sizeof(struct virtgpu_response));
+      }
+
       break;
    case VIRTGPU_CMD_GET_DISPLAY_INFO:
       return -1;

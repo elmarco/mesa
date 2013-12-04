@@ -9,7 +9,6 @@ struct virgl_hw_res;
 #define VIRGL_MAX_CMDBUF_DWORDS (16*1024)
 
 struct virgl_drm_caps {
-   uint32_t bo_handle;
    union virgl_caps caps;
 };
 

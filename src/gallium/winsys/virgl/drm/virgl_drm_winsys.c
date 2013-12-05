@@ -233,16 +233,16 @@ virgl_bo_transfer_get(struct virgl_winsys *vws,
                       uint32_t buf_offset, uint32_t level)
 {
    struct virgl_drm_winsys *vdws = virgl_drm_winsys(vws);
-   struct drm_virgl_3d_transfer_get getcmd;
+   struct drm_virtgpu_3d_transfer_from_host fromhostcmd;
    int ret;
 
-   getcmd.bo_handle = res->bo_handle;
-   getcmd.level = level;
-   getcmd.offset = buf_offset;
-   getcmd.stride = stride;
-   getcmd.layer_stride = layer_stride;
-   getcmd.box = *(struct drm_virgl_3d_box *)box;
-   ret = drmIoctl(vdws->fd, DRM_IOCTL_VIRGL_TRANSFER_GET, &getcmd);
+   fromhostcmd.bo_handle = res->bo_handle;
+   fromhostcmd.level = level;
+   fromhostcmd.offset = buf_offset;
+  // fromhostcmd.stride = stride;
+  // fromhostcmd.layer_stride = layer_stride;
+   fromhostcmd.box = *(struct drm_virtgpu_3d_box *)box;
+   ret = drmIoctl(vdws->fd, DRM_IOCTL_VIRTGPU_TRANSFER_FROM_HOST, &fromhostcmd);
    return ret;
 }
 
@@ -334,7 +334,7 @@ static struct virgl_hw_res *virgl_drm_winsys_resource_create_handle(struct virgl
 {
    struct virgl_drm_winsys *qdws = virgl_drm_winsys(qws);
    struct drm_gem_open open_arg = {};
-   struct drm_virgl_resource_info info_arg = {};
+   struct drm_virtgpu_resource_info info_arg = {};
    struct virgl_hw_res *res;
 
    memset(&open_arg, 0, sizeof(open_arg));
@@ -363,7 +363,7 @@ static struct virgl_hw_res *virgl_drm_winsys_resource_create_handle(struct virgl
    memset(&info_arg, 0, sizeof(info_arg));
    info_arg.bo_handle = res->bo_handle;
 
-   if (drmIoctl(qdws->fd, DRM_IOCTL_VIRGL_RESOURCE_INFO, &info_arg)) {
+   if (drmIoctl(qdws->fd, DRM_IOCTL_VIRTGPU_RESOURCE_INFO, &info_arg)) {
       /* close */
       FREE(res);
       res = NULL;
@@ -427,14 +427,14 @@ static void virgl_drm_winsys_resource_unref(struct virgl_winsys *qws,
 static void *virgl_drm_resource_map(struct virgl_winsys *qws, struct virgl_hw_res *res)
 {
    struct virgl_drm_winsys *qdws = virgl_drm_winsys(qws);
-   struct drm_virgl_map mmap_arg;
+   struct drm_virtgpu_map mmap_arg;
    void *ptr;
 
    if (res->ptr)
       return res->ptr;
 
    mmap_arg.handle = res->bo_handle;
-   if (drmIoctl(qdws->fd, DRM_IOCTL_VIRGL_MAP, &mmap_arg))
+   if (drmIoctl(qdws->fd, DRM_IOCTL_VIRTGPU_MAP, &mmap_arg))
       return NULL;
 
    ptr = os_mmap(0, res->size, PROT_READ|PROT_WRITE, MAP_SHARED,
@@ -450,13 +450,13 @@ static void *virgl_drm_resource_map(struct virgl_winsys *qws, struct virgl_hw_re
 static void virgl_drm_resource_wait(struct virgl_winsys *qws, struct virgl_hw_res *res)
 {
    struct virgl_drm_winsys *qdws = virgl_drm_winsys(qws);
-   struct drm_virgl_3d_wait waitcmd;
+   struct drm_virtgpu_3d_wait waitcmd;
    int ret;
 
    waitcmd.handle = res->bo_handle;
    waitcmd.flags = 0;
  again:
-   ret = drmIoctl(qdws->fd, DRM_IOCTL_VIRGL_WAIT, &waitcmd);
+   ret = drmIoctl(qdws->fd, DRM_IOCTL_VIRTGPU_WAIT, &waitcmd);
    if (ret == -EAGAIN)
       goto again;
 }
@@ -580,19 +580,19 @@ static int virgl_drm_winsys_submit_cmd(struct virgl_winsys *qws, struct virgl_cm
 {
    struct virgl_drm_winsys *qdws = virgl_drm_winsys(qws);
    struct virgl_drm_cmd_buf *cbuf = (struct virgl_drm_cmd_buf *)_cbuf;
-   struct drm_virgl_execbuffer eb;
+   struct drm_virtgpu_execbuffer eb;
    int ret;
 
    if (cbuf->base.cdw == 0)
       return 0;
 
-   memset(&eb, 0, sizeof(struct drm_virgl_execbuffer));
+   memset(&eb, 0, sizeof(struct drm_virtgpu_execbuffer));
    eb.command = (unsigned long)(void*)cbuf->buf;
    eb.size = cbuf->base.cdw * 4;
    eb.num_bo_handles = cbuf->cres;
    eb.bo_handles = (unsigned long)(void *)cbuf->res_hlist;
 
-   ret = drmIoctl(qdws->fd, DRM_IOCTL_VIRGL_EXECBUFFER, &eb);
+   ret = drmIoctl(qdws->fd, DRM_IOCTL_VIRTGPU_EXECBUFFER, &eb);
    if (ret == -1)
       fprintf(stderr,"got error from kernel - expect bad rendering %d\n", errno);
    cbuf->base.cdw = 0;
@@ -606,34 +606,15 @@ static int virgl_drm_winsys_submit_cmd(struct virgl_winsys *qws, struct virgl_cm
 static int virgl_drm_get_caps(struct virgl_winsys *vws, struct virgl_drm_caps *caps)
 {
    struct virgl_drm_winsys *vdws = virgl_drm_winsys(vws);
-   struct drm_virgl_get_caps args;
-   struct drm_virgl_map mmap_arg;
-   struct drm_gem_close close_bo;
-   void *ptr;
+   struct drm_virtgpu_get_caps args;
    int ret;
 
    memset(&args, 0, sizeof(args));
 
-   ret = drmIoctl(vdws->fd, DRM_IOCTL_VIRGL_GET_CAPS, &args);
-   if (ret)
-      return ret;
-
-   mmap_arg.handle = args.handle;
-   if (drmIoctl(vdws->fd, DRM_IOCTL_VIRGL_MAP, &mmap_arg))
-      return -EINVAL;
-
-   ptr = os_mmap(0, sizeof(union virgl_caps), PROT_READ|PROT_WRITE, MAP_SHARED,
-                 vdws->fd, mmap_arg.offset);
-   if (ptr == MAP_FAILED)
-      return -EINVAL;
-
-   memcpy(&caps->caps, ptr, sizeof(union virgl_caps));
-          
-   os_munmap(ptr, sizeof(union virgl_caps));
-
-   close_bo.handle = args.handle;
-   drmIoctl(vdws->fd, DRM_IOCTL_GEM_CLOSE, &close_bo);
-   return 0;
+   args.addr = (unsigned long)&caps->caps;
+   args.size = sizeof(union virgl_caps);
+   ret = drmIoctl(vdws->fd, DRM_IOCTL_VIRTGPU_GET_CAPS, &args);
+   return ret;
 }
 
 #define PTR_TO_UINT(x) ((unsigned)((intptr_t)(x)))

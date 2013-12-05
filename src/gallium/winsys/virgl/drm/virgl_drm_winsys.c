@@ -11,7 +11,7 @@
 #include <sys/ioctl.h>
 #include <errno.h>
 #include <xf86drm.h>
-#include "virgl_drm.h"
+#include "virtgpu_drm.h"
 
 static INLINE boolean can_cache_resource(struct virgl_hw_res *res)
 {
@@ -40,13 +40,13 @@ static void virgl_hw_res_destroy(struct virgl_drm_winsys *qdws,
 
 static boolean virgl_drm_resource_is_busy(struct virgl_drm_winsys *qdws, struct virgl_hw_res *res)
 {
-   struct drm_virgl_3d_wait waitcmd;
+   struct drm_virtgpu_3d_wait waitcmd;
    int ret;
 
    waitcmd.handle = res->bo_handle;
-   waitcmd.flags = VIRGL_WAIT_NOWAIT;
+   waitcmd.flags = VIRTGPU_WAIT_NOWAIT;
 
-   ret = drmIoctl(qdws->fd, DRM_IOCTL_VIRGL_WAIT, &waitcmd);
+   ret = drmIoctl(qdws->fd, DRM_IOCTL_VIRTGPU_WAIT, &waitcmd);
    if (ret && errno == EBUSY)
       return TRUE;
    return FALSE;
@@ -143,7 +143,7 @@ static struct virgl_hw_res *virgl_drm_winsys_resource_create(struct virgl_winsys
                                                uint32_t size)
 {
    struct virgl_drm_winsys *qdws = virgl_drm_winsys(qws);
-   struct drm_virgl_resource_create createcmd;
+   struct drm_virtgpu_resource_create createcmd;
    int ret;
    struct virgl_hw_res *res;
    uint32_t stride = width * util_format_get_blocksize(format);
@@ -166,7 +166,7 @@ static struct virgl_hw_res *virgl_drm_winsys_resource_create(struct virgl_winsys
    createcmd.size = size;
    createcmd.flags = 0;
 
-   ret = drmIoctl(qdws->fd, DRM_IOCTL_VIRGL_RESOURCE_CREATE, &createcmd);
+   ret = drmIoctl(qdws->fd, DRM_IOCTL_VIRTGPU_RESOURCE_CREATE, &createcmd);
    if (ret != 0) {
       FREE(res);
       return NULL;
@@ -212,16 +212,16 @@ virgl_bo_transfer_put(struct virgl_winsys *vws,
                       uint32_t buf_offset, uint32_t level)
 {
    struct virgl_drm_winsys *vdws = virgl_drm_winsys(vws);
-   struct drm_virgl_3d_transfer_put putcmd;
+   struct drm_virtgpu_3d_transfer_to_host tohostcmd;
    int ret;
 
-   putcmd.bo_handle = res->bo_handle;
-   putcmd.box = *(struct drm_virgl_3d_box *)box;
-   putcmd.offset = buf_offset;
-   putcmd.level = level;
-   putcmd.stride = stride;
-   putcmd.layer_stride = stride;
-   ret = drmIoctl(vdws->fd, DRM_IOCTL_VIRGL_TRANSFER_PUT, &putcmd);
+   tohostcmd.bo_handle = res->bo_handle;
+   tohostcmd.box = *(struct drm_virtgpu_3d_box *)box;
+   tohostcmd.offset = buf_offset;
+   tohostcmd.level = level;
+  // tohostcmd.stride = stride;
+  // tohostcmd.layer_stride = stride;
+   ret = drmIoctl(vdws->fd, DRM_IOCTL_VIRTGPU_TRANSFER_TO_HOST, &tohostcmd);
    return ret;
 }
 

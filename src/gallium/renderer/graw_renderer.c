@@ -3170,7 +3170,7 @@ static void vrend_transfer_send_readpixels(struct grend_resource *res,
    if (actually_invert && !have_invert_mesa)
       separate_invert = TRUE;
 
-   if (num_iovs > 1 || separate_invert || stride)
+   if (num_iovs > 1 || separate_invert)
       need_temp = 1;
 
    if (need_temp) {
@@ -3207,7 +3207,9 @@ static void vrend_transfer_send_readpixels(struct grend_resource *res,
       if (have_invert_mesa && actually_invert)
          glPixelStorei(GL_PACK_INVERT_MESA, 1);
       if (!vrend_format_is_ds(res->base.format))
-          glReadBuffer(GL_COLOR_ATTACHMENT0_EXT);  
+          glReadBuffer(GL_COLOR_ATTACHMENT0_EXT);
+      if (!need_temp && stride)
+         glPixelStorei(GL_PACK_ROW_LENGTH, stride);
    } else {
       glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
       y1 = box->y;
@@ -3245,6 +3247,8 @@ static void vrend_transfer_send_readpixels(struct grend_resource *res,
       glPixelTransferf(GL_DEPTH_SCALE, 1.0);
    if (have_invert_mesa && actually_invert)
       glPixelStorei(GL_PACK_INVERT_MESA, 0);
+   if (!need_temp && stride)
+      glPixelStorei(GL_PACK_ROW_LENGTH, 0);
    glPixelStorei(GL_PACK_ALIGNMENT, 4);
    if (need_temp) {
       graw_transfer_write_tex_return(&res->base, box, level, stride, offset, iov, num_iovs, data, send_size, separate_invert);
@@ -3765,6 +3769,8 @@ int graw_renderer_flush_buffer_res(struct grend_resource *res,
             clicbs->make_current(i, vrend_lookup_renderer_ctx(0)->gl_context);
             graw_renderer_flush_scanout_res(res, box, i);
             clicbs->swap_buffers(i);
+            if (clicbs->dirty_rect)
+               clicbs->dirty_rect(i, box->x, box->y, box->width, box->height);
          }
       }
 
@@ -4425,3 +4431,23 @@ void graw_renderer_force_ctx_0(void)
    grend_state.current_hw_ctx = NULL;
    grend_hw_switch_context(vrend_lookup_renderer_ctx(0), TRUE);
 }
+
+void graw_renderer_get_rect(int idx, struct graw_iovec *iov, unsigned int num_iovs,
+                            uint32_t offset, int x, int y, int width, int height)
+{
+   struct grend_resource *res = frontbuffer[idx];
+   struct pipe_box box;
+   int elsize = util_format_get_blocksize(res->base.format);
+   int stride;
+   box.x = x;
+   box.y = y;
+   box.z = 0;
+   box.width = width;
+   box.height = height;
+   box.depth = 1;
+
+   stride = util_format_get_nblocksx(res->base.format, res->base.width0) * elsize;
+   graw_renderer_transfer_send_iov(res->handle, 0,
+                                   0, stride, 0, &box, offset, iov, num_iovs);
+}
+                                   

@@ -33,6 +33,8 @@ struct graw_renderer_callbacks {
    virgl_gl_context (*get_current_context)(void *cookie);
    /* */
    void (*notify_state)(void *cookie, int idx, int x, int y, uint32_t width, uint32_t height);
+
+   void (*rect_update)(void *cookie, int idx, int x, int y, int width, int height);
 };
 
 GREND_EXPORT void graw_lib_renderer_init(void *cookie, struct graw_renderer_callbacks *cb);
@@ -49,4 +51,7 @@ GREND_EXPORT void virgl_renderer_set_cursor_info(uint32_t cursor_handle, int x, 
 
 /* we need to give qemu the cursor resource contents */
 GREND_EXPORT void *virgl_get_cursor_data(uint32_t resource_id, uint32_t *width, uint32_t *height);
+
+GREND_EXPORT void virgl_renderer_get_rect(int idx, struct graw_iovec *iov, unsigned int num_iovs,
+                                          uint32_t offset, int x, int y, int width, int height);
 #endif

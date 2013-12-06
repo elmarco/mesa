@@ -335,6 +335,12 @@ static virgl_gl_context get_current_context(void)
    return rcbs->get_current_context(dev_cookie);
 }
 
+static void dirty_rect(int scanout_id, int x, int y, int width, int height)
+{
+   if (rcbs->rect_update)
+      rcbs->rect_update(dev_cookie, scanout_id, x, y, width, height);
+}
+
 static struct grend_if_cbs virgl_cbs = {
    virgl_write_fence,
    swap_buffers,
@@ -342,6 +348,7 @@ static struct grend_if_cbs virgl_cbs = {
    destroy_gl_context,
    make_current,
    get_current_context,
+   dirty_rect,
 };
 
 void *virgl_get_cursor_data(uint32_t resource_id, uint32_t *width, uint32_t *height)
@@ -358,6 +365,13 @@ void virgl_renderer_poll(void)
 {
    graw_renderer_check_queries();
    graw_renderer_check_fences();
+}
+
+void virgl_renderer_get_rect(int idx, struct graw_iovec *iov, unsigned int num_iovs,
+                             uint32_t offset, int x, int y, int width, int height)
+{
+   graw_renderer_get_rect(idx, iov, num_iovs, offset, x, y, width, height);
+   
 }
 
 void virgl_renderer_init(void *cookie, struct graw_renderer_callbacks *cbs)

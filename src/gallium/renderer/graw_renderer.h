@@ -51,6 +51,7 @@ struct grend_if_cbs {
    void (*destroy_gl_context)(virgl_gl_context ctx);
    int (*make_current)(int scanout, virgl_gl_context ctx);
    virgl_gl_context (*get_current_context)(void);
+   void (*dirty_rect)(int scanout, int x, int y, uint32_t width, uint32_t height);
 };
 void graw_renderer_init(struct grend_if_cbs *cbs);
 
@@ -307,4 +308,6 @@ grend_resource_reference(struct grend_resource **ptr, struct grend_resource *tex
 
 void graw_renderer_force_ctx_0(void);
 
+void graw_renderer_get_rect(int idx, struct graw_iovec *iov, unsigned int num_iovs,
+                            uint32_t offset, int x, int y, int width, int height);
 #endif

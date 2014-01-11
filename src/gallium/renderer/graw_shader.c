@@ -796,6 +796,10 @@ iter_instruction(struct tgsi_iterate_context *iter,
       snprintf(buf, 255, "%s = %s(%s((uvec4(%s) * uvec4(%s)))%s);\n", dsts[0], dstconv, dtypeprefix, srcs[0], srcs[1], writemask);
       emit_buf(ctx, buf);
       break;
+   case TGSI_OPCODE_UMOD:
+      snprintf(buf, 255, "%s = %s(%s((uvec4(%s) %% uvec4(%s)))%s);\n", dsts[0], dstconv, dtypeprefix, srcs[0], srcs[1], writemask);
+      strcat(ctx->glsl_main, buf);
+      break;
    case TGSI_OPCODE_IDIV:
       snprintf(buf, 255, "%s = %s(%s((ivec4(%s) / ivec4(%s)))%s);\n", dsts[0], dstconv, dtypeprefix, srcs[0], srcs[1], writemask);
       emit_buf(ctx, buf);

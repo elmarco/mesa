@@ -310,7 +310,6 @@ static struct grend_nontimer_hw_query *grend_create_hw_query(struct grend_query 
 #define MAX_SCANOUT 4
 static struct grend_resource *frontbuffer[MAX_SCANOUT];
 static struct pipe_box front_box[MAX_SCANOUT];
-static GLuint front_fb_id[MAX_SCANOUT];
 static struct grend_format_table tex_conv_table[VIRGL_FORMAT_MAX];
 
 static INLINE boolean vrend_format_can_render(enum virgl_formats format)

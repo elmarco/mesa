@@ -80,6 +80,9 @@ struct dump_ctx {
 
    struct vrend_shader_key *key;
    boolean has_ints;
+
+   int indent_level;
+
 };
 
 static inline boolean fs_emit_layout(struct dump_ctx *ctx)
@@ -102,7 +105,7 @@ iter_declaration(struct tgsi_iterate_context *iter,
    struct dump_ctx *ctx = (struct dump_ctx *)iter;
    int i;
    int color_offset = 0;
-   char *name_prefix;
+   char *name_prefix = "";
 
    ctx->prog_type = iter->processor.Processor;
    switch (decl->Declaration.File) {
@@ -409,6 +412,15 @@ static void emit_so_movs(struct dump_ctx *ctx)
 
 #define emit_ucompare(op) snprintf(buf, 255, "%s = %s(uintBitsToFloat(%s(%s(%s, %s)%s) * %s(0xffffffff)));\n", dsts[0], dstconv, udstconv, op, srcs[0], srcs[1], writemask, udstconv)
 
+static void emit_buf(struct dump_ctx *ctx, char *buf)
+{
+   int i;
+   for (i = 0; i < ctx->indent_level; i++)
+      strcat(ctx->glsl_main, "\t");
+
+   strcat(ctx->glsl_main, buf);
+}
+
 static boolean
 iter_instruction(struct tgsi_iterate_context *iter,
                  struct tgsi_full_instruction *inst)
@@ -418,7 +430,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
    uint instno = ctx->instno++;
    int i;
    int j;
-   int sreg_index;
+   int sreg_index = 0;
    char dstconv[32] = {0};
    char udstconv[32] = {0};
    char writemask[6] = {0};
@@ -610,216 +622,220 @@ iter_instruction(struct tgsi_iterate_context *iter,
    switch (inst->Instruction.Opcode) {
    case TGSI_OPCODE_SQRT:
       snprintf(buf, 255, "%s = sqrt(vec4(%s))%s;\n", dsts[0], srcs[0], writemask);
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_LRP:
       snprintf(buf, 255, "%s = mix(vec4(%s), vec4(%s), vec4(%s))%s;\n", dsts[0], srcs[2], srcs[1], srcs[0], writemask);
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_DP2:
       snprintf(buf, 255, "%s = %s(dot(vec2(%s), vec2(%s)));\n", dsts[0], dstconv, srcs[0], srcs[1]);
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_DP3:
       snprintf(buf, 255, "%s = %s(dot(vec3(%s), vec3(%s)));\n", dsts[0], dstconv, srcs[0], srcs[1]);
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_DP4:
       snprintf(buf, 255, "%s = %s(dot(vec4(%s), vec4(%s)));\n", dsts[0], dstconv, srcs[0], srcs[1]);
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_DPH:
       snprintf(buf, 255, "%s = %s(dot(vec4(vec3(%s), 1.0), vec4(%s)));\n", dsts[0], dstconv, srcs[0], srcs[1]);
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_MAX:
    case TGSI_OPCODE_IMAX:
    case TGSI_OPCODE_UMAX:
       snprintf(buf, 255, "%s = %s(%s(max(%s, %s)));\n", dsts[0], dstconv, dtypeprefix, srcs[0], srcs[1]);
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_MIN:
    case TGSI_OPCODE_IMIN:
    case TGSI_OPCODE_UMIN:
       snprintf(buf, 255, "%s = %s(%s(min(%s, %s)));\n", dsts[0], dstconv, dtypeprefix, srcs[0], srcs[1]);
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_ABS:
    case TGSI_OPCODE_IABS:
       emit_op1("abs");
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_KILL_IF:
       snprintf(buf, 255, "if (any(lessThan(%s, vec4(0.0))))\ndiscard;\n", srcs[0]);
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_IF:
    case TGSI_OPCODE_UIF:
       snprintf(buf, 255, "if (any(bvec4(%s))) {\n", srcs[0]);
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
+      ctx->indent_level++;
       break;
    case TGSI_OPCODE_ELSE:
       snprintf(buf, 255, "} else {\n");
-      strcat(ctx->glsl_main, buf);
+      ctx->indent_level--;
+      emit_buf(ctx, buf);
+      ctx->indent_level++;
       break;
    case TGSI_OPCODE_ENDIF:
       snprintf(buf, 255, "}\n");
-      strcat(ctx->glsl_main, buf);
+      ctx->indent_level--;
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_KILL:
       snprintf(buf, 255, "discard;\n");
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_DST:
       snprintf(buf, 512, "%s = vec4(1.0, %s.y * %s.y, %s.z, %s.w);\n", dsts[0],
                srcs[0], srcs[1], srcs[0], srcs[1]);
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_LIT:
       snprintf(buf, 512, "%s = %s(vec4(1.0, max(%s.x, 0.0), step(0.0, %s.x) * pow(max(0.0, %s.y), clamp(%s.w, -128.0, 128.0)), 1.0)%s);\n", dsts[0], dstconv, srcs[0], srcs[0], srcs[0], srcs[0], writemask);
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_EX2:
       emit_op1("exp2");
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_LG2:
       emit_op1("log2");
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_EXP:
       snprintf(buf, 512, "%s = %s(vec4(pow(2.0, floor(%s.x)), %s.x - floor(%s.x), exp2(%s.x), 1.0)%s);\n", dsts[0], dstconv, srcs[0], srcs[0], srcs[0], srcs[0], writemask);
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_LOG:
       snprintf(buf, 512, "%s = %s(vec4(floor(log2(%s.x)), %s.x / pow(2.0, floor(log2(%s.x))), log2(%s.x), 1.0)%s);\n", dsts[0], dstconv, srcs[0], srcs[0], srcs[0], srcs[0], writemask);
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_COS:
       emit_op1("cos");
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_SIN:
       emit_op1("sin");
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_SCS:
       snprintf(buf, 255, "%s = %s(vec4(cos(%s.x), sin(%s.x), 0, 1)%s);\n", dsts[0], dstconv,
                srcs[0], srcs[0], writemask);
-      strcat(ctx->glsl_main, buf);      
+      emit_buf(ctx, buf);      
       break;
    case TGSI_OPCODE_DDX:
       emit_op1("dFdx");
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_DDY:
       emit_op1("dFdy");
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_RCP:
       snprintf(buf, 255, "%s = %s(1.0/(%s));\n", dsts[0], dstconv, srcs[0]);
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_FLR:
       emit_op1("floor");
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_ROUND:
       emit_op1("round");
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_ISSG:
       emit_op1("sign");
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_CEIL:
       emit_op1("ceil");
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_FRC:
       emit_op1("fract");
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_TRUNC:
       emit_op1("trunc");
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_SSG:
       emit_op1("sign");
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_RSQ:
       snprintf(buf, 255, "%s = %s(inversesqrt(%s.x));\n", dsts[0], dstconv, srcs[0]);
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_MOV:
       snprintf(buf, 255, "%s = %s(%s(%s%s));\n", dsts[0], dstconv, dtypeprefix, srcs[0], writemask);
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_ADD:
       emit_arit_op2("+");
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_UADD:
       snprintf(buf, 255, "%s = %s(%s(ivec4((uvec4(%s) + uvec4(%s))))%s);\n", dsts[0], dstconv, dtypeprefix, srcs[0], srcs[1], writemask);
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_SUB:
       emit_arit_op2("-");
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_MUL:
       emit_arit_op2("*");
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_DIV:
       emit_arit_op2("/");
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_UMUL:
       snprintf(buf, 255, "%s = %s(%s((uvec4(%s) * uvec4(%s)))%s);\n", dsts[0], dstconv, dtypeprefix, srcs[0], srcs[1], writemask);
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_IDIV:
       snprintf(buf, 255, "%s = %s(%s((ivec4(%s) / ivec4(%s)))%s);\n", dsts[0], dstconv, dtypeprefix, srcs[0], srcs[1], writemask);
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_UDIV:
       snprintf(buf, 255, "%s = %s(%s((uvec4(%s) / uvec4(%s)))%s);\n", dsts[0], dstconv, dtypeprefix, srcs[0], srcs[1], writemask);
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_ISHR:
    case TGSI_OPCODE_USHR:
       emit_arit_op2(">>");
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_SHL:
       emit_arit_op2("<<");
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_MAD:
       snprintf(buf, 255, "%s = %s((%s * %s + %s)%s);\n", dsts[0], dstconv, srcs[0], srcs[1], srcs[2], writemask);
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_UMAD:
       snprintf(buf, 255, "%s = %s(%s((%s * %s + %s)%s));\n", dsts[0], dstconv, dtypeprefix, srcs[0], srcs[1], srcs[2], writemask);
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_OR:
       emit_arit_op2("|");
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_AND:
       emit_arit_op2("&");
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_XOR:
       emit_arit_op2("^");
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_MOD:
       emit_arit_op2("%");
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_TEX:
    case TGSI_OPCODE_TXB:
@@ -918,7 +934,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
          snprintf(buf, 255, "%s = %s(vec4(vec4(texture%s(%s, %s%s%s)) * %s%d + %s%d)%s);\n", dsts[0], dstconv, tex_ext, srcs[sampler_index], srcs[0], twm, bias, mname, src->Register.Index, cname, src->Register.Index, writemask);
       } else
          snprintf(buf, 255, "%s = %s(texture%s(%s, %s%s%s)%s);\n", dsts[0], dstconv, tex_ext, srcs[sampler_index], srcs[0], twm, bias, ctx->outputs[0].override_no_wm ? "" : writemask);
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_TXP:
 
@@ -973,76 +989,76 @@ iter_instruction(struct tgsi_iterate_context *iter,
       } else
          snprintf(buf, 255, "%s = %s(textureProj(%s, %s)%s);\n", dsts[0], dstconv, srcs[1], srcs[0], writemask);
 
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_TXQ:
       fprintf(stderr,"got TXQ TODO\n");
       break;
    case TGSI_OPCODE_I2F:
       snprintf(buf, 255, "%s = %s(ivec4(%s));\n", dsts[0], dstconv, srcs[0]);
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_U2F:
       snprintf(buf, 255, "%s = %s(uvec4(%s));\n", dsts[0], dstconv, srcs[0]);
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_F2I:
       snprintf(buf, 255, "%s = %s(%s(ivec4(%s)));\n", dsts[0], dstconv, dtypeprefix, srcs[0]);      
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_F2U:
       snprintf(buf, 255, "%s = %s(%s(uvec4(%s)));\n", dsts[0], dstconv, dtypeprefix, srcs[0]);      
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_NOT:
       snprintf(buf, 255, "%s = %s(uintBitsToFloat(~(uvec4(%s))));\n", dsts[0], dstconv, srcs[0]);
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_INEG:
       snprintf(buf, 255, "%s = %s(intBitsToFloat(-(ivec4(%s))));\n", dsts[0], dstconv, srcs[0]);
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_SEQ:
       emit_compare("equal");
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_USEQ:
       emit_ucompare("equal");
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_SLT:
       emit_compare("lessThan");
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_ISLT:
    case TGSI_OPCODE_USLT:
       emit_ucompare("lessThan");
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_SNE:
       emit_compare("notEqual");
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_USNE:
       emit_ucompare("notEqual");
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_SGE:
       emit_compare("greaterThanEqual");
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_ISGE:
    case TGSI_OPCODE_USGE:
       emit_ucompare("greaterThanEqual");
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_POW:
       snprintf(buf, 255, "%s = %s(pow(%s, %s));\n", dsts[0], dstconv, srcs[0], srcs[1]);
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_CMP:
       snprintf(buf, 255, "%s = mix(%s, %s, greaterThanEqual(%s, vec4(0.0)))%s;\n", dsts[0], srcs[1], srcs[2], srcs[0], writemask);
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_END:
       if (iter->processor.Processor == TGSI_PROCESSOR_VERTEX) {
@@ -1058,27 +1074,29 @@ iter_instruction(struct tgsi_iterate_context *iter,
       break;
    case TGSI_OPCODE_ARL:
       snprintf(buf, 255, "addr0 = int(floor(%s)%s);\n", srcs[0], writemask);
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_UARL:
       snprintf(buf, 255, "addr0 = int(%s%s);\n", srcs[0], writemask);
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_XPD:
       snprintf(buf, 255, "%s = %s(cross(vec3(%s), vec3(%s)));\n", dsts[0], dstconv, srcs[0], srcs[1]);
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_BGNLOOP:
       snprintf(buf, 255, "do {\n");
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
+      ctx->indent_level++;
       break;
    case TGSI_OPCODE_ENDLOOP:
+      ctx->indent_level--;
       snprintf(buf, 255, "} while(true);\n");
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_BRK:
       snprintf(buf, 255, "break;\n");
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
       break;
    default:
       fprintf(stderr,"failed to convert opcode %d\n", inst->Instruction.Opcode);
@@ -1087,7 +1105,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
 
    if (inst->Instruction.Saturate == TGSI_SAT_ZERO_ONE) {
       snprintf(buf, 255, "%s = clamp(%s, 0.0, 1.0);\n", dsts[0], dsts[0]);
-      strcat(ctx->glsl_main, buf);
+      emit_buf(ctx, buf);
    }
      
    return TRUE;

@@ -45,13 +45,15 @@ struct grend_format_table {
 
 struct grend_if_cbs {
    void (*write_fence)(unsigned fence_id);
-   int (*swap_buffers)(int idx);
+   /* inform the control layer about a new scanout */
+   void (*scanout_info)(int scanout_id, GLuint tex_id, uint32_t flags, int x, int y,
+                        uint32_t width, uint32_t height);
 
    virgl_gl_context (*create_gl_context)(int scanout);
    void (*destroy_gl_context)(virgl_gl_context ctx);
    int (*make_current)(int scanout, virgl_gl_context ctx);
-   virgl_gl_context (*get_current_context)(void);
-   void (*dirty_rect)(int scanout, int x, int y, uint32_t width, uint32_t height);
+
+   void (*flush_scanout)(int scanout, int x, int y, uint32_t width, uint32_t height);
 };
 void graw_renderer_init(struct grend_if_cbs *cbs);
 

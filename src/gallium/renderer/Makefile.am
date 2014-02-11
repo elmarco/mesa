@@ -30,7 +30,8 @@ libgrend_la_SOURCES = \
         graw_decode.c \
 	graw_cursor.c \
         graw_formats.c \
-        iov.c
+        iov.c \
+        graw_renderer_helper.c
 
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = virglrenderer.pc
@@ -52,4 +53,4 @@ endif
 
 
 libvirglrendererincludedir = ${includedir}
-libvirglrendererinclude_HEADERS = virglrenderer.h
+libvirglrendererinclude_HEADERS = virglrenderer.h virgl_helper.h

@@ -310,11 +310,6 @@ static void virgl_write_fence(uint32_t fence_id)
    rcbs->write_fence(dev_cookie, fence_id);   
 }
 
-static int swap_buffers(int idx)
-{
-   return rcbs->swap_buffers(dev_cookie, idx);
-}
-
 static virgl_gl_context create_gl_context(int scanout_idx)
 {
    return rcbs->create_gl_context(dev_cookie, scanout_idx);
@@ -330,25 +325,29 @@ static int make_current(int scanout_idx, virgl_gl_context ctx)
     return rcbs->make_current(dev_cookie, scanout_idx, ctx);
 }
 
-static virgl_gl_context get_current_context(void)
-{
-   return rcbs->get_current_context(dev_cookie);
-}
-
-static void dirty_rect(int scanout_id, int x, int y, int width, int height)
+static void flush_scanout(int scanout_id, int x, int y, uint32_t width, uint32_t height)
 {
    if (rcbs->rect_update)
       rcbs->rect_update(dev_cookie, scanout_id, x, y, width, height);
 }
 
+static void scanout_info(int scanout_id, GLuint tex_id, uint32_t flags,
+                         int x, int y, uint32_t width,
+                         uint32_t height)
+{
+   if (rcbs->scanout_info)
+      rcbs->scanout_info(dev_cookie, scanout_id, tex_id, flags,
+                         x, y, width, height);
+
+}
+
 static struct grend_if_cbs virgl_cbs = {
    virgl_write_fence,
-   swap_buffers,
+   scanout_info,
    create_gl_context,
    destroy_gl_context,
    make_current,
-   get_current_context,
-   dirty_rect,
+   flush_scanout,
 };
 
 void *virgl_get_cursor_data(uint32_t resource_id, uint32_t *width, uint32_t *height)

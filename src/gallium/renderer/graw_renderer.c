@@ -3268,10 +3268,13 @@ void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t ctx_id,
 
    res = vrend_resource_lookup(res_handle, ctx_id);
    if (!res) {
-
       report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, res_handle);
       return;
    }
+
+   if (box->width + box->x > u_minify(res->base.width0, level) ||
+       box->height + box->y > u_minify(res->base.height0, level))
+       return;
 
    grend_hw_switch_context(vrend_lookup_renderer_ctx(0), TRUE);
 
@@ -3684,102 +3687,26 @@ int graw_renderer_set_scanout(uint32_t res_handle, uint32_t scanout_id, uint32_t
    if (!res)
       return 0;
 
-#if 0
-   if (frontbuffer && frontbuffer != res) {
-      struct pipe_blit_info bi;
-
-      bi.dst.level = 0;
-      bi.dst.box.x = bi.dst.box.y = bi.dst.box.z = 0;
-      bi.dst.box.width = res->base.width0;
-      bi.dst.box.height = res->base.height0;
-      bi.dst.box.depth = 1;
-
-      bi.src.level = 0;
-      bi.src.box.x = bi.src.box.y = bi.src.box.z = 0;
-      bi.src.box.width = res->base.width0;
-      bi.src.box.height = res->base.height0;
-      bi.src.box.depth = 1;
-
-      bi.mask = PIPE_MASK_RGBA;
-      bi.filter = PIPE_TEX_FILTER_NEAREST;
-      bi.scissor_enable = 0;
-
-      res->is_front = 1;
-      graw_renderer_blit_int(vrend_lookup_renderer_ctx(0), res_handle, res_handle, &bi);
-      
-      frontbuffer->is_front = 0;
-   }
-#endif
    grend_resource_reference(&frontbuffer[scanout_id], res);
    front_box[scanout_id] = *box;
+
+   (*clicbs->scanout_info)(scanout_id, res->id, res->y_0_top ? 1 : 0, box->x, box->y, box->width, box->height);
    fprintf(stderr,"setting frontbuffer %d to %d\n", scanout_id, res_handle);
    return 0;
-}
-
-static void graw_renderer_flush_scanout_res(struct grend_resource *res,
-                                           struct pipe_box *box,
-                                           int id)
-{
-   uint32_t sy1, sy2, dy1, dy2;
-   if (!front_fb_id[id])
-      glGenFramebuffers(1, &front_fb_id[id]);
-
-   glBindFramebuffer(GL_FRAMEBUFFER_EXT, front_fb_id[id]);
-
-   grend_fb_bind_texture(res, 0, 0, 0);
-
-   glBindFramebuffer(GL_READ_FRAMEBUFFER, front_fb_id[id]);
-   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-      
-   /* force full scissor and viewport - should probably use supplied box */
-   glViewport(0, 0, res->base.width0, res->base.height0);
-   glScissor(0, 0, front_box[id].width, front_box[id].height);
-
-   grend_state.viewport_dirty = TRUE;
-   grend_state.scissor_dirty = TRUE;
-   /* justification for inversion here required */
-
-   dy1 = front_box[id].height - box->y - front_box[id].y;
-   dy2 = front_box[id].height - box->y - box->height - front_box[id].y;
-   if (res->y_0_top) {
-      sy1 = front_box[id].height - box->y;
-      sy2 = front_box[id].height - box->y - box->height;
-   } else {
-      sy1 = box->y;
-      sy2 = box->y + box->height;
-   }
-
-   glBlitFramebuffer(box->x, sy1, box->x + box->width, sy2,
-                     box->x - front_box[id].x, dy1, box->x + box->width - front_box[id].x, dy2,
-                     GL_COLOR_BUFFER_BIT, GL_NEAREST);
-
-
 }
 
 int graw_renderer_flush_buffer_res(struct grend_resource *res,
                                    struct pipe_box *box)
 {
-   if (!res->is_front) {
-
+   if (1 && !res->is_front) {
       int i;
       grend_hw_switch_context(vrend_lookup_renderer_ctx(0), TRUE);
 
       for (i = 0; i < MAX_SCANOUT; i++) {
-         if (res == frontbuffer[i]) {
-            clicbs->make_current(i, vrend_lookup_renderer_ctx(0)->gl_context);
-            graw_renderer_flush_scanout_res(res, box, i);
-            clicbs->swap_buffers(i);
-            if (clicbs->dirty_rect)
-               clicbs->dirty_rect(i, box->x, box->y, box->width, box->height);
-         }
+         if (clicbs->flush_scanout)
+            clicbs->flush_scanout(i, box->x, box->y, box->width, box->height);
       }
-
-   } else {
-      glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
-      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-      clicbs->swap_buffers(0);
    }
-
 
    return 0;
 }

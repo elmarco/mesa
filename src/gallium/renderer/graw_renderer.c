@@ -2878,6 +2878,12 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
       num_iovs = res->num_iovs;
    }
 
+   if (!iov) {
+      struct grend_context *ctx = vrend_lookup_renderer_ctx(ctx_id);
+      report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, res_handle);
+      return;
+   }
+
    grend_hw_switch_context(vrend_lookup_renderer_ctx(0), TRUE);
 
    if (res->target == 0 && res->ptr) {
@@ -3280,6 +3286,11 @@ void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t ctx_id,
    if (res->iov && (!iov || num_iovs == 0)) {
       iov = res->iov;
       num_iovs = res->num_iovs;
+   }
+
+   if (!iov) {
+      report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, res_handle);
+      return;
    }
 
    if (res->target == 0 && res->ptr) {

@@ -22,7 +22,7 @@ struct graw_renderer_callbacks {
    void (*send_irq)(void *cookie, uint32_t irq);
    void (*write_fence)(void *cookie, uint32_t fence);
 
-   void (*map_iov)(struct graw_iovec *iov, uint64_t addr);
+   int (*map_iov)(struct graw_iovec *iov, uint64_t addr);
    void (*unmap_iov)(struct graw_iovec *iov);
    
    /* interact with GL implementation */

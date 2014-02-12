@@ -83,6 +83,7 @@ static void virgl_resource_attach_backing(struct virtgpu_resource_attach_backing
     struct graw_iovec *res_iovs;
     int i;
     void *data;
+    int ret;
 
     res_iovs = malloc(att_rb->nr_entries * sizeof(struct graw_iovec));
     if (!res_iovs)
@@ -97,11 +98,18 @@ static void virgl_resource_attach_backing(struct virtgpu_resource_attach_backing
     for (i = 0; i < att_rb->nr_entries; i++) {
 	struct virtgpu_mem_entry *ent = ((struct virtgpu_mem_entry *)data) + i;
 	res_iovs[i].iov_len = ent->length;
-        rcbs->map_iov(&res_iovs[i], ent->addr);
+        ret = rcbs->map_iov(&res_iovs[i], ent->addr);
+        if (ret) {
+           fprintf(stderr, "failed to attach backing %d\n", att_rb->resource_id);
+           free(res_iovs);
+           break;
+        }
     }
 
     graw_renderer_resource_attach_iov(att_rb->resource_id, res_iovs,
                                       att_rb->nr_entries);
+
+ fail:
 
     if (iov_cnt > 1)
        free(data);

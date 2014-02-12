@@ -469,12 +469,16 @@ static void graw_flush_eq(struct graw_context *ctx, void *closure)
    }
 }
 
-static void graw_flush(struct pipe_context *ctx,
-                       struct pipe_fence_handle **fence,
-                       enum pipe_flush_flags flags)
+static void graw_flush_from_st(struct pipe_context *ctx,
+                               struct pipe_fence_handle **fence,
+                               enum pipe_flush_flags flags)
 {
    struct graw_context *grctx = (struct graw_context *)ctx;
+   struct virgl_screen *rs = virgl_screen(ctx->screen);
    struct virgl_buffer *buf, *tmp;
+
+   if (fence)
+      *fence = rs->vws->cs_create_fence(rs->vws);
 
    LIST_FOR_EACH_ENTRY_SAFE(buf, tmp, &grctx->to_flush_bufs, flush_list) {
       struct pipe_resource *res = &buf->base.u.b;
@@ -749,7 +753,7 @@ struct pipe_context *graw_context_create(struct pipe_screen *pscreen,
    
    grctx->base.clear = graw_clear;
    grctx->base.draw_vbo = graw_draw_vbo;
-   grctx->base.flush = graw_flush;
+   grctx->base.flush = graw_flush_from_st;
    grctx->base.screen = pscreen;
    grctx->base.create_sampler_view = graw_create_sampler_view;
    grctx->base.sampler_view_destroy = graw_destroy_sampler_view;

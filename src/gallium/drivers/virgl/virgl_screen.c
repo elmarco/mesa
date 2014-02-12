@@ -386,6 +386,36 @@ static void virgl_flush_frontbuffer(struct pipe_screen *screen,
 {
 }
 
+static void virgl_fence_reference(struct pipe_screen *screen,
+                                  struct pipe_fence_handle **ptr,
+                                  struct pipe_fence_handle *fence)
+{
+   struct virgl_screen *vscreen = virgl_screen(screen);
+   struct virgl_winsys *vws = vscreen->vws;
+
+   vws->fence_reference(vws, ptr, fence);
+}
+
+static boolean virgl_fence_signalled(struct pipe_screen *screen,
+                                     struct pipe_fence_handle *fence)
+{
+   struct virgl_screen *vscreen = virgl_screen(screen);
+   struct virgl_winsys *vws = vscreen->vws;
+
+   return vws->fence_wait(vws, fence, 0);
+
+}
+
+static boolean virgl_fence_finish(struct pipe_screen *screen,
+                                  struct pipe_fence_handle *fence,
+                                  uint64_t timeout)
+{
+   struct virgl_screen *vscreen = virgl_screen(screen);
+   struct virgl_winsys *vws = vscreen->vws;
+
+   return vws->fence_wait(vws, fence, timeout);
+}
+
 static uint64_t
 virgl_get_timestamp(struct pipe_screen *_screen)
 {
@@ -423,6 +453,9 @@ virgl_create_screen(struct virgl_winsys *vws)
    screen->base.context_create = graw_context_create;
    screen->base.flush_frontbuffer = virgl_flush_frontbuffer;
    screen->base.get_timestamp = virgl_get_timestamp;
+   screen->base.fence_reference = virgl_fence_reference;
+   screen->base.fence_signalled = virgl_fence_signalled;
+   screen->base.fence_finish = virgl_fence_finish;
 
    virgl_init_screen_resource_functions(&screen->base);
 

@@ -65,6 +65,17 @@ struct virgl_winsys {
                                 struct virgl_hw_res *res);
 
    int (*get_caps)(struct virgl_winsys *vws, struct virgl_drm_caps *caps);
+
+   /* fence */
+   struct pipe_fence_handle *(*cs_create_fence)(struct virgl_winsys *vws);
+   bool (*fence_wait)(struct virgl_winsys *vws,
+                      struct pipe_fence_handle *fence,
+                      uint64_t timeout);
+
+   void (*fence_reference)(struct virgl_winsys *vws,
+                           struct pipe_fence_handle **dst,
+                           struct pipe_fence_handle *src);
+
 };
 
 

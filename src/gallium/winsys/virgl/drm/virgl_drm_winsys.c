@@ -266,7 +266,7 @@ static struct virgl_hw_res *virgl_drm_winsys_resource_cache_create(struct virgl_
 
    /* only store binds for vertex/index/const buffers */
    if (bind != PIPE_BIND_CONSTANT_BUFFER && bind != PIPE_BIND_INDEX_BUFFER &&
-       bind != PIPE_BIND_VERTEX_BUFFER)
+       bind != PIPE_BIND_VERTEX_BUFFER && bind != PIPE_BIND_CUSTOM)
       goto alloc;
 
    pipe_mutex_lock(qdws->mutex);
@@ -629,6 +629,54 @@ static int handle_compare(void *key1, void *key2)
     return PTR_TO_UINT(key1) != PTR_TO_UINT(key2);
 }
 
+static struct pipe_fence_handle *
+virgl_cs_create_fence(struct virgl_winsys *vws)
+{
+   struct virgl_hw_res *res;
+
+   res = virgl_drm_winsys_resource_cache_create(vws,
+                                                PIPE_BUFFER,
+                                                PIPE_FORMAT_R8_UNORM,
+                                                PIPE_BIND_CUSTOM,
+                                                8, 1, 1, 0, 0, 0, 8);
+
+   return (struct pipe_fence_handle *)res;
+}
+
+static bool virgl_fence_wait(struct virgl_winsys *vws,
+                             struct pipe_fence_handle *fence,
+                             uint64_t timeout)
+{
+   struct virgl_drm_winsys *vdws = virgl_drm_winsys(vws);
+   struct virgl_hw_res *res = (struct virgl_hw_res *)fence;
+
+   if (timeout == 0)
+      return virgl_drm_resource_is_busy(vdws, res);
+
+   if (timeout != PIPE_TIMEOUT_INFINITE) {
+      int64_t start_time = os_time_get();
+      timeout /= 1000;
+      while (virgl_drm_resource_is_busy(vdws, res)) {
+         if (os_time_get() - start_time >= timeout)
+            return FALSE;
+         os_time_sleep(10);
+      }
+      return TRUE;
+   }
+   virgl_drm_resource_wait(vws, res);
+   return TRUE;
+}
+
+static void virgl_fence_reference(struct virgl_winsys *vws,
+                                  struct pipe_fence_handle **dst,
+                                  struct pipe_fence_handle *src)
+{
+   struct virgl_drm_winsys *vdws = virgl_drm_winsys(vws);
+   virgl_drm_resource_reference(vdws, (struct virgl_hw_res **)dst,
+                                (struct virgl_hw_res *)src);
+}
+
+
 struct virgl_winsys *
 virgl_drm_winsys_create(int drmFD)
 {
@@ -660,7 +708,11 @@ virgl_drm_winsys_create(int drmFD)
    qdws->base.submit_cmd = virgl_drm_winsys_submit_cmd;
    qdws->base.emit_res = virgl_drm_emit_res;
    qdws->base.res_is_referenced = virgl_drm_res_is_ref;
-   
+
+   qdws->base.cs_create_fence = virgl_cs_create_fence;
+   qdws->base.fence_wait = virgl_fence_wait;
+   qdws->base.fence_reference = virgl_fence_reference;
+
    qdws->base.get_caps = virgl_drm_get_caps;
    return &qdws->base;
 

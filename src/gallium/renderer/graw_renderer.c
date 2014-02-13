@@ -2658,8 +2658,10 @@ void graw_renderer_resource_invalid_iov(int res_handle, struct graw_iovec **iov,
 {
    struct grend_resource *res;
    res = vrend_resource_lookup(res_handle, 0);
-   if (!res)
+   if (!res) {
+      *num_iovs = 0;
       return;
+   }
 
    *iov = res->iov;
    *num_iovs = res->num_iovs;

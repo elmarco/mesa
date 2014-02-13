@@ -220,6 +220,9 @@ struct pipe_resource *virgl_texture_create(struct virgl_screen *vs,
    vrend_resource_layout(tex, &size);
    
    tex->base.hw_res = vs->vws->resource_create(vs->vws, template->target, template->format, template->bind, template->width0, template->height0, template->depth0, template->array_size, template->last_level, template->nr_samples, size);
-   assert(tex->base.hw_res);
+   if (!tex->base.hw_res) {
+      FREE(tex);
+      return NULL;
+   }
    return &tex->base.u.b;
 }

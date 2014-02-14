@@ -57,6 +57,8 @@ struct dump_ctx {
    struct graw_shader_io inputs[32];
    int num_outputs;
    struct graw_shader_io outputs[32];
+   int num_system_values;
+   struct graw_shader_io system_values[32];
 
    int num_temps;
    struct graw_shader_sampler samplers[32];
@@ -287,6 +289,20 @@ iter_declaration(struct tgsi_iterate_context *iter,
       ctx->num_address = 1;
       break;
    case TGSI_FILE_SYSTEM_VALUE:
+      i = ctx->num_system_values++;
+      ctx->system_values[i].name = decl->Semantic.Name;
+      ctx->system_values[i].sid = decl->Semantic.Index;
+      ctx->system_values[i].glsl_predefined_no_emit = TRUE;
+      ctx->system_values[i].glsl_no_index = TRUE;
+      ctx->system_values[i].first = decl->Range.First;
+      if (decl->Semantic.Name == TGSI_SEMANTIC_INSTANCEID) {
+         name_prefix = "gl_InstanceID";
+      } else {
+         fprintf(stderr, "unsupported system value %d\n", decl->Semantic.Name);
+         name_prefix = "unknown";
+      }
+      snprintf(ctx->system_values[i].glsl_name, 64, "%s", name_prefix);
+      break;
    default:
       fprintf(stderr,"unsupported file %d declaration\n", decl->Declaration.File);
       break;
@@ -617,6 +633,11 @@ iter_instruction(struct tgsi_iterate_context *iter,
                strncat(srcs[i], temp, 255);
             }
          }
+      } else if (src->Register.File == TGSI_FILE_SYSTEM_VALUE) {
+         for (j = 0; j < ctx->num_system_values; j++)
+            if (ctx->system_values[j].first == src->Register.Index) {
+               snprintf(srcs[i], 255, "%s%s%s", prefix, ctx->system_values[j].glsl_name, swizzle);
+            }
       }
    }
    switch (inst->Instruction.Opcode) {

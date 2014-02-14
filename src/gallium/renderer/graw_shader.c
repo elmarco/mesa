@@ -82,7 +82,7 @@ struct dump_ctx {
 
    struct vrend_shader_key *key;
    boolean has_ints;
-
+   boolean has_instanceid;
    int indent_level;
 
 };
@@ -297,6 +297,7 @@ iter_declaration(struct tgsi_iterate_context *iter,
       ctx->system_values[i].first = decl->Range.First;
       if (decl->Semantic.Name == TGSI_SEMANTIC_INSTANCEID) {
          name_prefix = "gl_InstanceID";
+         ctx->has_instanceid = TRUE;
       } else {
          fprintf(stderr, "unsupported system value %d\n", decl->Semantic.Name);
          name_prefix = "unknown";
@@ -636,7 +637,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
       } else if (src->Register.File == TGSI_FILE_SYSTEM_VALUE) {
          for (j = 0; j < ctx->num_system_values; j++)
             if (ctx->system_values[j].first == src->Register.Index) {
-               snprintf(srcs[i], 255, "%s%s%s", prefix, ctx->system_values[j].glsl_name, swizzle);
+               snprintf(srcs[i], 255, "%s%s", prefix, ctx->system_values[j].glsl_name);
             }
       }
    }
@@ -1102,7 +1103,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
       emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_UARL:
-      snprintf(buf, 255, "addr0 = int(%s%s);\n", srcs[0], writemask);
+      snprintf(buf, 255, "addr0 = int(%s);\n", srcs[0]);
       emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_XPD:
@@ -1154,6 +1155,9 @@ static void emit_header(struct dump_ctx *ctx, char *glsl_final)
       strcat(glsl_final, "#extension GL_ARB_texture_cube_map_array : require\n");
    if (ctx->has_ints)
       strcat(glsl_final, "#extension GL_ARB_shader_bit_encoding : require\n");
+
+   if (ctx->has_instanceid)
+      strcat(glsl_final, "#extension GL_ARB_draw_instanced : require\n");
 }
 
 static const char *samplertypeconv(int sampler_type, int *is_shad)

@@ -292,7 +292,7 @@ GLint64 graw_renderer_get_timestamp(void);
 /* formats */
 void vrend_build_format_list(void);
 
-void graw_renderer_resource_attach_iov(int res_handle, struct graw_iovec *iov,
+int graw_renderer_resource_attach_iov(int res_handle, struct graw_iovec *iov,
                                        int num_iovs);
 void graw_renderer_resource_invalid_iov(int res_handle, struct graw_iovec **iov,
                                         int *num_iovs);

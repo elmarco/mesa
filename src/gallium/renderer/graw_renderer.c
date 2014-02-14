@@ -2644,17 +2644,19 @@ struct grend_context *grend_create_context(int id, uint32_t nlen, const char *de
    return grctx;
 }
 
-void graw_renderer_resource_attach_iov(int res_handle, struct graw_iovec *iov,
-                                       int num_iovs)
+int graw_renderer_resource_attach_iov(int res_handle, struct graw_iovec *iov,
+                                      int num_iovs)
 {
    struct grend_resource *res;
+   
    res = vrend_resource_lookup(res_handle, 0);
    if (!res)
       return;
 
+   /* work out size and max resource size */
    res->iov = iov;
    res->num_iovs = num_iovs;
-
+   return 0;
 }
 
 void graw_renderer_resource_invalid_iov(int res_handle, struct graw_iovec **iov,

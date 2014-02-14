@@ -102,14 +102,17 @@ static void virgl_resource_attach_backing(struct virtgpu_resource_attach_backing
         if (ret) {
            fprintf(stderr, "failed to attach backing %d\n", att_rb->resource_id);
            free(res_iovs);
-           break;
+           res_iovs = NULL;
+           goto fail_free;
         }
     }
 
-    graw_renderer_resource_attach_iov(att_rb->resource_id, res_iovs,
-                                      att_rb->nr_entries);
-
- fail:
+    ret = graw_renderer_resource_attach_iov(att_rb->resource_id, res_iovs,
+                                            att_rb->nr_entries);
+    goto out;
+ fail_free:
+    free(res_iovs);
+ out:
 
     if (iov_cnt > 1)
        free(data);

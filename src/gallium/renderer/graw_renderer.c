@@ -648,6 +648,10 @@ static struct grend_linked_shader_program *add_shader_program(struct grend_conte
   } else
     sprog->attrib_locs = NULL;
    
+  if (fs->sel->sinfo.num_outputs > 1) {
+     glBindFragDataLocationIndexed(prog_id, 0, 0, "out_c0");
+     glBindFragDataLocationIndexed(prog_id, 0, 1, "out_c1");
+  }
   return sprog;
 }
 

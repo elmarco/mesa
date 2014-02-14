@@ -451,7 +451,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
    char dstconv[32] = {0};
    char udstconv[32] = {0};
    char writemask[6] = {0};
-   char *twm, *gwm;
+   char *twm, *gwm, *txfi;
    char bias[64] = {0};
    char *tex_ext;
    boolean is_shad = FALSE;
@@ -459,6 +459,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
    enum tgsi_opcode_type dtype = tgsi_opcode_infer_dst_type(inst->Instruction.Opcode);
    enum tgsi_opcode_type stype = tgsi_opcode_infer_src_type(inst->Instruction.Opcode);
    char *dtypeprefix="", *stypeprefix = "";
+   bool stprefix = false;
 
    if (dtype == TGSI_TYPE_SIGNED || dtype == TGSI_TYPE_UNSIGNED ||
        stype == TGSI_TYPE_SIGNED || stype == TGSI_TYPE_UNSIGNED)
@@ -474,16 +475,21 @@ iter_instruction(struct tgsi_iterate_context *iter,
    default:
       break;
    }
-   switch (stype) {
-   case TGSI_TYPE_UNSIGNED:
-      stypeprefix = "floatBitsToUint";
-      break;
-   case TGSI_TYPE_SIGNED:
-      stypeprefix = "floatBitsToInt";
-      break;
-   default:
-      break;
-   }
+   if (inst->Instruction.Opcode == TGSI_OPCODE_TXF) {
+
+   } else
+      switch (stype) {
+      case TGSI_TYPE_UNSIGNED:
+         stypeprefix = "floatBitsToUint";
+         stprefix = true;
+         break;
+      case TGSI_TYPE_SIGNED:
+         stypeprefix = "floatBitsToInt";
+         stprefix = true;
+         break;
+      default:
+         break;
+      }
 
    if (instno == 0)
       strcat(ctx->glsl_main, "void main(void)\n{\n");
@@ -564,9 +570,9 @@ iter_instruction(struct tgsi_iterate_context *iter,
       }
       else if (src->Register.File == TGSI_FILE_TEMPORARY) {
          if (src->Register.Indirect) {
-            snprintf(srcs[i], 255, "%s(%stemps[addr0 + %d]%s)", stypeprefix, prefix, src->Register.Index, swizzle);
+            snprintf(srcs[i], 255, "%s%c%stemps[addr0 + %d]%s%c", stypeprefix, stprefix ? '(' : ' ', prefix, src->Register.Index, swizzle, stprefix ? ')' : ' ');
          } else
-            snprintf(srcs[i], 255, "%s(%stemps[%d]%s)", stypeprefix, prefix, src->Register.Index, swizzle);
+            snprintf(srcs[i], 255, "%s%c%stemps[%d]%s%c", stypeprefix, stprefix ? '(' : ' ', prefix, src->Register.Index, swizzle, stprefix ? ')' : ' ');
       } else if (src->Register.File == TGSI_FILE_CONSTANT) {
 	  const char *cname = ctx->prog_type == TGSI_PROCESSOR_VERTEX ? "vsconst" : "fsconst";
           if (src->Register.Indirect) {
@@ -869,6 +875,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
    case TGSI_OPCODE_TXB2:
    case TGSI_OPCODE_TXL2:
    case TGSI_OPCODE_TXD:
+   case TGSI_OPCODE_TXF:
       ctx->samplers[sreg_index].tgsi_sampler_type = inst->Texture.Texture;
 
       if (inst->Texture.Texture == TGSI_TEXTURE_CUBE_ARRAY || inst->Texture.Texture == TGSI_TEXTURE_SHADOWCUBE_ARRAY)
@@ -877,10 +884,12 @@ iter_instruction(struct tgsi_iterate_context *iter,
       switch (inst->Texture.Texture) {
       case TGSI_TEXTURE_1D:
          twm = ".x";
+         txfi = "int";
          break;
       case TGSI_TEXTURE_2D:
       case TGSI_TEXTURE_1D_ARRAY:
          twm = ".xy";
+         txfi = "ivec2";
          break;
       case TGSI_TEXTURE_SHADOW1D:
       case TGSI_TEXTURE_SHADOW2D:
@@ -890,6 +899,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
       case TGSI_TEXTURE_CUBE:
       case TGSI_TEXTURE_2D_ARRAY:
          twm = ".xyz";
+         txfi = "ivec3";
          break;
       case TGSI_TEXTURE_SHADOWCUBE:
       case TGSI_TEXTURE_SHADOW2D_ARRAY:
@@ -898,6 +908,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
       case TGSI_TEXTURE_SHADOWCUBE_ARRAY:
       default:
          twm = "";
+         txfi = "";
          break;
       }
 
@@ -934,6 +945,8 @@ iter_instruction(struct tgsi_iterate_context *iter,
          snprintf(bias, 64, ", %s.x", srcs[1]);
       } else if (inst->Instruction.Opcode == TGSI_OPCODE_TXB || inst->Instruction.Opcode == TGSI_OPCODE_TXL)
          snprintf(bias, 64, ", %s.w", srcs[0]);
+      else if (inst->Instruction.Opcode == TGSI_OPCODE_TXF)
+         snprintf(bias, 64, ", int(%s.w)", srcs[0]);
       else if (inst->Instruction.Opcode == TGSI_OPCODE_TXD) {
          snprintf(bias, 64, ", %s%s, %s%s", srcs[1], gwm, srcs[2], gwm);
          sampler_index = 3;
@@ -948,8 +961,11 @@ iter_instruction(struct tgsi_iterate_context *iter,
       else
          tex_ext = "";
 
+      if (inst->Instruction.Opcode == TGSI_OPCODE_TXF) {
+         snprintf(buf, 255, "%s = %s(texelFetch(%s, %s(%s%s)%s)%s);\n", dsts[0], dstconv, srcs[sampler_index], txfi, srcs[0], twm, bias, ctx->outputs[0].override_no_wm ? "" : writemask);
+      } 
       /* rect is special in GLSL 1.30 */
-      if (inst->Texture.Texture == TGSI_TEXTURE_RECT)
+      else if (inst->Texture.Texture == TGSI_TEXTURE_RECT)
          snprintf(buf, 255, "%s = texture2DRect(%s, %s.xy)%s;\n", dsts[0], srcs[sampler_index], srcs[0], writemask);
       else if (inst->Texture.Texture == TGSI_TEXTURE_SHADOWRECT)
          snprintf(buf, 255, "%s = shadow2DRect(%s, %s.xyz)%s;\n", dsts[0], srcs[sampler_index], srcs[0], writemask);

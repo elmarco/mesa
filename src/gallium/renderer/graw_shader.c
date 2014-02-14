@@ -1402,6 +1402,7 @@ char *tgsi_convert(const struct tgsi_token *tokens,
    sinfo->num_consts = ctx.num_consts;
    sinfo->num_inputs = ctx.num_inputs;
    sinfo->num_interps = ctx.num_interps;
+   sinfo->num_outputs = ctx.num_outputs;
    sinfo->shadow_samp_mask = ctx.shadow_samp_mask;
    return glsl_final;
 }

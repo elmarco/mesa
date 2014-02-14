@@ -17,7 +17,7 @@ struct vrend_shader_info {
    int num_consts;
    int num_inputs;
    int num_interps;
-
+   int num_outputs;
    uint32_t shadow_samp_mask;
    struct pipe_stream_output_info so_info;
 

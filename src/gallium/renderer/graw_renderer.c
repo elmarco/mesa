@@ -2659,18 +2659,15 @@ int graw_renderer_resource_attach_iov(int res_handle, struct graw_iovec *iov,
    return 0;
 }
 
-void graw_renderer_resource_invalid_iov(int res_handle, struct graw_iovec **iov,
-                                        int *num_iovs)
+void graw_renderer_resource_invalid_iov(int res_handle)
 {
    struct grend_resource *res;
    res = vrend_resource_lookup(res_handle, 0);
    if (!res) {
-      *num_iovs = 0;
       return;
    }
 
-   *iov = res->iov;
-   *num_iovs = res->num_iovs;
+   (*clicbs->inval_backing)(res->iov, res->num_iovs);
    res->num_iovs = 0;
    res->iov = 0;
 }
@@ -2814,6 +2811,9 @@ void graw_renderer_resource_unref(uint32_t res_handle)
    if (!res)
       return;
 
+   if (res->iov) {
+      (*clicbs->inval_backing)(res->iov, res->num_iovs);
+   }
    vrend_resource_remove(res->handle);
    res->handle = 0;
 

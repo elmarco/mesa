@@ -118,17 +118,18 @@ static void virgl_resource_attach_backing(struct virtgpu_resource_attach_backing
        free(data);
 }
 
-static void virgl_resource_inval_backing(int resource_id)
+static void virgl_resource_inval_backing_iov(struct graw_iovec *iov, uint32_t iov_cnt)
 {
-   struct graw_iovec *iov;
-   int iov_cnt;
    int i;
-   graw_renderer_resource_invalid_iov(resource_id, &iov, &iov_cnt);
-
    for (i = 0; i < iov_cnt; i++) {
       rcbs->unmap_iov(&iov[i]);
-
    }
+   free(iov);
+}
+
+static void virgl_resource_inval_backing(int resource_id)
+{
+   graw_renderer_resource_invalid_iov(resource_id);
 }
 
 static int graw_process_cmd(struct virtgpu_command *cmd, struct graw_iovec *iov,
@@ -359,6 +360,7 @@ static struct grend_if_cbs virgl_cbs = {
    destroy_gl_context,
    make_current,
    flush_scanout,
+   virgl_resource_inval_backing_iov,
 };
 
 void *virgl_get_cursor_data(uint32_t resource_id, uint32_t *width, uint32_t *height)

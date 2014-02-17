@@ -3207,8 +3207,9 @@ static void vrend_transfer_send_readpixels(struct grend_resource *res,
    if (num_iovs > 1 || separate_invert)
       need_temp = 1;
 
+   send_size = box->width * box->height * box->depth * util_format_get_blocksize(res->base.format);
+
    if (need_temp) {
-      send_size = box->width * box->height * box->depth * util_format_get_blocksize(res->base.format);
       data = malloc(send_size);
       if (!data)
          fprintf(stderr,"malloc failed %d\n", send_size);

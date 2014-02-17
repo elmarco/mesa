@@ -4029,6 +4029,12 @@ void grend_create_query(struct grend_context *ctx, uint32_t handle,
    case PIPE_QUERY_TIME_ELAPSED:
       q->gltype = GL_TIME_ELAPSED;
       break;
+   case PIPE_QUERY_PRIMITIVES_GENERATED:
+      q->gltype = GL_PRIMITIVES_GENERATED;
+      break;
+   case PIPE_QUERY_PRIMITIVES_EMITTED:
+      q->gltype = GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN;
+      break;
    default:
       fprintf(stderr,"unknown query object received %d\n", q->type);
       break;

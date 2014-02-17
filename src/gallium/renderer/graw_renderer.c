@@ -1558,6 +1558,27 @@ static void grend_update_viewport_state(struct grend_context *ctx)
    grend_state.viewport_dirty = FALSE;
 }
 
+static GLenum get_xfb_mode(GLenum mode)
+{
+   switch (mode) {
+   case GL_POINTS:
+      return GL_POINTS;
+   case GL_TRIANGLES:
+   case GL_TRIANGLE_STRIP:
+   case GL_TRIANGLE_FAN:
+   case GL_QUADS:
+   case GL_QUAD_STRIP:
+   case GL_POLYGON:
+      return GL_TRIANGLES;
+   case GL_LINES:
+   case GL_LINE_LOOP:
+   case GL_LINE_STRIP:
+      return GL_LINES;
+   }
+   fprintf(stderr, "failed to translate TFB %d\n", mode);
+   return GL_POINTS;
+}
+
 void grend_draw_vbo(struct grend_context *ctx,
                     const struct pipe_draw_info *info)
 {
@@ -1788,7 +1809,7 @@ void grend_draw_vbo(struct grend_context *ctx,
 //   grend_ctx_restart_queries(ctx);
 
    if (ctx->num_so_targets) {
-      glBeginTransformFeedback(info->mode);
+      glBeginTransformFeedback(get_xfb_mode(info->mode));
    }
 
    if (info->primitive_restart) {

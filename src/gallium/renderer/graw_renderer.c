@@ -3395,7 +3395,10 @@ static void grend_hw_emit_streamout_targets(struct grend_context *ctx)
    int i;
 
    for (i = 0; i < ctx->num_so_targets; i++) {
-      glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, i, ctx->so_targets[i]->buffer->id);
+      if (ctx->so_targets[i]->buffer_offset)
+         glBindBufferRange(GL_TRANSFORM_FEEDBACK_BUFFER, i, ctx->so_targets[i]->buffer->id, ctx->so_targets[i]->buffer_offset, ctx->so_targets[i]->buffer_size);
+      else
+         glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, i, ctx->so_targets[i]->buffer->id);
    }
 }
 

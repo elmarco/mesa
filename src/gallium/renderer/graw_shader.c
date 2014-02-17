@@ -1195,6 +1195,8 @@ static const char *samplertypeconv(int sampler_type, int *is_shad)
         case TGSI_TEXTURE_SHADOW2D_ARRAY: *is_shad = 1; return "2DArrayShadow";
 	case TGSI_TEXTURE_CUBE_ARRAY: return "CubeArray";
 	case TGSI_TEXTURE_SHADOWCUBE_ARRAY: *is_shad = 1; return "CubeArrayShadow";
+	case TGSI_TEXTURE_2D_MSAA: return "2DMS";
+	case TGSI_TEXTURE_2D_ARRAY_MSAA: return "2DMSArray";
 	default: return NULL;
         }
 }

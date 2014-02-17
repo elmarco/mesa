@@ -3,6 +3,7 @@
 #include "tgsi/tgsi_iterate.h"
 #include <string.h>
 #include <stdio.h>
+#include <math.h>
 #include "graw_shader.h"
 extern int vrend_dump_shaders;
 /*
@@ -592,7 +593,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
       } else if (src->Register.File == TGSI_FILE_IMMEDIATE) {
          struct immed *imd = &ctx->imm[(src->Register.Index)];
          int idx = src->Register.SwizzleX;
-         char temp[25];
+         char temp[48];
          const char *vtype = "vec4";
          const char *imm_stypeprefix = stypeprefix;
 
@@ -629,7 +630,10 @@ iter_instruction(struct tgsi_iterate_context *iter,
                idx = src->Register.SwizzleW;
             switch (imd->type) {
             case TGSI_IMM_FLOAT32:
-               snprintf(temp, 25, "%.8g", imd->val[idx].f);
+               if (isinf(imd->val[idx].f) || isnan(imd->val[idx].f))
+                  snprintf(temp, 48, "uintBitsToFloat(%uU)", imd->val[idx].ui);
+               else
+                  snprintf(temp, 25, "%.8g", imd->val[idx].f);
                break;
             case TGSI_IMM_UINT32:
                snprintf(temp, 25, "%u", imd->val[idx].ui);

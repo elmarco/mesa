@@ -74,7 +74,7 @@ struct dump_ctx {
    
    struct pipe_stream_output_info *so;
    boolean uses_cube_array;
-
+   boolean uses_sampler_ms;
    /* create a shader with lower left if upper left is primary variant
       or vice versa */
    uint32_t shadow_samp_mask;
@@ -892,6 +892,8 @@ iter_instruction(struct tgsi_iterate_context *iter,
 
       if (inst->Texture.Texture == TGSI_TEXTURE_CUBE_ARRAY || inst->Texture.Texture == TGSI_TEXTURE_SHADOWCUBE_ARRAY)
          ctx->uses_cube_array = TRUE;
+      if (inst->Texture.Texture == TGSI_TEXTURE_2D_MSAA || inst->Texture.Texture == TGSI_TEXTURE_2D_ARRAY_MSAA)
+         ctx->uses_sampler_ms = TRUE;
 
       switch (inst->Texture.Texture) {
       case TGSI_TEXTURE_1D:
@@ -913,6 +915,15 @@ iter_instruction(struct tgsi_iterate_context *iter,
          twm = ".xyz";
          txfi = "ivec3";
          break;
+      case TGSI_TEXTURE_2D_MSAA:
+         twm = ".xy";
+         txfi = "ivec2";
+         break;
+      case TGSI_TEXTURE_2D_ARRAY_MSAA:
+         twm = ".xyz";
+         txfi = "ivec3";
+         break;
+
       case TGSI_TEXTURE_SHADOWCUBE:
       case TGSI_TEXTURE_SHADOW2D_ARRAY:
          is_shad = TRUE;
@@ -1189,7 +1200,8 @@ static void emit_header(struct dump_ctx *ctx, char *glsl_final)
       strcat(glsl_final, "#extension GL_ARB_texture_cube_map_array : require\n");
    if (ctx->has_ints)
       strcat(glsl_final, "#extension GL_ARB_shader_bit_encoding : require\n");
-
+   if (ctx->uses_sampler_ms)
+      strcat(glsl_final, "#extension GL_ARB_texture_multisample : require\n");
    if (ctx->has_instanceid)
       strcat(glsl_final, "#extension GL_ARB_draw_instanced : require\n");
 }

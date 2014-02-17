@@ -94,7 +94,7 @@ struct global_renderer_state {
 
    struct graw_cursor_info cursor_info;
    boolean have_robustness;
-
+   boolean have_multisample;
    GLuint vaoid;
 
    struct pipe_rasterizer_state hw_rs_state;
@@ -2094,6 +2094,17 @@ static void grend_hw_emit_blend(struct grend_context *ctx)
       }
    }
 
+   if (grend_state.have_multisample) {
+      if (state->alpha_to_coverage)
+         glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE);
+      else
+         glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
+      
+      if (state->alpha_to_one)
+         glEnable(GL_SAMPLE_ALPHA_TO_ONE);
+      else
+         glDisable(GL_SAMPLE_ALPHA_TO_ONE);
+   }
 }
 
 void grend_object_bind_blend(struct grend_context *ctx,
@@ -2367,7 +2378,15 @@ static void grend_hw_emit_rs(struct grend_context *ctx)
       glClampColor(GL_CLAMP_FRAGMENT_COLOR_ARB, GL_TRUE);
    else
       glClampColor(GL_CLAMP_FRAGMENT_COLOR_ARB, GL_FALSE);
+
+   if (grend_state.have_multisample) {
+      if (state->multisample)
+         glEnable(GL_MULTISAMPLE);
+      else
+         glDisable(GL_MULTISAMPLE);
+   }
 }
+
 void grend_object_bind_rasterizer(struct grend_context *ctx,
                                   uint32_t handle)
 {
@@ -2561,6 +2580,10 @@ void graw_renderer_init(struct grend_if_cbs *cbs)
    else if (glewIsSupported("GL_NV_primitive_restart"))
       grend_state.have_nv_prim_restart = TRUE;
    
+   if (glewIsSupported("GL_EXT_framebuffer_multisample") && glewIsSupported("GL_ARB_texture_multisample")) {
+      grend_state.have_multisample = true;
+   }
+
    /* callbacks for when we are cleaning up the object table */
    vrend_object_set_destroy_callback(VIRGL_OBJECT_QUERY, grend_destroy_query_object);
    vrend_object_set_destroy_callback(VIRGL_OBJECT_SURFACE, grend_destroy_surface_object);

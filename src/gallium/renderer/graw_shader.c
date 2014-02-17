@@ -348,8 +348,10 @@ iter_immediate(
       if (imm->Immediate.DataType == TGSI_IMM_FLOAT32) {
          ctx->imm[first].val[i].f = imm->u[i].Float;
       } else if (imm->Immediate.DataType == TGSI_IMM_UINT32) {
+         ctx->has_ints = TRUE;
          ctx->imm[first].val[i].ui  = imm->u[i].Uint;
       } else if (imm->Immediate.DataType == TGSI_IMM_INT32) {
+         ctx->has_ints = TRUE;
          ctx->imm[first].val[i].i = imm->u[i].Int;
       } 
    }

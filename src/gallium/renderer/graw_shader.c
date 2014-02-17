@@ -299,6 +299,8 @@ iter_declaration(struct tgsi_iterate_context *iter,
       if (decl->Semantic.Name == TGSI_SEMANTIC_INSTANCEID) {
          name_prefix = "gl_InstanceID";
          ctx->has_instanceid = TRUE;
+      } else if (decl->Semantic.Name == TGSI_SEMANTIC_VERTEXID) {
+	 name_prefix = "gl_VertexID";
       } else {
          fprintf(stderr, "unsupported system value %d\n", decl->Semantic.Name);
          name_prefix = "unknown";

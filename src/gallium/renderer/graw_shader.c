@@ -467,15 +467,19 @@ iter_instruction(struct tgsi_iterate_context *iter,
        stype == TGSI_TYPE_SIGNED || stype == TGSI_TYPE_UNSIGNED)
       ctx->has_ints = TRUE;
 
-   switch (dtype) {
-   case TGSI_TYPE_UNSIGNED:
-      dtypeprefix = "uintBitsToFloat";
-      break;
-   case TGSI_TYPE_SIGNED:
+   if (inst->Instruction.Opcode == TGSI_OPCODE_TXQ) {
       dtypeprefix = "intBitsToFloat";
-      break;
-   default:
-      break;
+   } else {
+      switch (dtype) {
+      case TGSI_TYPE_UNSIGNED:
+	 dtypeprefix = "uintBitsToFloat";
+	 break;
+      case TGSI_TYPE_SIGNED:
+	 dtypeprefix = "intBitsToFloat";
+	 break;
+      default:
+	 break;
+      }
    }
    if (inst->Instruction.Opcode == TGSI_OPCODE_TXF) {
 
@@ -1035,9 +1039,15 @@ iter_instruction(struct tgsi_iterate_context *iter,
 
       emit_buf(ctx, buf);
       break;
-   case TGSI_OPCODE_TXQ:
-      fprintf(stderr,"got TXQ TODO\n");
+   case TGSI_OPCODE_TXQ: {
+      ctx->samplers[sreg_index].tgsi_sampler_type = inst->Texture.Texture;
+      if (inst->Texture.Texture == TGSI_TEXTURE_CUBE_ARRAY || inst->Texture.Texture == TGSI_TEXTURE_SHADOWCUBE_ARRAY)
+         ctx->uses_cube_array = TRUE;
+      sampler_index = 1;
+      snprintf(buf, 255, "%s = %s(%s(textureSize(%s, int(%s)))%s);\n", dsts[0], dstconv, dtypeprefix, srcs[sampler_index], srcs[0], ctx->outputs[0].override_no_wm ? "" : writemask);
+      emit_buf(ctx, buf);
       break;
+   } 
    case TGSI_OPCODE_I2F:
       snprintf(buf, 255, "%s = %s(ivec4(%s));\n", dsts[0], dstconv, srcs[0]);
       emit_buf(ctx, buf);

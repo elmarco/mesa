@@ -1043,17 +1043,20 @@ parse_instruction(
    }
 
    if (inst.Instruction.Texture) {
-      uint j;
+      uint j = 0;
 
       cur = ctx->cur;
-      eat_opt_white( &ctx->cur );
+      eat_opt_white( &cur );
       for (j = 0; j < 4; j++) {
-         if (*ctx->cur != ',') {
+         if (*cur == ',') {
+            ctx->cur = cur;
+            ctx->cur++;
+            eat_opt_white( &ctx->cur );
+            if (!parse_tex_offset_operand(ctx, &inst.TexOffsets[j]))
+               return FALSE;
+            cur = ctx->cur;
+         } else
             break;
-         }
-         ctx->cur++;
-         eat_opt_white( &ctx->cur );
-         parse_tex_offset_operand(ctx, &inst.TexOffsets[j]);
       }
       inst.Texture.NumOffsets = j;
    }

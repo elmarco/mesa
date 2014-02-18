@@ -1018,7 +1018,27 @@ iter_instruction(struct tgsi_iterate_context *iter,
          tex_ext = "";
 
       if (inst->Instruction.Opcode == TGSI_OPCODE_TXF) {
-         snprintf(buf, 255, "%s = %s(texelFetch(%s, %s(%s%s)%s)%s);\n", dsts[0], dstconv, srcs[sampler_index], txfi, srcs[0], twm, bias, ctx->outputs[0].override_no_wm ? "" : writemask);
+         if (inst->Texture.NumOffsets == 1) {
+            struct immed *imd = &ctx->imm[(inst->TexOffsets[0].Index)];
+            char offbuf[25];
+            char *offprefix = "";
+            switch (inst->Texture.Texture) {
+            case TGSI_TEXTURE_1D:
+            case TGSI_TEXTURE_1D_ARRAY:
+               offprefix = "int";
+               break;
+            case TGSI_TEXTURE_2D:
+            case TGSI_TEXTURE_2D_ARRAY:
+               offprefix = "ivec2";
+               break;
+            case TGSI_TEXTURE_3D:
+               offprefix = "ivec3";
+               break;
+            }
+            snprintf(offbuf, 25, "%s(%d, %d)", offprefix, imd->val[0].i, imd->val[1].i);
+            snprintf(buf, 255, "%s = %s(texelFetchOffset(%s, %s(%s%s)%s, %s)%s);\n", dsts[0], dstconv, srcs[sampler_index], txfi, srcs[0], twm, bias, offbuf, ctx->outputs[0].override_no_wm ? "" : writemask);
+         } else
+            snprintf(buf, 255, "%s = %s(texelFetch(%s, %s(%s%s)%s)%s);\n", dsts[0], dstconv, srcs[sampler_index], txfi, srcs[0], twm, bias, ctx->outputs[0].override_no_wm ? "" : writemask);
       } 
       /* rect is special in GLSL 1.30 */
       else if (inst->Texture.Texture == TGSI_TEXTURE_RECT)

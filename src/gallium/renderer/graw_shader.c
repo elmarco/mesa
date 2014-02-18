@@ -606,7 +606,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
       if (src->Register.File == TGSI_FILE_INPUT) {
          for (j = 0; j < ctx->num_inputs; j++)
             if (ctx->inputs[j].first == src->Register.Index) {
-               snprintf(srcs[i], 255, "%s%s%s", prefix, ctx->inputs[j].glsl_name, swizzle);
+               snprintf(srcs[i], 255, "%s(%s%s%s)", stypeprefix, prefix, ctx->inputs[j].glsl_name, swizzle);
                break;
             }
       }
@@ -1114,7 +1114,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
       if (inst->Texture.Texture == TGSI_TEXTURE_CUBE_ARRAY || inst->Texture.Texture == TGSI_TEXTURE_SHADOWCUBE_ARRAY)
          ctx->uses_cube_array = TRUE;
       sampler_index = 1;
-      snprintf(buf, 255, "%s = %s(%s(textureSize(%s, int(%s)))%s);\n", dsts[0], dstconv, dtypeprefix, srcs[sampler_index], srcs[0], ctx->outputs[0].override_no_wm ? "" : writemask);
+      snprintf(buf, 255, "%s = %s(%s(textureSize(%s, int(%s))));\n", dsts[0], dstconv, dtypeprefix, srcs[sampler_index], srcs[0]);
       emit_buf(ctx, buf);
       break;
    } 

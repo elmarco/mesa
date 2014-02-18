@@ -485,6 +485,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
    char dstconv[32] = {0};
    char udstconv[32] = {0};
    char writemask[6] = {0};
+   char offbuf[64] = {0};
    char *twm, *gwm, *txfi;
    char bias[64] = {0};
    char *tex_ext;
@@ -1010,35 +1011,56 @@ iter_instruction(struct tgsi_iterate_context *iter,
       else
          bias[0] = 0;
 
-      if (inst->Instruction.Opcode == TGSI_OPCODE_TXL || inst->Instruction.Opcode == TGSI_OPCODE_TXL2)
-         tex_ext = "Lod";
-      else if (inst->Instruction.Opcode == TGSI_OPCODE_TXD)
-         tex_ext = "Grad";
-      else
-         tex_ext = "";
+      if (inst->Instruction.Opcode == TGSI_OPCODE_TXL || inst->Instruction.Opcode == TGSI_OPCODE_TXL2) {
+         if (inst->Texture.NumOffsets == 1)
+            tex_ext = "LodOffset";
+         else
+            tex_ext = "Lod";
+      } else if (inst->Instruction.Opcode == TGSI_OPCODE_TXD) {
+         if (inst->Texture.NumOffsets == 1)
+            tex_ext = "GradOffset";
+         else
+            tex_ext = "Grad";
+      } else {
+         if (inst->Texture.NumOffsets == 1)
+            tex_ext = "Offset";
+         else
+            tex_ext = "";
+      }
 
+      if (inst->Texture.NumOffsets == 1) {
+         struct immed *imd = &ctx->imm[(inst->TexOffsets[0].Index)];
+         switch (inst->Texture.Texture) {
+         case TGSI_TEXTURE_1D:
+         case TGSI_TEXTURE_1D_ARRAY:
+         case TGSI_TEXTURE_SHADOW1D:
+         case TGSI_TEXTURE_SHADOW1D_ARRAY:
+            snprintf(offbuf, 25, ", int(%d)", imd->val[inst->TexOffsets[0].SwizzleX].i);
+            break;
+         case TGSI_TEXTURE_2D:
+         case TGSI_TEXTURE_2D_ARRAY:
+         case TGSI_TEXTURE_SHADOW2D:
+         case TGSI_TEXTURE_SHADOW2D_ARRAY:
+            snprintf(offbuf, 25, ", ivec2(%d, %d)", imd->val[inst->TexOffsets[0].SwizzleX].i, imd->val[inst->TexOffsets[0].SwizzleY].i);
+            break;
+         case TGSI_TEXTURE_3D:
+            snprintf(offbuf, 25, ", ivec3(%d, %d, %d)", imd->val[inst->TexOffsets[0].SwizzleX].i, imd->val[inst->TexOffsets[0].SwizzleY].i,
+                     imd->val[inst->TexOffsets[0].SwizzleZ].i);
+            break;
+         }
+
+         if (inst->Instruction.Opcode == TGSI_OPCODE_TXL || inst->Instruction.Opcode == TGSI_OPCODE_TXL2 || inst->Instruction.Opcode == TGSI_OPCODE_TXD) {
+            char tmp[64];
+            strcpy(tmp, offbuf);
+            strcpy(offbuf, bias);
+            strcpy(bias, tmp);
+
+         }
+      }
       if (inst->Instruction.Opcode == TGSI_OPCODE_TXF) {
-         if (inst->Texture.NumOffsets == 1) {
-            struct immed *imd = &ctx->imm[(inst->TexOffsets[0].Index)];
-            char offbuf[25];
-            char *offprefix = "";
-            switch (inst->Texture.Texture) {
-            case TGSI_TEXTURE_1D:
-            case TGSI_TEXTURE_1D_ARRAY:
-               offprefix = "int";
-               break;
-            case TGSI_TEXTURE_2D:
-            case TGSI_TEXTURE_2D_ARRAY:
-               offprefix = "ivec2";
-               break;
-            case TGSI_TEXTURE_3D:
-               offprefix = "ivec3";
-               break;
-            }
-            snprintf(offbuf, 25, "%s(%d, %d)", offprefix, imd->val[0].i, imd->val[1].i);
-            snprintf(buf, 255, "%s = %s(texelFetchOffset(%s, %s(%s%s)%s, %s)%s);\n", dsts[0], dstconv, srcs[sampler_index], txfi, srcs[0], twm, bias, offbuf, ctx->outputs[0].override_no_wm ? "" : writemask);
-         } else
-            snprintf(buf, 255, "%s = %s(texelFetch(%s, %s(%s%s)%s)%s);\n", dsts[0], dstconv, srcs[sampler_index], txfi, srcs[0], twm, bias, ctx->outputs[0].override_no_wm ? "" : writemask);
+         snprintf(buf, 255, "%s = %s(texelFetch%s(%s, %s(%s%s)%s%s)%s);\n", dsts[0], dstconv, tex_ext, srcs[sampler_index], txfi, srcs[0], twm, bias, offbuf, ctx->outputs[0].override_no_wm ? "" : writemask);
+         //   } else
+         //  snprintf(buf, 255, "%s = %s(texelFetch(%s, %s(%s%s)%s)%s);\n", dsts[0], dstconv, srcs[sampler_index], txfi, srcs[0], twm, bias, ctx->outputs[0].override_no_wm ? "" : writemask);
       } 
       /* rect is special in GLSL 1.30 */
       else if (inst->Texture.Texture == TGSI_TEXTURE_RECT)
@@ -1051,7 +1073,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
          const struct tgsi_full_src_register *src = &inst->Src[sampler_index];
          snprintf(buf, 255, "%s = %s(vec4(vec4(texture%s(%s, %s%s%s)) * %s%d + %s%d)%s);\n", dsts[0], dstconv, tex_ext, srcs[sampler_index], srcs[0], twm, bias, mname, src->Register.Index, cname, src->Register.Index, writemask);
       } else
-         snprintf(buf, 255, "%s = %s(texture%s(%s, %s%s%s)%s);\n", dsts[0], dstconv, tex_ext, srcs[sampler_index], srcs[0], twm, bias, ctx->outputs[0].override_no_wm ? "" : writemask);
+         snprintf(buf, 255, "%s = %s(texture%s(%s, %s%s%s%s)%s);\n", dsts[0], dstconv, tex_ext, srcs[sampler_index], srcs[0], twm, offbuf, bias, ctx->outputs[0].override_no_wm ? "" : writemask);
       emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_TXP:

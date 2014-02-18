@@ -85,6 +85,7 @@ struct dump_ctx {
    boolean has_ints;
    boolean has_instanceid;
    int indent_level;
+   int num_clip_dist;
 
 };
 
@@ -207,6 +208,12 @@ iter_declaration(struct tgsi_iterate_context *iter,
             ctx->outputs[i].glsl_no_index = TRUE;
             ctx->outputs[i].override_no_wm = TRUE;
          }
+         break;
+      case TGSI_SEMANTIC_CLIPDIST:
+         name_prefix = "gl_ClipDistance";
+         ctx->outputs[i].glsl_predefined_no_emit = TRUE;
+         ctx->outputs[i].glsl_no_index = TRUE;
+         ctx->num_clip_dist += 4;
          break;
       case TGSI_SEMANTIC_CLIPVERTEX:
          name_prefix = "gl_ClipVertex";
@@ -428,6 +435,28 @@ static void emit_so_movs(struct dump_ctx *ctx)
 
 }
 
+static void emit_clip_dist_movs(struct dump_ctx *ctx)
+{
+   char buf[255];
+   int i;
+   for (i = 0; i < ctx->num_clip_dist; i++) {
+      int clipidx = i < 4 ? 0 : 1;
+      char swiz = i & 3;
+      char wm = 0;
+      switch (swiz) {
+      case 0: wm = 'x'; break;
+      case 1: wm = 'y'; break;
+      case 2: wm = 'z'; break;
+      case 3: wm = 'w'; break;
+      }
+      snprintf(buf, 255, "gl_ClipDistance[%d] = clip_dist_temp[%d].%c;\n",
+               i, clipidx, wm);
+      strcat(ctx->glsl_main, buf);
+   }
+}
+
+
+
 #define emit_arit_op2(op) snprintf(buf, 255, "%s = %s(%s((%s %s %s))%s);\n", dsts[0], dstconv, dtypeprefix, srcs[0], op, srcs[1], writemask)
 #define emit_op1(op) snprintf(buf, 255, "%s = %s(%s(%s(%s)));\n", dsts[0], dstconv, dtypeprefix, op, srcs[0])
 #define emit_compare(op) snprintf(buf, 255, "%s = %s(%s((%s(%s, %s)))%s);\n", dsts[0], dstconv, dtypeprefix, op, srcs[0], srcs[1], writemask)
@@ -529,11 +558,15 @@ iter_instruction(struct tgsi_iterate_context *iter,
       if (dst->Register.File == TGSI_FILE_OUTPUT) {
          for (j = 0; j < ctx->num_outputs; j++) {
             if (ctx->outputs[j].first == dst->Register.Index) {
-               snprintf(dsts[i], 255, "%s%s", ctx->outputs[j].glsl_name, ctx->outputs[j].override_no_wm ? "" : writemask);
-               if (ctx->outputs[j].name == TGSI_SEMANTIC_PSIZE) {
-                  snprintf(dstconv, 6, "float");
-                  break;
-		}
+               if (ctx->outputs[j].name == TGSI_SEMANTIC_CLIPDIST) {
+                  snprintf(dsts[i], 255, "clip_dist_temp[%d]", ctx->outputs[j].sid);
+               } else {
+                  snprintf(dsts[i], 255, "%s%s", ctx->outputs[j].glsl_name, ctx->outputs[j].override_no_wm ? "" : writemask);
+                  if (ctx->outputs[j].name == TGSI_SEMANTIC_PSIZE) {
+                     snprintf(dstconv, 6, "float");
+                     break;
+                  }
+               }
             }
          }
       }
@@ -1136,6 +1169,8 @@ iter_instruction(struct tgsi_iterate_context *iter,
          emit_prescale(ctx);
          if (ctx->so)
             emit_so_movs(ctx);
+         if (ctx->num_clip_dist)
+            emit_clip_dist_movs(ctx);
       } else if (ctx->write_all_cbufs)
          emit_cbuf_writes(ctx);
       strcat(ctx->glsl_main, "}\n");
@@ -1305,6 +1340,13 @@ static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
    if (ctx->prog_type == TGSI_PROCESSOR_VERTEX) {
       snprintf(buf, 255, "uniform vec4 winsys_adjust;\n");
       strcat(glsl_final, buf);
+
+      if (ctx->num_clip_dist) {
+         snprintf(buf, 255, "out float gl_ClipDistance[%d];\n", ctx->num_clip_dist);
+         strcat(glsl_final, buf);
+         snprintf(buf, 255, "vec4 clip_dist_temp[2];\n");
+         strcat(glsl_final, buf);
+      }
    }
    
    if (ctx->so) {

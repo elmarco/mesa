@@ -204,6 +204,8 @@ virgl_get_shader_param(struct pipe_screen *screen, unsigned shader, enum pipe_sh
             return PIPE_MAX_SAMPLERS;
       case PIPE_SHADER_CAP_INTEGERS:
          return vscreen->caps.caps.v1.glsl_level >= 130;
+      case PIPE_SHADER_CAP_MAX_CONTROL_FLOW_DEPTH:
+         return 32;
       default:
          return 0;
       }

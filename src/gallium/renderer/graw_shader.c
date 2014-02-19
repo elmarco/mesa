@@ -640,9 +640,9 @@ iter_instruction(struct tgsi_iterate_context *iter,
                vtype = "ivec4";
 
             if (stype == TGSI_TYPE_UNSIGNED && imd->type == TGSI_IMM_INT32)
-               imm_stypeprefix = "ivec4";
-            else if (stype == TGSI_TYPE_SIGNED && imd->type == TGSI_IMM_UINT32)
                imm_stypeprefix = "uvec4";
+            else if (stype == TGSI_TYPE_SIGNED && imd->type == TGSI_IMM_UINT32)
+               imm_stypeprefix = "ivec4";
             else if (stype == TGSI_TYPE_FLOAT || stype == TGSI_TYPE_UNTYPED) {
                if (imd->type == TGSI_IMM_INT32)
                   imm_stypeprefix = "intBitsToFloat";
@@ -672,7 +672,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
                   snprintf(temp, 25, "%.8g", imd->val[idx].f);
                break;
             case TGSI_IMM_UINT32:
-               snprintf(temp, 25, "%u", imd->val[idx].ui);
+               snprintf(temp, 25, "%uU", imd->val[idx].ui);
                break;
             case TGSI_IMM_INT32:
                snprintf(temp, 25, "%d", imd->val[idx].i);

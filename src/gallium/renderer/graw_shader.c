@@ -477,7 +477,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
                  struct tgsi_full_instruction *inst)
 {
    struct dump_ctx *ctx = (struct dump_ctx *)iter;
-   char srcs[3][255], dsts[3][255], buf[512];
+   char srcs[4][255], dsts[3][255], buf[512];
    uint instno = ctx->instno++;
    int i;
    int j;

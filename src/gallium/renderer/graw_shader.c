@@ -666,9 +666,10 @@ iter_instruction(struct tgsi_iterate_context *iter,
                idx = src->Register.SwizzleW;
             switch (imd->type) {
             case TGSI_IMM_FLOAT32:
-               if (isinf(imd->val[idx].f) || isnan(imd->val[idx].f))
+               if (isinf(imd->val[idx].f) || isnan(imd->val[idx].f)) {
+                  ctx->has_ints = TRUE;
                   snprintf(temp, 48, "uintBitsToFloat(%uU)", imd->val[idx].ui);
-               else
+               } else
                   snprintf(temp, 25, "%.8g", imd->val[idx].f);
                break;
             case TGSI_IMM_UINT32:

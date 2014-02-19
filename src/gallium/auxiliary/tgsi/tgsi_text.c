@@ -1385,6 +1385,17 @@ static boolean parse_declaration( struct translate_ctx *ctx )
       }
    }
 
+   cur = ctx->cur;
+   eat_opt_white( &cur );
+   if (*cur == ',' && !is_vs_input) {
+      cur++;
+      eat_opt_white( &cur );
+      if (str_match_nocase_whole( &cur, "CENTROID" )) {
+         decl.Interp.Centroid = 1;
+         ctx->cur = cur;
+      }
+   }
+
    advance = tgsi_build_full_declaration(
       &decl,
       ctx->tokens_cur,

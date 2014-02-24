@@ -2489,6 +2489,11 @@ static void grend_apply_sampler_state(struct grend_context *ctx,
       fprintf(stderr, "cannot find sampler state for %d %d\n", shader_type, id);
       return;
    }
+   if (res->base.nr_samples > 1) {
+      tex->state = *state;
+      return;
+   }
+
    if (tex->state.max_lod == -1)
       set_all = TRUE;
 

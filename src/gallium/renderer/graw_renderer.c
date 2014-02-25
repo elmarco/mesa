@@ -3359,11 +3359,11 @@ void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t ctx_id,
       uint32_t send_size = box->width * util_format_get_blocksize(res->base.format);      
       void *data;
       glBindBufferARB(res->target, res->id);
-      data = glMapBuffer(res->target, GL_READ_ONLY);
+      data = glMapBufferRange(res->target, box->x, box->width, GL_MAP_READ_BIT);
       if (!data)
          fprintf(stderr,"unable to open buffer for reading %d\n", res->target);
       else
-         graw_transfer_write_return(data + box->x, send_size, offset, iov, num_iovs);
+         graw_transfer_write_return(data, send_size, offset, iov, num_iovs);
       glUnmapBuffer(res->target);
    } else {
       boolean can_readpixels = TRUE;

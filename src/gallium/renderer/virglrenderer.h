@@ -12,6 +12,7 @@ struct virgl_iovec;
 typedef void *virgl_gl_context;
 
 struct virgl_renderer_callbacks {
+   int version;
    void (*write_fence)(void *cookie, uint32_t fence);
 
    int (*map_iov)(struct virgl_iovec *iov, uint64_t addr);
@@ -32,7 +33,7 @@ struct virgl_renderer_callbacks {
 };
 
 /* virtio-gpu compatible interface */
-VIRGL_EXPORT void virgl_renderer_init(void *cookie, struct virgl_renderer_callbacks *cb);
+VIRGL_EXPORT int virgl_renderer_init(void *cookie, struct virgl_renderer_callbacks *cb);
 VIRGL_EXPORT void virgl_renderer_poll(void); /* force fences */
 
 VIRGL_EXPORT int virgl_renderer_process_vcmd(void *cmd, struct virgl_iovec *iov, unsigned int num_iovs);

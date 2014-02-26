@@ -385,11 +385,14 @@ void virgl_renderer_get_rect(int idx, struct virgl_iovec *iov, unsigned int num_
    
 }
 
-void virgl_renderer_init(void *cookie, struct virgl_renderer_callbacks *cbs)
+int virgl_renderer_init(void *cookie, struct virgl_renderer_callbacks *cbs)
 {
    dev_cookie = cookie;
    rcbs = cbs;
    localrender = 1;
    glewInit();
+   if (cbs->version != 1)
+      return -1;
    graw_renderer_init(&virgl_cbs);
+   return 0;
 }

@@ -278,7 +278,6 @@ static int graw_process_cmd(struct virtgpu_command *cmd, struct graw_iovec *iov,
    return 0;
 }
 
-#if 0
 void graw_transfer_write_return(void *data, uint32_t bytes, uint64_t offset,
                                 struct graw_iovec *iov, int num_iovs)
 {
@@ -297,9 +296,10 @@ void graw_transfer_write_tex_return(struct pipe_resource *res,
    int elsize = util_format_get_blocksize(res->format);
    int h;
    uint32_t myoffset = offset;
-   uint32_t stride = dst_stride ? dst_stride : util_format_get_nblocksx(res->format, box->width) * elsize;
+   uint32_t stride = dst_stride ? dst_stride : util_format_get_nblocksx(res->format, u_minify(res->width0, level)) * elsize;
+//   uint32_t stride = dst_stride ? dst_stride : util_format_get_nblocksx(res->format, box->width) * elsize;
 
-   if (!invert && (!dst_stride || dst_stride == util_format_get_nblocksx(res->format, box->width) * elsize))
+   if (!invert && (stride == util_format_get_nblocksx(res->format, box->width) * elsize))
       graw_iov_from_buf(iov, num_iovs, offset, myptr, size);
    else if (invert) {
       for (h = box->height - 1; h >= 0; h--) {
@@ -315,7 +315,6 @@ void graw_transfer_write_tex_return(struct pipe_resource *res,
       }
    }
 }
-#endif
 
 static void virgl_write_fence(uint32_t fence_id)
 {

@@ -18,8 +18,6 @@ GREND_EXPORT void graw_renderer_set_cursor_info(uint32_t cursor_handle, int x, i
 typedef void *virgl_gl_context;
 
 struct graw_renderer_callbacks {
-   /* send IRQ to guest */
-   void (*send_irq)(void *cookie, uint32_t irq);
    void (*write_fence)(void *cookie, uint32_t fence);
 
    int (*map_iov)(struct graw_iovec *iov, uint64_t addr);

@@ -824,6 +824,7 @@ static void grend_fb_bind_texture(struct grend_resource *res,
     switch (res->target) {
     case GL_TEXTURE_1D_ARRAY:
     case GL_TEXTURE_2D_ARRAY:
+    case GL_TEXTURE_2D_MULTISAMPLE_ARRAY:
     case GL_TEXTURE_CUBE_MAP_ARRAY:
         glFramebufferTextureLayer(GL_FRAMEBUFFER_EXT, attachment,
                                   res->id, level, layer);
@@ -2383,10 +2384,13 @@ static void grend_hw_emit_rs(struct grend_context *ctx)
       glClampColor(GL_CLAMP_FRAGMENT_COLOR_ARB, GL_FALSE);
 
    if (grend_state.have_multisample) {
-      if (state->multisample)
+      if (state->multisample) {
          glEnable(GL_MULTISAMPLE);
-      else
+         glEnable(GL_SAMPLE_MASK);
+      } else {
          glDisable(GL_MULTISAMPLE);
+         glDisable(GL_SAMPLE_MASK);
+      }
    }
 }
 
@@ -3439,7 +3443,7 @@ void grend_set_clip_state(struct grend_context *ctx, struct pipe_clip_state *ucp
 
 void grend_set_sample_mask(struct grend_context *ctx, unsigned sample_mask)
 {
-
+   glSampleMaski(0, sample_mask);
 }
 
 

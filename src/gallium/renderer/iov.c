@@ -29,7 +29,7 @@
 #endif
 
 
-size_t graw_iov_from_buf(const struct graw_iovec *iov, unsigned int iov_cnt,
+size_t graw_iov_from_buf(const struct virgl_iovec *iov, unsigned int iov_cnt,
                     size_t offset, const void *buf, size_t bytes)
 {
     size_t done;
@@ -48,7 +48,7 @@ size_t graw_iov_from_buf(const struct graw_iovec *iov, unsigned int iov_cnt,
     return done;
 }
 
-size_t graw_iov_to_buf(const struct graw_iovec *iov, const unsigned int iov_cnt,
+size_t graw_iov_to_buf(const struct virgl_iovec *iov, const unsigned int iov_cnt,
                   size_t offset, void *buf, size_t bytes)
 {
     size_t done;
@@ -67,7 +67,7 @@ size_t graw_iov_to_buf(const struct graw_iovec *iov, const unsigned int iov_cnt,
     return done;
 }
 
-size_t graw_iov_to_buf_cb(const struct graw_iovec *iov, const unsigned int iov_cnt,
+size_t graw_iov_to_buf_cb(const struct virgl_iovec *iov, const unsigned int iov_cnt,
                           size_t offset, size_t bytes, IOCallback iovcb,
                           void *cookie)
 {
@@ -88,7 +88,7 @@ size_t graw_iov_to_buf_cb(const struct graw_iovec *iov, const unsigned int iov_c
 }
 
 #if 0
-size_t iov_memset(const struct graw_iovec *iov, const unsigned int iov_cnt,
+size_t iov_memset(const struct virgl_iovec *iov, const unsigned int iov_cnt,
                   size_t offset, int fillc, size_t bytes)
 {
     size_t done;
@@ -107,7 +107,7 @@ size_t iov_memset(const struct graw_iovec *iov, const unsigned int iov_cnt,
     return done;
 }
 #endif
-size_t graw_iov_size(const struct graw_iovec *iov, const unsigned int iov_cnt)
+size_t graw_iov_size(const struct virgl_iovec *iov, const unsigned int iov_cnt)
 {
     size_t len;
     unsigned int i;
@@ -122,7 +122,7 @@ size_t graw_iov_size(const struct graw_iovec *iov, const unsigned int iov_cnt)
 #if 0
 /* helper function for iov_send_recv() */
 static ssize_t
-do_send_recv(int sockfd, struct graw_iovec *iov, unsigned iov_cnt, bool do_send)
+do_send_recv(int sockfd, struct virgl_iovec *iov, unsigned iov_cnt, bool do_send)
 {
 #if defined CONFIG_IOVEC && defined CONFIG_POSIX
     ssize_t ret;
@@ -165,7 +165,7 @@ do_send_recv(int sockfd, struct graw_iovec *iov, unsigned iov_cnt, bool do_send)
 #endif
 }
 
-ssize_t iov_send_recv(int sockfd, struct graw_iovec *iov, unsigned iov_cnt,
+ssize_t iov_send_recv(int sockfd, struct virgl_iovec *iov, unsigned iov_cnt,
                       size_t offset, size_t bytes,
                       bool do_send)
 {
@@ -173,7 +173,7 @@ ssize_t iov_send_recv(int sockfd, struct graw_iovec *iov, unsigned iov_cnt,
     unsigned si, ei;            /* start and end indexes */
     if (bytes == 0) {
         /* Catch the do-nothing case early, as otherwise we will pass an
-         * empty graw_iovec to sendmsg/recvmsg(), and not all implementations
+         * empty virgl_iovec to sendmsg/recvmsg(), and not all implementations
          * accept this.
          */
         return 0;
@@ -223,7 +223,7 @@ ssize_t iov_send_recv(int sockfd, struct graw_iovec *iov, unsigned iov_cnt,
 }
 
 
-void iov_hexdump(const struct graw_iovec *iov, const unsigned int iov_cnt,
+void iov_hexdump(const struct virgl_iovec *iov, const unsigned int iov_cnt,
                  FILE *fp, const char *prefix, size_t limit)
 {
     unsigned int i, v, b;

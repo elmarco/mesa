@@ -891,7 +891,7 @@ static void graw_decode_block(uint32_t ctx_id, uint32_t *block, int ndw)
 
 }
 
-void graw_decode_block_iov(struct graw_iovec *iov, unsigned int niovs,
+void graw_decode_block_iov(struct virgl_iovec *iov, unsigned int niovs,
                            uint32_t ctx_id, uint64_t offset, int ndw)
 {
    uint32_t *block = (uint32_t *)(iov[0].iov_base + offset);

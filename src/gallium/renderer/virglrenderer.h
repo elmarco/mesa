@@ -5,23 +5,17 @@
 
 #include <stdint.h>
 
-struct graw_iovec;
+struct virgl_iovec;
 
-#define GREND_EXPORT  __attribute__((visibility("default")))
-GREND_EXPORT void graw_renderer_poll(void); /* force fences */
-
-GREND_EXPORT void graw_process_vcmd(void *cmd, struct graw_iovec *iov, unsigned int num_iovs);
-
-GREND_EXPORT void graw_renderer_set_cursor_info(uint32_t cursor_handle, int x, int y);
-
+#define VIRGL_EXPORT  __attribute__((visibility("default")))
 
 typedef void *virgl_gl_context;
 
-struct graw_renderer_callbacks {
+struct virgl_renderer_callbacks {
    void (*write_fence)(void *cookie, uint32_t fence);
 
-   int (*map_iov)(struct graw_iovec *iov, uint64_t addr);
-   void (*unmap_iov)(struct graw_iovec *iov);
+   int (*map_iov)(struct virgl_iovec *iov, uint64_t addr);
+   void (*unmap_iov)(struct virgl_iovec *iov);
    
    /* interact with GL implementation */
    virgl_gl_context (*create_gl_context)(void *cookie, int scanout_idx);
@@ -37,22 +31,18 @@ struct graw_renderer_callbacks {
                         uint32_t width, uint32_t height);
 };
 
-GREND_EXPORT void graw_lib_renderer_init(void *cookie, struct graw_renderer_callbacks *cb);
-
-
 /* virtio-gpu compatible interface */
+VIRGL_EXPORT void virgl_renderer_init(void *cookie, struct virgl_renderer_callbacks *cb);
+VIRGL_EXPORT void virgl_renderer_poll(void); /* force fences */
 
-GREND_EXPORT void virgl_renderer_init(void *cookie, struct graw_renderer_callbacks *cb);
-GREND_EXPORT void virgl_renderer_poll(void); /* force fences */
+VIRGL_EXPORT int virgl_renderer_process_vcmd(void *cmd, struct virgl_iovec *iov, unsigned int num_iovs);
 
-GREND_EXPORT int virgl_renderer_process_vcmd(void *cmd, struct graw_iovec *iov, unsigned int num_iovs);
-
-GREND_EXPORT void virgl_renderer_set_cursor_info(uint32_t cursor_handle, int x, int y);
+VIRGL_EXPORT void virgl_renderer_set_cursor_info(uint32_t cursor_handle, int x, int y);
 
 /* we need to give qemu the cursor resource contents */
-GREND_EXPORT void *virgl_get_cursor_data(uint32_t resource_id, uint32_t *width, uint32_t *height);
+VIRGL_EXPORT void *virgl_get_cursor_data(uint32_t resource_id, uint32_t *width, uint32_t *height);
 
-GREND_EXPORT void virgl_renderer_get_rect(int idx, struct graw_iovec *iov, unsigned int num_iovs,
+VIRGL_EXPORT void virgl_renderer_get_rect(int idx, struct virgl_iovec *iov, unsigned int num_iovs,
                                           uint32_t offset, int x, int y, int width, int height);
 
 #endif

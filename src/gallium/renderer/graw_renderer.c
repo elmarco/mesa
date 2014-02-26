@@ -2700,7 +2700,7 @@ struct grend_context *grend_create_context(int id, uint32_t nlen, const char *de
    return grctx;
 }
 
-int graw_renderer_resource_attach_iov(int res_handle, struct graw_iovec *iov,
+int graw_renderer_resource_attach_iov(int res_handle, struct virgl_iovec *iov,
                                       int num_iovs)
 {
    struct grend_resource *res;
@@ -2728,7 +2728,7 @@ void graw_renderer_resource_invalid_iov(int res_handle)
    res->iov = 0;
 }
 
-void graw_renderer_resource_create(struct graw_renderer_resource_create_args *args, struct graw_iovec *iov, uint32_t num_iovs)
+void graw_renderer_resource_create(struct graw_renderer_resource_create_args *args, struct virgl_iovec *iov, uint32_t num_iovs)
 {
    struct grend_resource *gr = (struct grend_resource *)CALLOC_STRUCT(grend_texture);
    int level;
@@ -2889,7 +2889,7 @@ static void iov_buffer_upload(void *cookie, uint32_t doff, void *src, int len)
 }
 
 static void copy_transfer_data(struct pipe_resource *res,
-                               struct graw_iovec *iov,
+                               struct virgl_iovec *iov,
                                unsigned int num_iovs,
                                void *data,
                                uint32_t src_stride,
@@ -2923,7 +2923,7 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
                                       uint32_t layer_stride,
                                       struct pipe_box *box,
                                       uint64_t offset,
-                                      struct graw_iovec *iov,
+                                      struct virgl_iovec *iov,
                                       unsigned int num_iovs)
 {
    struct grend_resource *res;
@@ -3136,7 +3136,7 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
 static void vrend_transfer_send_getteximage(struct grend_resource *res,
                                             uint32_t level, uint32_t stride,
                                             struct pipe_box *box, uint64_t offset,
-                                            struct graw_iovec *iov, int num_iovs)
+                                            struct virgl_iovec *iov, int num_iovs)
 {
    GLenum format, type;
    uint32_t send_size, tex_size;
@@ -3212,7 +3212,7 @@ static void vrend_transfer_send_getteximage(struct grend_resource *res,
 static void vrend_transfer_send_readpixels(struct grend_resource *res,
                                            uint32_t level, uint32_t stride,
                                            struct pipe_box *box, uint64_t offset,
-                                           struct graw_iovec *iov, int num_iovs)
+                                           struct virgl_iovec *iov, int num_iovs)
 {
    void *myptr = iov[0].iov_base + offset;
    int need_temp = 0;
@@ -3330,7 +3330,7 @@ void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t ctx_id,
                                      uint32_t level, uint32_t stride,
                                      uint32_t layer_stride,
                                      struct pipe_box *box,
-                                     uint64_t offset, struct graw_iovec *iov,
+                                     uint64_t offset, struct virgl_iovec *iov,
                                      int num_iovs)
 {
    struct grend_resource *res;
@@ -4444,7 +4444,7 @@ void graw_renderer_force_ctx_0(void)
    grend_hw_switch_context(vrend_lookup_renderer_ctx(0), TRUE);
 }
 
-void graw_renderer_get_rect(int idx, struct graw_iovec *iov, unsigned int num_iovs,
+void graw_renderer_get_rect(int idx, struct virgl_iovec *iov, unsigned int num_iovs,
                             uint32_t offset, int x, int y, int width, int height)
 {
    struct grend_resource *res = frontbuffer[idx];

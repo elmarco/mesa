@@ -20,17 +20,17 @@
 #include "graw_renderer.h"
 
 #include "virglrenderer.h"
-static struct graw_renderer_callbacks *rcbs;
+static struct virgl_renderer_callbacks *rcbs;
 
 static void *dev_cookie;
 extern int localrender;
 
 static struct grend_if_cbs virgl_cbs;
 
-static int graw_process_cmd(struct virtgpu_command *cmd, struct graw_iovec *iov,
+static int graw_process_cmd(struct virtgpu_command *cmd, struct virgl_iovec *iov,
                              unsigned int niovs);
 
-int virgl_renderer_process_vcmd(void *cmd, struct graw_iovec *iov, unsigned int niovs)
+int virgl_renderer_process_vcmd(void *cmd, struct virgl_iovec *iov, unsigned int niovs)
 {
    struct virtgpu_command *qcmd = cmd;
    int ret;
@@ -80,12 +80,12 @@ static void virgl_resource_attach_backing(struct virtgpu_resource_attach_backing
                                           unsigned int iov_cnt)
 {
     uint32_t gsize = graw_iov_size(iov, iov_cnt);
-    struct graw_iovec *res_iovs;
+    struct virgl_iovec *res_iovs;
     int i;
     void *data;
     int ret;
 
-    res_iovs = malloc(att_rb->nr_entries * sizeof(struct graw_iovec));
+    res_iovs = malloc(att_rb->nr_entries * sizeof(struct virgl_iovec));
     if (!res_iovs)
 	return;
 
@@ -118,7 +118,7 @@ static void virgl_resource_attach_backing(struct virtgpu_resource_attach_backing
        free(data);
 }
 
-static void virgl_resource_inval_backing_iov(struct graw_iovec *iov, uint32_t iov_cnt)
+static void virgl_resource_inval_backing_iov(struct virgl_iovec *iov, uint32_t iov_cnt)
 {
    int i;
    for (i = 0; i < iov_cnt; i++) {
@@ -132,7 +132,7 @@ static void virgl_resource_inval_backing(int resource_id)
    graw_renderer_resource_invalid_iov(resource_id);
 }
 
-static int graw_process_cmd(struct virtgpu_command *cmd, struct graw_iovec *iov,
+static int graw_process_cmd(struct virtgpu_command *cmd, struct virgl_iovec *iov,
                             unsigned int niovs)
 {
    static int inited;
@@ -279,7 +279,7 @@ static int graw_process_cmd(struct virtgpu_command *cmd, struct graw_iovec *iov,
 }
 
 void graw_transfer_write_return(void *data, uint32_t bytes, uint64_t offset,
-                                struct graw_iovec *iov, int num_iovs)
+                                struct virgl_iovec *iov, int num_iovs)
 {
    graw_iov_from_buf(iov, num_iovs, offset, data, bytes);
 }
@@ -289,7 +289,7 @@ void graw_transfer_write_tex_return(struct pipe_resource *res,
                                     uint32_t level,
                                     uint32_t dst_stride,
                                     uint64_t offset,
-                                    struct graw_iovec *iov,
+                                    struct virgl_iovec *iov,
                                     int num_iovs,
 				    void *myptr, int size, int invert)
 {
@@ -378,14 +378,14 @@ void virgl_renderer_poll(void)
    graw_renderer_check_fences();
 }
 
-void virgl_renderer_get_rect(int idx, struct graw_iovec *iov, unsigned int num_iovs,
+void virgl_renderer_get_rect(int idx, struct virgl_iovec *iov, unsigned int num_iovs,
                              uint32_t offset, int x, int y, int width, int height)
 {
    graw_renderer_get_rect(idx, iov, num_iovs, offset, x, y, width, height);
    
 }
 
-void virgl_renderer_init(void *cookie, struct graw_renderer_callbacks *cbs)
+void virgl_renderer_init(void *cookie, struct virgl_renderer_callbacks *cbs)
 {
    dev_cookie = cookie;
    rcbs = cbs;

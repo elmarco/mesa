@@ -778,8 +778,8 @@ void grend_create_sampler_view(struct grend_context *ctx,
    view->swizzle_g = (swizzle_packed >> 3) & 0x7;
    view->swizzle_b = (swizzle_packed >> 6) & 0x7;
    view->swizzle_a = (swizzle_packed >> 9) & 0x7;
-   view->cur_base = 0;
-   view->cur_max = 1000;
+   view->cur_base = -1;
+   view->cur_max = 10000;
 
    grend_resource_reference(&view->texture, res);
 
@@ -1246,12 +1246,12 @@ void grend_set_single_sampler_view(struct grend_context *ctx,
          }
 
          if (view->cur_base != (view->val1 & 0xff)) {
-            glTexParameteri(view->texture->target, GL_TEXTURE_BASE_LEVEL, (view->val1) & 0xff);
             view->cur_base = view->val1 & 0xff;
+            glTexParameteri(view->texture->target, GL_TEXTURE_BASE_LEVEL, view->cur_base);
          }
          if (view->cur_max != ((view->val1 >> 8) & 0xff)) {
-            glTexParameteri(view->texture->target, GL_TEXTURE_MAX_LEVEL, (view->val1 >> 8) & 0xff);
             view->cur_max = (view->val1 >> 8) & 0xff;
+            glTexParameteri(view->texture->target, GL_TEXTURE_MAX_LEVEL, view->cur_max);
          }
          if (tex->cur_swizzle_r != view->gl_swizzle_r) {
             glTexParameteri(view->texture->target, GL_TEXTURE_SWIZZLE_R, view->gl_swizzle_r);

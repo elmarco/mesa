@@ -4339,9 +4339,10 @@ void graw_renderer_fill_caps(uint32_t set, uint32_t version,
          caps->v1.bset.fragment_coord_conventions = 1;
    }
 
-   if (glewIsSupported("GL_ARB_texture_multisample"))
+   if (glewIsSupported("GL_ARB_texture_multisample")) {
        /* disable multisample until developed */
-      caps->v1.bset.texture_multisample = 0;
+      caps->v1.bset.texture_multisample = 1;
+   }
    if (glewIsSupported("GL_VERSION_4_0")) {
       caps->v1.bset.indep_blend_func = 1;
       caps->v1.bset.cube_map_array = 1;
@@ -4361,10 +4362,10 @@ void graw_renderer_fill_caps(uint32_t set, uint32_t version,
    if (glewIsSupported("GL_ARB_shader_stencil_export"))
       caps->v1.bset.shader_stencil_export = 1;
 
-   caps->v1.glsl_level = 120;
+   caps->v1.glsl_level = 130;
    if (glewIsSupported("GL_EXT_texture_array"))
       caps->v1.max_texture_array_layers = 256;
-   caps->v1.max_streamout_buffers = 0;
+   caps->v1.max_streamout_buffers = 4;
    if (glewIsSupported("GL_ARB_blend_func_extended")) {
       glGetIntegerv(GL_MAX_DUAL_SOURCE_DRAW_BUFFERS, &max);
       caps->v1.max_dual_source_render_targets = max;

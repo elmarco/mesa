@@ -1139,10 +1139,12 @@ iter_instruction(struct tgsi_iterate_context *iter,
       ctx->samplers[sreg_index].tgsi_sampler_type = inst->Texture.Texture;
       if (inst->Texture.Texture == TGSI_TEXTURE_CUBE_ARRAY || inst->Texture.Texture == TGSI_TEXTURE_SHADOWCUBE_ARRAY)
          ctx->uses_cube_array = TRUE;
-      if (inst->Texture.Texture == TGSI_TEXTURE_2D_MSAA || inst->Texture.Texture == TGSI_TEXTURE_2D_ARRAY_MSAA)
+      if (inst->Texture.Texture == TGSI_TEXTURE_2D_MSAA || inst->Texture.Texture == TGSI_TEXTURE_2D_ARRAY_MSAA) {
          ctx->uses_sampler_ms = TRUE;
+      } else
+         snprintf(bias, 64, ", int(%s.w)", srcs[0]);
       sampler_index = 1;
-      snprintf(buf, 255, "%s = %s(%s(textureSize(%s, int(%s))));\n", dsts[0], dstconv, dtypeprefix, srcs[sampler_index], srcs[0]);
+      snprintf(buf, 255, "%s = %s(%s(textureSize(%s%s)));\n", dsts[0], dstconv, dtypeprefix, srcs[sampler_index], bias);
       emit_buf(ctx, buf);
       break;
    } 

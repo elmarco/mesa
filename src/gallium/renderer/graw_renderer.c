@@ -1777,8 +1777,12 @@ void grend_draw_vbo(struct grend_context *ctx,
          disable_bitmask |= (1 << loc);
       } else {
          enable_bitmask |= (1 << loc);
-         glVertexAttribPointer(loc, ve->nr_chan, ve->type, ve->norm, ctx->vbo[vbo_index].stride, (void *)(unsigned long)(ctx->ve->elements[i].base.src_offset + ctx->vbo[vbo_index].buffer_offset));
-         glVertexAttribDivisorARB(loc, ctx->ve->elements[i].base.instance_divisor);
+         if (util_format_is_pure_integer(ve->base.src_format)) {
+            glVertexAttribIPointer(loc, ve->nr_chan, ve->type, ctx->vbo[vbo_index].stride, (void *)(unsigned long)(ve->base.src_offset + ctx->vbo[vbo_index].buffer_offset));
+         } else {
+            glVertexAttribPointer(loc, ve->nr_chan, ve->type, ve->norm, ctx->vbo[vbo_index].stride, (void *)(unsigned long)(ve->base.src_offset + ctx->vbo[vbo_index].buffer_offset));
+         }
+         glVertexAttribDivisorARB(loc, ve->base.instance_divisor);
       }
    }
 

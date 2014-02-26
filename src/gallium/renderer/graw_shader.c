@@ -519,21 +519,19 @@ iter_instruction(struct tgsi_iterate_context *iter,
 	 break;
       }
    }
-   if (inst->Instruction.Opcode == TGSI_OPCODE_TXF) {
 
-   } else
-      switch (stype) {
-      case TGSI_TYPE_UNSIGNED:
-         stypeprefix = "floatBitsToUint";
-         stprefix = true;
-         break;
-      case TGSI_TYPE_SIGNED:
-         stypeprefix = "floatBitsToInt";
-         stprefix = true;
-         break;
-      default:
-         break;
-      }
+   switch (stype) {
+   case TGSI_TYPE_UNSIGNED:
+      stypeprefix = "floatBitsToUint";
+      stprefix = true;
+      break;
+   case TGSI_TYPE_SIGNED:
+      stypeprefix = "floatBitsToInt";
+      stprefix = true;
+      break;
+   default:
+      break;
+   }
 
    if (instno == 0)
       strcat(ctx->glsl_main, "void main(void)\n{\n");
@@ -922,6 +920,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
       emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_TEX:
+   case TGSI_OPCODE_TEX2:
    case TGSI_OPCODE_TXB:
    case TGSI_OPCODE_TXL:
    case TGSI_OPCODE_TXB2:
@@ -1003,14 +1002,15 @@ iter_instruction(struct tgsi_iterate_context *iter,
 
       sampler_index = 1;
 
-      if (inst->Instruction.Opcode == TGSI_OPCODE_TXB2 || inst->Instruction.Opcode == TGSI_OPCODE_TXL2) {
+      if (inst->Instruction.Opcode == TGSI_OPCODE_TXB2 || inst->Instruction.Opcode == TGSI_OPCODE_TXL2 || inst->Instruction.Opcode == TGSI_OPCODE_TEX2) {
          sampler_index = 2;
-         snprintf(bias, 64, ", %s.x", srcs[1]);
+         if (inst->Instruction.Opcode != TGSI_OPCODE_TEX2)
+            snprintf(bias, 64, ", %s.x", srcs[1]);
       } else if (inst->Instruction.Opcode == TGSI_OPCODE_TXB || inst->Instruction.Opcode == TGSI_OPCODE_TXL)
          snprintf(bias, 64, ", %s.w", srcs[0]);
-      else if (inst->Instruction.Opcode == TGSI_OPCODE_TXF)
+      else if (inst->Instruction.Opcode == TGSI_OPCODE_TXF) {
          snprintf(bias, 64, ", int(%s.w)", srcs[0]);
-      else if (inst->Instruction.Opcode == TGSI_OPCODE_TXD) {
+      } else if (inst->Instruction.Opcode == TGSI_OPCODE_TXD) {
          snprintf(bias, 64, ", %s%s, %s%s", srcs[1], gwm, srcs[2], gwm);
          sampler_index = 3;
       }
@@ -1065,8 +1065,6 @@ iter_instruction(struct tgsi_iterate_context *iter,
       }
       if (inst->Instruction.Opcode == TGSI_OPCODE_TXF) {
          snprintf(buf, 255, "%s = %s(texelFetch%s(%s, %s(%s%s)%s%s)%s);\n", dsts[0], dstconv, tex_ext, srcs[sampler_index], txfi, srcs[0], twm, bias, offbuf, ctx->outputs[0].override_no_wm ? "" : writemask);
-         //   } else
-         //  snprintf(buf, 255, "%s = %s(texelFetch(%s, %s(%s%s)%s)%s);\n", dsts[0], dstconv, srcs[sampler_index], txfi, srcs[0], twm, bias, ctx->outputs[0].override_no_wm ? "" : writemask);
       } 
       /* rect is special in GLSL 1.30 */
       else if (inst->Texture.Texture == TGSI_TEXTURE_RECT)

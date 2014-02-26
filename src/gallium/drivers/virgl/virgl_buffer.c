@@ -31,6 +31,8 @@ static void *virgl_buffer_transfer_map(struct pipe_context *ctx,
 
    if ((!(usage & PIPE_TRANSFER_UNSYNCHRONIZED)) && vs->vws->res_is_referenced(vs->vws, grctx->cbuf, vbuf->base.hw_res))
       ctx->flush(ctx, NULL, 0);
+   else if ((usage & PIPE_TRANSFER_READ) && (vbuf->on_list == TRUE))
+      ctx->flush(ctx, NULL, 0);
 
    trans = util_slab_alloc(&grctx->texture_transfer_pool);
    if (trans == NULL)

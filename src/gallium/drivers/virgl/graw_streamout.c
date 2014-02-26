@@ -2,7 +2,7 @@
 #include "util/u_inlines.h"
 #include "graw_context.h"
 #include "graw_encode.h"
-
+#include "virgl_resource.h"
 
 static struct pipe_stream_output_target *graw_create_so_target(
    struct pipe_context *ctx,
@@ -25,6 +25,7 @@ static struct pipe_stream_output_target *graw_create_so_target(
    t->base.buffer_offset = buffer_offset;
    t->base.buffer_size = buffer_size;
    t->handle = handle;
+   res->clean = FALSE;
    graw_encoder_create_so_target(grctx, handle, res, buffer_offset, buffer_size);
    return &t->base;
 }

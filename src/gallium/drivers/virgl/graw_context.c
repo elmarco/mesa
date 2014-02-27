@@ -519,6 +519,7 @@ static struct pipe_sampler_view *graw_create_sampler_view(struct pipe_context *c
 
 static void graw_set_sampler_views(struct pipe_context *ctx,
                                    unsigned shader_type,
+                                   unsigned start_slot,
                                    unsigned num_views,
                                    struct pipe_sampler_view **views)
 {
@@ -558,20 +559,6 @@ static void graw_set_sampler_views(struct pipe_context *ctx,
    graw_encode_set_sampler_views(grctx, shader_type, num_views, tinfo->views);
 }
 
-static void graw_set_vertex_sampler_views(struct pipe_context *ctx,	
-					unsigned num_views,
-					struct pipe_sampler_view **views)
-{
-   graw_set_sampler_views(ctx, PIPE_SHADER_VERTEX, num_views, views);
-}
-
-static void graw_set_fragment_sampler_views(struct pipe_context *ctx,	
-                                            unsigned num_views,
-                                            struct pipe_sampler_view **views)
-{
-   graw_set_sampler_views(ctx, PIPE_SHADER_FRAGMENT, num_views, views);
-}
-
 static void graw_destroy_sampler_view(struct pipe_context *ctx,
                                  struct pipe_sampler_view *view)
 {
@@ -604,9 +591,10 @@ static void graw_delete_sampler_state(struct pipe_context *ctx,
    graw_encode_delete_object(grctx, handle, VIRGL_OBJECT_SAMPLER_STATE);
 }
 
-static void graw_bind_fragment_sampler_states(struct pipe_context *ctx,
-						unsigned num_samplers,
-						void **samplers)
+static void graw_bind_sampler_states(struct pipe_context *ctx,
+                                     unsigned shader, unsigned start_slot,
+                                     unsigned num_samplers,
+                                     void **samplers)
 {
    struct graw_context *grctx = (struct graw_context *)ctx;
    uint32_t handles[32];
@@ -614,20 +602,7 @@ static void graw_bind_fragment_sampler_states(struct pipe_context *ctx,
    for (i = 0; i < num_samplers; i++) {
       handles[i] = (unsigned long)(samplers[i]);
    }
-   graw_encode_bind_sampler_states(grctx, PIPE_SHADER_FRAGMENT, num_samplers, handles);
-}
-
-static void graw_bind_vertex_sampler_states(struct pipe_context *ctx,
-						unsigned num_samplers,
-						void **samplers)
-{
-   struct graw_context *grctx = (struct graw_context *)ctx;
-   uint32_t handles[32];
-   int i;
-   for (i = 0; i < num_samplers; i++) {
-      handles[i] = (unsigned long)(samplers[i]);
-   }
-   graw_encode_bind_sampler_states(grctx, PIPE_SHADER_VERTEX, num_samplers, handles);
+   graw_encode_bind_sampler_states(grctx, shader, num_samplers, handles);
 }
 
 static void graw_set_polygon_stipple(struct pipe_context *ctx,
@@ -678,6 +653,13 @@ static void graw_resource_copy_region(struct pipe_context *ctx,
                                     sres, src_level,
                                     src_box);
 }
+
+static void
+graw_flush_resource(struct pipe_context *pipe,
+                    struct pipe_resource *resource)
+{
+}
+
 
 static void graw_blit(struct pipe_context *ctx,
                       const struct pipe_blit_info *blit)
@@ -757,13 +739,11 @@ struct pipe_context *graw_context_create(struct pipe_screen *pscreen,
    grctx->base.screen = pscreen;
    grctx->base.create_sampler_view = graw_create_sampler_view;
    grctx->base.sampler_view_destroy = graw_destroy_sampler_view;
-   grctx->base.set_fragment_sampler_views = graw_set_fragment_sampler_views;
-   grctx->base.set_vertex_sampler_views = graw_set_vertex_sampler_views;
+   grctx->base.set_sampler_views = graw_set_sampler_views;
 
    grctx->base.create_sampler_state = graw_create_sampler_state;
    grctx->base.delete_sampler_state = graw_delete_sampler_state;
-   grctx->base.bind_fragment_sampler_states = graw_bind_fragment_sampler_states;
-   grctx->base.bind_vertex_sampler_states = graw_bind_vertex_sampler_states;
+   grctx->base.bind_sampler_states = graw_bind_sampler_states;
 
    grctx->base.set_polygon_stipple = graw_set_polygon_stipple;
    grctx->base.set_scissor_states = graw_set_scissor_states;
@@ -774,6 +754,7 @@ struct pipe_context *graw_context_create(struct pipe_screen *pscreen,
    grctx->base.set_blend_color = graw_set_blend_color;
 
    grctx->base.resource_copy_region = graw_resource_copy_region;
+   grctx->base.flush_resource = graw_flush_resource;
    grctx->base.blit =  graw_blit;
 
    virgl_init_context_resource_functions(&grctx->base);

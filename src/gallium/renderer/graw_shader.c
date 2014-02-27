@@ -1177,6 +1177,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
       emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_USEQ:
+   case TGSI_OPCODE_FSEQ:
       emit_ucompare("equal");
       emit_buf(ctx, buf);
       break;
@@ -1186,6 +1187,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
       break;
    case TGSI_OPCODE_ISLT:
    case TGSI_OPCODE_USLT:
+   case TGSI_OPCODE_FSLT:
       emit_ucompare("lessThan");
       emit_buf(ctx, buf);
       break;
@@ -1194,6 +1196,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
       emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_USNE:
+   case TGSI_OPCODE_FSNE:
       emit_ucompare("notEqual");
       emit_buf(ctx, buf);
       break;
@@ -1203,6 +1206,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
       break;
    case TGSI_OPCODE_ISGE:
    case TGSI_OPCODE_USGE:
+   case TGSI_OPCODE_FSGE:
       emit_ucompare("greaterThanEqual");
       emit_buf(ctx, buf);
       break;

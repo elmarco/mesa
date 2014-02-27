@@ -39,8 +39,6 @@ virgl_get_param(struct pipe_screen *screen, enum pipe_cap param)
 {
    struct virgl_screen *vscreen = virgl_screen(screen);
    switch (param) {
-   case PIPE_CAP_MAX_COMBINED_SAMPLERS:
-      return 2 * PIPE_MAX_SAMPLERS;  /* VS + FS */
    case PIPE_CAP_NPOT_TEXTURES:
       return 1;
    case PIPE_CAP_TWO_SIDED_STENCIL:
@@ -97,8 +95,6 @@ virgl_get_param(struct pipe_screen *screen, enum pipe_cap param)
    case PIPE_CAP_SEAMLESS_CUBE_MAP:
    case PIPE_CAP_SEAMLESS_CUBE_MAP_PER_TEXTURE:
       return vscreen->caps.caps.v1.bset.seamless_cube_map;
-   case PIPE_CAP_SCALED_RESOLVE:
-      return 0;
    case PIPE_CAP_MAX_TEXTURE_ARRAY_LAYERS:
       return vscreen->caps.caps.v1.max_texture_array_layers;
    case PIPE_CAP_MIN_TEXEL_OFFSET:
@@ -160,6 +156,15 @@ virgl_get_param(struct pipe_screen *screen, enum pipe_cap param)
    case PIPE_CAP_QUERY_PIPELINE_STATISTICS:
    case PIPE_CAP_MAX_TEXTURE_BUFFER_SIZE:
    case PIPE_CAP_ENDIANNESS:
+      return 0;
+   case PIPE_CAP_MIXED_FRAMEBUFFER_SIZES:
+      return 1;
+   case PIPE_CAP_TGSI_VS_LAYER:
+   case PIPE_CAP_MAX_GEOMETRY_OUTPUT_VERTICES:
+   case PIPE_CAP_MAX_GEOMETRY_TOTAL_OUTPUT_COMPONENTS:
+   case PIPE_CAP_MAX_TEXTURE_GATHER_COMPONENTS:
+   case PIPE_CAP_TEXTURE_GATHER_SM5:
+   case PIPE_CAP_BUFFER_MAP_PERSISTENT_COHERENT:\
       return 0;
    }
    /* should only get here on unhandled cases */

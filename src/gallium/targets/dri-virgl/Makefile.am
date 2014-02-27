@@ -38,17 +38,17 @@ AM_CPPFLAGS = \
         -DGALLIUM_SOFTPIPE
 
 dridir = $(DRI_DRIVER_INSTALL_DIR)
-dri_LTLIBRARIES = virgl_dri.la
+dri_LTLIBRARIES = virtio-gpu_dri.la
 
-virgl_dri_la_SOURCES = \
+virtio_gpu_dri_la_SOURCES = \
 	target.c \
 	$(top_srcdir)/src/mesa/drivers/dri/common/utils.c \
 	$(top_srcdir)/src/mesa/drivers/dri/common/dri_util.c \
 	$(top_srcdir)/src/mesa/drivers/dri/common/xmlconfig.c
 
-virgl_dri_la_LDFLAGS = -module -avoid-version -shared -no-undefined
+virtio_gpu_dri_la_LDFLAGS = -module -avoid-version -shared -no-undefined
 
-virgl_dri_la_LIBADD = \
+virtio_gpu_dri_la_LIBADD = \
 	$(top_builddir)/src/mesa/libmesagallium.la \
 	$(top_builddir)/src/gallium/auxiliary/libgallium.la \
 	$(top_builddir)/src/gallium/state_trackers/dri/drm/libdridrm.la \
@@ -60,15 +60,15 @@ virgl_dri_la_LIBADD = \
 	$(GALLIUM_DRI_LIB_DEPS) \
 	$(LIBDRM_LIBS)
 
-nodist_EXTRA_virgl_dri_la_SOURCES = dummy.cpp
+nodist_EXTRA_virtio_gpu_dri_la_SOURCES = dummy.cpp
 
 if HAVE_MESA_LLVM
-virgl_dri_la_LDFLAGS += $(LLVM_LDFLAGS)
-virgl_dri_la_LIBADD += $(LLVM_LIBS)
+virtio_gpu_dri_la_LDFLAGS += $(LLVM_LDFLAGS)
+virtio_gpu_dri_la_LIBADD += $(LLVM_LIBS)
 endif
 
 # Provide compatibility with scripts for the old Mesa build system for
 # a while by putting a link to the driver into /lib of the build tree.
-all-local: virgl_dri.la
+all-local: virtio-gpu_dri.la
 	$(MKDIR_P) $(top_builddir)/$(LIB_DIR)/gallium
-	ln -f .libs/virgl_dri.so $(top_builddir)/$(LIB_DIR)/gallium/virgl_dri.so
+	ln -f .libs/virtio-gpu_dri.so $(top_builddir)/$(LIB_DIR)/gallium/virtio-gpu_dri.so

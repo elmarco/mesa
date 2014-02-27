@@ -11,6 +11,7 @@
 #include <sys/ioctl.h>
 #include <errno.h>
 #include <xf86drm.h>
+#include <stdio.h>
 #include "virtgpu_drm.h"
 
 static INLINE boolean can_cache_resource(struct virgl_hw_res *res)

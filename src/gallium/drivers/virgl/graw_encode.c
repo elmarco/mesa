@@ -246,8 +246,9 @@ int graw_encoder_set_framebuffer_state(struct graw_context *ctx,
    graw_encoder_write_dword(ctx->cbuf, zsurf ? zsurf->handle : 0);
    for (i = 0; i < state->nr_cbufs; i++) {
       struct graw_surface *surf = (struct graw_surface *)state->cbufs[i];
-      graw_encoder_write_dword(ctx->cbuf, surf->handle);
-      graw_encoder_attach_res(ctx, (struct virgl_resource *)surf->base.texture);
+      graw_encoder_write_dword(ctx->cbuf, surf ? surf->handle : 0);
+      if (surf)
+         graw_encoder_attach_res(ctx, (struct virgl_resource *)surf->base.texture);
    }
 
    if (zsurf)

@@ -24,8 +24,6 @@ struct virgl_renderer_callbacks {
    int (*make_current)(void *cookie, int scanout_idx, virgl_gl_context ctx);
 
    /* */
-   void (*notify_state)(void *cookie, int idx, int x, int y, uint32_t width, uint32_t height);
-
    void (*rect_update)(void *cookie, int idx, int x, int y, int width, int height);
    void (*scanout_info)(void *cookie, int idx, uint32_t tex_id, uint32_t flags,
                         int x, int y,

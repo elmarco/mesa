@@ -1282,14 +1282,15 @@ void grend_set_single_sampler_view(struct grend_context *ctx,
 
 void grend_set_num_sampler_views(struct grend_context *ctx,
                                     uint32_t shader_type,
+                                    uint32_t start_slot,
                                     int num_sampler_views)
 {
-   if (num_sampler_views < ctx->views[shader_type].num_views) {
+   if (start_slot + num_sampler_views < ctx->views[shader_type].num_views) {
       int i;
-      for (i = num_sampler_views; i < ctx->views[shader_type].num_views; i++)
+      for (i = start_slot + num_sampler_views; i < ctx->views[shader_type].num_views; i++)
          grend_sampler_view_reference(&ctx->views[shader_type].views[i], NULL);
    }
-   ctx->views[shader_type].num_views = num_sampler_views;
+   ctx->views[shader_type].num_views = start_slot + num_sampler_views;
 }
 
 void grend_transfer_inline_write(struct grend_context *ctx,
@@ -2437,6 +2438,7 @@ static GLuint convert_wrap(int wrap)
 
 void grend_bind_sampler_states(struct grend_context *ctx,
                                uint32_t shader_type,
+                               uint32_t start_slot,
                                uint32_t num_states,
                                uint32_t *handles)
 {
@@ -2451,7 +2453,7 @@ void grend_bind_sampler_states(struct grend_context *ctx,
       else
          state = vrend_object_lookup(ctx->object_hash, handles[i], VIRGL_OBJECT_SAMPLER_STATE);
       
-      ctx->sampler_state[shader_type][i] = state;
+      ctx->sampler_state[shader_type][i + start_slot] = state;
    }
    ctx->sampler_state_dirty = TRUE;
 }
@@ -2638,8 +2640,8 @@ bool grend_destroy_context(struct grend_context *ctx)
    /* reset references on framebuffers */
    grend_set_framebuffer_state(ctx, 0, NULL, 0);
 
-   grend_set_num_sampler_views(ctx, PIPE_SHADER_VERTEX, 0);
-   grend_set_num_sampler_views(ctx, PIPE_SHADER_FRAGMENT, 0);
+   grend_set_num_sampler_views(ctx, PIPE_SHADER_VERTEX, 0, 0);
+   grend_set_num_sampler_views(ctx, PIPE_SHADER_FRAGMENT, 0, 0);
 
    grend_set_streamout_targets(ctx, 0, 0, NULL);
    grend_set_num_vbo(ctx, 0);

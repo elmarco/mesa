@@ -556,7 +556,7 @@ static void graw_set_sampler_views(struct pipe_context *ctx,
 
    tinfo->enabled_mask &= ~disable_mask;
    tinfo->enabled_mask |= new_mask;
-   graw_encode_set_sampler_views(grctx, shader_type, num_views, tinfo->views);
+   graw_encode_set_sampler_views(grctx, shader_type, start_slot, num_views, tinfo->views);
 }
 
 static void graw_destroy_sampler_view(struct pipe_context *ctx,
@@ -602,7 +602,7 @@ static void graw_bind_sampler_states(struct pipe_context *ctx,
    for (i = 0; i < num_samplers; i++) {
       handles[i] = (unsigned long)(samplers[i]);
    }
-   graw_encode_bind_sampler_states(grctx, shader, num_samplers, handles);
+   graw_encode_bind_sampler_states(grctx, shader, start_slot, num_samplers, handles);
 }
 
 static void graw_set_polygon_stipple(struct pipe_context *ctx,

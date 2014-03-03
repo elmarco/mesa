@@ -162,6 +162,7 @@ void grend_set_viewport_state(struct grend_context *ctx,
                               const struct pipe_viewport_state *state);
 void grend_set_num_sampler_views(struct grend_context *ctx,
                                  uint32_t shader_type,
+                                 uint32_t start_slot,
                                  int num_sampler_views);
 void grend_set_single_sampler_view(struct grend_context *ctx,
                                    uint32_t shader_type,
@@ -177,6 +178,7 @@ void grend_object_bind_rasterizer(struct grend_context *ctx,
 
 void grend_bind_sampler_states(struct grend_context *ctx,
                                uint32_t shader_type,
+                               uint32_t start_slot,
                                uint32_t num_states,
                                uint32_t *handles);
 void grend_set_index_buffer(struct grend_context *ctx,

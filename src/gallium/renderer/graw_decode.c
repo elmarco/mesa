@@ -182,14 +182,15 @@ static void graw_decode_set_sampler_views(struct grend_decode_ctx *ctx, uint16_t
 {
    int num_samps;
    int i;
-   uint32_t shader_type;
-   num_samps = length - 1;
+   uint32_t shader_type, start_slot;
+   num_samps = length - 2;
    shader_type = ctx->ds->buf[ctx->ds->buf_offset + 1];
+   start_slot = ctx->ds->buf[ctx->ds->buf_offset + 2];
    for (i = 0; i < num_samps; i++) {
-      uint32_t handle = ctx->ds->buf[ctx->ds->buf_offset + 2 + i];
-      grend_set_single_sampler_view(ctx->grctx, shader_type, i, handle);
+      uint32_t handle = ctx->ds->buf[ctx->ds->buf_offset + 3 + i];
+      grend_set_single_sampler_view(ctx->grctx, shader_type, i + start_slot, handle);
    }
-   grend_set_num_sampler_views(ctx->grctx, shader_type, num_samps);
+   grend_set_num_sampler_views(ctx->grctx, shader_type, start_slot, num_samps);
 }
 
 static void graw_decode_resource_inline_write(struct grend_decode_ctx *ctx, uint16_t length)
@@ -658,10 +659,11 @@ static void graw_decode_blit(struct grend_decode_ctx *ctx)
 static void graw_decode_bind_sampler_states(struct grend_decode_ctx *ctx, int length)
 {
    uint32_t shader_type = ctx->ds->buf[ctx->ds->buf_offset + 1];
+   uint32_t start_slot = ctx->ds->buf[ctx->ds->buf_offset + 2];
    uint32_t num_states = length - 1;
 
-   grend_bind_sampler_states(ctx->grctx, shader_type, num_states,
-                                    &ctx->ds->buf[ctx->ds->buf_offset + 2]);
+   grend_bind_sampler_states(ctx->grctx, shader_type, start_slot, num_states,
+                                    &ctx->ds->buf[ctx->ds->buf_offset + 3]);
 }
 
 static void graw_decode_begin_query(struct grend_decode_ctx *ctx)

@@ -20,11 +20,14 @@
 #include "graw_renderer.h"
 
 #include "virglrenderer.h"
+#include "virgl_egl.h"
+
 static struct virgl_renderer_callbacks *rcbs;
 
 static void *dev_cookie;
 extern int localrender;
-
+extern int use_egl_context;
+struct virgl_egl *egl_info;
 static struct grend_if_cbs virgl_cbs;
 
 static int graw_process_cmd(struct virtgpu_command *cmd, struct virgl_iovec *iov,
@@ -321,16 +324,22 @@ static void virgl_write_fence(uint32_t fence_id)
 
 static virgl_gl_context create_gl_context(int scanout_idx)
 {
-   return rcbs->create_gl_context(dev_cookie, scanout_idx);
+    if (use_egl_context)
+        return virgl_egl_create_context(egl_info);
+    return rcbs->create_gl_context(dev_cookie, scanout_idx);
 }
 
 static void destroy_gl_context(virgl_gl_context ctx)
 {
+    if (use_egl_context)
+        return virgl_egl_destroy_context(egl_info, ctx);
     return rcbs->destroy_gl_context(dev_cookie, ctx);
 }
 
 static int make_current(int scanout_idx, virgl_gl_context ctx)
 {
+    if (use_egl_context)
+        return virgl_egl_make_context_current(egl_info, ctx);
     return rcbs->make_current(dev_cookie, scanout_idx, ctx);
 }
 

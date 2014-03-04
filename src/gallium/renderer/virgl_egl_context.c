@@ -203,7 +203,7 @@ virgl_gl_context virgl_egl_create_context(struct virgl_egl *ve)
     };
     eglctx = eglCreateContext(ve->egl_display,
 			      ve->egl_conf,
-			      EGL_NO_CONTEXT,
+                              ve->egl_ctx,
 			      ctx_att);
     return (virgl_gl_context)eglctx;
 }

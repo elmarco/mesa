@@ -9,6 +9,7 @@ AM_CFLAGS = \
 	-I$(top_srcdir)/include \
 	$(DEFINES) \
 	$(PIC_FLAGS) \
+	$(LIBDRM_CFLAGS) \
 	$(VISIBILITY_CFLAGS)
 
 #graw_renderer_SOURCES = \

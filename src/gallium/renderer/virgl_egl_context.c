@@ -1,18 +1,20 @@
 /* create our own EGL offscreen rendering context via gbm and rendernodes */
 
+
 /* if we are using EGL and rendernodes then we talk via file descriptors to the remote
    node */
-
+#define EGL_EGLEXT_PROTOTYPES
 #include <dirent.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 #include <gbm.h>
-
+#include <xf86drm.h>
 #include "virglrenderer.h"
 #include "virgl_egl.h"
 
@@ -22,6 +24,8 @@ struct virgl_egl {
     EGLDisplay egl_display;
     EGLConfig egl_conf;
     EGLContext egl_ctx;
+    bool have_mesa_drm_image;
+    bool have_mesa_dma_buf_img_export;
 };
 
 static int egl_rendernode_open(void)
@@ -62,6 +66,35 @@ static int egl_rendernode_open(void)
     return fd;
 }
 
+static bool virgl_egl_has_extension_in_string(const char *haystack, const char *needle)
+{
+        const unsigned needle_len = strlen(needle);
+
+        if (needle_len == 0)
+                return false;
+
+        while (true) {
+                const char *const s = strstr(haystack, needle);
+
+                if (s == NULL)
+                        return false;
+
+                if (s[needle_len] == ' ' || s[needle_len] == '\0') {
+                        return true;
+                }
+
+                /* strstr found an extension whose name begins with
+                 * needle, but whose name is not equal to needle.
+                 * Restart the search at s + needle_len so that we
+                 * don't just find the same extension again and go
+                 * into an infinite loop.
+                 */
+                haystack = s + needle_len;
+        }
+
+        return false;
+}
+
 struct virgl_egl *virgl_egl_init(void)
 {
 	static const EGLint conf_att[] = {
@@ -80,6 +113,7 @@ struct virgl_egl *virgl_egl_init(void)
 	EGLBoolean b;
 	EGLenum api;
 	EGLint major, minor, n;
+        const char *extension_list;
         struct virgl_egl *d;
 
         d = malloc(sizeof(struct virgl_egl));
@@ -99,14 +133,29 @@ struct virgl_egl *virgl_egl_init(void)
 	if (!b)
 	    goto fail;
 
+        extension_list = eglQueryString(d->egl_display, EGL_EXTENSIONS);
 	fprintf(stderr, "EGL major/minor: %d.%d\n", major, minor);
 	fprintf(stderr, "EGL version: %s\n",
 		eglQueryString(d->egl_display, EGL_VERSION));
 	fprintf(stderr, "EGL vendor: %s\n",
 		eglQueryString(d->egl_display, EGL_VENDOR));
-	fprintf(stderr, "EGL extensions: %s\n",
-		eglQueryString(d->egl_display, EGL_EXTENSIONS));
-		
+        fprintf(stderr, "EGL extensions: %s\n", extension_list);
+
+        /* require surfaceless context */
+        if (!virgl_egl_has_extension_in_string(extension_list, "EGL_KHR_surfaceless_context"))
+            goto fail;
+
+        if (!virgl_egl_has_extension_in_string(extension_list, "EGL_MESA_drm_image"))
+           d->have_mesa_drm_image = true;
+
+        if (!virgl_egl_has_extension_in_string(extension_list, "EGL_MESA_image_dma_buf_export"))
+           d->have_mesa_dma_buf_img_export = true;
+
+        if (d->have_mesa_drm_image == false && d->have_mesa_dma_buf_img_export == false) {
+           fprintf(stderr, "failed to find drm image extensions\n");
+           goto fail;
+        }
+
 	api = EGL_OPENGL_API;
 	b = eglBindAPI(api);
 	if (!b)
@@ -177,4 +226,48 @@ virgl_gl_context virgl_egl_get_current_context(struct virgl_egl *ve)
 {
    EGLContext eglctx = eglGetCurrentContext();
    return (virgl_gl_context)eglctx;
+}
+
+int virgl_egl_get_fd_for_texture(struct virgl_egl *ve, uint32_t tex_id, int *fd)
+{
+   EGLImageKHR image;
+   EGLint stride;
+   EGLBoolean b;
+
+   image = eglCreateImageKHR(ve->egl_display, ve->egl_ctx, EGL_GL_TEXTURE_2D_KHR, (EGLClientBuffer)(unsigned long)tex_id, NULL);
+
+   if (!image)
+      return -1;
+
+   if (ve->have_mesa_dma_buf_img_export) {
+#ifdef EGL_MESA_image_dma_buf_export
+	b = eglExportDMABUFImageMESA(ve->egl_display,
+				     image,
+				     fd,
+				     &stride);
+#else
+        return -1;
+#endif
+   } else {
+#ifdef EGL_MESA_drm_image
+       EGLint handle;
+       int r;
+       b = eglExportDRMImageMESA(ve->egl_display,
+                                 image,
+                                 NULL, &handle,
+                                 &stride);
+
+       if (!b)
+           return -1;
+
+       fprintf(stderr,"image exported %d %d\n", handle, stride);
+
+       r = drmPrimeHandleToFD(ve->fd, handle, DRM_CLOEXEC, fd);
+       if (r < 0)
+           return -1;
+#else
+       return -1;
+#endif
+   }
+   return 0;
 }

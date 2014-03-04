@@ -26,7 +26,7 @@ static struct virgl_renderer_callbacks *rcbs;
 
 static void *dev_cookie;
 extern int localrender;
-extern int use_egl_context;
+static int use_egl_context;
 struct virgl_egl *egl_info;
 static struct grend_if_cbs virgl_cbs;
 
@@ -392,14 +392,29 @@ void virgl_renderer_get_rect(int idx, struct virgl_iovec *iov, unsigned int num_
    
 }
 
-int virgl_renderer_init(void *cookie, struct virgl_renderer_callbacks *cbs)
+int virgl_renderer_init(void *cookie, int flags, struct virgl_renderer_callbacks *cbs)
 {
    dev_cookie = cookie;
    rcbs = cbs;
    localrender = 1;
+
+   if (flags & VIRGL_RENDERER_USE_EGL) {
+       egl_info = virgl_egl_init();
+       if (!egl_info)
+           return -1;
+       use_egl_context = 1;
+   }
+
    glewInit();
+
    if (cbs->version != 1)
       return -1;
    graw_renderer_init(&virgl_cbs);
    return 0;
+}
+
+int virgl_renderer_get_fd_for_texture(uint32_t tex_id, int *fd)
+{
+    return virgl_egl_get_fd_for_texture(egl_info, tex_id, fd);
+
 }

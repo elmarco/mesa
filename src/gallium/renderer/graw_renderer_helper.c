@@ -1,7 +1,6 @@
 /* helper library for qemu local renderers like SDL / GTK
    flushes the given texture to the frontbuffer */
-#include <GL/glew.h>
-#include <GL/gl.h>
+#include <epoxy/gl.h>
 #include "virgl_helper.h"
 
 #define MAX_HELPER_SCANOUT 4

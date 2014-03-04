@@ -1,8 +1,7 @@
 #include <stdio.h>
 #include <time.h>
 
-#include <GL/glew.h>
-#include <GL/gl.h>
+#include <epoxy/gl.h>
 
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -404,8 +403,6 @@ int virgl_renderer_init(void *cookie, int flags, struct virgl_renderer_callbacks
            return -1;
        use_egl_context = 1;
    }
-
-   glewInit();
 
    if (cbs->version != 1)
       return -1;

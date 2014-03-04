@@ -11,8 +11,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdbool.h>
-#include <EGL/egl.h>
-#include <EGL/eglext.h>
+#include <epoxy/egl.h>
 #include <gbm.h>
 #include <xf86drm.h>
 #include "virglrenderer.h"
@@ -145,10 +144,12 @@ struct virgl_egl *virgl_egl_init(void)
         if (!virgl_egl_has_extension_in_string(extension_list, "EGL_KHR_surfaceless_context"))
             goto fail;
 
-        if (!virgl_egl_has_extension_in_string(extension_list, "EGL_MESA_drm_image"))
+d->have_mesa_drm_image = false;
+d->have_mesa_dma_buf_img_export = false;
+        if (virgl_egl_has_extension_in_string(extension_list, "EGL_MESA_drm_image"))
            d->have_mesa_drm_image = true;
 
-        if (!virgl_egl_has_extension_in_string(extension_list, "EGL_MESA_image_dma_buf_export"))
+        if (virgl_egl_has_extension_in_string(extension_list, "EGL_MESA_image_dma_buf_export"))
            d->have_mesa_dma_buf_img_export = true;
 
         if (d->have_mesa_drm_image == false && d->have_mesa_dma_buf_img_export == false) {

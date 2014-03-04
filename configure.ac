@@ -826,6 +826,9 @@ esac
 PKG_CHECK_MODULES([LIBUDEV], [libudev >= $LIBUDEV_REQUIRED],
                   have_libudev=yes, have_libudev=no)
 
+PKG_CHECK_MODULES([EPOXY], [epoxy],
+                  [have_epoxy=yes], [have_epoxy=no])
+
 if test "x$enable_dri" = xyes; then
     if test "$enable_static" = yes; then
         AC_MSG_ERROR([Cannot use static libraries for DRI drivers])

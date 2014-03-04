@@ -1,5 +1,4 @@
-#include <GL/glew.h>
-#include <GL/gl.h>
+#include <epoxy/gl.h>
 
 #include "graw_renderer.h"
 #include "util/u_memory.h"

@@ -46,5 +46,5 @@ VIRGL_EXPORT void *virgl_get_cursor_data(uint32_t resource_id, uint32_t *width, 
 VIRGL_EXPORT void virgl_renderer_get_rect(int idx, struct virgl_iovec *iov, unsigned int num_iovs,
                                           uint32_t offset, int x, int y, int width, int height);
 
-int virgl_renderer_get_fd_for_texture(uint32_t tex_id, int *fd);
+VIRGL_EXPORT int virgl_renderer_get_fd_for_texture(uint32_t tex_id, int *fd);
 #endif

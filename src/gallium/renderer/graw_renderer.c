@@ -1,5 +1,4 @@
-#include <GL/glew.h>
-#include <GL/gl.h>
+#include <epoxy/gl.h>
 
 #include <stdio.h>
 #include "pipe/p_shader_tokens.h"
@@ -2581,15 +2580,16 @@ void graw_renderer_init(struct grend_if_cbs *cbs)
       vrend_object_init_resource_table();
       clicbs = cbs;
    }
-
+   int gl_ver = epoxy_gl_version();
+#define glewIsSupported epoxy_has_gl_extension
    if (glewIsSupported("GL_ARB_robustness"))
       grend_state.have_robustness = TRUE;
    else
       fprintf(stderr,"WARNING: running without ARB robustness in place may crash\n");
 
-   if (glewIsSupported("GL_VERSION_3_3") || glewIsSupported("GL_ARB_shader_bit_encoding"))
+   if (gl_ver >= 33 || glewIsSupported("GL_ARB_shader_bit_encoding"))
       grend_state.have_bit_encoding = TRUE;
-   if (glewIsSupported("GL_VERSION_3_1"))
+   if (gl_ver >= 31)
       grend_state.have_gl_prim_restart = TRUE;
    else if (glewIsSupported("GL_NV_primitive_restart"))
       grend_state.have_nv_prim_restart = TRUE;
@@ -4304,6 +4304,7 @@ void graw_renderer_fill_caps(uint32_t set, uint32_t version,
    int i;
    GLint max;
    int glsl_major, glsl_minor;
+   int gl_ver = epoxy_gl_version();
    memset(caps, 0, sizeof(*caps));
 
    if (set != 0) {
@@ -4314,7 +4315,7 @@ void graw_renderer_fill_caps(uint32_t set, uint32_t version,
    caps->max_version = 1;
 
    caps->v1.bset.occlusion_query = 1;
-   if (glewIsSupported("GL_VERSION_3_0")) {
+   if (gl_ver >= 30) {
       caps->v1.bset.indep_blend_enable = 1;
       caps->v1.bset.conditional_render = 1;
    } else {
@@ -4324,7 +4325,7 @@ void graw_renderer_fill_caps(uint32_t set, uint32_t version,
          caps->v1.bset.conditional_render = 1;
    }
 
-   if (glewIsSupported("GL_VERSION_3_1")) {
+   if (gl_ver >= 31) {
       caps->v1.bset.instanceid = 1;
    } else {
       if (glewIsSupported("GL_ARB_draw_instanced"))
@@ -4334,7 +4335,7 @@ void graw_renderer_fill_caps(uint32_t set, uint32_t version,
    if (grend_state.have_nv_prim_restart || grend_state.have_gl_prim_restart)
       caps->v1.bset.primitive_restart = 1;
 
-   if (glewIsSupported("GL_VERSION_3_2")) {
+   if (gl_ver >= 32) {
       caps->v1.bset.fragment_coord_conventions = 1;
    } else {
       if (glewIsSupported("GL_ARB_fragment_coord_conventions"))
@@ -4345,7 +4346,7 @@ void graw_renderer_fill_caps(uint32_t set, uint32_t version,
        /* disable multisample until developed */
       caps->v1.bset.texture_multisample = 1;
    }
-   if (glewIsSupported("GL_VERSION_4_0")) {
+   if (gl_ver >= 40) {
       caps->v1.bset.indep_blend_func = 1;
       caps->v1.bset.cube_map_array = 1;
    } else {
@@ -4355,7 +4356,7 @@ void graw_renderer_fill_caps(uint32_t set, uint32_t version,
          caps->v1.bset.cube_map_array = 1;
    }
 
-   if (glewIsSupported("GL_VERSION_4_2")) {
+   if (gl_ver >= 42) {
       caps->v1.bset.start_instance = 1;
    } else {
       if (glewIsSupported("GL_ARB_base_instance"))      

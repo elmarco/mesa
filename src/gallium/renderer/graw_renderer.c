@@ -3770,7 +3770,13 @@ int graw_renderer_set_scanout(uint32_t res_handle, uint32_t scanout_id, uint32_t
    grend_resource_reference(&frontbuffer[scanout_id], res);
    front_box[scanout_id] = *box;
 
-   (*clicbs->scanout_info)(scanout_id, res->id, res->y_0_top ? 1 : 0, box->x, box->y, box->width, box->height);
+   {
+      int elsize = util_format_get_blocksize(res->base.format);
+      uint32_t stride;
+      stride = util_format_get_nblocksx(res->base.format, u_minify(res->base.width0, 0)) * elsize;
+      (*clicbs->scanout_resource_info)(scanout_id, res->id, res->y_0_top ? 1 : 0, stride, res->base.width0, res->base.height0, res->base.format);
+   }
+   (*clicbs->scanout_rect_info)(scanout_id, res->id, box->x, box->y, box->width, box->height);
    fprintf(stderr,"setting frontbuffer %d to %d\n", scanout_id, res_handle);
    return 0;
 }

@@ -25,7 +25,9 @@ struct virgl_renderer_callbacks {
 
    /* */
    void (*rect_update)(void *cookie, int idx, int x, int y, int width, int height);
-   void (*scanout_info)(void *cookie, int idx, uint32_t tex_id, uint32_t flags,
+   void (*scanout_resource_info)(void *cookie, int idx, uint32_t tex_id, uint32_t flags,
+                                 uint32_t stride, uint32_t width, uint32_t height, uint32_t format);
+   void (*scanout_rect_info)(void *cookie, int idx, uint32_t tex_id,
                         int x, int y,
                         uint32_t width, uint32_t height);
 };

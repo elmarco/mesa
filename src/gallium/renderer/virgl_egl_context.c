@@ -17,6 +17,7 @@
 #include "virglrenderer.h"
 #include "virgl_egl.h"
 
+#include "virgl_hw.h"
 struct virgl_egl {
     int fd;
     struct gbm_device *gbm_dev;
@@ -271,4 +272,17 @@ int virgl_egl_get_fd_for_texture(struct virgl_egl *ve, uint32_t tex_id, int *fd)
 #endif
    }
    return 0;
+}
+
+uint32_t virgl_egl_get_gbm_format(uint32_t format)
+{
+   switch (format) {
+   case VIRGL_FORMAT_B8G8R8X8_UNORM:
+      return GBM_FORMAT_XRGB8888;
+   case VIRGL_FORMAT_B8G8R8A8_UNORM:
+      return GBM_FORMAT_ARGB8888;
+   default:
+      fprintf(stderr, "unknown format to convert to GBM %d\n", format);
+      return 0;
+   }
 }

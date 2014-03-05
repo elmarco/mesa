@@ -46,8 +46,11 @@ struct grend_format_table {
 struct grend_if_cbs {
    void (*write_fence)(unsigned fence_id);
    /* inform the control layer about a new scanout */
-   void (*scanout_info)(int scanout_id, GLuint tex_id, uint32_t flags, int x, int y,
-                        uint32_t width, uint32_t height);
+   void (*scanout_rect_info)(int scanout_id, GLuint tex_id, int x, int y,
+                             uint32_t width, uint32_t height);
+   void (*scanout_resource_info)(int scanout_id, GLuint tex_id, uint32_t flags,
+                                 uint32_t stride,
+                                 uint32_t width, uint32_t height, uint32_t format);
 
    virgl_gl_context (*create_gl_context)(int scanout);
    void (*destroy_gl_context)(virgl_gl_context ctx);

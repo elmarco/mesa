@@ -363,7 +363,7 @@ struct virgl_caps_v1 {
         uint32_t max_streamout_buffers;
         uint32_t max_dual_source_render_targets;
         uint32_t max_render_targets;
-
+        uint32_t max_samples;
 };
 
 union virgl_caps {

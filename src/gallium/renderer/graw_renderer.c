@@ -4378,6 +4378,9 @@ void graw_renderer_fill_caps(uint32_t set, uint32_t version,
    glGetIntegerv(GL_MAX_DRAW_BUFFERS, &max);
    caps->v1.max_render_targets = max;
 
+   glGetIntegerv(GL_MAX_SAMPLES, &max);
+   caps->v1.max_samples = max;
+
    for (i = 0; i < VIRGL_FORMAT_MAX; i++) {
       uint32_t offset = i / 32;
       uint32_t index = i % 32;

@@ -307,8 +307,13 @@ virgl_is_format_supported( struct pipe_screen *screen,
 
    if (util_format_is_intensity(format))
       return FALSE;
-   if (sample_count > 1 && !vscreen->caps.caps.v1.bset.texture_multisample)
-      return FALSE;
+
+   if (sample_count > 1) {
+      if (!vscreen->caps.caps.v1.bset.texture_multisample)
+         return FALSE;
+      if (sample_count > vscreen->caps.caps.v1.max_samples)
+         return FALSE;
+   }
 
    if (bind & PIPE_BIND_VERTEX_BUFFER) {
       return virgl_is_vertex_format_supported(screen, format);

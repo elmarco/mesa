@@ -29,6 +29,8 @@ struct grend_resource {
    struct virgl_iovec *iov;
    uint32_t num_iovs;
    boolean y_0_top;
+
+   boolean scannedout;
 };
 
 /* assume every format is sampler friendly */

@@ -2841,6 +2841,9 @@ void graw_renderer_resource_create(struct graw_renderer_resource_create_args *ar
 
 void graw_renderer_resource_destroy(struct grend_resource *res)
 {
+   if (res->scannedout)
+      (*clicbs->scanout_resource_info)(0, res->id, 0, 0, 0, 0, 0);
+
    if (res->readback_fb_id)
       glDeleteFramebuffers(1, &res->readback_fb_id);
 
@@ -3775,6 +3778,7 @@ int graw_renderer_set_scanout(uint32_t res_handle, uint32_t scanout_id, uint32_t
       uint32_t stride;
       stride = util_format_get_nblocksx(res->base.format, u_minify(res->base.width0, 0)) * elsize;
       (*clicbs->scanout_resource_info)(scanout_id, res->id, res->y_0_top ? 1 : 0, stride, res->base.width0, res->base.height0, res->base.format);
+      res->scannedout = 1;
    }
    (*clicbs->scanout_rect_info)(scanout_id, res->id, box->x, box->y, box->width, box->height);
    fprintf(stderr,"setting frontbuffer %d to %d\n", scanout_id, res_handle);

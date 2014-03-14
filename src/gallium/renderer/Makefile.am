@@ -1,5 +1,5 @@
 
-AM_LDFLAGS = ../auxiliary/libgallium.la $(EPOXY_LIBS) $(GL_LIBS) -lm -ldl
+AM_LDFLAGS = ../auxiliary/libgallium.la $(EPOXY_LIBS) $(GL_LIBS) -lgbm -lm -ldl
 
 AM_CFLAGS = \
         -I$(top_srcdir)/src/gallium/drivers/virgl \

@@ -28,56 +28,67 @@ enum virtgpu_ctrl_cmd {
 	VIRTGPU_CMD_SUBMIT_3D = (17 | VIRTGPU_CMD_3D_ONLY),
 };
 
-enum virtgpu_ctrl_event {
-	VIRTGPU_EVENT_NOP,
-	VIRTGPU_EVENT_ERROR,
-	VIRTGPU_EVENT_DISPLAY_CHANGE,
-};
-
 /* data passed in the cursor vq */
 struct virtgpu_hw_cursor_page {
-	uint32_t cursor_x, cursor_y;
-	uint32_t cursor_hot_x, cursor_hot_y;
-	uint32_t cursor_id;
+        uint32_t cursor_x, cursor_y;
+        uint32_t cursor_hot_x, cursor_hot_y;
+        uint32_t cursor_id;
+        uint32_t generation_id;
+};
+
+struct virtgpu_cmd_hdr {
+	uint32_t type;
+	uint32_t flags;
+	uint64_t fence;
+};
+
+struct virtgpu_resp_hdr {
+        uint32_t type; /* virtgpu ctrl response */
+        uint32_t flags;
 };
 
 struct virtgpu_resource_unref {
-	uint32_t resource_id;
+	struct virtgpu_cmd_hdr hdr;
+        uint32_t resource_id;
 };
 
 /* create a simple 2d resource with a format */
 struct virtgpu_resource_create_2d {
-	uint32_t resource_id;
-	uint32_t format;
-	uint32_t width;
-	uint32_t height;
+        struct virtgpu_cmd_hdr hdr;
+        uint32_t resource_id;
+        uint32_t format;
+        uint32_t width;
+        uint32_t height;
 };
 
 struct virtgpu_set_scanout {
-	uint32_t scanout_id;
-	uint32_t resource_id;
-	uint32_t width;
-	uint32_t height;
-	uint32_t x;
-	uint32_t y;
+        struct virtgpu_cmd_hdr hdr;
+        uint32_t scanout_id;
+        uint32_t resource_id;
+        uint32_t width;
+        uint32_t height;
+        uint32_t x;
+        uint32_t y;
 };
 
 struct virtgpu_resource_flush {
-	uint32_t resource_id;
-	uint32_t width;
-	uint32_t height;
-	uint32_t x;
-	uint32_t y;
+        struct virtgpu_cmd_hdr hdr;
+        uint32_t resource_id;
+        uint32_t width;
+        uint32_t height;
+        uint32_t x;
+        uint32_t y;
 };
 
 /* simple transfer to_host */
 struct virtgpu_transfer_to_host_2d {
-	uint32_t resource_id;
-	uint32_t offset;
-	uint32_t width;
-	uint32_t height;
-	uint32_t x;
-	uint32_t y;
+        struct virtgpu_cmd_hdr hdr;
+        uint32_t resource_id;
+        uint32_t offset;
+        uint32_t width;
+        uint32_t height;
+        uint32_t x;
+        uint32_t y;
 };
 
 struct virtgpu_mem_entry {
@@ -87,25 +98,28 @@ struct virtgpu_mem_entry {
 };
 
 struct virtgpu_resource_attach_backing {
-	uint32_t resource_id;
-	uint32_t nr_entries;
+        struct virtgpu_cmd_hdr hdr;
+        uint32_t resource_id;
+        uint32_t nr_entries;
 };
 
 struct virtgpu_resource_inval_backing {
-	uint32_t resource_id;
+        struct virtgpu_cmd_hdr hdr;
+        uint32_t resource_id;
 };
 
 #define VIRTGPU_MAX_SCANOUTS 16
 struct virtgpu_display_info {
-	uint32_t num_scanouts;
-	struct {
-		uint32_t enabled;
-		uint32_t width;
-		uint32_t height;
-		uint32_t x;
-		uint32_t y;
-		uint32_t flags;
-	} pmodes[VIRTGPU_MAX_SCANOUTS];
+        struct virtgpu_resp_hdr hdr;
+        uint32_t num_scanouts;
+        struct {
+                uint32_t enabled;
+                uint32_t width;
+                uint32_t height;
+                uint32_t x;
+                uint32_t y;
+                uint32_t flags;
+        } pmodes[VIRTGPU_MAX_SCANOUTS];
 };
 
 
@@ -116,6 +130,7 @@ struct virtgpu_box {
 };
 
 struct virtgpu_transfer_to_host_3d {
+        struct virtgpu_cmd_hdr hdr;
 	uint64_t data;
 	uint32_t resource_id;
 	uint32_t level;
@@ -126,6 +141,7 @@ struct virtgpu_transfer_to_host_3d {
 };
 
 struct virtgpu_transfer_from_host_3d {
+        struct virtgpu_cmd_hdr hdr;
 	uint64_t data;
 	uint32_t resource_id;
 	uint32_t level;
@@ -137,6 +153,7 @@ struct virtgpu_transfer_from_host_3d {
 
 #define VIRTGPU_RESOURCE_FLAG_Y_0_TOP (1 << 0)
 struct virtgpu_resource_create_3d {
+        struct virtgpu_cmd_hdr hdr;
 	uint32_t resource_id;
 	uint32_t target;
 	uint32_t format;
@@ -151,24 +168,35 @@ struct virtgpu_resource_create_3d {
 };
 
 struct virtgpu_ctx_create {
+        struct virtgpu_cmd_hdr hdr;
 	uint32_t ctx_id;
 	uint32_t nlen;
 	char debug_name[64];
 };
 
 struct virtgpu_ctx_destroy {
+        struct virtgpu_cmd_hdr hdr;
 	uint32_t ctx_id;
 };
 
 struct virtgpu_ctx_resource {
+        struct virtgpu_cmd_hdr hdr;
 	uint32_t resource_id;
 	uint32_t ctx_id;
 };
 
 struct virtgpu_cmd_submit {
+        struct virtgpu_cmd_hdr hdr;
 	uint64_t phy_addr;
 	uint32_t size;
 	uint32_t ctx_id;
+};
+
+#define VIRTGPU_EVENT_DISPLAY (1 << 0)
+
+struct virtgpu_config {
+        uint32_t events_read;
+	uint32_t events_clear;
 };
 
 struct virtgpu_caps_bool_set1 {
@@ -193,6 +221,7 @@ struct virtgpu_supported_format_mask {
         uint32_t bitmask[16];
 };
 /* capabilities set 2 - version 1 - 32-bit and float values */
+
 struct virtgpu_caps_v1 {
         uint32_t max_version;
         struct virtgpu_supported_format_mask sampler;
@@ -205,7 +234,7 @@ struct virtgpu_caps_v1 {
         uint32_t max_streamout_buffers;
         uint32_t max_dual_source_render_targets;
         uint32_t max_render_targets;
-
+	uint32_t max_samples;
 };
 
 union virtgpu_caps {
@@ -214,8 +243,14 @@ union virtgpu_caps {
 };
 
 struct virtgpu_cmd_get_cap {
+        struct virtgpu_cmd_hdr hdr;
         uint32_t cap_set;
         uint32_t cap_set_version;
+};
+
+struct virtgpu_resp_caps {
+	struct virtgpu_resp_hdr hdr;
+	union virtgpu_caps caps;
 };
 
 #define VIRTGPU_COMMAND_EMIT_FENCE (1 << 0)

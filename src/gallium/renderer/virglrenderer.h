@@ -38,7 +38,10 @@ struct virgl_renderer_callbacks {
 VIRGL_EXPORT int virgl_renderer_init(void *cookie, int flags, struct virgl_renderer_callbacks *cb);
 VIRGL_EXPORT void virgl_renderer_poll(void); /* force fences */
 
-VIRGL_EXPORT int virgl_renderer_process_vcmd(void *cmd, struct virgl_iovec *iov, unsigned int num_iovs);
+VIRGL_EXPORT int virgl_renderer_process_vcmd(struct virtgpu_cmd_hdr *cmd_hdr,
+                                             struct virgl_iovec *cmd_iov,
+                                             unsigned int num_cmd_iovs,
+                                             struct virgl_iovec *iov, unsigned int num_iovs);
 
 VIRGL_EXPORT void virgl_renderer_set_cursor_info(uint32_t cursor_handle, int x, int y);
 

@@ -28,28 +28,47 @@ static int use_egl_context;
 struct virgl_egl *egl_info;
 static struct grend_if_cbs virgl_cbs;
 
-static int graw_process_cmd(struct virtgpu_command *cmd, struct virgl_iovec *iov,
-                             unsigned int niovs);
+#define VIRTGPU_FILL_CMD(out) do {                                \
+        size_t s;                                                       \
+        s = graw_iov_to_buf(cmd_iov, cmd_iov_cnt, 0, &out, sizeof(out));     \
+        if (s != sizeof(out)) {                                         \
+           fprintf(stderr,                                              \
+                          "%s: command size incorrect %zu vs %zu\n",    \
+                          __func__, s, sizeof(out));                    \
+            return;                                                     \
+        }                                                               \
+    } while(0)
 
-int virgl_renderer_process_vcmd(void *cmd, struct virgl_iovec *iov, unsigned int niovs)
+static int graw_process_cmd(struct virtgpu_cmd_hdr *hdr, 
+                            struct virgl_iovec *cmd_iov,
+                            unsigned int cmd_num_iovs,
+                            struct virgl_iovec *iov,
+                            unsigned int niovs);
+
+int virgl_renderer_process_vcmd(struct virtgpu_cmd_hdr *hdr, 
+                                struct virgl_iovec *cmd_iov, unsigned int cmd_niovs,
+                                struct virgl_iovec *iov, unsigned int niovs)
 {
-   struct virtgpu_command *qcmd = cmd;
    int ret;
-   ret = graw_process_cmd(qcmd, iov, niovs);
+   ret = graw_process_cmd(hdr, cmd_iov, cmd_niovs, iov, niovs);
    graw_renderer_check_fences();
    return ret;
 }
 
-static void virgl_cmd_create_resource_2d(struct virtgpu_command *cmd)
+static void virgl_cmd_create_resource_2d(struct virgl_iovec *cmd_iov,
+                                         unsigned int cmd_iov_cnt)
 {
+   struct virtgpu_resource_create_2d c2d;
    struct graw_renderer_resource_create_args args;
 
-   args.handle = cmd->u.resource_create_2d.resource_id;
+   VIRTGPU_FILL_CMD(c2d);
+
+   args.handle = c2d.resource_id;
    args.target = 2;
-   args.format = cmd->u.resource_create_2d.format;
+   args.format = c2d.format;
    args.bind = (1 << 1);
-   args.width = cmd->u.resource_create_2d.width;
-   args.height = cmd->u.resource_create_2d.height;
+   args.width = c2d.width;
+   args.height = c2d.height;
    args.depth = 1;
    args.array_size = 1;
    args.last_level = 0;
@@ -58,35 +77,190 @@ static void virgl_cmd_create_resource_2d(struct virtgpu_command *cmd)
    graw_renderer_resource_create(&args, NULL, 0);
 }
 
-static void virgl_cmd_create_resource_3d(struct virtgpu_command *cmd)
+static void virgl_cmd_create_resource_3d(struct virgl_iovec *cmd_iov,
+                                         unsigned int cmd_iov_cnt)
 {
+   struct virtgpu_resource_create_3d c3d;
    struct graw_renderer_resource_create_args args;
 
-   args.handle = cmd->u.resource_create_3d.resource_id;
-   args.target = cmd->u.resource_create_3d.target;
-   args.format = cmd->u.resource_create_3d.format;
-   args.bind = cmd->u.resource_create_3d.bind;
-   args.width = cmd->u.resource_create_3d.width;
-   args.height = cmd->u.resource_create_3d.height;
-   args.depth = cmd->u.resource_create_3d.depth;
-   args.array_size = cmd->u.resource_create_3d.array_size;
-   args.last_level = cmd->u.resource_create_3d.last_level;
-   args.nr_samples = cmd->u.resource_create_3d.nr_samples;
-   args.flags = cmd->u.resource_create_3d.flags;
+   VIRTGPU_FILL_CMD(c3d);
+
+   args.handle = c3d.resource_id;
+   args.target = c3d.target;
+   args.format = c3d.format;
+   args.bind = c3d.bind;
+   args.width = c3d.width;
+   args.height = c3d.height;
+   args.depth = c3d.depth;
+   args.array_size = c3d.array_size;
+   args.last_level = c3d.last_level;
+   args.nr_samples = c3d.nr_samples;
+   args.flags = c3d.flags;
    graw_renderer_resource_create(&args, NULL, 0);
 }
 
-static void virgl_resource_attach_backing(struct virtgpu_resource_attach_backing *att_rb,
-                                          struct iovec *iov,
+static void virgl_cmd_resource_unref(struct virgl_iovec *cmd_iov,
+                                     unsigned cmd_iov_cnt)
+{
+   struct virtgpu_resource_unref unref;
+   
+   VIRTGPU_FILL_CMD(unref);
+   graw_renderer_resource_unref(unref.resource_id);
+}
+
+static void virgl_cmd_get_caps(struct virgl_iovec *cmd_iov,
+                               unsigned cmd_iov_cnt,
+                               struct virgl_iovec *iov,
+                               unsigned niovs)
+{
+   struct virtgpu_cmd_get_cap gc;
+   struct virtgpu_resp_caps caps;
+
+   VIRTGPU_FILL_CMD(gc);
+
+   caps.hdr.type = VIRTGPU_CMD_GET_CAPS;
+   caps.hdr.flags = 0;
+   graw_renderer_fill_caps(gc.cap_set,
+                           gc.cap_set_version,
+                           (union virgl_caps *)&caps.caps);
+
+   graw_iov_from_buf(iov, niovs, 0, &caps, sizeof(union virtgpu_caps));
+
+}
+
+static void virgl_cmd_context_create(struct virgl_iovec *cmd_iov,
+                                     unsigned int cmd_iov_cnt)
+{
+   struct virtgpu_ctx_create cc;
+   VIRTGPU_FILL_CMD(cc);
+   graw_renderer_context_create(cc.ctx_id, cc.nlen,
+                                cc.debug_name); 
+}
+
+static void virgl_cmd_context_destroy(struct virgl_iovec *cmd_iov,
+                                      unsigned int cmd_iov_cnt)
+{
+   struct virtgpu_ctx_destroy cd;
+   VIRTGPU_FILL_CMD(cd);
+   graw_renderer_context_destroy(cd.ctx_id);
+}
+
+static void virgl_cmd_resource_flush(struct virgl_iovec *cmd_iov,
+                                     unsigned cmd_iov_cnt)
+{
+   struct virtgpu_resource_flush rf;
+   struct pipe_box box;
+
+   VIRTGPU_FILL_CMD(rf);
+
+   box.x = rf.x;
+   box.y = rf.y;
+   box.z = 0;
+   box.width = rf.width;
+   box.height = rf.height;
+   box.depth = 1;
+   graw_renderer_flush_buffer(rf.resource_id, 0, &box);
+
+}
+
+static void virgl_cmd_set_scanout(struct virgl_iovec *cmd_iov,
+                                  unsigned cmd_iov_cnt)
+{
+   struct virtgpu_set_scanout ss;
+   struct pipe_box box;
+   VIRTGPU_FILL_CMD(ss);
+   box.x = ss.x;
+   box.y = ss.y;
+   box.z = 0;
+   box.width = ss.width;
+   box.height = ss.height;
+   box.depth = 1;
+   graw_renderer_set_scanout(ss.resource_id, ss.scanout_id,
+                             0, &box);
+}
+
+static unsigned virgl_cmd_submit_3d(struct virgl_iovec *cmd_iov,
+                                    unsigned cmd_iov_cnt,
+                                    struct virgl_iovec *iov,
+                                    unsigned niovs)
+{
+   struct virtgpu_cmd_submit cs;
+   VIRTGPU_FILL_CMD(cs);
+   graw_decode_block_iov(iov, niovs, cs.ctx_id, cs.phy_addr, cs.size / 4);
+   return cs.ctx_id;
+}
+
+static void virgl_cmd_transfer_to_host_2d(struct virgl_iovec *cmd_iov,
+                                          unsigned cmd_iov_cnt)
+{
+   struct virtgpu_transfer_to_host_2d t2d;
+   struct pipe_box box;
+
+   VIRTGPU_FILL_CMD(t2d);
+
+   box.x = t2d.x;
+   box.y = t2d.y;
+   box.z = 0;
+   box.width = t2d.width;
+   box.height = t2d.height;
+   box.depth = 1;
+   
+   graw_renderer_transfer_write_iov(t2d.resource_id,
+                                    0,
+                                    0,
+                                    0,
+                                    0,
+                                    (struct pipe_box *)&box,
+                                    t2d.offset, NULL, 0);
+
+}
+                                
+static unsigned virgl_cmd_transfer_to_host_3d(struct virgl_iovec *cmd_iov,
+                                          unsigned cmd_iov_cnt)
+{
+   struct virtgpu_transfer_to_host_3d t3d;
+
+   VIRTGPU_FILL_CMD(t3d);
+   graw_renderer_transfer_write_iov(t3d.resource_id,
+                                    t3d.ctx_id,
+                                    t3d.level,
+                                    t3d.stride,
+                                    t3d.layer_stride,
+                                    (struct pipe_box *)&t3d.box,
+                                    t3d.data, NULL, 0);
+   return t3d.ctx_id;
+}
+
+static unsigned virgl_cmd_transfer_from_host_3d(struct virgl_iovec *cmd_iov,
+                                                unsigned cmd_iov_cnt)
+{
+   struct virtgpu_transfer_from_host_3d tf3d;
+   VIRTGPU_FILL_CMD(tf3d);
+   graw_renderer_transfer_send_iov(tf3d.resource_id,
+                                   tf3d.ctx_id,
+                                   tf3d.level,
+                                   tf3d.stride,
+                                   tf3d.layer_stride,
+                                   (struct pipe_box *)&tf3d.box,
+                                   tf3d.data, NULL, 0);
+   return tf3d.ctx_id;
+}
+
+static void virgl_resource_attach_backing(struct virgl_iovec *cmd_iov,
+                                          unsigned int cmd_iov_cnt,
+                                          struct virgl_iovec *iov,
                                           unsigned int iov_cnt)
 {
+    struct virtgpu_resource_attach_backing att_rb;
     uint32_t gsize = graw_iov_size(iov, iov_cnt);
     struct virgl_iovec *res_iovs;
     int i;
     void *data;
     int ret;
 
-    res_iovs = malloc(att_rb->nr_entries * sizeof(struct virgl_iovec));
+    VIRTGPU_FILL_CMD(att_rb);
+
+    res_iovs = malloc(att_rb.nr_entries * sizeof(struct virgl_iovec));
     if (!res_iovs)
 	return;
 
@@ -96,20 +270,20 @@ static void virgl_resource_attach_backing(struct virtgpu_resource_attach_backing
     } else
 	data = iov[0].iov_base;
 
-    for (i = 0; i < att_rb->nr_entries; i++) {
+    for (i = 0; i < att_rb.nr_entries; i++) {
 	struct virtgpu_mem_entry *ent = ((struct virtgpu_mem_entry *)data) + i;
 	res_iovs[i].iov_len = ent->length;
         ret = rcbs->map_iov(&res_iovs[i], ent->addr);
         if (ret) {
-           fprintf(stderr, "failed to attach backing %d\n", att_rb->resource_id);
+           fprintf(stderr, "failed to attach backing %d\n", att_rb.resource_id);
            free(res_iovs);
            res_iovs = NULL;
            goto fail_free;
         }
     }
 
-    ret = graw_renderer_resource_attach_iov(att_rb->resource_id, res_iovs,
-                                            att_rb->nr_entries);
+    ret = graw_renderer_resource_attach_iov(att_rb.resource_id, res_iovs,
+                                            att_rb.nr_entries);
     goto out;
  fail_free:
     free(res_iovs);
@@ -128,116 +302,60 @@ static void virgl_resource_inval_backing_iov(struct virgl_iovec *iov, uint32_t i
    free(iov);
 }
 
-static void virgl_resource_inval_backing(int resource_id)
+static void virgl_resource_inval_backing(struct virgl_iovec *cmd_iov, uint32_t cmd_iov_cnt)
 {
-   graw_renderer_resource_invalid_iov(resource_id);
+   struct virtgpu_resource_inval_backing inval_rb;
+   VIRTGPU_FILL_CMD(inval_rb);
+   graw_renderer_resource_invalid_iov(inval_rb.resource_id);
 }
 
-static int graw_process_cmd(struct virtgpu_command *cmd, struct virgl_iovec *iov,
+static int graw_process_cmd(struct virtgpu_cmd_hdr *hdr, struct virgl_iovec *cmd_iov,
+                            unsigned int cmd_niovs,
+                            struct virgl_iovec *iov,
                             unsigned int niovs)
 {
-   static int inited;
    int fence_ctx_id = 0;
 
    graw_renderer_force_ctx_0();
-   switch (cmd->type) {
+   switch (hdr->type) {
    case VIRTGPU_CMD_CTX_CREATE:
-      graw_renderer_context_create(cmd->u.ctx_create.ctx_id, cmd->u.ctx_create.nlen,
-                                   cmd->u.ctx_create.debug_name);
+      virgl_cmd_context_create(cmd_iov, cmd_niovs);
       break;
    case VIRTGPU_CMD_CTX_DESTROY:
-      graw_renderer_context_destroy(cmd->u.ctx_destroy.ctx_id);
+      virgl_cmd_context_destroy(cmd_iov, cmd_niovs);
       break;
    case VIRTGPU_CMD_RESOURCE_CREATE_2D:
-      virgl_cmd_create_resource_2d(cmd);
+      virgl_cmd_create_resource_2d(cmd_iov, cmd_niovs);
       break;
    case VIRTGPU_CMD_RESOURCE_CREATE_3D:
-      virgl_cmd_create_resource_3d(cmd);
+      virgl_cmd_create_resource_3d(cmd_iov, cmd_niovs);
       break;
    case VIRTGPU_CMD_SUBMIT_3D:
-//         fprintf(stderr,"cmd submit %lx %d\n", cmd->u.cmd_submit.data, cmd->u.cmd_submit.size);
-      
-   {
-      graw_decode_block_iov(iov, niovs, cmd->u.cmd_submit.ctx_id, cmd->u.cmd_submit.phy_addr, cmd->u.cmd_submit.size / 4);
-      fence_ctx_id = cmd->u.cmd_submit.ctx_id;
-   }
-   
-   break;
-   case VIRTGPU_CMD_TRANSFER_TO_HOST_2D: {
-      struct pipe_box box;
-
-      box.x = cmd->u.transfer_to_host_2d.x;
-      box.y = cmd->u.transfer_to_host_2d.y;
-      box.z = 0;
-      box.width = cmd->u.transfer_to_host_2d.width;
-      box.height = cmd->u.transfer_to_host_2d.height;
-      box.depth = 1;
-         
-//         fprintf(stderr,"got transfer get %d\n", cmd->u.transfer_to_host_3d.res_handle);
-      graw_renderer_transfer_write_iov(cmd->u.transfer_to_host_2d.resource_id,
-                                       0,
-                                       0,
-                                       0,
-                                       0,
-                                       (struct pipe_box *)&box,
-                                       cmd->u.transfer_to_host_2d.offset, NULL, 0);
+      fence_ctx_id = virgl_cmd_submit_3d(cmd_iov, cmd_niovs, iov, niovs);
       break;
-   }
+   case VIRTGPU_CMD_TRANSFER_TO_HOST_2D:
+      virgl_cmd_transfer_to_host_2d(cmd_iov, cmd_niovs);
+      break;
    case VIRTGPU_CMD_TRANSFER_TO_HOST_3D:
-//         fprintf(stderr,"got transfer get %d\n", cmd->u.transfer_to_host_3d.res_handle);
-      graw_renderer_transfer_write_iov(cmd->u.transfer_to_host_3d.resource_id,
-                                      cmd->u.transfer_to_host_3d.ctx_id,
-                                      cmd->u.transfer_to_host_3d.level,
-                                      cmd->u.transfer_to_host_3d.stride,
-                                      cmd->u.transfer_to_host_3d.layer_stride,
-                                      (struct pipe_box *)&cmd->u.transfer_to_host_3d.box,
-                                      cmd->u.transfer_to_host_3d.data, NULL, 0);
-      fence_ctx_id = cmd->u.transfer_to_host_3d.ctx_id;
+      fence_ctx_id = virgl_cmd_transfer_to_host_3d(cmd_iov, cmd_niovs);
       break;
    case VIRTGPU_CMD_TRANSFER_FROM_HOST_3D:
-      graw_renderer_transfer_send_iov(cmd->u.transfer_from_host_3d.resource_id,
-                                       cmd->u.transfer_from_host_3d.ctx_id,
-                                       cmd->u.transfer_from_host_3d.level,
-                                       cmd->u.transfer_from_host_3d.stride,
-                                       cmd->u.transfer_from_host_3d.layer_stride,
-                                       (struct pipe_box *)&cmd->u.transfer_from_host_3d.box,
-                                       cmd->u.transfer_from_host_3d.data, NULL, 0);
-      fence_ctx_id = cmd->u.transfer_from_host_3d.ctx_id;
+      fence_ctx_id = virgl_cmd_transfer_from_host_3d(cmd_iov, cmd_niovs);
       break;
-      
-   case VIRTGPU_CMD_RESOURCE_ATTACH_BACKING:
-      virgl_resource_attach_backing(&cmd->u.resource_attach_backing, iov, niovs);
+    case VIRTGPU_CMD_RESOURCE_ATTACH_BACKING:
+      virgl_resource_attach_backing(cmd_iov, cmd_niovs, iov, niovs);
       break;
    case VIRTGPU_CMD_RESOURCE_INVAL_BACKING:
-      virgl_resource_inval_backing(cmd->u.resource_inval_backing.resource_id);
+      virgl_resource_inval_backing(cmd_iov, cmd_niovs);
       break;
-   case VIRTGPU_CMD_SET_SCANOUT: {
-      struct pipe_box box;
-      box.x = cmd->u.set_scanout.x;
-      box.y = cmd->u.set_scanout.y;
-      box.z = 0;
-      box.width = cmd->u.set_scanout.width;
-      box.height = cmd->u.set_scanout.height;
-      box.depth = 1;
-      graw_renderer_set_scanout(cmd->u.set_scanout.resource_id, cmd->u.set_scanout.scanout_id,
-                                0, &box);
+   case VIRTGPU_CMD_SET_SCANOUT:
+      virgl_cmd_set_scanout(cmd_iov, cmd_niovs);
       break;
-   }
    case VIRTGPU_CMD_RESOURCE_FLUSH:
-   {
-      struct pipe_box box;
-      box.x = cmd->u.resource_flush.x;
-      box.y = cmd->u.resource_flush.y;
-      box.z = 0;
-      box.width = cmd->u.resource_flush.width;
-      box.height = cmd->u.resource_flush.height;
-      box.depth = 1;
-      graw_renderer_flush_buffer(cmd->u.resource_flush.resource_id,
-                                 0, &box);
+      virgl_cmd_resource_flush(cmd_iov, cmd_niovs);
       break;
-   } 
    case VIRTGPU_CMD_RESOURCE_UNREF:
-      graw_renderer_resource_unref(cmd->u.resource_unref.resource_id);
+      virgl_cmd_resource_unref(cmd_iov, cmd_niovs);
       break;
    case VIRTGPU_CMD_CTX_ATTACH_RESOURCE:
       /* TODO add security */
@@ -248,32 +366,14 @@ static int graw_process_cmd(struct virtgpu_command *cmd, struct virgl_iovec *iov
    case VIRTGPU_CMD_GET_CAPS:
       if (!niovs)
          return;
-
-      {
-         struct virtgpu_response resp;
-         graw_renderer_fill_caps(cmd->u.get_cap.cap_set,
-                                 cmd->u.get_cap.cap_set_version,
-                                 (union virgl_caps *)&resp.u.caps);
-         resp.flags = 0;
-         resp.type = VIRTGPU_CMD_GET_CAPS;
-         graw_iov_from_buf(iov, niovs, 0, &resp, sizeof(struct virtgpu_response));
-      }
-
+      virgl_cmd_get_caps(cmd_iov, cmd_niovs, iov, niovs);
       break;
    case VIRTGPU_CMD_GET_DISPLAY_INFO:
       return -1;
-   case 0xdeadbeef:
-      if (inited) {
-         graw_renderer_fini();
-         
-      }
-      graw_renderer_init(&virgl_cbs);
-      inited = 1;
-      break;
    }
    
-   if (cmd->flags & VIRGL_COMMAND_EMIT_FENCE)
-      graw_renderer_create_fence(cmd->fence_id, fence_ctx_id);
+   if (hdr->flags & VIRGL_COMMAND_EMIT_FENCE)
+      graw_renderer_create_fence(hdr->fence, fence_ctx_id);
    return 0;
 }
 

@@ -13,18 +13,6 @@ AM_CFLAGS = \
 	$(EPOXY_CFLAGS) \
 	$(VISIBILITY_CFLAGS)
 
-#graw_renderer_SOURCES = \
-#        graw_pipe_renderer.c \
-#        graw_renderer_glx.c
-
-#graw_shm_renderer_SOURCES = \
-#        graw_shm_renderer.c \
-#        graw_renderer_glx.c \
-#        send_scm.c
-
-#graw_renderer_LDADD = libgrend.la -lX11
-#graw_shm_renderer_LDADD = libgrend.la -lrt -lX11
-
 libgrend_la_SOURCES = \
         graw_renderer.c \
         graw_shader.c \

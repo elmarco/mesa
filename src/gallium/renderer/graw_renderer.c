@@ -21,7 +21,6 @@
 #include "graw_shader.h"
 
 #include "graw_renderer.h"
-#include "graw_renderer_glx.h"
 #include "graw_decode.h"
 #include "graw_cursor.h"
 

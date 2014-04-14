@@ -1094,6 +1094,9 @@ eglGetProcAddress(const char *procname)
       { "eglGetPlatformDisplayEXT", (_EGLProc) eglGetPlatformDisplayEXT },
       { "eglCreatePlatformWindowSurfaceEXT", (_EGLProc) eglCreatePlatformWindowSurfaceEXT },
       { "eglCreatePlatformPixmapSurfaceEXT", (_EGLProc) eglCreatePlatformPixmapSurfaceEXT },
+#ifdef EGL_MESA_image_dma_buf_export
+      { "eglExportDMABUFImageMESA", (_EGLProc) eglExportDMABUFImageMESA },
+#endif
       { NULL, NULL }
    };
    EGLint i;
@@ -1759,3 +1762,25 @@ eglPostSubBufferNV(EGLDisplay dpy, EGLSurface surface,
 
    RETURN_EGL_EVAL(disp, ret);
 }
+
+#ifdef EGL_MESA_image_dma_buf_export
+EGLBoolean EGLAPIENTRY
+eglExportDMABUFImageMESA(EGLDisplay dpy, EGLImageKHR image,
+                         int *fd, EGLint *stride)
+{
+   _EGLDisplay *disp = _eglLockDisplay(dpy);
+   _EGLImage *img = _eglLookupImage(image, disp);
+   _EGLDriver *drv;
+   EGLBoolean ret;
+
+   _EGL_CHECK_DISPLAY(disp, EGL_FALSE, drv);
+   assert(disp->Extensions.MESA_image_dma_buf_export);
+
+   if (!img)
+      RETURN_EGL_ERROR(disp, EGL_BAD_PARAMETER, EGL_FALSE);
+
+   ret = drv->API.ExportDMABUFImageMESA(drv, disp, img, fd, stride);
+
+   RETURN_EGL_EVAL(disp, ret);
+}
+#endif

@@ -523,6 +523,7 @@ dri2_setup_screen(_EGLDisplay *disp)
 
    if (dri2_dpy->image) {
       disp->Extensions.MESA_drm_image = EGL_TRUE;
+      disp->Extensions.MESA_image_dma_buf_export = EGL_TRUE;
       disp->Extensions.KHR_image_base = EGL_TRUE;
       disp->Extensions.KHR_gl_renderbuffer_image = EGL_TRUE;
       if (dri2_dpy->image->base.version >= 5 &&
@@ -1898,6 +1899,26 @@ dri2_export_drm_image_mesa(_EGLDriver *drv, _EGLDisplay *disp, _EGLImage *img,
 
    return EGL_TRUE;
 }
+
+static EGLBoolean
+dri2_export_dma_buf_image_mesa(_EGLDriver *drv, _EGLDisplay *disp, _EGLImage *img,
+                               int *fd, EGLint *stride)
+{
+   struct dri2_egl_display *dri2_dpy = dri2_egl_display(disp);
+   struct dri2_egl_image *dri2_img = dri2_egl_image(img);
+
+   (void) drv;
+
+   if (fd)
+      dri2_dpy->image->queryImage(dri2_img->dri_image,
+				  __DRI_IMAGE_ATTRIB_FD, fd);
+
+   if (stride)
+      dri2_dpy->image->queryImage(dri2_img->dri_image,
+				  __DRI_IMAGE_ATTRIB_STRIDE, stride);
+
+   return EGL_TRUE;
+}
 #endif
 
 #ifdef HAVE_WAYLAND_PLATFORM
@@ -2150,6 +2171,7 @@ _eglBuiltInDriverDRI2(const char *args)
 #ifdef HAVE_DRM_PLATFORM
    dri2_drv->base.API.CreateDRMImageMESA = dri2_create_drm_image_mesa;
    dri2_drv->base.API.ExportDRMImageMESA = dri2_export_drm_image_mesa;
+   dri2_drv->base.API.ExportDMABUFImageMESA = dri2_export_dma_buf_image_mesa;
 #endif
 #ifdef HAVE_WAYLAND_PLATFORM
    dri2_drv->base.API.BindWaylandDisplayWL = dri2_bind_wayland_display_wl;

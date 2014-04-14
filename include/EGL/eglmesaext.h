@@ -170,6 +170,11 @@ typedef EGLBoolean (EGLAPIENTRYP PFNEGLSWAPBUFFERSREGIONNOK) (EGLDisplay dpy, EG
 #define EGL_NO_CONFIG_MESA			((EGLConfig)0)
 #endif
 
+#ifndef EGL_MESA_image_dma_buf_export
+#define EGL_MESA_image_dma_buf_export 1
+EGLAPI EGLBoolean EGLAPIENTRY eglExportDMABUFImageMESA (EGLDisplay dpy, EGLImageKHR image, int *fd, EGLint *stride);
+#endif
+
 #ifdef __cplusplus
 }
 #endif

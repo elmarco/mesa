@@ -139,6 +139,10 @@ typedef EGLint (*QueryBufferAge_t)(_EGLDriver *drv,
 typedef EGLBoolean (*SwapBuffersWithDamageEXT_t) (_EGLDriver *drv, _EGLDisplay *dpy, _EGLSurface *surface, const EGLint *rects, EGLint n_rects);
 #endif
 
+#ifdef EGL_MESA_image_dma_buf_export
+typedef EGLBoolean (*ExportDMABUFImageMESA_t)(_EGLDriver *drv, _EGLDisplay *disp, _EGLImage *img, int *fd, EGLint *stride);
+#endif
+
 /**
  * The API dispatcher jumps through these functions
  */
@@ -225,6 +229,10 @@ struct _egl_api
    PostSubBufferNV_t PostSubBufferNV;
 
    QueryBufferAge_t QueryBufferAge;
+
+#ifdef EGL_MESA_image_dma_buf_export
+   ExportDMABUFImageMESA_t ExportDMABUFImageMESA;
+#endif
 };
 
 #endif /* EGLAPI_INCLUDED */

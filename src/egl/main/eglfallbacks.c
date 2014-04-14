@@ -120,4 +120,8 @@ _eglInitDriverFallbacks(_EGLDriver *drv)
 #ifdef EGL_NOK_swap_region
    drv->API.SwapBuffersRegionNOK = NULL;
 #endif
+
+#ifdef EGL_MESA_image_dma_buf_export
+   drv->API.ExportDMABUFImageMESA = NULL;
+#endif
 }

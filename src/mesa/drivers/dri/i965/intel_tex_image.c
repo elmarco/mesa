@@ -378,7 +378,7 @@ intel_image_target_texture_2d(struct gl_context *ctx, GLenum target,
 					      screen->loaderPrivate);
    if (image == NULL)
       return;
-
+#if 0
    /**
     * Images originating via EGL_EXT_image_dma_buf_import can be used only
     * with GL_OES_EGL_image_external only.
@@ -389,6 +389,7 @@ intel_image_target_texture_2d(struct gl_context *ctx, GLenum target,
                "GL_OES_EGL_image_external only");
       return;
    }
+#endif
 
    if (target == GL_TEXTURE_EXTERNAL_OES && !image->dma_buf_imported) {
       _mesa_error(ctx, GL_INVALID_OPERATION,

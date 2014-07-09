@@ -22,6 +22,7 @@ libgrend_la_SOURCES = \
         graw_formats.c \
         iov.c \
         graw_renderer_helper.c \
+	virglrenderer.c \
 	virgl_egl_context.c
 
 pkgconfigdir = $(libdir)/pkgconfig

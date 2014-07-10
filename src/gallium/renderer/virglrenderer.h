@@ -18,9 +18,6 @@ struct virgl_renderer_callbacks {
    int version;
    void (*write_fence)(void *cookie, uint32_t fence);
 
-   int (*map_iov)(struct virgl_iovec *iov, uint64_t addr);
-   void (*unmap_iov)(struct virgl_iovec *iov);
-   
    /* interact with GL implementation */
    virgl_gl_context (*create_gl_context)(void *cookie, int scanout_idx);
    void (*destroy_gl_context)(void *cookie, virgl_gl_context ctx);
@@ -109,7 +106,7 @@ VIRGL_EXPORT void virgl_renderer_fill_caps(uint32_t set, uint32_t version,
 
 VIRGL_EXPORT int virgl_renderer_resource_attach_iov(int res_handle, struct virgl_iovec *iov,
                                        int num_iovs);
-VIRGL_EXPORT void virgl_renderer_resource_invalid_iov(int res_handle);
+VIRGL_EXPORT void virgl_renderer_resource_zap_iov(int res_handle, struct virgl_iovec **iov, int *num_iovs);
 
 VIRGL_EXPORT int virgl_renderer_create_fence(int client_fence_id, uint32_t ctx_id);
 

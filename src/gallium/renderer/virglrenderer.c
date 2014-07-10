@@ -105,9 +105,9 @@ int virgl_renderer_resource_attach_iov(int res_handle, struct virgl_iovec *iov,
    return graw_renderer_resource_attach_iov(res_handle, iov, num_iovs);
 }
 
-void virgl_renderer_resource_invalid_iov(int res_handle)
+void virgl_renderer_resource_zap_iov(int res_handle, struct virgl_iovec **iov_p, int *num_iovs_p)
 {
-   return graw_renderer_resource_invalid_iov(res_handle);
+   return graw_renderer_resource_zap_iov(res_handle, iov_p, num_iovs_p);
 }
 
 int virgl_renderer_create_fence(int client_fence_id, uint32_t ctx_id)

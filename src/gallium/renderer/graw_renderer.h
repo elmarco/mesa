@@ -59,7 +59,6 @@ struct grend_if_cbs {
    int (*make_current)(int scanout, virgl_gl_context ctx);
 
    void (*flush_scanout)(int scanout, int x, int y, uint32_t width, uint32_t height);
-   void (*inval_backing)(struct virgl_iovec *iov, uint32_t iov_cnt);
 };
 void graw_renderer_init(struct grend_if_cbs *cbs);
 
@@ -303,6 +302,9 @@ void vrend_build_format_list(void);
 int graw_renderer_resource_attach_iov(int res_handle, struct virgl_iovec *iov,
                                        int num_iovs);
 void graw_renderer_resource_invalid_iov(int res_handle);
+void graw_renderer_resource_zap_iov(int res_handle,
+                                    struct virgl_iovec **iov_p,
+                                    int *num_iovs_p);
 void graw_renderer_resource_destroy(struct grend_resource *res);
 
 static INLINE void

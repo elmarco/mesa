@@ -28,15 +28,6 @@ static int use_egl_context;
 struct virgl_egl *egl_info;
 static struct grend_if_cbs virgl_cbs;
 
-static void virgl_resource_inval_backing_iov(struct virgl_iovec *iov, uint32_t iov_cnt)
-{
-   int i;
-   for (i = 0; i < iov_cnt; i++) {
-      rcbs->unmap_iov(&iov[i]);
-   }
-   free(iov);
-}
-
 void graw_transfer_write_return(void *data, uint32_t bytes, uint64_t offset,
                                 struct virgl_iovec *iov, int num_iovs)
 {
@@ -133,7 +124,6 @@ static struct grend_if_cbs virgl_cbs = {
    destroy_gl_context,
    make_current,
    flush_scanout,
-   virgl_resource_inval_backing_iov,
 };
 
 void *virgl_get_cursor_data(uint32_t resource_id, uint32_t *width, uint32_t *height)

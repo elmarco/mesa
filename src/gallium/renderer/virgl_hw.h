@@ -364,6 +364,7 @@ struct virgl_caps_v1 {
         uint32_t max_dual_source_render_targets;
         uint32_t max_render_targets;
         uint32_t max_samples;
+        uint32_t prim_mask;
 };
 
 union virgl_caps {

@@ -29,6 +29,8 @@
 /* blit/copy operations from the guest POV are in y = 0 = top orientation */
 
 /* since we are storing things in OpenGL FBOs we need to flip transfer operations by default */
+
+#define USE_CORE_PROFILE 1
 static struct grend_resource *graw_renderer_ctx_res_lookup(struct grend_context *ctx, int res_handle);
 static void grend_update_viewport_state(struct grend_context *ctx);
 static void grend_update_scissor_state(struct grend_context *ctx);
@@ -2280,8 +2282,10 @@ static void grend_hw_emit_rs(struct grend_context *ctx)
          glDisable(GL_RASTERIZER_DISCARD);
    }
 
-   glPolygonMode(GL_FRONT, translate_fill(state->fill_front));
-   glPolygonMode(GL_BACK, translate_fill(state->fill_back));
+   if (USE_CORE_PROFILE == 0) {
+      glPolygonMode(GL_FRONT, translate_fill(state->fill_front));
+      glPolygonMode(GL_BACK, translate_fill(state->fill_back));
+   }
 
    if (state->offset_tri)
       glEnable(GL_POLYGON_OFFSET_FILL);
@@ -2375,10 +2379,12 @@ static void grend_hw_emit_rs(struct grend_context *ctx)
    else
       glDisable(GL_POLYGON_SMOOTH);
 
-   if (state->clamp_vertex_color)
-      glClampColor(GL_CLAMP_VERTEX_COLOR_ARB, GL_TRUE);
-   else
-      glClampColor(GL_CLAMP_VERTEX_COLOR_ARB, GL_FALSE);
+   if (USE_CORE_PROFILE == 0) {
+      if (state->clamp_vertex_color)
+         glClampColor(GL_CLAMP_VERTEX_COLOR_ARB, GL_TRUE);
+      else
+         glClampColor(GL_CLAMP_VERTEX_COLOR_ARB, GL_FALSE);
+   }
 
    if (state->clamp_fragment_color)
       glClampColor(GL_CLAMP_FRAGMENT_COLOR_ARB, GL_TRUE);
@@ -3034,7 +3040,7 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
       glformat = tex_conv_table[res->base.format].glformat;
       gltype = tex_conv_table[res->base.format].gltype; 
 
-      if (res->is_front || res->y_0_top) {
+      if ((!USE_CORE_PROFILE) && (res->is_front || res->y_0_top)) {
          if (!res->is_front) {
             if (res->readback_fb_id == 0 || res->readback_fb_level != level) {
                GLuint fb_id;
@@ -4394,6 +4400,16 @@ void graw_renderer_fill_caps(uint32_t set, uint32_t version,
 
    glGetIntegerv(GL_MAX_SAMPLES, &max);
    caps->v1.max_samples = max;
+
+   if (glewIsSupported("GL_ARB_texture_buffer_object")) {
+      caps->v1.bset.texture_buffer_object = 1;
+   }
+
+   caps->v1.prim_mask = (1 << PIPE_PRIM_POINTS) | (1 << PIPE_PRIM_LINES) | (1 << PIPE_PRIM_LINE_STRIP) | (1 << PIPE_PRIM_LINE_LOOP) | (1 << PIPE_PRIM_TRIANGLES) | (1 << PIPE_PRIM_TRIANGLE_STRIP) | (1 << PIPE_PRIM_TRIANGLE_FAN);
+   if (USE_CORE_PROFILE == 0) {
+      caps->v1.prim_mask |= (1 << PIPE_PRIM_QUADS) | (1 << PIPE_PRIM_QUAD_STRIP) | (1 << PIPE_PRIM_POLYGON);
+   }
+   /* TODO add GL 3.2 types */
 
    for (i = 0; i < VIRGL_FORMAT_MAX; i++) {
       uint32_t offset = i / 32;

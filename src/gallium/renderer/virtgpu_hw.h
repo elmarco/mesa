@@ -235,6 +235,7 @@ struct virtgpu_caps_v1 {
         uint32_t max_dual_source_render_targets;
         uint32_t max_render_targets;
 	uint32_t max_samples;
+	uint32_t prim_mask; /* supported primitive mask */
 };
 
 union virtgpu_caps {

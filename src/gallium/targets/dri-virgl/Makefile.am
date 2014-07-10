@@ -23,15 +23,8 @@
 include $(top_srcdir)/src/gallium/Automake.inc
 
 AM_CFLAGS = \
-	$(GALLIUM_CFLAGS) \
-	$(PTHREAD_CFLAGS) \
-	$(LIBDRM_CFLAGS)
+	$(GALLIUM_DRI_CFLAGS)
 AM_CPPFLAGS = \
-	-I$(top_srcdir)/src/gallium/drivers \
-	-I$(top_srcdir)/src/gallium/winsys \
-	-I$(top_srcdir)/src/mesa \
-	-I$(top_srcdir)/src/mapi \
-	-I$(top_builddir)/src/mesa/drivers/dri/common \
 	-DGALLIUM_RBUG \
 	-DGALLIUM_TRACE \
 	-DGALLIUM_NOOP \
@@ -41,16 +34,12 @@ dridir = $(DRI_DRIVER_INSTALL_DIR)
 dri_LTLIBRARIES = virtio-gpu_dri.la
 
 virtio_gpu_dri_la_SOURCES = \
-	target.c \
-	$(top_srcdir)/src/mesa/drivers/dri/common/utils.c \
-	$(top_srcdir)/src/mesa/drivers/dri/common/dri_util.c \
-	$(top_srcdir)/src/mesa/drivers/dri/common/xmlconfig.c
+	target.c
 
-virtio_gpu_dri_la_LDFLAGS = -module -avoid-version -shared -no-undefined
+virtio_gpu_dri_la_LDFLAGS = $(GALLIUM_DRI_LINKER_FLAGS)
 
 virtio_gpu_dri_la_LIBADD = \
-	$(top_builddir)/src/mesa/libmesagallium.la \
-	$(top_builddir)/src/gallium/auxiliary/libgallium.la \
+	$(top_builddir)/src/mesa/drivers/dri/common/libdricommon.la \
 	$(top_builddir)/src/gallium/state_trackers/dri/drm/libdridrm.la \
 	$(top_builddir)/src/gallium/winsys/virgl/drm/libvirgldrm.la \
 	$(top_builddir)/src/gallium/drivers/trace/libtrace.la \

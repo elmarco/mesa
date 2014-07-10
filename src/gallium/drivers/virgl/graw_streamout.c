@@ -44,10 +44,10 @@ static void graw_destroy_so_target(struct pipe_context *ctx,
 static void graw_set_so_targets(struct pipe_context *ctx,
                                 unsigned num_targets,
                                 struct pipe_stream_output_target **targets,
-                                unsigned append_bitmask)
+                                const unsigned *offset)
 {
    struct graw_context *grctx = (struct graw_context *)ctx;
-   graw_encoder_set_so_targets(grctx, num_targets, targets, append_bitmask);
+   graw_encoder_set_so_targets(grctx, num_targets, targets, 0);//append_bitmask);
 }
 
 void graw_init_so_functions(struct graw_context *grctx)

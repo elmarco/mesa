@@ -29,6 +29,7 @@
 /* blit/copy operations from the guest POV are in y = 0 = top orientation */
 
 /* since we are storing things in OpenGL FBOs we need to flip transfer operations by default */
+static struct grend_resource *graw_renderer_ctx_res_lookup(struct grend_context *ctx, int res_handle);
 static void grend_update_viewport_state(struct grend_context *ctx);
 static void grend_update_scissor_state(struct grend_context *ctx);
 static void grend_ctx_restart_queries(struct grend_context *ctx);
@@ -235,6 +236,8 @@ struct grend_context {
    uint32_t enabled_attribs_bitmask;
 
    struct util_hash_table *object_hash;
+   /* resource bounds to this context */
+   struct util_hash_table *res_hash;
    struct grend_vertex_element_array *ve;
    int num_vbos;
    struct pipe_vertex_buffer vbo[PIPE_MAX_ATTRIBS];
@@ -700,7 +703,7 @@ void grend_create_surface(struct grend_context *ctx,
    struct grend_surface *surf;
    struct grend_resource *res;
 
-   res = vrend_resource_lookup(res_handle, ctx->ctx_id);
+   res = graw_renderer_ctx_res_lookup(ctx, res_handle);
    if (!res) {
       report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, res_handle);
       return;
@@ -760,7 +763,7 @@ void grend_create_sampler_view(struct grend_context *ctx,
    struct grend_sampler_view *view;
    struct grend_resource *res;
 
-   res = vrend_resource_lookup(res_handle, ctx->ctx_id);
+   res = graw_renderer_ctx_res_lookup(ctx, res_handle);
    if (!res) {
       report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, res_handle);
       return;
@@ -1158,7 +1161,7 @@ void grend_set_index_buffer(struct grend_context *ctx,
    ctx->ib.offset = offset;
    if (res_handle) {
       if (ctx->index_buffer_res_id != res_handle) {
-         res = vrend_resource_lookup(res_handle, ctx->ctx_id);
+         res = graw_renderer_ctx_res_lookup(ctx, res_handle);
          if (!res) {
             grend_resource_reference((struct grend_resource **)&ctx->ib.buffer, NULL);
             ctx->index_buffer_res_id = 0;
@@ -1188,7 +1191,7 @@ void grend_set_single_vbo(struct grend_context *ctx,
       grend_resource_reference((struct grend_resource **)&ctx->vbo[index].buffer, NULL);
       ctx->vbo_res_ids[index] = 0;
    } else if (ctx->vbo_res_ids[index] != res_handle) {
-      res = vrend_resource_lookup(res_handle, ctx->ctx_id);
+      res = graw_renderer_ctx_res_lookup(ctx, res_handle);
       if (!res) {
          report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, res_handle);
          ctx->vbo_res_ids[index] = 0;
@@ -1228,7 +1231,7 @@ void grend_set_single_sampler_view(struct grend_context *ctx,
          report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_HANDLE, handle);
          return;
       }
-      tex = vrend_resource_lookup(view->res_handle, ctx->ctx_id);
+      tex = graw_renderer_ctx_res_lookup(ctx, view->res_handle);
       if (!tex) {
          fprintf(stderr,"cannot find texture to back resource view %d %d\n", handle, view->res_handle);
          return;
@@ -1302,7 +1305,7 @@ void grend_transfer_inline_write(struct grend_context *ctx,
 {
    struct grend_resource *res;
 
-   res = vrend_resource_lookup(res_handle, ctx->ctx_id);
+   res = graw_renderer_ctx_res_lookup(ctx, res_handle);
    if (!res) {
       report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, res_handle);
       return;
@@ -2697,6 +2700,8 @@ struct grend_context *grend_create_context(int id, uint32_t nlen, const char *de
    glGenFramebuffers(2, grctx->blit_fb_ids);
    grctx->object_hash = vrend_object_init_ctx_table();
 
+   grctx->res_hash = vrend_object_init_ctx_table();
+
    grend_bind_va(grctx->vaoid);
    return grctx;
 }
@@ -3607,8 +3612,8 @@ void graw_renderer_resource_copy_region(struct grend_context *ctx,
    if (ctx->in_error)
       return;
 
-   src_res = vrend_resource_lookup(src_handle, ctx->ctx_id);
-   dst_res = vrend_resource_lookup(dst_handle, ctx->ctx_id);
+   src_res = graw_renderer_ctx_res_lookup(ctx, src_handle);
+   dst_res = graw_renderer_ctx_res_lookup(ctx, dst_handle);
 
    if (!src_res) {
       report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, src_handle);
@@ -3686,8 +3691,8 @@ static void graw_renderer_blit_int(struct grend_context *ctx,
    if (ctx->in_error)
       return;
 
-   src_res = vrend_resource_lookup(src_handle, ctx->ctx_id);
-   dst_res = vrend_resource_lookup(dst_handle, ctx->ctx_id);
+   src_res = graw_renderer_ctx_res_lookup(ctx, src_handle);
+   dst_res = graw_renderer_ctx_res_lookup(ctx, dst_handle);
 
    if (!src_res) {
       report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, src_handle);
@@ -4069,7 +4074,7 @@ void grend_create_query(struct grend_context *ctx, uint32_t handle,
    struct grend_query *q;
    struct grend_resource *res;
 
-   res = vrend_resource_lookup(res_handle, ctx->ctx_id);
+   res = graw_renderer_ctx_res_lookup(ctx, res_handle);
    if (!res) {
       report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, res_handle);
       return;
@@ -4269,7 +4274,7 @@ void grend_create_so_target(struct grend_context *ctx,
    struct grend_so_target *target;
    struct grend_resource *res;
 
-   res = vrend_resource_lookup(res_handle, ctx->ctx_id);
+   res = graw_renderer_ctx_res_lookup(ctx, res_handle);
    if (!res) {
       report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, res_handle);
       return;
@@ -4478,3 +4483,30 @@ void graw_renderer_get_rect(int idx, struct virgl_iovec *iov, unsigned int num_i
                                    0, stride, 0, &box, offset, iov, num_iovs);
 }
                                    
+void graw_renderer_attach_res_ctx(int ctx_id, int resource_id)
+{
+   struct grend_context *ctx = vrend_lookup_renderer_ctx(ctx_id);
+   struct grend_resource *res = vrend_resource_lookup(resource_id, 0);
+   fprintf(stderr, "attaching %d %d %p\n", ctx_id, resource_id, res);
+   vrend_object_insert_nofree(ctx->res_hash, res, sizeof(*res), resource_id, 1, false);
+}
+
+void graw_renderer_detach_res_ctx(int ctx_id, int res_handle)
+{
+   struct grend_context *ctx = vrend_lookup_renderer_ctx(ctx_id);
+
+   struct grend_resource *res = vrend_object_lookup(ctx->res_hash, res_handle, 1);
+
+   fprintf(stderr, "detaching %d %d %p\n", ctx_id, res_handle, res);
+   if (!res)
+      return;
+
+   vrend_object_remove(ctx->res_hash, res_handle, 1);
+}
+
+static struct grend_resource *graw_renderer_ctx_res_lookup(struct grend_context *ctx, int res_handle)
+{
+   struct grend_resource *res = vrend_object_lookup(ctx->res_hash, res_handle, 1);
+
+   return res;
+}

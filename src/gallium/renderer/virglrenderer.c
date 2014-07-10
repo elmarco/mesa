@@ -119,3 +119,13 @@ void virgl_renderer_force_ctx_0(void)
 {
    graw_renderer_force_ctx_0();
 }
+
+void virgl_renderer_ctx_attach_resource(int ctx_id, int res_handle)
+{
+   graw_renderer_attach_res_ctx(ctx_id, res_handle);
+}
+
+void virgl_renderer_ctx_detach_resource(int ctx_id, int res_handle)
+{
+   graw_renderer_detach_res_ctx(ctx_id, res_handle);
+}

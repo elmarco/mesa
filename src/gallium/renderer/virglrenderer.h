@@ -51,6 +51,7 @@ VIRGL_EXPORT void virgl_renderer_get_rect(int idx, struct virgl_iovec *iov, unsi
 
 VIRGL_EXPORT int virgl_renderer_get_fd_for_texture(uint32_t tex_id, int *fd);
 
+struct virgl_resource;
 
 struct virgl_renderer_resource_create_args {
    uint32_t handle;
@@ -113,4 +114,7 @@ VIRGL_EXPORT void virgl_renderer_resource_invalid_iov(int res_handle);
 VIRGL_EXPORT int virgl_renderer_create_fence(int client_fence_id, uint32_t ctx_id);
 
 VIRGL_EXPORT void virgl_renderer_force_ctx_0(void);
+
+VIRGL_EXPORT void virgl_renderer_ctx_attach_resource(int ctx_id, int res_handle);
+VIRGL_EXPORT void virgl_renderer_ctx_detach_resource(int ctx_id, int res_handle);
 #endif

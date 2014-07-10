@@ -37,6 +37,7 @@ struct vrend_object {
    enum virgl_object_type type;
    uint32_t handle;
    void *data;
+   bool free_data;
 };
 
 struct util_hash_table *vrend_object_init_ctx_table(void)
@@ -48,11 +49,13 @@ struct util_hash_table *vrend_object_init_ctx_table(void)
 
 static void vrend_object_free(struct vrend_object *obj)
 {
-   if (obj_types[obj->type].unref)
-      obj_types[obj->type].unref(obj->data);
-   else {
-      /* for objects with no callback just free them */
-      free(obj->data);
+   if (obj->free_data) {
+      if (obj_types[obj->type].unref)
+         obj_types[obj->type].unref(obj->data);
+      else {
+         /* for objects with no callback just free them */
+         free(obj->data);
+      }
    }
    free(obj);
 }
@@ -88,8 +91,8 @@ void vrend_object_fini_resource_table(void)
 }
 
 uint32_t
-vrend_object_insert(struct util_hash_table *handle_hash,
-                    void *data, uint32_t length, uint32_t handle, enum virgl_object_type type)
+vrend_object_insert_nofree(struct util_hash_table *handle_hash,
+                           void *data, uint32_t length, uint32_t handle, enum virgl_object_type type, bool free_data)
 {
    struct vrend_object *obj = CALLOC_STRUCT(vrend_object);
 
@@ -98,8 +101,17 @@ vrend_object_insert(struct util_hash_table *handle_hash,
    obj->handle = handle;
    obj->data = data;
    obj->type = type;
+   obj->free_data = free_data;
    util_hash_table_set(handle_hash, intptr_to_pointer(obj->handle), obj);
    return obj->handle;
+}
+
+uint32_t
+vrend_object_insert(struct util_hash_table *handle_hash,
+                    void *data, uint32_t length, uint32_t handle, enum virgl_object_type type)
+{
+   return vrend_object_insert_nofree(handle_hash, data, length,
+                                     handle, type, true);
 }
 
 void

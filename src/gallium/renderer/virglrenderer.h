@@ -22,14 +22,6 @@ struct virgl_renderer_callbacks {
    virgl_gl_context (*create_gl_context)(void *cookie, int scanout_idx);
    void (*destroy_gl_context)(void *cookie, virgl_gl_context ctx);
    int (*make_current)(void *cookie, int scanout_idx, virgl_gl_context ctx);
-
-   /* */
-   void (*rect_update)(void *cookie, int idx, int x, int y, int width, int height);
-   void (*scanout_resource_info)(void *cookie, int idx, uint32_t tex_id, uint32_t flags,
-                                 uint32_t stride, uint32_t width, uint32_t height, uint32_t format);
-   void (*scanout_rect_info)(void *cookie, int idx, uint32_t tex_id,
-                        int x, int y,
-                        uint32_t width, uint32_t height);
 };
 
 /* virtio-gpu compatible interface */
@@ -74,11 +66,6 @@ VIRGL_EXPORT void virgl_renderer_check_fences(void);
 VIRGL_EXPORT void virgl_renderer_context_create(uint32_t handle, uint32_t nlen, const char *name);
 VIRGL_EXPORT void virgl_renderer_context_destroy(uint32_t handle);
 
-VIRGL_EXPORT void virgl_renderer_flush_buffer(uint32_t res_id, uint32_t ctx_id,
-                                              struct virgl_box *box);
-VIRGL_EXPORT void virgl_renderer_set_scanout(uint32_t res_handle, uint32_t scanout_id, uint32_t ctx_id,
-                                struct virgl_box *box);
-
 VIRGL_EXPORT void virgl_renderer_submit_cmd(struct virgl_iovec *iov,
                                             int niovs,
                                             int ctx_id, uint64_t offset,
@@ -114,4 +101,20 @@ VIRGL_EXPORT void virgl_renderer_force_ctx_0(void);
 
 VIRGL_EXPORT void virgl_renderer_ctx_attach_resource(int ctx_id, int res_handle);
 VIRGL_EXPORT void virgl_renderer_ctx_detach_resource(int ctx_id, int res_handle);
+
+/* return information about a resource */
+
+struct virgl_renderer_resource_info {
+   uint32_t handle;
+   uint32_t format;
+   uint32_t width;
+   uint32_t height;
+   uint32_t depth;
+   uint32_t flags;
+   uint32_t tex_id;
+   uint32_t stride;
+};
+
+VIRGL_EXPORT int virgl_renderer_resource_get_info(int res_handle,
+                                                  struct virgl_renderer_resource_info *info);
 #endif

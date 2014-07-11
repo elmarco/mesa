@@ -310,9 +310,6 @@ struct grend_context {
 
 static struct grend_nontimer_hw_query *grend_create_hw_query(struct grend_query *query);
 
-#define MAX_SCANOUT 4
-static struct grend_resource *frontbuffer[MAX_SCANOUT];
-static struct pipe_box front_box[MAX_SCANOUT];
 static struct grend_format_table tex_conv_table[VIRGL_FORMAT_MAX];
 
 static INLINE boolean vrend_format_can_render(enum virgl_formats format)
@@ -2854,8 +2851,8 @@ void graw_renderer_resource_create(struct graw_renderer_resource_create_args *ar
 
 void graw_renderer_resource_destroy(struct grend_resource *res)
 {
-   if (res->scannedout)
-      (*clicbs->scanout_resource_info)(0, res->id, 0, 0, 0, 0, 0);
+//   if (res->scannedout) TODO
+//      (*clicbs->scanout_resource_info)(0, res->id, 0, 0, 0, 0, 0);
 
    if (res->readback_fb_id)
       glDeleteFramebuffers(1, &res->readback_fb_id);
@@ -3772,73 +3769,6 @@ void graw_renderer_blit(struct grend_context *ctx,
    graw_renderer_blit_int(ctx, dst_handle, src_handle, info);
 }
 
-int graw_renderer_set_scanout(uint32_t res_handle, uint32_t scanout_id, uint32_t ctx_id,
-                              struct pipe_box *box)
-{
-   struct grend_resource *res;
-   res = vrend_resource_lookup(res_handle, ctx_id);
-   if (!res)
-      return 0;
-
-   grend_resource_reference(&frontbuffer[scanout_id], res);
-   front_box[scanout_id] = *box;
-
-   {
-      int elsize = util_format_get_blocksize(res->base.format);
-      uint32_t stride;
-      stride = util_format_get_nblocksx(res->base.format, u_minify(res->base.width0, 0)) * elsize;
-      (*clicbs->scanout_resource_info)(scanout_id, res->id, res->y_0_top ? 1 : 0, stride, res->base.width0, res->base.height0, res->base.format);
-      res->scannedout = 1;
-   }
-   (*clicbs->scanout_rect_info)(scanout_id, res->id, box->x, box->y, box->width, box->height);
-   fprintf(stderr,"setting frontbuffer %d to %d\n", scanout_id, res_handle);
-   return 0;
-}
-
-int graw_renderer_flush_buffer_res(struct grend_resource *res,
-                                   struct pipe_box *box)
-{
-   if (1 && !res->is_front) {
-      int i;
-      grend_hw_switch_context(vrend_lookup_renderer_ctx(0), TRUE);
-
-      for (i = 0; i < MAX_SCANOUT; i++) {
-         if (clicbs->flush_scanout)
-            clicbs->flush_scanout(i, box->x, box->y, box->width, box->height);
-      }
-   }
-
-   return 0;
-}
-
-int graw_renderer_flush_buffer(uint32_t res_handle,
-                               uint32_t ctx_id,
-                               struct pipe_box *box)
-{
-   struct grend_resource *res;
-   int i;
-   bool found = false;
-   if (!localrender)
-      return 0;
-
-   res = vrend_resource_lookup(res_handle, ctx_id);
-   if (!res)
-      return 0;
-
-   for (i = 0; i < MAX_SCANOUT; i++) {
-      if (res == frontbuffer[i]) {
-         found = true;
-      }
-   }
-
-   if (found == false) {
-      fprintf(stderr,"not the frontbuffer %d\n", res_handle); 
-      return 0;
-   }
-
-   return graw_renderer_flush_buffer_res(res, box);
-}
-
 int graw_renderer_create_fence(int client_fence_id, uint32_t ctx_id)
 {
    struct grend_fence *fence;
@@ -4483,7 +4413,7 @@ void graw_renderer_force_ctx_0(void)
 void graw_renderer_get_rect(int idx, struct virgl_iovec *iov, unsigned int num_iovs,
                             uint32_t offset, int x, int y, int width, int height)
 {
-   struct grend_resource *res = frontbuffer[idx];
+   struct grend_resource *res = NULL;//frontbuffer[idx];
    struct pipe_box box;
    int elsize = util_format_get_blocksize(res->base.format);
    int stride;
@@ -4525,4 +4455,27 @@ static struct grend_resource *graw_renderer_ctx_res_lookup(struct grend_context 
    struct grend_resource *res = vrend_object_lookup(ctx->res_hash, res_handle, 1);
 
    return res;
+}
+
+int graw_renderer_resource_get_info(int res_handle,
+                                     struct graw_renderer_resource_info *info)
+{
+   struct grend_resource *res = vrend_resource_lookup(res_handle, 0);
+   int elsize;
+
+   if (!res)
+      return -1;
+
+   elsize = util_format_get_blocksize(res->base.format);
+
+   info->handle = res_handle;
+   info->tex_id = res->id;
+   info->width = res->base.width0;
+   info->height = res->base.height0;
+   info->depth = res->base.depth0;
+   info->format = res->base.format;
+   info->flags = res->y_0_top ? VIRGL_RESOURCE_Y_0_TOP : 0;
+   info->stride = util_format_get_nblocksx(res->base.format, u_minify(res->base.width0, 0)) * elsize;
+
+   return 0;
 }

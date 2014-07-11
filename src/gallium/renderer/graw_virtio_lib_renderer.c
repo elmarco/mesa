@@ -92,38 +92,11 @@ static int make_current(int scanout_idx, virgl_gl_context ctx)
     return rcbs->make_current(dev_cookie, scanout_idx, ctx);
 }
 
-static void flush_scanout(int scanout_id, int x, int y, uint32_t width, uint32_t height)
-{
-   if (rcbs->rect_update)
-      rcbs->rect_update(dev_cookie, scanout_id, x, y, width, height);
-}
-
-static void scanout_rect_info(int scanout_id, GLuint tex_id,
-                              int x, int y, uint32_t width,
-                              uint32_t height)
-{
-   if (rcbs->scanout_rect_info)
-      rcbs->scanout_rect_info(dev_cookie, scanout_id, tex_id,
-                              x, y, width, height);
-}
-
-static void scanout_resource_info(int scanout_id, GLuint tex_id, uint32_t flags,
-                                  uint32_t stride, uint32_t width,
-                                  uint32_t height, uint32_t format)
-{
-   if (rcbs->scanout_resource_info)
-      rcbs->scanout_resource_info(dev_cookie, scanout_id, tex_id, flags,
-                                  stride, width, height, virgl_egl_get_gbm_format(format));
-}
-
 static struct grend_if_cbs virgl_cbs = {
    virgl_write_fence,
-   scanout_rect_info,
-   scanout_resource_info,
    create_gl_context,
    destroy_gl_context,
    make_current,
-   flush_scanout,
 };
 
 void *virgl_get_cursor_data(uint32_t resource_id, uint32_t *width, uint32_t *height)

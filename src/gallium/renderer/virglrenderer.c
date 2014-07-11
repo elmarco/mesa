@@ -18,7 +18,7 @@
 #include "graw_renderer.h"
 
 #include "virglrenderer.h"
-
+#include "virgl_egl.h"
 /* new API - just wrap internal API for now */
 
 void virgl_renderer_resource_create(struct virgl_renderer_resource_create_args *args, struct virgl_iovec *iov, uint32_t num_iovs)
@@ -45,18 +45,6 @@ void virgl_renderer_context_create(uint32_t handle, uint32_t nlen, const char *n
 void virgl_renderer_context_destroy(uint32_t handle)
 {
    graw_renderer_context_destroy(handle);
-}
-
-void virgl_renderer_flush_buffer(uint32_t res_id, uint32_t ctx_id,
-                                 struct virgl_box *box)
-{
-   graw_renderer_flush_buffer(res_id, ctx_id, (struct pipe_box *)box);
-}
-
-void virgl_renderer_set_scanout(uint32_t res_handle, uint32_t scanout_id, uint32_t ctx_id,
-                                struct virgl_box *box)
-{
-   graw_renderer_set_scanout(res_handle, scanout_id, ctx_id, (struct pipe_box *)box);
 }
 
 void virgl_renderer_submit_cmd(struct virgl_iovec *iov,
@@ -128,4 +116,13 @@ void virgl_renderer_ctx_attach_resource(int ctx_id, int res_handle)
 void virgl_renderer_ctx_detach_resource(int ctx_id, int res_handle)
 {
    graw_renderer_detach_res_ctx(ctx_id, res_handle);
+}
+
+int virgl_renderer_resource_get_info(int res_handle,
+                                     struct virgl_renderer_resource_info *info)
+{
+   int ret;
+   ret = graw_renderer_resource_get_info(res_handle, (struct graw_renderer_resource_info *)info);
+   info->format = virgl_egl_get_gbm_format(info->format);
+   return ret; 
 }

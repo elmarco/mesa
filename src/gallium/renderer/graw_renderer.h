@@ -47,18 +47,10 @@ struct grend_format_table {
 
 struct grend_if_cbs {
    void (*write_fence)(unsigned fence_id);
-   /* inform the control layer about a new scanout */
-   void (*scanout_rect_info)(int scanout_id, GLuint tex_id, int x, int y,
-                             uint32_t width, uint32_t height);
-   void (*scanout_resource_info)(int scanout_id, GLuint tex_id, uint32_t flags,
-                                 uint32_t stride,
-                                 uint32_t width, uint32_t height, uint32_t format);
 
    virgl_gl_context (*create_gl_context)(int scanout);
    void (*destroy_gl_context)(virgl_gl_context ctx);
    int (*make_current)(int scanout, virgl_gl_context ctx);
-
-   void (*flush_scanout)(int scanout, int x, int y, uint32_t width, uint32_t height);
 };
 void graw_renderer_init(struct grend_if_cbs *cbs);
 
@@ -243,15 +235,6 @@ void graw_transfer_write_tex_return(struct pipe_resource *res,
                                     int num_iovs,
 				    void *myptr, int size, int invert);
 
-int graw_renderer_set_scanout(uint32_t res_handle,
-                              uint32_t scanout_id,
-                              uint32_t ctx_id,
-                              struct pipe_box *box);
-
-int graw_renderer_flush_buffer(uint32_t res_handle,
-                               uint32_t ctx_id,
-                               struct pipe_box *box);
-
 void graw_renderer_fini(void);
 void graw_reset_decode(void);
 
@@ -323,4 +306,19 @@ void graw_renderer_get_rect(int idx, struct virgl_iovec *iov, unsigned int num_i
                             uint32_t offset, int x, int y, int width, int height);
 void graw_renderer_attach_res_ctx(int ctx_id, int resource_id);
 void graw_renderer_detach_res_ctx(int ctx_id, int resource_id);
+
+
+struct graw_renderer_resource_info {
+   uint32_t handle;
+   uint32_t format;
+   uint32_t width;
+   uint32_t height;
+   uint32_t depth;
+   uint32_t flags;
+   uint32_t tex_id;
+   uint32_t stride;
+};
+
+int graw_renderer_resource_get_info(int res_handle,
+                                     struct graw_renderer_resource_info *info);
 #endif

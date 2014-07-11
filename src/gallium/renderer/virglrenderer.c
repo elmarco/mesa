@@ -130,3 +130,9 @@ void virgl_renderer_get_cap_set(uint32_t cap_set, uint32_t *max_ver,
 {
    graw_renderer_get_cap_set(cap_set, max_ver, max_size);
 }
+
+void virgl_renderer_get_rect(int resource_id, struct iovec *iov, unsigned int num_iovs,
+                                uint32_t offset, int x, int y, int width, int height)
+{
+   graw_renderer_get_rect(resource_id, iov, num_iovs, offset, x, y, width, height);
+}

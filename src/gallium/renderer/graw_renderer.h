@@ -299,7 +299,7 @@ grend_resource_reference(struct grend_resource **ptr, struct grend_resource *tex
 
 void graw_renderer_force_ctx_0(void);
 
-void graw_renderer_get_rect(int idx, struct iovec *iov, unsigned int num_iovs,
+void graw_renderer_get_rect(int resource_id, struct iovec *iov, unsigned int num_iovs,
                             uint32_t offset, int x, int y, int width, int height);
 void graw_renderer_attach_res_ctx(int ctx_id, int resource_id);
 void graw_renderer_detach_res_ctx(int ctx_id, int resource_id);

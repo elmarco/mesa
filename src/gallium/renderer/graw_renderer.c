@@ -4378,13 +4378,15 @@ void graw_renderer_force_ctx_0(void)
    grend_hw_switch_context(vrend_lookup_renderer_ctx(0), TRUE);
 }
 
-void graw_renderer_get_rect(int idx, struct iovec *iov, unsigned int num_iovs,
+void graw_renderer_get_rect(int res_handle, struct iovec *iov, unsigned int num_iovs,
                             uint32_t offset, int x, int y, int width, int height)
 {
-   struct grend_resource *res = NULL;//frontbuffer[idx];
+   struct grend_resource *res = vrend_resource_lookup(res_handle, 0);
    struct pipe_box box;
-   int elsize = util_format_get_blocksize(res->base.format);
+   int elsize;
    int stride;
+
+   elsize = util_format_get_blocksize(res->base.format);
    box.x = x;
    box.y = y;
    box.z = 0;

@@ -109,13 +109,6 @@ void virgl_renderer_poll(void)
    graw_renderer_check_fences();
 }
 
-void virgl_renderer_get_rect(int idx, struct iovec *iov, unsigned int num_iovs,
-                             uint32_t offset, int x, int y, int width, int height)
-{
-   graw_renderer_get_rect(idx, iov, num_iovs, offset, x, y, width, height);
-   
-}
-
 int virgl_renderer_init(void *cookie, int flags, struct virgl_renderer_callbacks *cbs)
 {
    dev_cookie = cookie;
@@ -138,5 +131,4 @@ int virgl_renderer_init(void *cookie, int flags, struct virgl_renderer_callbacks
 int virgl_renderer_get_fd_for_texture(uint32_t tex_id, int *fd)
 {
     return virgl_egl_get_fd_for_texture(egl_info, tex_id, fd);
-
 }

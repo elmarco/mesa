@@ -57,11 +57,18 @@ void grend_create_vs(struct grend_context *ctx,
                      uint32_t handle,
                      const struct pipe_shader_state *vs);
 
+void grend_create_gs(struct grend_context *ctx,
+                     uint32_t handle,
+                     const struct pipe_shader_state *gs);
+
 void grend_create_fs(struct grend_context *ctx,
                      uint32_t handle,
                      const struct pipe_shader_state *vs);
 
 void grend_bind_vs(struct grend_context *ctx,
+                   uint32_t handle);
+
+void grend_bind_gs(struct grend_context *ctx,
                    uint32_t handle);
 
 void grend_bind_fs(struct grend_context *ctx,

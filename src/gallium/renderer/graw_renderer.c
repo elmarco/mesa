@@ -243,6 +243,7 @@ struct grend_context {
    struct pipe_vertex_buffer vbo[PIPE_MAX_ATTRIBS];
    uint32_t vbo_res_ids[PIPE_MAX_ATTRIBS];
    struct grend_shader_selector *vs;
+   struct grend_shader_selector *gs;
    struct grend_shader_selector *fs;
 
    bool shader_dirty;
@@ -318,6 +319,16 @@ static INLINE boolean vrend_format_can_render(enum virgl_formats format)
 static INLINE boolean vrend_format_is_ds(enum virgl_formats format)
 {
    return tex_conv_table[format].bindings & VREND_BIND_DEPTHSTENCIL;
+}
+
+static inline const char *pipe_shader_to_prefix(int shader_type)
+{
+   switch (shader_type) {
+   case PIPE_SHADER_VERTEX: return "vs";
+   case PIPE_SHADER_FRAGMENT: return "fs";
+   case PIPE_SHADER_GEOMETRY: return "gs";
+   };
+   return NULL;
 }
 
 static const char *vrend_ctx_error_strings[] = { "None", "Unknown", "Illegal shader", "Illegal handle", "Illegal resource", "Illegal surface", "Illegal vertex format" };
@@ -531,9 +542,10 @@ static void set_stream_out_varyings(int prog_id, struct pipe_stream_output_info 
 
 static struct grend_linked_shader_program *add_shader_program(struct grend_context *ctx,
                                                               struct grend_shader *vs,
-                                                              struct grend_shader *fs)
+                                                              struct grend_shader *fs,
+                                                              struct grend_shader *gs)
 {
-  struct grend_linked_shader_program *sprog = malloc(sizeof(struct grend_linked_shader_program));
+   struct grend_linked_shader_program *sprog = CALLOC_STRUCT(grend_linked_shader_program);
   char name[16];
   int i;
   GLuint prog_id;
@@ -558,6 +570,8 @@ static struct grend_linked_shader_program *add_shader_program(struct grend_conte
   prog_id = glCreateProgram();
   glAttachShader(prog_id, vs->id);
   set_stream_out_varyings(prog_id, &vs->sel->sinfo.so_info);
+  if (gs)
+     glAttachShader(prog_id, gs->id);
   glAttachShader(prog_id, fs->id);
   glLinkProgram(prog_id);
 
@@ -570,6 +584,8 @@ static struct grend_linked_shader_program *add_shader_program(struct grend_conte
      /* dump shaders */
      report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_SHADER, 0);
      fprintf(stderr,"vert shader: GLSL\n%s\n", vs->glsl_prog);
+     if (gs)
+        fprintf(stderr,"geom shader: GLSL\n%s\n", gs->glsl_prog);
      fprintf(stderr,"frag shader: GLSL\n%s\n", fs->glsl_prog);
      glDeleteProgram(prog_id);
      return NULL;
@@ -577,13 +593,14 @@ static struct grend_linked_shader_program *add_shader_program(struct grend_conte
 
   sprog->ss[0] = vs;
   sprog->ss[1] = fs;
+  sprog->ss[2] = gs;
 
   sprog->id = prog_id;
 
   list_add(&sprog->head, &ctx->programs);
 
   sprog->vs_ws_adjust_loc = glGetUniformLocation(prog_id, "winsys_adjust");
-  for (id = PIPE_SHADER_VERTEX; id <= PIPE_SHADER_FRAGMENT; id++) {
+  for (id = PIPE_SHADER_VERTEX; id <= (gs ? PIPE_SHADER_GEOMETRY : PIPE_SHADER_FRAGMENT); id++) {
     if (sprog->ss[id]->sel->sinfo.samplers_used_mask) {
        uint32_t mask = sprog->ss[id]->sel->sinfo.samplers_used_mask;
        int nsamp = util_bitcount(sprog->ss[id]->sel->sinfo.samplers_used_mask);
@@ -597,7 +614,7 @@ static struct grend_linked_shader_program *add_shader_program(struct grend_conte
        }
        sprog->samp_locs[id] = calloc(nsamp, sizeof(uint32_t));
        if (sprog->samp_locs[id]) {
-          const char *prefix = (id == PIPE_SHADER_VERTEX) ? "vs" : "fs";
+          const char *prefix = pipe_shader_to_prefix(id);
           index = 0;
           while(mask) {
              i = u_bit_scan(&mask);
@@ -621,11 +638,11 @@ static struct grend_linked_shader_program *add_shader_program(struct grend_conte
     sprog->samplers_used_mask[id] = sprog->ss[id]->sel->sinfo.samplers_used_mask;
   }
   
-  for (id = PIPE_SHADER_VERTEX; id <= PIPE_SHADER_FRAGMENT; id++) {
+  for (id = PIPE_SHADER_VERTEX; id <= (gs ? PIPE_SHADER_GEOMETRY : PIPE_SHADER_FRAGMENT); id++) {
      if (sprog->ss[id]->sel->sinfo.num_consts) {
         sprog->const_locs[id] = calloc(sprog->ss[id]->sel->sinfo.num_consts, sizeof(uint32_t));
         if (sprog->const_locs[id]) {
-           const char *prefix = (id == PIPE_SHADER_VERTEX) ? "vs" : "fs";
+           const char *prefix = pipe_shader_to_prefix(id);
            for (i = 0; i < sprog->ss[id]->sel->sinfo.num_consts; i++) {
               snprintf(name, 16, "%sconst[%d]", prefix, i);
               sprog->const_locs[id][i] = glGetUniformLocation(prog_id, name);
@@ -654,12 +671,16 @@ static struct grend_linked_shader_program *add_shader_program(struct grend_conte
 }
 
 static struct grend_linked_shader_program *lookup_shader_program(struct grend_context *ctx,
-                                                                 GLuint vs_id, GLuint fs_id)
+                                                                 GLuint vs_id, GLuint fs_id, GLuint gs_id)
 {
   struct grend_linked_shader_program *ent;
   LIST_FOR_EACH_ENTRY(ent, &ctx->programs, head) {
-     if (ent->ss[PIPE_SHADER_VERTEX]->id == vs_id && ent->ss[PIPE_SHADER_FRAGMENT]->id == fs_id)
-        return ent;
+     if (ent->ss[PIPE_SHADER_VERTEX]->id == vs_id && ent->ss[PIPE_SHADER_FRAGMENT]->id == fs_id) {
+        if (!ent->ss[PIPE_SHADER_GEOMETRY] && gs_id == 0)
+           return ent;
+        if (ent->ss[PIPE_SHADER_GEOMETRY] && ent->ss[PIPE_SHADER_GEOMETRY]->id == gs_id)
+           return ent;
+     }
   }
   return 0;
 }
@@ -672,7 +693,7 @@ static void grend_free_programs(struct grend_context *ctx)
       glDeleteProgram(ent->id);
       list_del(&ent->head);
 
-      for (i = PIPE_SHADER_VERTEX; i <= PIPE_SHADER_FRAGMENT; i++) {
+      for (i = PIPE_SHADER_VERTEX; i <= PIPE_SHADER_GEOMETRY; i++) {
 //         grend_shader_state_reference(&ent->ss[i], NULL);
          free(ent->shadow_samp_mask_locs[i]);
          free(ent->shadow_samp_add_locs[i]);
@@ -1340,15 +1361,26 @@ static INLINE void vrend_fill_shader_key(struct grend_context *ctx,
    key->coord_replace = ctx->rs_state.point_quad_rasterization ? ctx->rs_state.sprite_coord_enable : 0;
 }
 
+static INLINE int conv_shader_type(int type)
+{
+   switch (type) {
+   case PIPE_SHADER_VERTEX: return GL_VERTEX_SHADER;
+   case PIPE_SHADER_FRAGMENT: return GL_FRAGMENT_SHADER;
+   case PIPE_SHADER_GEOMETRY: return GL_GEOMETRY_SHADER;
+   };
+   return 0;
+}
+
 static int grend_shader_create(struct grend_context *ctx,
                                struct grend_shader *shader,
                                struct vrend_shader_key key)
 {
-   shader->id = glCreateShader(shader->sel->type == PIPE_SHADER_VERTEX ? GL_VERTEX_SHADER : GL_FRAGMENT_SHADER);
+
+   shader->id = glCreateShader(conv_shader_type(shader->sel->type));
    shader->compiled_fs_id = 0;
    shader->glsl_prog = tgsi_convert(shader->sel->tokens, &key, &shader->sel->sinfo);
 
-   if (shader->sel->type == PIPE_SHADER_FRAGMENT) {
+   if (shader->sel->type == PIPE_SHADER_FRAGMENT || shader->sel->type == PIPE_SHADER_GEOMETRY) {
       boolean ret;
 
       ret = grend_compile_shader(ctx, shader);
@@ -1438,6 +1470,19 @@ void grend_create_vs(struct grend_context *ctx,
    return;
 }
 
+void grend_create_gs(struct grend_context *ctx,
+                     uint32_t handle,
+                     const struct pipe_shader_state *gs)
+{
+   struct grend_shader_selector *sel;
+
+   sel = grend_create_shader_state(ctx, gs, PIPE_SHADER_GEOMETRY);
+
+   vrend_object_insert(ctx->object_hash, sel, sizeof(*sel), handle, VIRGL_OBJECT_GS);
+
+   return;
+}
+
 void grend_create_fs(struct grend_context *ctx,
                      uint32_t handle,
                      const struct pipe_shader_state *fs)
@@ -1461,6 +1506,18 @@ void grend_bind_vs(struct grend_context *ctx,
    if (ctx->vs != sel)
       ctx->shader_dirty = true;
    grend_shader_state_reference(&ctx->vs, sel);
+}
+
+void grend_bind_gs(struct grend_context *ctx,
+                   uint32_t handle)
+{
+   struct grend_shader_selector *sel;
+
+   sel = vrend_object_lookup(ctx->object_hash, handle, VIRGL_OBJECT_GS);
+
+   if (ctx->gs != sel)
+      ctx->shader_dirty = true;
+   grend_shader_state_reference(&ctx->gs, sel);
 }
 
 void grend_bind_fs(struct grend_context *ctx,
@@ -1609,7 +1666,7 @@ void grend_draw_vbo(struct grend_context *ctx,
 
    if (ctx->shader_dirty) {
      struct grend_linked_shader_program *prog;
-     boolean fs_dirty, vs_dirty;
+     boolean fs_dirty, vs_dirty, gs_dirty;
 
      if (!ctx->vs || !ctx->fs) {
         fprintf(stderr,"dropping rendering due to missing shaders\n");
@@ -1618,10 +1675,12 @@ void grend_draw_vbo(struct grend_context *ctx,
 
      grend_shader_select(ctx, ctx->fs, &fs_dirty);
      grend_shader_select(ctx, ctx->vs, &vs_dirty);
+     if (ctx->gs)
+        grend_shader_select(ctx, ctx->gs, &gs_dirty);
 
-     prog = lookup_shader_program(ctx, ctx->vs->current->id, ctx->fs->current->id);
+     prog = lookup_shader_program(ctx, ctx->vs->current->id, ctx->fs->current->id, ctx->gs ? ctx->gs->current->id : 0);
      if (!prog) {
-        prog = add_shader_program(ctx, ctx->vs->current, ctx->fs->current);
+        prog = add_shader_program(ctx, ctx->vs->current, ctx->fs->current, ctx->gs ? ctx->gs->current : NULL);
         if (!prog)
            return;
      }
@@ -1635,11 +1694,13 @@ void grend_draw_vbo(struct grend_context *ctx,
    
    grend_use_program(ctx->prog->id);
 
-   for (shader_type = PIPE_SHADER_VERTEX; shader_type <= PIPE_SHADER_FRAGMENT; shader_type++) {
+   for (shader_type = PIPE_SHADER_VERTEX; shader_type <= (ctx->gs ? PIPE_SHADER_GEOMETRY : PIPE_SHADER_FRAGMENT); shader_type++) {
       if (ctx->prog->const_locs[shader_type] && (ctx->const_dirty[shader_type] || new_program)) {
 	 int nc;
          if (shader_type == PIPE_SHADER_VERTEX) {
 	    nc = ctx->vs->sinfo.num_consts;
+         } else if (shader_type == PIPE_SHADER_GEOMETRY) {
+	    nc = ctx->gs->sinfo.num_consts;
          } else if (shader_type == PIPE_SHADER_FRAGMENT) {
 	    nc = ctx->fs->sinfo.num_consts;
          }
@@ -2606,6 +2667,7 @@ void graw_renderer_init(struct grend_if_cbs *cbs)
    vrend_object_set_destroy_callback(VIRGL_OBJECT_SURFACE, grend_destroy_surface_object);
    vrend_object_set_destroy_callback(VIRGL_OBJECT_VS, grend_destroy_shader_object);
    vrend_object_set_destroy_callback(VIRGL_OBJECT_FS, grend_destroy_shader_object);
+   vrend_object_set_destroy_callback(VIRGL_OBJECT_GS, grend_destroy_shader_object);
    vrend_object_set_destroy_callback(VIRGL_OBJECT_SAMPLER_VIEW, grend_destroy_sampler_view_object);
    vrend_object_set_destroy_callback(VIRGL_OBJECT_STREAMOUT_TARGET, grend_destroy_so_target_object);
 
@@ -2644,6 +2706,7 @@ bool grend_destroy_context(struct grend_context *ctx)
 
    grend_set_num_sampler_views(ctx, PIPE_SHADER_VERTEX, 0, 0);
    grend_set_num_sampler_views(ctx, PIPE_SHADER_FRAGMENT, 0, 0);
+   grend_set_num_sampler_views(ctx, PIPE_SHADER_GEOMETRY, 0, 0);
 
    grend_set_streamout_targets(ctx, 0, 0, NULL);
    grend_set_num_vbo(ctx, 0);

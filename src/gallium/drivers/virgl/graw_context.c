@@ -343,6 +343,26 @@ static void *graw_create_vs_state(struct pipe_context *ctx,
    return (void *)(unsigned long)handle;
 }
 
+
+static void *graw_create_gs_state(struct pipe_context *ctx,
+                                   const struct pipe_shader_state *shader)
+{
+   struct graw_context *grctx = (struct graw_context *)ctx;
+   uint32_t handle;
+   int ret;
+
+   handle = graw_object_assign_handle();
+
+   /* encode GS state */
+   ret = graw_encode_shader_state(grctx, handle,
+                                  VIRGL_OBJECT_GS, shader);
+   if (ret) {
+      return NULL;
+   }
+
+   return (void *)(unsigned long)handle;
+}
+
 static void *graw_create_fs_state(struct pipe_context *ctx,
                                    const struct pipe_shader_state *shader)
 {
@@ -371,6 +391,16 @@ graw_delete_fs_state(struct pipe_context *ctx,
 }
 
 static void
+graw_delete_gs_state(struct pipe_context *ctx,
+                     void *gs)
+{
+   uint32_t handle = (unsigned long)gs;
+   struct graw_context *grctx = (struct graw_context *)ctx;
+
+   graw_encode_delete_object(grctx, handle, VIRGL_OBJECT_GS);
+}
+
+static void
 graw_delete_vs_state(struct pipe_context *ctx,
                      void *vs)
 {
@@ -387,6 +417,15 @@ static void graw_bind_vs_state(struct pipe_context *ctx,
    struct graw_context *grctx = (struct graw_context *)ctx;
 
    graw_encode_bind_object(grctx, handle, VIRGL_OBJECT_VS);
+}
+
+static void graw_bind_gs_state(struct pipe_context *ctx,
+                               void *vss)
+{
+   uint32_t handle = (unsigned long)vss;
+   struct graw_context *grctx = (struct graw_context *)ctx;
+
+   graw_encode_bind_object(grctx, handle, VIRGL_OBJECT_GS);
 }
 
 
@@ -726,11 +765,17 @@ struct pipe_context *graw_context_create(struct pipe_screen *pscreen,
    grctx->base.set_index_buffer = graw_set_index_buffer;
    grctx->base.set_constant_buffer = graw_set_constant_buffer;
    grctx->base.transfer_inline_write = graw_transfer_inline_write;
-   grctx->base.create_fs_state = graw_create_fs_state;
+
    grctx->base.create_vs_state = graw_create_vs_state;
+   grctx->base.create_gs_state = graw_create_gs_state;
+   grctx->base.create_fs_state = graw_create_fs_state;
+
    grctx->base.bind_vs_state = graw_bind_vs_state;
+   grctx->base.bind_gs_state = graw_bind_gs_state;
    grctx->base.bind_fs_state = graw_bind_fs_state;
+
    grctx->base.delete_vs_state = graw_delete_vs_state;
+   grctx->base.delete_gs_state = graw_delete_gs_state;
    grctx->base.delete_fs_state = graw_delete_fs_state;
    
    grctx->base.clear = graw_clear;

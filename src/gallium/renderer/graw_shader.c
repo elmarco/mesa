@@ -81,6 +81,8 @@ struct dump_ctx {
    boolean write_all_cbufs;
    int fs_coord_origin, fs_pixel_center;
 
+   int gs_in_prim, gs_out_prim, gs_max_out_verts;
+
    struct vrend_shader_key *key;
    boolean has_ints;
    boolean has_instanceid;
@@ -88,6 +90,42 @@ struct dump_ctx {
    int num_clip_dist;
 
 };
+
+static inline const char *tgsi_proc_to_prefix(int shader_type)
+{
+   switch (shader_type) {
+   case TGSI_PROCESSOR_VERTEX: return "vs";
+   case TGSI_PROCESSOR_FRAGMENT: return "fs";
+   case TGSI_PROCESSOR_GEOMETRY: return "gs";
+   };
+   return NULL;
+}
+
+static inline const char *prim_to_name(int prim)
+{
+   switch (prim) {
+   case PIPE_PRIM_POINTS: return "points";
+   case PIPE_PRIM_LINES: return "lines";
+   case PIPE_PRIM_LINE_STRIP: return "line_strip";
+   case PIPE_PRIM_LINES_ADJACENCY: return "lines_adjacency";
+   case PIPE_PRIM_TRIANGLES: return "triangles";
+   case PIPE_PRIM_TRIANGLE_STRIP: return "triangle_strip";
+   case PIPE_PRIM_TRIANGLES_ADJACENCY: return "triangles_adjacency";
+   default: return "UNKNOWN";
+   };
+}
+
+static inline int gs_input_prim_to_size(int prim)
+{
+   switch (prim) {
+   case PIPE_PRIM_POINTS: return 1;
+   case PIPE_PRIM_LINES: return 2;
+   case PIPE_PRIM_LINES_ADJACENCY: return 4;
+   case PIPE_PRIM_TRIANGLES: return 3;
+   case PIPE_PRIM_TRIANGLES_ADJACENCY: return 6;
+   default: return -1;
+   };
+}
 
 static inline boolean fs_emit_layout(struct dump_ctx *ctx)
 {
@@ -163,7 +201,8 @@ iter_declaration(struct tgsi_iterate_context *iter,
             }
          }
       default:
-         if (iter->processor.Processor == TGSI_PROCESSOR_FRAGMENT)
+         if (iter->processor.Processor == TGSI_PROCESSOR_FRAGMENT ||
+             iter->processor.Processor == TGSI_PROCESSOR_GEOMETRY)
             name_prefix = "ex";
          else
             name_prefix = "in";
@@ -194,7 +233,8 @@ iter_declaration(struct tgsi_iterate_context *iter,
       ctx->outputs[i].override_no_wm = FALSE;
       switch (ctx->outputs[i].name) {
       case TGSI_SEMANTIC_POSITION:
-         if (iter->processor.Processor == TGSI_PROCESSOR_VERTEX) {
+         if (iter->processor.Processor == TGSI_PROCESSOR_VERTEX ||
+             iter->processor.Processor == TGSI_PROCESSOR_GEOMETRY) {
             if (ctx->outputs[i].first > 0)
                fprintf(stderr,"Illegal position input\n");
             name_prefix = "gl_Position";
@@ -302,6 +342,7 @@ iter_declaration(struct tgsi_iterate_context *iter,
       ctx->system_values[i].sid = decl->Semantic.Index;
       ctx->system_values[i].glsl_predefined_no_emit = TRUE;
       ctx->system_values[i].glsl_no_index = TRUE;
+      ctx->system_values[i].override_no_wm = TRUE;
       ctx->system_values[i].first = decl->Range.First;
       if (decl->Semantic.Name == TGSI_SEMANTIC_INSTANCEID) {
          name_prefix = "gl_InstanceID";
@@ -342,6 +383,17 @@ iter_property(struct tgsi_iterate_context *iter,
       ctx->fs_pixel_center = prop->u[0].Data;
    }
 
+   if (prop->Property.PropertyName == TGSI_PROPERTY_GS_INPUT_PRIM) {
+      ctx->gs_in_prim = prop->u[0].Data;
+   }
+
+   if (prop->Property.PropertyName == TGSI_PROPERTY_GS_OUTPUT_PRIM) {
+      ctx->gs_out_prim = prop->u[0].Data;
+   }
+
+   if (prop->Property.PropertyName == TGSI_PROPERTY_GS_MAX_OUTPUT_VERTICES) {
+      ctx->gs_max_out_verts = prop->u[0].Data;
+   }
    return TRUE;
 }
 
@@ -500,6 +552,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
    enum tgsi_opcode_type stype = tgsi_opcode_infer_src_type(inst->Instruction.Opcode);
    char *dtypeprefix="", *stypeprefix = "";
    bool stprefix = false;
+   bool override_no_wm[4];
 
    if (dtype == TGSI_TYPE_SIGNED || dtype == TGSI_TYPE_UNSIGNED ||
        stype == TGSI_TYPE_SIGNED || stype == TGSI_TYPE_UNSIGNED)
@@ -586,9 +639,11 @@ iter_instruction(struct tgsi_iterate_context *iter,
       const struct tgsi_full_src_register *src = &inst->Src[i];
       char swizzle[8] = {0};
       char prefix[6] = {0};
+      char arrayname[8] = {0};
       int swz_idx = 0, pre_idx = 0;
       boolean isabsolute = src->Register.Absolute;
       
+      override_no_wm[i] = false;
       if (isabsolute)
          swizzle[swz_idx++] = ')';
 
@@ -596,6 +651,9 @@ iter_instruction(struct tgsi_iterate_context *iter,
          prefix[pre_idx++] = '-';
       if (isabsolute)
          strcpy(&prefix[pre_idx++], "abs(");
+
+      if (src->Register.Dimension)
+         sprintf(arrayname, "[%d]", src->Dimension.Index);
 
       if (src->Register.SwizzleX != TGSI_SWIZZLE_X ||
           src->Register.SwizzleY != TGSI_SWIZZLE_Y ||
@@ -610,7 +668,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
       if (src->Register.File == TGSI_FILE_INPUT) {
          for (j = 0; j < ctx->num_inputs; j++)
             if (ctx->inputs[j].first == src->Register.Index) {
-               snprintf(srcs[i], 255, "%s(%s%s%s)", stypeprefix, prefix, ctx->inputs[j].glsl_name, swizzle);
+               snprintf(srcs[i], 255, "%s(%s%s%s%s)", stypeprefix, prefix, ctx->inputs[j].glsl_name, arrayname, swizzle);
                break;
             }
       }
@@ -620,14 +678,14 @@ iter_instruction(struct tgsi_iterate_context *iter,
          } else
             snprintf(srcs[i], 255, "%s%c%stemps[%d]%s%c", stypeprefix, stprefix ? '(' : ' ', prefix, src->Register.Index, swizzle, stprefix ? ')' : ' ');
       } else if (src->Register.File == TGSI_FILE_CONSTANT) {
-	  const char *cname = ctx->prog_type == TGSI_PROCESSOR_VERTEX ? "vsconst" : "fsconst";
+          const char *cname = tgsi_proc_to_prefix(ctx->prog_type);
           if (src->Register.Indirect) {
-             snprintf(srcs[i], 255, "%s(%s%s[addr0 + %d]%s)", stypeprefix, prefix, cname, src->Register.Index, swizzle);
+             snprintf(srcs[i], 255, "%s(%s%sconst[addr0 + %d]%s)", stypeprefix, prefix, cname, src->Register.Index, swizzle);
           } else
-             snprintf(srcs[i], 255, "%s(%s%s[%d]%s)", stypeprefix, prefix, cname, src->Register.Index, swizzle);
+             snprintf(srcs[i], 255, "%s(%s%sconst[%d]%s)", stypeprefix, prefix, cname, src->Register.Index, swizzle);
       } else if (src->Register.File == TGSI_FILE_SAMPLER) {
-	  const char *cname = ctx->prog_type == TGSI_PROCESSOR_VERTEX ? "vssamp" : "fssamp";
-          snprintf(srcs[i], 255, "%s%d%s", cname, src->Register.Index, swizzle);
+          const char *cname = tgsi_proc_to_prefix(ctx->prog_type);
+          snprintf(srcs[i], 255, "%ssamp%d%s", cname, src->Register.Index, swizzle);
 	  sreg_index = src->Register.Index;
       } else if (src->Register.File == TGSI_FILE_IMMEDIATE) {
          struct immed *imd = &ctx->imm[(src->Register.Index)];
@@ -694,6 +752,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
          for (j = 0; j < ctx->num_system_values; j++)
             if (ctx->system_values[j].first == src->Register.Index) {
                snprintf(srcs[i], 255, "%s%s", prefix, ctx->system_values[j].glsl_name);
+               override_no_wm[i] = ctx->system_values[j].override_no_wm;
             }
       }
    }
@@ -847,7 +906,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
       emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_MOV:
-      snprintf(buf, 255, "%s = %s(%s(%s%s));\n", dsts[0], dstconv, dtypeprefix, srcs[0], writemask);
+      snprintf(buf, 255, "%s = %s(%s(%s%s));\n", dsts[0], dstconv, dtypeprefix, srcs[0], override_no_wm[0] ? "" : writemask);
       emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_ADD:
@@ -1225,6 +1284,8 @@ iter_instruction(struct tgsi_iterate_context *iter,
             emit_so_movs(ctx);
          if (ctx->num_clip_dist)
             emit_clip_dist_movs(ctx);
+      } else if (iter->processor.Processor == TGSI_PROCESSOR_GEOMETRY) {
+
       } else if (ctx->write_all_cbufs)
          emit_cbuf_writes(ctx);
       strcat(ctx->glsl_main, "}\n");
@@ -1258,6 +1319,14 @@ iter_instruction(struct tgsi_iterate_context *iter,
       snprintf(buf, 255, "break;\n");
       emit_buf(ctx, buf);
       break;
+   case TGSI_OPCODE_EMIT:
+      snprintf(buf, 255, "EmitVertex();\n");
+      emit_buf(ctx, buf);
+      break;
+   case TGSI_OPCODE_ENDPRIM:
+      snprintf(buf, 255, "EndPrimitive();\n");
+      emit_buf(ctx, buf);
+      break;
    default:
       fprintf(stderr,"failed to convert opcode %d\n", inst->Instruction.Opcode);
       break;
@@ -1279,7 +1348,10 @@ prolog(struct tgsi_iterate_context *iter)
 
 static void emit_header(struct dump_ctx *ctx, char *glsl_final)
 {
-   strcat(glsl_final, "#version 130\n");
+   if (ctx->prog_type == TGSI_PROCESSOR_GEOMETRY)
+      strcat(glsl_final, "#version 150\n");
+   else
+      strcat(glsl_final, "#version 130\n");
    if (ctx->prog_type == TGSI_PROCESSOR_VERTEX && graw_shader_use_explicit)
       strcat(glsl_final, "#extension GL_ARB_explicit_attrib_location : enable\n");
    if (ctx->prog_type == TGSI_PROCESSOR_FRAGMENT && fs_emit_layout(ctx))
@@ -1336,6 +1408,7 @@ static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
 {
    int i;
    char buf[255];
+   char postfix[8];
    const char *prefix = "";
 
    ctx->num_interps = 0;
@@ -1352,6 +1425,12 @@ static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
          strcat(glsl_final, buf);
       }
    }
+   if (ctx->prog_type == TGSI_PROCESSOR_GEOMETRY) {
+      snprintf(buf, 255, "layout(%s) in;\n", prim_to_name(ctx->gs_in_prim));
+      strcat(glsl_final, buf);
+               snprintf(buf, 255, "layout(%s, max_vertices = %d) out;\n", prim_to_name(ctx->gs_out_prim), ctx->gs_max_out_verts);
+      strcat(glsl_final, buf);
+   }
    for (i = 0; i < ctx->num_inputs; i++) {
       if (!ctx->inputs[i].glsl_predefined_no_emit) { 
          if (ctx->prog_type == TGSI_PROCESSOR_VERTEX && graw_shader_use_explicit) {
@@ -1367,8 +1446,12 @@ static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
             else
                ctx->num_interps++;
          }
-                 
-         snprintf(buf, 255, "%sin vec4 %s;\n", prefix, ctx->inputs[i].glsl_name);
+
+         if (ctx->prog_type == TGSI_PROCESSOR_GEOMETRY) {
+            snprintf(postfix, 8, "[%d]", gs_input_prim_to_size(ctx->gs_in_prim));
+         } else
+            postfix[0] = 0;
+         snprintf(buf, 255, "%sin vec4 %s%s;\n", prefix, ctx->inputs[i].glsl_name, postfix);
          strcat(glsl_final, buf);
       }
    }
@@ -1425,8 +1508,8 @@ static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
       strcat(glsl_final, buf);
    }
    if (ctx->num_consts) {
-      const char *cname = ctx->prog_type == TGSI_PROCESSOR_VERTEX ? "vsconst" : "fsconst";
-      snprintf(buf, 255, "uniform vec4 %s[%d];\n", cname, ctx->num_consts);
+      const char *cname = tgsi_proc_to_prefix(ctx->prog_type);
+      snprintf(buf, 255, "uniform vec4 %sconst[%d];\n", cname, ctx->num_consts);
       strcat(glsl_final, buf);
    }
    for (i = 0; i < 32; i++) {
@@ -1439,11 +1522,9 @@ static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
       stc = samplertypeconv(ctx->samplers[i].tgsi_sampler_type, &is_shad);
 
       if (stc) {
-         char *sname = "fs";
+         const char *sname;
 
-         if (ctx->prog_type == TGSI_PROCESSOR_VERTEX)
-            sname = "vs";
-
+         sname = tgsi_proc_to_prefix(ctx->prog_type);
          snprintf(buf, 255, "uniform sampler%s %ssamp%d;\n", stc, sname, i);
          strcat(glsl_final, buf);
          if (is_shad) {

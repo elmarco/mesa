@@ -72,7 +72,9 @@ static int graw_decode_create_shader(struct grend_decode_ctx *ctx, uint32_t type
 
    state->tokens = tokens;
 
-   if (type == VIRGL_OBJECT_FS)
+   if (type == VIRGL_OBJECT_GS)
+      grend_create_gs(ctx->grctx, handle, state);
+   else if (type == VIRGL_OBJECT_FS)
       grend_create_fs(ctx->grctx, handle, state);
    else
       grend_create_vs(ctx->grctx, handle, state);
@@ -456,6 +458,7 @@ static void graw_decode_create_object(struct grend_decode_ctx *ctx)
       graw_decode_create_rasterizer(ctx, handle, length);
       break;
    case VIRGL_OBJECT_VS:
+   case VIRGL_OBJECT_GS:
    case VIRGL_OBJECT_FS:
       graw_decode_create_shader(ctx, obj_type, handle, length);
       break;
@@ -501,6 +504,9 @@ static void graw_decode_bind_object(struct grend_decode_ctx *ctx)
       break;
    case VIRGL_OBJECT_VS:
       grend_bind_vs(ctx->grctx, handle);
+      break;
+   case VIRGL_OBJECT_GS:
+      grend_bind_gs(ctx->grctx, handle);
       break;
    case VIRGL_OBJECT_FS:
       grend_bind_fs(ctx->grctx, handle);

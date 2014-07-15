@@ -207,7 +207,7 @@ static struct grend_format_table srgb_formats[] = {
 static struct grend_format_table bit10_formats[] = {
       { VIRGL_FORMAT_B10G10R10X2_UNORM, GL_RGB10_A2, GL_BGRA, GL_UNSIGNED_INT_2_10_10_10_REV },
       { VIRGL_FORMAT_B10G10R10A2_UNORM, GL_RGB10_A2, GL_BGRA, GL_UNSIGNED_INT_2_10_10_10_REV },
-      { VIRGL_FORMAT_B10G10R10A2_UINT, GL_RGB10_A2UI, GL_RGBA, GL_UNSIGNED_INT_2_10_10_10_REV },
+      { VIRGL_FORMAT_B10G10R10A2_UINT, GL_RGB10_A2UI, GL_RGBA_INTEGER, GL_UNSIGNED_INT_2_10_10_10_REV },
 };
 
 static struct grend_format_table packed_float_formats[] = {

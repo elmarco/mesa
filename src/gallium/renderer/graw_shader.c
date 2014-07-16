@@ -1134,7 +1134,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
          const char *mname = ctx->prog_type == TGSI_PROCESSOR_VERTEX ? "vsshadmask" : "fsshadmask";
          const char *cname = ctx->prog_type == TGSI_PROCESSOR_VERTEX ? "vsshadadd" : "fsshadadd";
          const struct tgsi_full_src_register *src = &inst->Src[sampler_index];
-         snprintf(buf, 255, "%s = %s(vec4(vec4(texture%s(%s, %s%s%s)) * %s%d + %s%d)%s);\n", dsts[0], dstconv, tex_ext, srcs[sampler_index], srcs[0], twm, bias, mname, src->Register.Index, cname, src->Register.Index, writemask);
+         snprintf(buf, 255, "%s = %s(vec4(vec4(texture%s(%s, %s%s%s%s)) * %s%d + %s%d)%s);\n", dsts[0], dstconv, tex_ext, srcs[sampler_index], srcs[0], twm, offbuf, bias, mname, src->Register.Index, cname, src->Register.Index, writemask);
       } else
          snprintf(buf, 255, "%s = %s(texture%s(%s, %s%s%s%s)%s);\n", dsts[0], dstconv, tex_ext, srcs[sampler_index], srcs[0], twm, offbuf, bias, ctx->outputs[0].override_no_wm ? "" : writemask);
       emit_buf(ctx, buf);

@@ -777,7 +777,7 @@ struct grend_context *vrend_lookup_renderer_ctx(uint32_t ctx_id)
    return dec_ctx[ctx_id]->grctx;
 }
 
-static void graw_decode_block(uint32_t ctx_id, uint32_t *block, int ndw)
+void graw_decode_block(uint32_t ctx_id, uint32_t *block, int ndw)
 {
    int i = 0;
    struct grend_decode_ctx *gdctx;
@@ -892,20 +892,4 @@ static void graw_decode_block(uint32_t ctx_id, uint32_t *block, int ndw)
 
 }
 
-void graw_decode_block_iov(struct iovec *iov, unsigned int niovs,
-                           uint32_t ctx_id, uint64_t offset, int ndw)
-{
-   uint32_t *block = (uint32_t *)(iov[0].iov_base + offset);
-   void *data;
-   if (niovs > 1) {
-      data = malloc(ndw * 4);
-      graw_iov_to_buf(iov, niovs, offset, data, ndw * 4);
-   }
-   else
-      data = (uint32_t *)(iov[0].iov_base + offset);
-   graw_decode_block(ctx_id, data, ndw);
-   if (niovs > 1)
-      free(data);
-
-}
 

@@ -47,12 +47,11 @@ void virgl_renderer_context_destroy(uint32_t handle)
    graw_renderer_context_destroy(handle);
 }
 
-void virgl_renderer_submit_cmd(struct iovec *iov,
-                               int niovs,
-                               int ctx_id, uint64_t offset,
+void virgl_renderer_submit_cmd(void *buffer,
+                               int ctx_id,
                                int ndw)
 {
-   graw_decode_block_iov(iov, niovs, ctx_id, offset, ndw);
+   graw_decode_block(ctx_id, buffer, ndw);
 }
 
 void virgl_renderer_transfer_write_iov(uint32_t handle, 

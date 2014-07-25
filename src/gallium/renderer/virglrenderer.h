@@ -64,9 +64,8 @@ VIRGL_EXPORT void virgl_renderer_check_fences(void);
 VIRGL_EXPORT void virgl_renderer_context_create(uint32_t handle, uint32_t nlen, const char *name);
 VIRGL_EXPORT void virgl_renderer_context_destroy(uint32_t handle);
 
-VIRGL_EXPORT void virgl_renderer_submit_cmd(struct iovec *iov,
-                                            int niovs,
-                                            int ctx_id, uint64_t offset,
+VIRGL_EXPORT void virgl_renderer_submit_cmd(void *buffer,
+                                            int ctx_id,
                                             int ndw);
 
 VIRGL_EXPORT void virgl_renderer_transfer_read_iov(uint32_t handle, uint32_t ctx_id,

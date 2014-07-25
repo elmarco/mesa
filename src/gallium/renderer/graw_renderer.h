@@ -238,7 +238,7 @@ void graw_transfer_write_tex_return(struct pipe_resource *res,
 void graw_renderer_fini(void);
 void graw_reset_decode(void);
 
-void graw_decode_block_iov(struct iovec *iov, uint32_t niovs, uint32_t ctx_id, uint64_t offset, int ndw);
+void graw_decode_block(uint32_t ctx_id, uint32_t *block, int ndw);
 struct grend_context *vrend_lookup_renderer_ctx(uint32_t ctx_id);
 
 int graw_renderer_create_fence(int client_fence_id, uint32_t ctx_id);

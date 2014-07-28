@@ -29,7 +29,7 @@
 
 /* since we are storing things in OpenGL FBOs we need to flip transfer operations by default */
 
-#define USE_CORE_PROFILE 1
+#define USE_CORE_PROFILE 0
 static struct grend_resource *graw_renderer_ctx_res_lookup(struct grend_context *ctx, int res_handle);
 static void grend_update_viewport_state(struct grend_context *ctx);
 static void grend_update_scissor_state(struct grend_context *ctx);

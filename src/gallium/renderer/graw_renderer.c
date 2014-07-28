@@ -3034,28 +3034,22 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
       glformat = tex_conv_table[res->base.format].glformat;
       gltype = tex_conv_table[res->base.format].gltype; 
 
-      if ((!USE_CORE_PROFILE) && (res->is_front || res->y_0_top)) {
-         if (!res->is_front) {
-            if (res->readback_fb_id == 0 || res->readback_fb_level != level) {
-               GLuint fb_id;
-               if (res->readback_fb_id)
-                  glDeleteFramebuffers(1, &res->readback_fb_id);
+      if ((!USE_CORE_PROFILE) && (res->y_0_top)) {
+         if (res->readback_fb_id == 0 || res->readback_fb_level != level) {
+            GLuint fb_id;
+            if (res->readback_fb_id)
+               glDeleteFramebuffers(1, &res->readback_fb_id);
             
-               glGenFramebuffers(1, &fb_id);
-               glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fb_id);
-               grend_fb_bind_texture(res, 0, level, 0);
+            glGenFramebuffers(1, &fb_id);
+            glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fb_id);
+            grend_fb_bind_texture(res, 0, level, 0);
 
-               res->readback_fb_id = fb_id;
-               res->readback_fb_level = level;
-            } else {
-               glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, res->readback_fb_id);
-            }
-            glDrawBuffer(GL_COLOR_ATTACHMENT0_EXT);
+            res->readback_fb_id = fb_id;
+            res->readback_fb_level = level;
          } else {
-
-            glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
-            glDrawBuffer(GL_BACK);
+            glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, res->readback_fb_id);
          }
+         glDrawBuffer(GL_COLOR_ATTACHMENT0_EXT);
          grend_blend_enable(GL_FALSE);
          grend_depth_test_enable(GL_FALSE);
          grend_alpha_test_enable(GL_FALSE);
@@ -3240,10 +3234,7 @@ static void vrend_transfer_send_readpixels(struct grend_resource *res,
    type = tex_conv_table[res->base.format].gltype; 
    /* if we are asked to invert and reading from a front then don't */
 
-   if (res->is_front)
-      actually_invert = FALSE;
-   else
-      actually_invert = res->y_0_top;
+   actually_invert = res->y_0_top;
 
    if (actually_invert && !have_invert_mesa)
       separate_invert = TRUE;
@@ -3259,25 +3250,21 @@ static void vrend_transfer_send_readpixels(struct grend_resource *res,
          fprintf(stderr,"malloc failed %d\n", send_size);
    } else
       data = myptr;
-//      fprintf(stderr,"TEXTURE TRANSFER %d %d %d %d %d, temp:%d\n", res_handle, res->readback_fb_id, box->width, box->height, level, need_temp);
 
-   if (!res->is_front) {
-      if (res->readback_fb_id == 0 || res->readback_fb_level != level || res->readback_fb_z != box->z) {
+   if (res->readback_fb_id == 0 || res->readback_fb_level != level || res->readback_fb_z != box->z) {
 
-         if (res->readback_fb_id)
-            glDeleteFramebuffers(1, &res->readback_fb_id);
+      if (res->readback_fb_id)
+         glDeleteFramebuffers(1, &res->readback_fb_id);
          
-         glGenFramebuffers(1, &fb_id);
-         glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fb_id);
+      glGenFramebuffers(1, &fb_id);
+      glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fb_id);
 
-         grend_fb_bind_texture(res, 0, level, box->z);
+      grend_fb_bind_texture(res, 0, level, box->z);
 
-         res->readback_fb_id = fb_id;
-         res->readback_fb_level = level;
-         res->readback_fb_z = box->z;
-      } else {
-         glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, res->readback_fb_id);
-      }
+      res->readback_fb_id = fb_id;
+      res->readback_fb_level = level;
+      res->readback_fb_z = box->z;
+
       if (actually_invert)
          y1 = h - box->y - box->height;
       else
@@ -3642,19 +3629,16 @@ void graw_renderer_resource_copy_region(struct grend_context *ctx,
    glBindFramebuffer(GL_FRAMEBUFFER_EXT, ctx->blit_fb_ids[0]);
    grend_fb_bind_texture(src_res, 0, src_level, src_box->z);
       
-   if (!dst_res->is_front) {
-      glBindFramebuffer(GL_FRAMEBUFFER_EXT, ctx->blit_fb_ids[1]);
-      grend_fb_bind_texture(dst_res, 0, dst_level, dstz);
-      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, ctx->blit_fb_ids[1]);
-   } else
-      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+   glBindFramebuffer(GL_FRAMEBUFFER_EXT, ctx->blit_fb_ids[1]);
+   grend_fb_bind_texture(dst_res, 0, dst_level, dstz);
+   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, ctx->blit_fb_ids[1]);
 
    glBindFramebuffer(GL_READ_FRAMEBUFFER, ctx->blit_fb_ids[0]);
 
    glmask = GL_COLOR_BUFFER_BIT;
    glDisable(GL_SCISSOR_TEST);
 
-   if (!src_res->is_front && !src_res->y_0_top) {
+   if (!src_res->y_0_top) {
       sy1 = src_box->y;
       sy2 = src_box->y + src_box->height;
    } else {
@@ -3662,7 +3646,7 @@ void graw_renderer_resource_copy_region(struct grend_context *ctx,
       sy2 = src_res->base.height0 - src_box->y;
    }
 
-   if (!dst_res->is_front && !dst_res->y_0_top) {
+   if (!dst_res->y_0_top) {
       dy1 = dsty;
       dy2 = dsty + src_box->height;
    } else {
@@ -3707,13 +3691,10 @@ static void graw_renderer_blit_int(struct grend_context *ctx,
 
    grend_fb_bind_texture(src_res, 0, info->src.level, info->src.box.z);
 
-   if (!dst_res->is_front) {
-      glBindFramebuffer(GL_FRAMEBUFFER_EXT, ctx->blit_fb_ids[1]);
+   glBindFramebuffer(GL_FRAMEBUFFER_EXT, ctx->blit_fb_ids[1]);
 
-      grend_fb_bind_texture(dst_res, 0, info->dst.level, info->dst.box.z);
-      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, ctx->blit_fb_ids[1]);
-   } else
-      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+   grend_fb_bind_texture(dst_res, 0, info->dst.level, info->dst.box.z);
+   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, ctx->blit_fb_ids[1]);
 
    glBindFramebuffer(GL_READ_FRAMEBUFFER, ctx->blit_fb_ids[0]);
 
@@ -3724,7 +3705,7 @@ static void graw_renderer_blit_int(struct grend_context *ctx,
    if (info->mask & PIPE_MASK_RGBA)
       glmask |= GL_COLOR_BUFFER_BIT;
 
-   if (!dst_res->is_front && !dst_res->y_0_top) {
+   if (!dst_res->y_0_top) {
       dst_y1 = info->dst.box.y + info->dst.box.height;
       dst_y2 = info->dst.box.y;
    } else {
@@ -3732,7 +3713,7 @@ static void graw_renderer_blit_int(struct grend_context *ctx,
       dst_y2 = dst_res->base.height0 - info->dst.box.y;
    }
 
-   if ((!src_res->is_front && !src_res->y_0_top)) {
+   if (!src_res->y_0_top) {
       src_y1 = info->src.box.y + info->src.box.height;
       src_y2 = info->src.box.y;
    } else {

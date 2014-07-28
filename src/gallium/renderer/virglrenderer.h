@@ -30,8 +30,6 @@ struct virgl_renderer_callbacks {
 VIRGL_EXPORT int virgl_renderer_init(void *cookie, int flags, struct virgl_renderer_callbacks *cb);
 VIRGL_EXPORT void virgl_renderer_poll(void); /* force fences */
 
-VIRGL_EXPORT void virgl_renderer_set_cursor_info(uint32_t cursor_handle, int x, int y);
-
 /* we need to give qemu the cursor resource contents */
 VIRGL_EXPORT void *virgl_get_cursor_data(uint32_t resource_id, uint32_t *width, uint32_t *height);
 

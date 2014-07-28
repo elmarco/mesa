@@ -22,7 +22,6 @@
 
 #include "graw_renderer.h"
 #include "graw_decode.h"
-#include "graw_cursor.h"
 
 #include "virgl_hw.h"
 /* transfer boxes from the guest POV are in y = 0 = top orientation */
@@ -93,7 +92,6 @@ struct global_renderer_state {
    struct grend_context *current_hw_ctx;
    struct list_head waiting_query_list;
 
-   struct graw_cursor_info cursor_info;
    boolean have_robustness;
    boolean have_multisample;
    GLuint vaoid;
@@ -2617,7 +2615,6 @@ void graw_renderer_init(struct grend_if_cbs *cbs)
    list_inithead(&grend_state.fence_list);
    list_inithead(&grend_state.waiting_query_list);
 
-   graw_cursor_init(&grend_state.cursor_info);
    /* create 0 context */
    graw_renderer_context_create_internal(0, 0, NULL);
 }
@@ -4189,16 +4186,6 @@ void grend_set_query_state(struct grend_context *ctx,
                            boolean enabled)
 {
 
-}
-
-void grend_set_cursor_info(uint32_t cursor_handle, int x, int y)
-{
-   grend_state.cursor_info.res_handle = cursor_handle;
-   grend_state.cursor_info.x = x;
-   grend_state.cursor_info.y = y;
-
-//   if (frontbuffer && draw_cursor)
-//      graw_renderer_remove_cursor(&grend_state.cursor_info, frontbuffer);
 }
 
 void grend_create_so_target(struct grend_context *ctx,

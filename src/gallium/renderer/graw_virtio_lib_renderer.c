@@ -104,11 +104,6 @@ void *virgl_get_cursor_data(uint32_t resource_id, uint32_t *width, uint32_t *hei
    return graw_renderer_get_cursor_contents(resource_id, width, height);
 }
 
-void virgl_renderer_set_cursor_info(uint32_t cursor_handle, int x, int y)
-{
-   grend_set_cursor_info(cursor_handle, x, y);
-}
-
 void virgl_renderer_poll(void)
 {
    graw_renderer_check_queries();

@@ -18,7 +18,6 @@ libgrend_la_SOURCES = \
         graw_shader.c \
         vrend_object.c \
         graw_decode.c \
-	graw_cursor.c \
         graw_formats.c \
         iov.c \
         graw_renderer_helper.c \

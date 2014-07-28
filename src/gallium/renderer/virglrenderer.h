@@ -6,9 +6,9 @@
 #include <stdint.h>
 
 struct virgl_box;
-struct virgl_iovec;
 struct virtgpu_cmd_hdr;
 union virgl_caps;
+struct iovec;
 
 #define VIRGL_EXPORT  __attribute__((visibility("default")))
 
@@ -33,7 +33,7 @@ VIRGL_EXPORT void virgl_renderer_poll(void); /* force fences */
 /* we need to give qemu the cursor resource contents */
 VIRGL_EXPORT void *virgl_get_cursor_data(uint32_t resource_id, uint32_t *width, uint32_t *height);
 
-VIRGL_EXPORT void virgl_renderer_get_rect(int idx, struct virgl_iovec *iov, unsigned int num_iovs,
+VIRGL_EXPORT void virgl_renderer_get_rect(int idx, struct iovec *iov, unsigned int num_iovs,
                                           uint32_t offset, int x, int y, int width, int height);
 
 VIRGL_EXPORT int virgl_renderer_get_fd_for_texture(uint32_t tex_id, int *fd);
@@ -56,7 +56,7 @@ struct virgl_renderer_resource_create_args {
 
 /* new API */
    
-VIRGL_EXPORT void virgl_renderer_resource_create(struct virgl_renderer_resource_create_args *args, struct virgl_iovec *iov, uint32_t num_iovs);
+VIRGL_EXPORT void virgl_renderer_resource_create(struct virgl_renderer_resource_create_args *args, struct iovec *iov, uint32_t num_iovs);
 VIRGL_EXPORT void virgl_renderer_resource_unref(uint32_t res_handle);
 
 VIRGL_EXPORT void virgl_renderer_check_fences(void);
@@ -64,7 +64,7 @@ VIRGL_EXPORT void virgl_renderer_check_fences(void);
 VIRGL_EXPORT void virgl_renderer_context_create(uint32_t handle, uint32_t nlen, const char *name);
 VIRGL_EXPORT void virgl_renderer_context_destroy(uint32_t handle);
 
-VIRGL_EXPORT void virgl_renderer_submit_cmd(struct virgl_iovec *iov,
+VIRGL_EXPORT void virgl_renderer_submit_cmd(struct iovec *iov,
                                             int niovs,
                                             int ctx_id, uint64_t offset,
                                             int ndw);
@@ -73,7 +73,7 @@ VIRGL_EXPORT void virgl_renderer_transfer_read_iov(uint32_t handle, uint32_t ctx
                                                    uint32_t level, uint32_t stride,
                                                    uint32_t layer_stride,
                                                    struct virgl_box *box,
-                                                   uint64_t offset, struct virgl_iovec *iov,
+                                                   uint64_t offset, struct iovec *iov,
                                                    int iovec_cnt);
 
 VIRGL_EXPORT void virgl_renderer_transfer_write_iov(uint32_t handle, 
@@ -83,15 +83,15 @@ VIRGL_EXPORT void virgl_renderer_transfer_write_iov(uint32_t handle,
                                        uint32_t layer_stride,
                                        struct virgl_box *box,
                                        uint64_t offset,
-                                       struct virgl_iovec *iovec,
+                                       struct iovec *iovec,
                                        unsigned int iovec_cnt);
 
 VIRGL_EXPORT void virgl_renderer_fill_caps(uint32_t set, uint32_t version,
                                            union virgl_caps *caps);
 
-VIRGL_EXPORT int virgl_renderer_resource_attach_iov(int res_handle, struct virgl_iovec *iov,
+VIRGL_EXPORT int virgl_renderer_resource_attach_iov(int res_handle, struct iovec *iov,
                                        int num_iovs);
-VIRGL_EXPORT void virgl_renderer_resource_zap_iov(int res_handle, struct virgl_iovec **iov, int *num_iovs);
+VIRGL_EXPORT void virgl_renderer_resource_zap_iov(int res_handle, struct iovec **iov, int *num_iovs);
 
 VIRGL_EXPORT int virgl_renderer_create_fence(int client_fence_id, uint32_t ctx_id);
 

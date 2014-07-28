@@ -26,7 +26,7 @@ struct grend_resource {
    void *ptr;
    GLuint handle;
 
-   struct virgl_iovec *iov;
+   struct iovec *iov;
    uint32_t num_iovs;
    boolean y_0_top;
 
@@ -107,7 +107,7 @@ struct graw_renderer_resource_create_args {
    uint32_t flags;
 };
      
-void graw_renderer_resource_create(struct graw_renderer_resource_create_args *args, struct virgl_iovec *iov, uint32_t num_iovs);
+void graw_renderer_resource_create(struct graw_renderer_resource_create_args *args, struct iovec *iov, uint32_t num_iovs);
 
 void graw_renderer_resource_unref(uint32_t handle);
 
@@ -189,7 +189,7 @@ void graw_renderer_transfer_write_iov(uint32_t handle,
                                       uint32_t layer_stride,
                                       struct pipe_box *box,
                                       uint64_t offset,
-                                      struct virgl_iovec *iovec,
+                                      struct iovec *iovec,
                                       unsigned int iovec_cnt);
 
 void graw_renderer_resource_copy_region(struct grend_context *ctx,
@@ -206,7 +206,7 @@ void graw_renderer_transfer_send_iov(uint32_t handle, uint32_t ctx_id,
                                      uint32_t level, uint32_t stride,
                                      uint32_t layer_stride,
                                      struct pipe_box *box,
-                                     uint64_t offset, struct virgl_iovec *iov,
+                                     uint64_t offset, struct iovec *iov,
                                      int iovec_cnt);
 void grend_set_stencil_ref(struct grend_context *ctx, struct pipe_stencil_ref *ref);
 void grend_set_blend_color(struct grend_context *ctx, struct pipe_blend_color *color);
@@ -224,21 +224,21 @@ void grend_set_constants(struct grend_context *ctx,
                          float *data);
 
 void graw_transfer_write_return(void *data, uint32_t bytes, uint64_t offset,
-                                struct virgl_iovec *iov, int iovec_cnt);
+                                struct iovec *iov, int iovec_cnt);
 
 void graw_transfer_write_tex_return(struct pipe_resource *res,
 				    struct pipe_box *box,
                                     uint32_t level,
                                     uint32_t dst_stride,
                                     uint64_t offset,
-                                    struct virgl_iovec *iov,
+                                    struct iovec *iov,
                                     int num_iovs,
 				    void *myptr, int size, int invert);
 
 void graw_renderer_fini(void);
 void graw_reset_decode(void);
 
-void graw_decode_block_iov(struct virgl_iovec *iov, uint32_t niovs, uint32_t ctx_id, uint64_t offset, int ndw);
+void graw_decode_block_iov(struct iovec *iov, uint32_t niovs, uint32_t ctx_id, uint64_t offset, int ndw);
 struct grend_context *vrend_lookup_renderer_ctx(uint32_t ctx_id);
 
 int graw_renderer_create_fence(int client_fence_id, uint32_t ctx_id);
@@ -281,11 +281,11 @@ GLint64 graw_renderer_get_timestamp(void);
 /* formats */
 void vrend_build_format_list(void);
 
-int graw_renderer_resource_attach_iov(int res_handle, struct virgl_iovec *iov,
+int graw_renderer_resource_attach_iov(int res_handle, struct iovec *iov,
                                        int num_iovs);
 void graw_renderer_resource_invalid_iov(int res_handle);
 void graw_renderer_resource_zap_iov(int res_handle,
-                                    struct virgl_iovec **iov_p,
+                                    struct iovec **iov_p,
                                     int *num_iovs_p);
 void graw_renderer_resource_destroy(struct grend_resource *res);
 
@@ -301,7 +301,7 @@ grend_resource_reference(struct grend_resource **ptr, struct grend_resource *tex
 
 void graw_renderer_force_ctx_0(void);
 
-void graw_renderer_get_rect(int idx, struct virgl_iovec *iov, unsigned int num_iovs,
+void graw_renderer_get_rect(int idx, struct iovec *iov, unsigned int num_iovs,
                             uint32_t offset, int x, int y, int width, int height);
 void graw_renderer_attach_res_ctx(int ctx_id, int resource_id);
 void graw_renderer_detach_res_ctx(int ctx_id, int resource_id);

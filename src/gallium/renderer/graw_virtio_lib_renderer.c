@@ -29,7 +29,7 @@ struct virgl_egl *egl_info;
 static struct grend_if_cbs virgl_cbs;
 
 void graw_transfer_write_return(void *data, uint32_t bytes, uint64_t offset,
-                                struct virgl_iovec *iov, int num_iovs)
+                                struct iovec *iov, int num_iovs)
 {
    graw_iov_from_buf(iov, num_iovs, offset, data, bytes);
 }
@@ -39,7 +39,7 @@ void graw_transfer_write_tex_return(struct pipe_resource *res,
                                     uint32_t level,
                                     uint32_t dst_stride,
                                     uint64_t offset,
-                                    struct virgl_iovec *iov,
+                                    struct iovec *iov,
                                     int num_iovs,
 				    void *myptr, int size, int invert)
 {
@@ -110,7 +110,7 @@ void virgl_renderer_poll(void)
    graw_renderer_check_fences();
 }
 
-void virgl_renderer_get_rect(int idx, struct virgl_iovec *iov, unsigned int num_iovs,
+void virgl_renderer_get_rect(int idx, struct iovec *iov, unsigned int num_iovs,
                              uint32_t offset, int x, int y, int width, int height)
 {
    graw_renderer_get_rect(idx, iov, num_iovs, offset, x, y, width, height);

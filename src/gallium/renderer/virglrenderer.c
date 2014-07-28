@@ -21,7 +21,7 @@
 #include "virgl_egl.h"
 /* new API - just wrap internal API for now */
 
-void virgl_renderer_resource_create(struct virgl_renderer_resource_create_args *args, struct virgl_iovec *iov, uint32_t num_iovs)
+void virgl_renderer_resource_create(struct virgl_renderer_resource_create_args *args, struct iovec *iov, uint32_t num_iovs)
 {
    graw_renderer_resource_create((struct graw_renderer_resource_create_args *)args, iov, num_iovs);
 }
@@ -47,7 +47,7 @@ void virgl_renderer_context_destroy(uint32_t handle)
    graw_renderer_context_destroy(handle);
 }
 
-void virgl_renderer_submit_cmd(struct virgl_iovec *iov,
+void virgl_renderer_submit_cmd(struct iovec *iov,
                                int niovs,
                                int ctx_id, uint64_t offset,
                                int ndw)
@@ -62,7 +62,7 @@ void virgl_renderer_transfer_write_iov(uint32_t handle,
                                        uint32_t layer_stride,
                                        struct virgl_box *box,
                                        uint64_t offset,
-                                       struct virgl_iovec *iovec,
+                                       struct iovec *iovec,
                                        unsigned int iovec_cnt)
 {
    graw_renderer_transfer_write_iov(handle, ctx_id, level,
@@ -74,7 +74,7 @@ void virgl_renderer_transfer_read_iov(uint32_t handle, uint32_t ctx_id,
                                      uint32_t level, uint32_t stride,
                                      uint32_t layer_stride,
                                      struct virgl_box *box,
-                                     uint64_t offset, struct virgl_iovec *iov,
+                                     uint64_t offset, struct iovec *iov,
                                      int iovec_cnt)
 {
    graw_renderer_transfer_send_iov(handle, ctx_id, level, stride,
@@ -87,13 +87,13 @@ void virgl_renderer_check_fences()
    graw_renderer_check_fences();
 }
 
-int virgl_renderer_resource_attach_iov(int res_handle, struct virgl_iovec *iov,
+int virgl_renderer_resource_attach_iov(int res_handle, struct iovec *iov,
                                       int num_iovs)
 {
    return graw_renderer_resource_attach_iov(res_handle, iov, num_iovs);
 }
 
-void virgl_renderer_resource_zap_iov(int res_handle, struct virgl_iovec **iov_p, int *num_iovs_p)
+void virgl_renderer_resource_zap_iov(int res_handle, struct iovec **iov_p, int *num_iovs_p)
 {
    return graw_renderer_resource_zap_iov(res_handle, iov_p, num_iovs_p);
 }

@@ -4433,7 +4433,6 @@ void graw_renderer_attach_res_ctx(int ctx_id, int resource_id)
 {
    struct grend_context *ctx = vrend_lookup_renderer_ctx(ctx_id);
    struct grend_resource *res = vrend_resource_lookup(resource_id, 0);
-   fprintf(stderr, "attaching %d %d %p\n", ctx_id, resource_id, res);
    vrend_object_insert_nofree(ctx->res_hash, res, sizeof(*res), resource_id, 1, false);
 }
 
@@ -4443,7 +4442,6 @@ void graw_renderer_detach_res_ctx(int ctx_id, int res_handle)
 
    struct grend_resource *res = vrend_object_lookup(ctx->res_hash, res_handle, 1);
 
-   fprintf(stderr, "detaching %d %d %p\n", ctx_id, res_handle, res);
    if (!res)
       return;
 

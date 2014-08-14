@@ -125,3 +125,9 @@ int virgl_renderer_resource_get_info(int res_handle,
    info->format = virgl_egl_get_gbm_format(info->format);
    return ret; 
 }
+
+void virgl_renderer_get_cap_set(uint32_t cap_set, uint32_t *max_ver,
+                                uint32_t *max_size)
+{
+   graw_renderer_get_cap_set(cap_set, max_ver, max_size);
+}

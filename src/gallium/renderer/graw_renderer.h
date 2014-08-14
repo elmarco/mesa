@@ -318,4 +318,9 @@ struct graw_renderer_resource_info {
 
 int graw_renderer_resource_get_info(int res_handle,
                                      struct graw_renderer_resource_info *info);
+
+#define GRAW_CAP_SET 1
+
+void graw_renderer_get_cap_set(uint32_t cap_set, uint32_t *max_ver,
+                               uint32_t *max_size);
 #endif

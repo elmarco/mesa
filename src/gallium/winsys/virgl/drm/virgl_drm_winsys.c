@@ -612,6 +612,7 @@ static int virgl_drm_get_caps(struct virgl_winsys *vws, struct virgl_drm_caps *c
 
    memset(&args, 0, sizeof(args));
 
+   args.cap_set_id = 1;
    args.addr = (unsigned long)&caps->caps;
    args.size = sizeof(union virgl_caps);
    ret = drmIoctl(vdws->fd, DRM_IOCTL_VIRTGPU_GET_CAPS, &args);

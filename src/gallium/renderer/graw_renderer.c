@@ -4225,7 +4225,7 @@ void graw_renderer_fill_caps(uint32_t set, uint32_t version,
    int gl_ver = epoxy_gl_version();
    memset(caps, 0, sizeof(*caps));
 
-   if (set != 0) {
+   if (set != 1 && set != 0) {
       caps->max_version = 0;
       return;
    }
@@ -4444,4 +4444,17 @@ int graw_renderer_resource_get_info(int res_handle,
    info->stride = util_format_get_nblocksx(res->base.format, u_minify(res->base.width0, 0)) * elsize;
 
    return 0;
+}
+
+void graw_renderer_get_cap_set(uint32_t cap_set, uint32_t *max_ver,
+                               uint32_t *max_size)
+{
+   if (cap_set != GRAW_CAP_SET) {
+      *max_ver = 0;
+      *max_size = 0;
+      return;
+   }
+
+   *max_ver = 1;
+   *max_size = sizeof(union virgl_caps);
 }

@@ -569,9 +569,11 @@ static struct grend_linked_shader_program *add_shader_program(struct grend_conte
 
   prog_id = glCreateProgram();
   glAttachShader(prog_id, vs->id);
+  if (gs) {
+     if (gs->id > 0)
+        glAttachShader(prog_id, gs->id);
+  }
   set_stream_out_varyings(prog_id, &vs->sel->sinfo.so_info);
-  if (gs)
-     glAttachShader(prog_id, gs->id);
   glAttachShader(prog_id, fs->id);
   glLinkProgram(prog_id);
 
@@ -583,10 +585,10 @@ static struct grend_linked_shader_program *add_shader_program(struct grend_conte
      fprintf(stderr,"got error linking\n%s\n", infolog);
      /* dump shaders */
      report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_SHADER, 0);
-     fprintf(stderr,"vert shader: GLSL\n%s\n", vs->glsl_prog);
+     fprintf(stderr,"vert shader: %d GLSL\n%s\n", vs->id, vs->glsl_prog);
      if (gs)
-        fprintf(stderr,"geom shader: GLSL\n%s\n", gs->glsl_prog);
-     fprintf(stderr,"frag shader: GLSL\n%s\n", fs->glsl_prog);
+        fprintf(stderr,"geom shader: %d GLSL\n%s\n", gs->id, gs->glsl_prog);
+     fprintf(stderr,"frag shader: %d GLSL\n%s\n", fs->id, fs->glsl_prog);
      glDeleteProgram(prog_id);
      return NULL;
   }

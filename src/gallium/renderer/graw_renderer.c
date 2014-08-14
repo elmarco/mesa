@@ -4448,7 +4448,7 @@ int graw_renderer_resource_get_info(int res_handle,
 
 void graw_renderer_get_cap_set(uint32_t cap_set, uint32_t *max_ver,
                                uint32_t *max_size)
-{
+{ 
    if (cap_set != GRAW_CAP_SET) {
       *max_ver = 0;
       *max_size = 0;

@@ -11,7 +11,6 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/eventfd.h>
-#include "virtgpu_hw.h"
 #include "pipe/p_state.h"
 #include "util/u_format.h"
 #include "util/u_math.h"

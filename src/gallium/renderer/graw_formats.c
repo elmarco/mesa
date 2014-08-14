@@ -253,7 +253,7 @@ static void vrend_add_formats(struct grend_format_table *table, int num_entries)
       }
       
       status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-      binding = 0;
+      binding = VREND_BIND_SAMPLER;
       if (status == GL_FRAMEBUFFER_COMPLETE)
          binding |= (is_depth ? VREND_BIND_DEPTHSTENCIL : VREND_BIND_RENDER);
       

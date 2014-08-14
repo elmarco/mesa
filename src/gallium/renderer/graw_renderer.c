@@ -312,6 +312,10 @@ static struct grend_nontimer_hw_query *grend_create_hw_query(struct grend_query 
 
 static struct grend_format_table tex_conv_table[VIRGL_FORMAT_MAX];
 
+static INLINE boolean vrend_format_can_sample(enum virgl_formats format)
+{
+   return tex_conv_table[format].bindings & VREND_BIND_SAMPLER;
+}
 static INLINE boolean vrend_format_can_render(enum virgl_formats format)
 {
    return tex_conv_table[format].bindings & VREND_BIND_RENDER;
@@ -4411,9 +4415,11 @@ void graw_renderer_fill_caps(uint32_t set, uint32_t version,
       uint32_t index = i % 32;
 
       if (tex_conv_table[i].internalformat != 0) {
-         caps->v1.sampler.bitmask[offset] |= (1 << index);
-         if (vrend_format_can_render(i))
-            caps->v1.render.bitmask[offset] |= (1 << index);
+         if (vrend_format_can_sample(i)) {
+            caps->v1.sampler.bitmask[offset] |= (1 << index);
+            if (vrend_format_can_render(i))
+               caps->v1.render.bitmask[offset] |= (1 << index);
+         }
       }
    }
 

@@ -4345,6 +4345,8 @@ void graw_renderer_fill_caps(uint32_t set, uint32_t version,
 
    if (gl_ver >= 31) {
       caps->v1.bset.instanceid = 1;
+      glGetIntegerv(GL_MAX_VERTEX_UNIFORM_BLOCKS, &max);
+      caps->v1.max_uniform_blocks = max;
    } else {
       if (glewIsSupported("GL_ARB_draw_instanced"))
          caps->v1.bset.instanceid = 1;

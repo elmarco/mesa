@@ -203,7 +203,7 @@ virgl_get_shader_param(struct pipe_screen *screen, unsigned shader, enum pipe_sh
       case PIPE_SHADER_CAP_MAX_TEMPS:
          return 256;
       case PIPE_SHADER_CAP_MAX_CONST_BUFFERS:
-         return 1;//PIPE_MAX_CONSTANT_BUFFERS;
+         return vscreen->caps.caps.v1.max_uniform_blocks;
       case PIPE_SHADER_CAP_MAX_ADDRS:
          return 1;
       case PIPE_SHADER_CAP_MAX_PREDS:

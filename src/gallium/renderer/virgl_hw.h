@@ -189,9 +189,11 @@ struct virgl_caps_bool_set1 {
         unsigned occlusion_query:1;
         unsigned timer_query:1;
         unsigned streamout_pause_resume:1;
-        unsigned texture_buffer_object:1;
         unsigned texture_multisample:1;
         unsigned fragment_coord_conventions:1;
+        unsigned depth_clip_disable:1;
+        unsigned seamless_cube_map_per_texture:1;
+        unsigned ubo:1;
 };
 
 /* endless expansion capabilites - current gallium has 252 formats */
@@ -213,6 +215,7 @@ struct virgl_caps_v1 {
         uint32_t max_render_targets;
         uint32_t max_samples;
         uint32_t prim_mask;
+        uint32_t max_tbo_size;
 };
 
 union virgl_caps {

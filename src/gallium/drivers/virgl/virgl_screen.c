@@ -79,7 +79,7 @@ virgl_get_param(struct pipe_screen *screen, enum pipe_cap param)
    case PIPE_CAP_TGSI_FS_COORD_PIXEL_CENTER_INTEGER:
       return vscreen->caps.caps.v1.bset.fragment_coord_conventions;
    case PIPE_CAP_DEPTH_CLIP_DISABLE:
-      return 0;
+      return vscreen->caps.caps.v1.bset.depth_clip_disable;
    case PIPE_CAP_MAX_STREAM_OUTPUT_BUFFERS:
       return vscreen->caps.caps.v1.max_streamout_buffers;
    case PIPE_CAP_MAX_STREAM_OUTPUT_SEPARATE_COMPONENTS:
@@ -93,8 +93,9 @@ virgl_get_param(struct pipe_screen *screen, enum pipe_cap param)
    case PIPE_CAP_VERTEX_ELEMENT_INSTANCE_DIVISOR:
       return 1;
    case PIPE_CAP_SEAMLESS_CUBE_MAP:
-   case PIPE_CAP_SEAMLESS_CUBE_MAP_PER_TEXTURE:
       return vscreen->caps.caps.v1.bset.seamless_cube_map;
+   case PIPE_CAP_SEAMLESS_CUBE_MAP_PER_TEXTURE:
+      return vscreen->caps.caps.v1.bset.seamless_cube_map_per_texture;
    case PIPE_CAP_MAX_TEXTURE_ARRAY_LAYERS:
       return vscreen->caps.caps.v1.max_texture_array_layers;
    case PIPE_CAP_MIN_TEXEL_OFFSET:
@@ -143,7 +144,7 @@ virgl_get_param(struct pipe_screen *screen, enum pipe_cap param)
    case PIPE_CAP_MIN_MAP_BUFFER_ALIGNMENT:
       return 1;
    case PIPE_CAP_TEXTURE_BUFFER_OBJECTS:
-      return vscreen->caps.caps.v1.bset.texture_buffer_object;
+      return vscreen->caps.caps.v1.max_tbo_size > 0;
    case PIPE_CAP_TEXTURE_BUFFER_OFFSET_ALIGNMENT:
       return 0;
    case PIPE_CAP_CUBE_MAP_ARRAY:
@@ -152,9 +153,10 @@ virgl_get_param(struct pipe_screen *screen, enum pipe_cap param)
       return vscreen->caps.caps.v1.bset.texture_multisample;
    case PIPE_CAP_MAX_VIEWPORTS:
       return 1;
+   case PIPE_CAP_MAX_TEXTURE_BUFFER_SIZE:
+      return vscreen->caps.caps.v1.max_tbo_size;
    case PIPE_CAP_TEXTURE_BORDER_COLOR_QUIRK:
    case PIPE_CAP_QUERY_PIPELINE_STATISTICS:
-   case PIPE_CAP_MAX_TEXTURE_BUFFER_SIZE:
    case PIPE_CAP_ENDIANNESS:
       return 0;
    case PIPE_CAP_MIXED_FRAMEBUFFER_SIZES:

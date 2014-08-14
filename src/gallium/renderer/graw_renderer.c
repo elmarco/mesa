@@ -4355,10 +4355,17 @@ void graw_renderer_fill_caps(uint32_t set, uint32_t version,
 
    if (gl_ver >= 32) {
       caps->v1.bset.fragment_coord_conventions = 1;
+      caps->v1.bset.depth_clip_disable = 1;
+      caps->v1.bset.seamless_cube_map = 1;
    } else {
       if (glewIsSupported("GL_ARB_fragment_coord_conventions"))
          caps->v1.bset.fragment_coord_conventions = 1;
+      if (glewIsSupported("GL_ARB_seamless_cube_map"))
+         caps->v1.bset.seamless_cube_map = 1;
    }
+
+   if (glewIsSupported("GL_AMD_seamless_cube_map_per_texture"))
+      caps->v1.bset.seamless_cube_map_per_texture = 1;
 
    if (glewIsSupported("GL_ARB_texture_multisample")) {
        /* disable multisample until developed */
@@ -4383,7 +4390,10 @@ void graw_renderer_fill_caps(uint32_t set, uint32_t version,
    if (glewIsSupported("GL_ARB_shader_stencil_export"))
       caps->v1.bset.shader_stencil_export = 1;
 
-   caps->v1.glsl_level = 130;
+   if (use_core_profile)
+      caps->v1.glsl_level = 330;
+   else
+      caps->v1.glsl_level = 130;
    if (glewIsSupported("GL_EXT_texture_array"))
       caps->v1.max_texture_array_layers = 256;
    caps->v1.max_streamout_buffers = 4;
@@ -4400,7 +4410,8 @@ void graw_renderer_fill_caps(uint32_t set, uint32_t version,
    caps->v1.max_samples = max;
 
    if (glewIsSupported("GL_ARB_texture_buffer_object")) {
-      caps->v1.bset.texture_buffer_object = 1;
+      glGetIntegerv(GL_MAX_TEXTURE_BUFFER_SIZE, &max);
+      caps->v1.max_tbo_size = max;
    }
 
    caps->v1.prim_mask = (1 << PIPE_PRIM_POINTS) | (1 << PIPE_PRIM_LINES) | (1 << PIPE_PRIM_LINE_STRIP) | (1 << PIPE_PRIM_LINE_LOOP) | (1 << PIPE_PRIM_TRIANGLES) | (1 << PIPE_PRIM_TRIANGLE_STRIP) | (1 << PIPE_PRIM_TRIANGLE_FAN);

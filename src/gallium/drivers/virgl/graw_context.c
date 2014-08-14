@@ -452,8 +452,16 @@ static void graw_draw_vbo(struct pipe_context *ctx,
                                    const struct pipe_draw_info *dinfo)
 {
    struct graw_context *grctx = (struct graw_context *)ctx;
+   struct virgl_screen *rs = virgl_screen(ctx->screen);
    struct pipe_index_buffer ib = {};
    struct pipe_draw_info info = *dinfo;
+
+   if (!(rs->caps.caps.v1.prim_mask & (1 << dinfo->mode))) {
+      util_primconvert_save_index_buffer(grctx->primconvert, &grctx->index_buffer);
+//      util_primconvert_save_rasterizer_state(grctx->primconvert, grctx->rasterizer);
+      util_primconvert_draw_vbo(grctx->primconvert, dinfo);
+      return;
+   }
    if (info.indexed) {
            pipe_resource_reference(&ib.buffer, grctx->index_buffer.buffer);
            ib.user_buffer = grctx->index_buffer.user_buffer;
@@ -724,7 +732,7 @@ graw_context_destroy( struct pipe_context *ctx )
       util_blitter_destroy(grctx->blitter);
    if (grctx->uploader)
       u_upload_destroy(grctx->uploader);
-
+   util_primconvert_destroy(grctx->primconvert);
    
    util_slab_destroy(&grctx->texture_transfer_pool);
    FREE(grctx);
@@ -810,6 +818,7 @@ struct pipe_context *graw_context_create(struct pipe_screen *pscreen,
    util_slab_create(&grctx->texture_transfer_pool, sizeof(struct virgl_transfer),
                     16, UTIL_SLAB_SINGLETHREADED);
 
+   grctx->primconvert = util_primconvert_create(&grctx->base, rs->caps.caps.v1.prim_mask);
    grctx->uploader = u_upload_create(&grctx->base, 1024 * 1024, 256,
                                      PIPE_BIND_INDEX_BUFFER);
    if (!grctx->uploader)

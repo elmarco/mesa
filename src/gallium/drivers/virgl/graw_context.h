@@ -8,6 +8,7 @@
 #include "virgl.h"
 #include "util/u_slab.h"
 #include "util/u_double_list.h"
+#include "indices/u_primconvert.h"
 
 struct virgl_resource;
 struct virgl_buffer;
@@ -75,6 +76,8 @@ struct graw_context {
    int num_transfers;
    int num_draws;
    struct list_head to_flush_bufs;
+
+   struct primconvert_context *primconvert;
 };
 
 struct pipe_context *graw_context_create(struct pipe_screen *pscreen,

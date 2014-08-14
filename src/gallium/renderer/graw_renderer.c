@@ -2968,7 +2968,7 @@ static void copy_transfer_data(struct pipe_resource *res,
                                void *data,
                                uint32_t src_stride,
                                struct pipe_box *box,
-                               uint64_t offset)
+                               uint64_t offset, bool invert)
 {
    int blsize = util_format_get_blocksize(res->format);
    GLuint size = graw_iov_size(iov, num_iovs);
@@ -2979,13 +2979,21 @@ static void copy_transfer_data(struct pipe_resource *res,
    int h;
    uint32_t myoffset = offset;
 
-   if (send_size == size || bh == 1)
+   if ((send_size == size || bh == 1) && !invert)
       graw_iov_to_buf(iov, num_iovs, offset, data, send_size);
    else {
-      for (h = 0; h < bh; h++) {
-         void *ptr = data + (h * bwx);
-         graw_iov_to_buf(iov, num_iovs, myoffset, ptr, bwx);
-         myoffset += src_stride;
+      if (invert) {
+	 for (h = bh - 1; h >= 0; h--) {
+	    void *ptr = data + (h * bwx);
+	    graw_iov_to_buf(iov, num_iovs, myoffset, ptr, bwx);
+	    myoffset += src_stride;
+	 }
+      } else {
+	 for (h = 0; h < bh; h++) {
+	    void *ptr = data + (h * bwx);
+	    graw_iov_to_buf(iov, num_iovs, myoffset, ptr, bwx);
+	    myoffset += src_stride;
+	 }
       }
    }
 }
@@ -3055,6 +3063,7 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
       int elsize = util_format_get_blocksize(res->base.format);
       int x = 0, y = 0;
       boolean compressed;
+      bool invert = false;
       grend_use_program(0);
 
       if (!stride)
@@ -3070,7 +3079,7 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
                                                     box->height) * util_format_get_blocksize(res->base.format) * box->depth;
          data = malloc(send_size);
          copy_transfer_data(&res->base, iov, num_iovs, data, stride,
-                            box, offset);
+                            box, offset, invert);
       } else {
          data = iov[0].iov_base + offset;
       }
@@ -3139,7 +3148,7 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
          }
 
          x = box->x;
-         y = box->y;
+         y = invert ? res->base.height0 - box->y - box->height : box->y;
 
          if (res->base.format == (enum pipe_format)VIRGL_FORMAT_Z24X8_UNORM) {
             /* we get values from the guest as 24-bit scaled integers

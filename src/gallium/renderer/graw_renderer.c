@@ -42,7 +42,6 @@ static void grend_update_frontface_state(struct grend_context *ctx);
 extern int graw_shader_use_explicit;
 int localrender;
 static int have_invert_mesa = 0;
-static int draw_cursor = 0;
 static int use_core_profile = USE_CORE_PROFILE;
 int vrend_dump_shaders;
 

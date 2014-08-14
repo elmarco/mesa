@@ -6,7 +6,6 @@
 #include <stdint.h>
 
 struct virgl_box;
-struct virtgpu_cmd_hdr;
 union virgl_caps;
 struct iovec;
 

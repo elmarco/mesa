@@ -1256,7 +1256,7 @@ void grend_set_single_sampler_view(struct grend_context *ctx,
          report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_HANDLE, handle);
          return;
       }
-      tex = graw_renderer_ctx_res_lookup(ctx, view->res_handle);
+      tex = (struct grend_texture *)graw_renderer_ctx_res_lookup(ctx, view->res_handle);
       if (!tex) {
          fprintf(stderr,"cannot find texture to back resource view %d %d\n", handle, view->res_handle);
          return;
@@ -2800,7 +2800,7 @@ int graw_renderer_resource_attach_iov(int res_handle, struct iovec *iov,
    
    res = vrend_resource_lookup(res_handle, 0);
    if (!res)
-      return;
+      return -1;
 
    /* work out size and max resource size */
    res->iov = iov;
@@ -4506,13 +4506,13 @@ void graw_renderer_attach_res_ctx(int ctx_id, int resource_id)
 {
    struct grend_context *ctx = vrend_lookup_renderer_ctx(ctx_id);
    struct grend_resource *res = vrend_resource_lookup(resource_id, 0);
+
    vrend_object_insert_nofree(ctx->res_hash, res, sizeof(*res), resource_id, 1, false);
 }
 
 void graw_renderer_detach_res_ctx(int ctx_id, int res_handle)
 {
    struct grend_context *ctx = vrend_lookup_renderer_ctx(ctx_id);
-
    struct grend_resource *res = vrend_object_lookup(ctx->res_hash, res_handle, 1);
 
    if (!res)

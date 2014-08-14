@@ -43,6 +43,7 @@ extern int graw_shader_use_explicit;
 int localrender;
 static int have_invert_mesa = 0;
 static int draw_cursor = 0;
+static int use_core_profile = USE_CORE_PROFILE;
 int vrend_dump_shaders;
 
 static struct grend_if_cbs *clicbs;
@@ -2340,9 +2341,11 @@ static void grend_hw_emit_rs(struct grend_context *ctx)
          glDisable(GL_RASTERIZER_DISCARD);
    }
 
-   if (USE_CORE_PROFILE == 0) {
+   if (use_core_profile == 0) {
       glPolygonMode(GL_FRONT, translate_fill(state->fill_front));
       glPolygonMode(GL_BACK, translate_fill(state->fill_back));
+   } else if (state->fill_front == state->fill_back) {
+      glPolygonMode(GL_FRONT_AND_BACK, translate_fill(state->fill_front));
    }
 
    if (state->offset_tri)
@@ -2378,18 +2381,23 @@ static void grend_hw_emit_rs(struct grend_context *ctx)
    }
    glPolygonOffset(state->offset_scale, state->offset_units);
 
-   if (state->poly_stipple_enable)
-      glEnable(GL_POLYGON_STIPPLE);
-   else
-      glDisable(GL_POLYGON_STIPPLE);
-   
+   if (use_core_profile == 0) {
+      if (state->poly_stipple_enable)
+         glEnable(GL_POLYGON_STIPPLE);
+      else
+         glDisable(GL_POLYGON_STIPPLE);
+   } else if (state->poly_stipple_enable)
+      fprintf(stderr, "polygon stipple enabled in core profile\n");
+
    if (state->point_quad_rasterization) {
-      glEnable(GL_POINT_SPRITE);
+      if (use_core_profile == 0)
+         glEnable(GL_POINT_SPRITE);
 
       glPointParameteri(GL_POINT_SPRITE_COORD_ORIGIN, state->sprite_coord_mode ? GL_UPPER_LEFT : GL_LOWER_LEFT);
-   } else
-      glDisable(GL_POINT_SPRITE);
-
+   } else {
+      if (use_core_profile == 0)
+         glDisable(GL_POINT_SPRITE);
+   }
    if (state->cull_face != PIPE_FACE_NONE) {
       switch (state->cull_face) {
       case PIPE_FACE_FRONT:
@@ -2405,11 +2413,13 @@ static void grend_hw_emit_rs(struct grend_context *ctx)
       glEnable(GL_CULL_FACE);
    } else
       glDisable(GL_CULL_FACE);
-   
-   if (state->light_twoside)
-      glEnable(GL_VERTEX_PROGRAM_TWO_SIDE);
-   else
-      glDisable(GL_VERTEX_PROGRAM_TWO_SIDE);
+
+   if (use_core_profile == 0) {
+      if (state->light_twoside)
+         glEnable(GL_VERTEX_PROGRAM_TWO_SIDE);
+      else
+         glDisable(GL_VERTEX_PROGRAM_TWO_SIDE);
+   }
 
    if (state->clip_plane_enable != grend_state.hw_rs_state.clip_plane_enable) {
       grend_state.hw_rs_state.clip_plane_enable = state->clip_plane_enable;
@@ -2420,12 +2430,13 @@ static void grend_hw_emit_rs(struct grend_context *ctx)
             glDisable(GL_CLIP_PLANE0 + i);
       }
    }
-
-   glLineStipple(state->line_stipple_factor, state->line_stipple_pattern);
-   if (state->line_stipple_enable)
-      glEnable(GL_LINE_STIPPLE);
-   else
-      glDisable(GL_LINE_STIPPLE);
+   if (use_core_profile == 0) {
+      glLineStipple(state->line_stipple_factor, state->line_stipple_pattern);
+      if (state->line_stipple_enable)
+         glEnable(GL_LINE_STIPPLE);
+      else
+         glDisable(GL_LINE_STIPPLE);
+   }
 
    if (state->line_smooth)
       glEnable(GL_LINE_SMOOTH);
@@ -2437,17 +2448,17 @@ static void grend_hw_emit_rs(struct grend_context *ctx)
    else
       glDisable(GL_POLYGON_SMOOTH);
 
-   if (USE_CORE_PROFILE == 0) {
+   if (use_core_profile == 0) {
       if (state->clamp_vertex_color)
          glClampColor(GL_CLAMP_VERTEX_COLOR_ARB, GL_TRUE);
       else
          glClampColor(GL_CLAMP_VERTEX_COLOR_ARB, GL_FALSE);
-   }
 
-   if (state->clamp_fragment_color)
-      glClampColor(GL_CLAMP_FRAGMENT_COLOR_ARB, GL_TRUE);
-   else
-      glClampColor(GL_CLAMP_FRAGMENT_COLOR_ARB, GL_FALSE);
+      if (state->clamp_fragment_color)
+         glClampColor(GL_CLAMP_FRAGMENT_COLOR_ARB, GL_TRUE);
+      else
+         glClampColor(GL_CLAMP_FRAGMENT_COLOR_ARB, GL_FALSE);
+   }
 
    if (grend_state.have_multisample) {
       if (state->multisample) {
@@ -2486,7 +2497,7 @@ static GLuint convert_wrap(int wrap)
 {
    switch(wrap){
    case PIPE_TEX_WRAP_REPEAT: return GL_REPEAT;
-   case PIPE_TEX_WRAP_CLAMP: return GL_CLAMP;
+   case PIPE_TEX_WRAP_CLAMP: if (use_core_profile == 0) return GL_CLAMP; else return GL_CLAMP_TO_EDGE;
 
    case PIPE_TEX_WRAP_CLAMP_TO_EDGE: return GL_CLAMP_TO_EDGE;
    case PIPE_TEX_WRAP_CLAMP_TO_BORDER: return GL_CLAMP_TO_BORDER;
@@ -3074,6 +3085,11 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
          need_temp = 1;
       }
 
+      if (use_core_profile == 1 && res->y_0_top) {
+	 need_temp = true;
+	 invert = true;
+      }
+
       if (need_temp) {
          GLuint send_size = util_format_get_nblocks(res->base.format, box->width,
                                                     box->height) * util_format_get_blocksize(res->base.format) * box->depth;
@@ -3108,7 +3124,7 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
       glformat = tex_conv_table[res->base.format].glformat;
       gltype = tex_conv_table[res->base.format].gltype; 
 
-      if ((!USE_CORE_PROFILE) && (res->y_0_top)) {
+      if ((!use_core_profile) && (res->y_0_top)) {
          if (res->readback_fb_id == 0 || res->readback_fb_level != level) {
             GLuint fb_id;
             if (res->readback_fb_id)
@@ -4378,7 +4394,7 @@ void graw_renderer_fill_caps(uint32_t set, uint32_t version,
    }
 
    caps->v1.prim_mask = (1 << PIPE_PRIM_POINTS) | (1 << PIPE_PRIM_LINES) | (1 << PIPE_PRIM_LINE_STRIP) | (1 << PIPE_PRIM_LINE_LOOP) | (1 << PIPE_PRIM_TRIANGLES) | (1 << PIPE_PRIM_TRIANGLE_STRIP) | (1 << PIPE_PRIM_TRIANGLE_FAN);
-   if (USE_CORE_PROFILE == 0) {
+   if (use_core_profile == 0) {
       caps->v1.prim_mask |= (1 << PIPE_PRIM_QUADS) | (1 << PIPE_PRIM_QUAD_STRIP) | (1 << PIPE_PRIM_POLYGON);
    }
    /* TODO add GL 3.2 types */

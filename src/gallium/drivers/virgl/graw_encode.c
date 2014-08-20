@@ -184,13 +184,13 @@ int graw_encode_shader_state(struct graw_context *ctx,
 			     uint32_t type,
                              const struct pipe_shader_state *shader)
 {
-   char *str;
+   static char str[65536];
    uint32_t shader_len, len;
    int i;
    uint32_t tmp;
    int num_tokens = tgsi_num_tokens(shader->tokens);
 
-   str = calloc(65536, sizeof(char));
+   memset(str, 0, 65536);
    tgsi_dump_str(shader->tokens, TGSI_DUMP_FLOAT_AS_HEX, str, sizeof(str));
 
    shader_len = strlen(str) + 1;
@@ -214,8 +214,6 @@ int graw_encode_shader_state(struct graw_context *ctx,
       }
    }
    graw_encoder_write_block(ctx->cbuf, (uint8_t *)str, shader_len);
-
-   free(str);
    return 0;
 }
 

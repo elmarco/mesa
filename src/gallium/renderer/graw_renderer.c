@@ -2655,12 +2655,17 @@ static int inited;
 
 void graw_renderer_init(struct grend_if_cbs *cbs)
 {
+   int gl_ver;
+   virgl_gl_context gl_context;
    if (!inited) {
       inited = 1;
       vrend_object_init_resource_table();
       clicbs = cbs;
    }
-   int gl_ver = epoxy_gl_version();
+
+   gl_context = clicbs->create_gl_context(0);
+   clicbs->make_current(0, gl_context);
+   gl_ver = epoxy_gl_version();
 #define glewIsSupported epoxy_has_gl_extension
    if (glewIsSupported("GL_ARB_robustness"))
       grend_state.have_robustness = TRUE;
@@ -2688,6 +2693,8 @@ void graw_renderer_init(struct grend_if_cbs *cbs)
    vrend_object_set_destroy_callback(VIRGL_OBJECT_STREAMOUT_TARGET, grend_destroy_so_target_object);
 
    vrend_build_format_list();
+
+   clicbs->destroy_gl_context(gl_context);
    grend_state.viewport_dirty = grend_state.scissor_dirty = TRUE;
    grend_state.program_id = (GLuint)-1;
    list_inithead(&grend_state.fence_list);

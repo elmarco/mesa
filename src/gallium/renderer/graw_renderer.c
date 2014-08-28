@@ -29,7 +29,6 @@
 
 /* since we are storing things in OpenGL FBOs we need to flip transfer operations by default */
 
-#define USE_CORE_PROFILE 0
 static struct grend_resource *graw_renderer_ctx_res_lookup(struct grend_context *ctx, int res_handle);
 static void grend_update_viewport_state(struct grend_context *ctx);
 static void grend_update_scissor_state(struct grend_context *ctx);
@@ -42,7 +41,7 @@ static void grend_update_frontface_state(struct grend_context *ctx);
 extern int graw_shader_use_explicit;
 int localrender;
 static int have_invert_mesa = 0;
-static int use_core_profile = USE_CORE_PROFILE;
+static int use_core_profile = 0;
 int vrend_dump_shaders;
 
 static struct grend_if_cbs *clicbs;
@@ -2653,6 +2652,8 @@ static GLenum tgsitargettogltarget(const enum pipe_texture_target target, int nr
 
 static int inited;
 
+#define glewIsSupported epoxy_has_gl_extension
+
 void graw_renderer_init(struct grend_if_cbs *cbs)
 {
    int gl_ver;
@@ -2666,7 +2667,14 @@ void graw_renderer_init(struct grend_if_cbs *cbs)
    gl_context = clicbs->create_gl_context(0);
    clicbs->make_current(0, gl_context);
    gl_ver = epoxy_gl_version();
-#define glewIsSupported epoxy_has_gl_extension
+
+   if (gl_ver > 30 && !glewIsSupported("GL_ARB_compatibility")) {
+      fprintf(stderr, "gl_version %d - core profile enabled\n", gl_ver);
+      use_core_profile = 1;
+   } else {
+      fprintf(stderr, "gl_version %d - compat profile\n", gl_ver);
+   }
+
    if (glewIsSupported("GL_ARB_robustness"))
       grend_state.have_robustness = TRUE;
    else

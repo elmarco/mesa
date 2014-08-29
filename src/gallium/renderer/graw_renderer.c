@@ -344,6 +344,21 @@ static void __report_context_error(const char *fname, struct grend_context *ctx,
 }
 #define report_context_error(ctx, error, value) __report_context_error(__func__, ctx, error, value)
 
+#define CORE_PROFILE_WARN_NONE 0
+#define CORE_PROFILE_WARN_ALPHA_TEST 1
+#define CORE_PROFILE_WARN_ALPHA_TEXTURE 2
+#define CORE_PROFILE_WARN_STIPPLE 3
+#define CORE_PROFILE_WARN_POLYGON_MODE 4
+#define CORE_PROFILE_WARN_TWO_SIDE 5
+#define CORE_PROFILE_WARN_CLAMP 6
+
+static const char *vrend_core_profile_warn_strings[] = { "None", "Alpha Test", "Alpha Texture", "Stipple", "Polygon Mode", "Two Side", "Clamping" };
+
+static void __report_core_warn(const char *fname, struct grend_context *ctx, enum virgl_ctx_errors error, uint32_t value)
+{
+   fprintf(stderr,"%s: core profile violation reported %d \"%s\" %s %d\n", fname, ctx->ctx_id, ctx->debug_name, vrend_core_profile_warn_strings[error], value);
+}
+#define report_core_warn(ctx, error, value) __report_core_warn(__func__, ctx, error, value)
 static INLINE boolean should_invert_viewport(struct grend_context *ctx)
 {
    /* if we have a negative viewport then gallium wanted to invert it,
@@ -500,8 +515,14 @@ void grend_depth_test_enable(GLboolean depth_test_enable)
    }
 }
 
-static void grend_alpha_test_enable(GLboolean alpha_test_enable)
+static void grend_alpha_test_enable(struct grend_context *ctx,
+                                    GLboolean alpha_test_enable)
 {
+   if (use_core_profile) {
+       if (alpha_test_enable)
+          report_core_warn(ctx, CORE_PROFILE_WARN_ALPHA_TEST, 0);
+       return;
+   }
    if (grend_state.alpha_test_enabled != alpha_test_enable) {
       grend_state.alpha_test_enabled = alpha_test_enable;
       if (alpha_test_enable)
@@ -2213,10 +2234,10 @@ static void grend_hw_emit_dsa(struct grend_context *ctx)
       grend_depth_test_enable(GL_FALSE);
  
    if (state->alpha.enabled) {
-      grend_alpha_test_enable(GL_TRUE);
+      grend_alpha_test_enable(ctx, GL_TRUE);
       glAlphaFunc(GL_NEVER + state->alpha.func, state->alpha.ref_value);
    } else
-      grend_alpha_test_enable(GL_FALSE);
+      grend_alpha_test_enable(ctx, GL_FALSE);
 
 
 }
@@ -2348,7 +2369,8 @@ static void grend_hw_emit_rs(struct grend_context *ctx)
       glPolygonMode(GL_BACK, translate_fill(state->fill_back));
    } else if (state->fill_front == state->fill_back) {
       glPolygonMode(GL_FRONT_AND_BACK, translate_fill(state->fill_front));
-   }
+   } else
+      report_core_warn(ctx, CORE_PROFILE_WARN_POLYGON_MODE, 0);
 
    if (state->offset_tri)
       glEnable(GL_POLYGON_OFFSET_FILL);
@@ -2389,7 +2411,7 @@ static void grend_hw_emit_rs(struct grend_context *ctx)
       else
          glDisable(GL_POLYGON_STIPPLE);
    } else if (state->poly_stipple_enable)
-      fprintf(stderr, "polygon stipple enabled in core profile\n");
+      report_core_warn(ctx, CORE_PROFILE_WARN_STIPPLE, 0);
 
    if (state->point_quad_rasterization) {
       if (use_core_profile == 0)
@@ -2421,7 +2443,8 @@ static void grend_hw_emit_rs(struct grend_context *ctx)
          glEnable(GL_VERTEX_PROGRAM_TWO_SIDE);
       else
          glDisable(GL_VERTEX_PROGRAM_TWO_SIDE);
-   }
+   } else if (state->light_twoside)
+      report_core_warn(ctx, CORE_PROFILE_WARN_TWO_SIDE, 0);
 
    if (state->clip_plane_enable != grend_state.hw_rs_state.clip_plane_enable) {
       grend_state.hw_rs_state.clip_plane_enable = state->clip_plane_enable;
@@ -2438,7 +2461,8 @@ static void grend_hw_emit_rs(struct grend_context *ctx)
          glEnable(GL_LINE_STIPPLE);
       else
          glDisable(GL_LINE_STIPPLE);
-   }
+   } else if (state->line_stipple_enable)
+         report_core_warn(ctx, CORE_PROFILE_WARN_STIPPLE, 0);
 
    if (state->line_smooth)
       glEnable(GL_LINE_SMOOTH);
@@ -2460,6 +2484,9 @@ static void grend_hw_emit_rs(struct grend_context *ctx)
          glClampColor(GL_CLAMP_FRAGMENT_COLOR_ARB, GL_TRUE);
       else
          glClampColor(GL_CLAMP_FRAGMENT_COLOR_ARB, GL_FALSE);
+   } else {
+      if (state->clamp_vertex_color || state->clamp_fragment_color)
+         report_core_warn(ctx, CORE_PROFILE_WARN_CLAMP, 0);
    }
 
    if (grend_state.have_multisample) {
@@ -3086,6 +3113,7 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
          }
       }
    } else {
+      struct grend_context *ctx = vrend_lookup_renderer_ctx(ctx_id);
       GLenum glformat;
       GLenum gltype;
       int need_temp = 0;
@@ -3160,7 +3188,7 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
          glDrawBuffer(GL_COLOR_ATTACHMENT0_EXT);
          grend_blend_enable(GL_FALSE);
          grend_depth_test_enable(GL_FALSE);
-         grend_alpha_test_enable(GL_FALSE);
+         grend_alpha_test_enable(ctx, GL_FALSE);
          grend_stencil_test_enable(GL_FALSE);
          glPixelZoom(1.0f, res->y_0_top ? -1.0f : 1.0f);
          glWindowPos2i(box->x, res->y_0_top ? res->base.height0 - box->y : box->y);

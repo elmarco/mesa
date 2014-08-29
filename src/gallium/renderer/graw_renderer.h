@@ -47,7 +47,7 @@ struct grend_format_table {
 struct grend_if_cbs {
    void (*write_fence)(unsigned fence_id);
 
-   virgl_gl_context (*create_gl_context)(int scanout);
+   virgl_gl_context (*create_gl_context)(int scanout, bool shared);
    void (*destroy_gl_context)(virgl_gl_context ctx);
    int (*make_current)(int scanout, virgl_gl_context ctx);
 };

@@ -18,7 +18,7 @@ struct virgl_renderer_callbacks {
    void (*write_fence)(void *cookie, uint32_t fence);
 
    /* interact with GL implementation */
-   virgl_gl_context (*create_gl_context)(void *cookie, int scanout_idx);
+   virgl_gl_context (*create_gl_context)(void *cookie, int scanout_idx, bool shared);
    void (*destroy_gl_context)(void *cookie, virgl_gl_context ctx);
    int (*make_current)(void *cookie, int scanout_idx, virgl_gl_context ctx);
 };

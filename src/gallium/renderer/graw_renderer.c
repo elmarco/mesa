@@ -2664,7 +2664,7 @@ void graw_renderer_init(struct grend_if_cbs *cbs)
       clicbs = cbs;
    }
 
-   gl_context = clicbs->create_gl_context(0);
+   gl_context = clicbs->create_gl_context(0, false);
    clicbs->make_current(0, gl_context);
    gl_ver = epoxy_gl_version();
 
@@ -2783,7 +2783,7 @@ struct grend_context *grend_create_context(int id, uint32_t nlen, const char *de
       strncpy(grctx->debug_name, debug_name, 64);
    }
 
-   grctx->gl_context = clicbs->create_gl_context(0);
+   grctx->gl_context = clicbs->create_gl_context(0, id == 0 ? false : true);
    clicbs->make_current(0, grctx->gl_context);
 
    grctx->ctx_id = id;
@@ -4496,9 +4496,11 @@ void *graw_renderer_get_cursor_contents(uint32_t res_handle, uint32_t *width, ui
 
 void graw_renderer_force_ctx_0(void)
 {
+   struct grend_context *ctx0 = vrend_lookup_renderer_ctx(0);
    grend_state.current_ctx = NULL;
    grend_state.current_hw_ctx = NULL;
-   grend_hw_switch_context(vrend_lookup_renderer_ctx(0), TRUE);
+   grend_hw_switch_context(ctx0, TRUE);
+   clicbs->make_current(0, ctx0->gl_context);
 }
 
 void graw_renderer_get_rect(int res_handle, struct iovec *iov, unsigned int num_iovs,

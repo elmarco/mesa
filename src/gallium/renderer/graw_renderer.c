@@ -3576,6 +3576,8 @@ void grend_set_scissor_state(struct grend_context *ctx,
 void grend_set_polygon_stipple(struct grend_context *ctx,
                                struct pipe_poly_stipple *ps)
 {
+   if (use_core_profile)
+      return;
    glPolygonStipple((const GLubyte *)ps->stipple);
 }
 

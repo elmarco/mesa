@@ -443,6 +443,30 @@ static void emit_cbuf_writes(struct dump_ctx *ctx)
    }
 }
 
+static const char *atests[PIPE_FUNC_ALWAYS + 1] = {
+   "false",
+   "%s < %f",
+   "%s == %f",
+   "%s <= %f",
+   "%s > %f",
+   "%s != %f",
+   "%s >= %f",
+   "true",
+};
+
+static void emit_alpha_test(struct dump_ctx *ctx)
+{
+   char buf[255];
+   char comp_buf[128];
+
+   fprintf(stderr, "emitting alpha %d %f\n", ctx->key->alpha_test, ctx->key->alpha_ref_val);
+   snprintf(comp_buf, 128, atests[ctx->key->alpha_test], "out_c0.w", ctx->key->alpha_ref_val);
+
+   snprintf(buf, 255, "if (!(%s)) {\n\tdiscard;\n}\n", comp_buf);
+   strcat(ctx->glsl_main, buf);
+
+}
+
 static void emit_prescale(struct dump_ctx *ctx)
 {
    char buf[255];
@@ -1287,8 +1311,12 @@ iter_instruction(struct tgsi_iterate_context *iter,
             emit_clip_dist_movs(ctx);
       } else if (iter->processor.Processor == TGSI_PROCESSOR_GEOMETRY) {
 
-      } else if (ctx->write_all_cbufs)
-         emit_cbuf_writes(ctx);
+      } else if (iter->processor.Processor == TGSI_PROCESSOR_FRAGMENT) {
+         if (ctx->key->add_alpha_test)
+            emit_alpha_test(ctx);
+         if (ctx->write_all_cbufs)
+            emit_cbuf_writes(ctx);
+      }
       strcat(ctx->glsl_main, "}\n");
       break;
    case TGSI_OPCODE_RET:

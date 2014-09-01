@@ -1383,6 +1383,12 @@ static void grend_destroy_shader_object(void *obj_ptr)
 static INLINE void vrend_fill_shader_key(struct grend_context *ctx,
                                          struct vrend_shader_key *key)
 {
+   if (use_core_profile == 1) {
+      key->add_alpha_test = ctx->dsa_state.alpha.enabled;
+      key->alpha_test = ctx->dsa_state.alpha.func;
+      key->alpha_ref_val = ctx->dsa_state.alpha.ref_value;
+   } else
+      key->add_alpha_test = 0;
    key->invert_fs_origin = !ctx->inverted_fbo_content;
    key->coord_replace = ctx->rs_state.point_quad_rasterization ? ctx->rs_state.sprite_coord_enable : 0;
 }
@@ -2235,7 +2241,10 @@ static void grend_hw_emit_dsa(struct grend_context *ctx)
  
    if (state->alpha.enabled) {
       grend_alpha_test_enable(ctx, GL_TRUE);
-      glAlphaFunc(GL_NEVER + state->alpha.func, state->alpha.ref_value);
+      if (use_core_profile) {
+         fprintf(stderr, "alpha test %d %f\n", state->alpha.func, state->alpha.ref_value);
+      } else
+         glAlphaFunc(GL_NEVER + state->alpha.func, state->alpha.ref_value);
    } else
       grend_alpha_test_enable(ctx, GL_FALSE);
 
@@ -2250,6 +2259,7 @@ void grend_object_bind_dsa(struct grend_context *ctx,
       memset(&ctx->dsa_state, 0, sizeof(ctx->dsa_state));
       ctx->dsa = NULL;
       ctx->stencil_state_dirty = TRUE;
+      ctx->shader_dirty = TRUE;
       grend_hw_emit_dsa(ctx);
       return;
    }
@@ -2260,10 +2270,13 @@ void grend_object_bind_dsa(struct grend_context *ctx,
       return;
    }
 
-   if (ctx->dsa != state)
+   if (ctx->dsa != state) {
       ctx->stencil_state_dirty = TRUE;
+      ctx->shader_dirty = TRUE;
+   }
    ctx->dsa_state = *state;
    ctx->dsa = state;
+
    grend_hw_emit_dsa(ctx);
 }
 

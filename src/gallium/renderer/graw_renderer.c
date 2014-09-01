@@ -4397,6 +4397,13 @@ void graw_renderer_fill_caps(uint32_t set, uint32_t version,
          caps->v1.bset.conditional_render = 1;
    }
 
+   if (use_core_profile) {
+      caps->v1.bset.poly_stipple = 0;
+      caps->v1.bset.color_clamping = 0;
+   } else {
+      caps->v1.bset.poly_stipple = 1;
+      caps->v1.bset.color_clamping = 1;
+   }
    if (gl_ver >= 31) {
       caps->v1.bset.instanceid = 1;
       glGetIntegerv(GL_MAX_VERTEX_UNIFORM_BLOCKS, &max);

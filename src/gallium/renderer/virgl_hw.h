@@ -194,6 +194,8 @@ struct virgl_caps_bool_set1 {
         unsigned depth_clip_disable:1;
         unsigned seamless_cube_map_per_texture:1;
         unsigned ubo:1;
+        unsigned color_clamping:1; /* not in GL 3.1 core profile */
+        unsigned poly_stipple:1; /* not in GL 3.1 core profile */
 };
 
 /* endless expansion capabilites - current gallium has 252 formats */

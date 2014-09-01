@@ -106,10 +106,11 @@ virgl_get_param(struct pipe_screen *screen, enum pipe_cap param)
       return vscreen->caps.caps.v1.bset.conditional_render;
    case PIPE_CAP_TEXTURE_BARRIER:
       return 0;
-   case PIPE_CAP_FRAGMENT_COLOR_CLAMPED:
-   case PIPE_CAP_VERTEX_COLOR_UNCLAMPED: /* draw module */
-   case PIPE_CAP_VERTEX_COLOR_CLAMPED: /* draw module */
+   case PIPE_CAP_VERTEX_COLOR_UNCLAMPED:
       return 1;
+   case PIPE_CAP_FRAGMENT_COLOR_CLAMPED:
+   case PIPE_CAP_VERTEX_COLOR_CLAMPED:
+      return vscreen->caps.caps.v1.bset.color_clamping;
    case PIPE_CAP_MIXED_COLORBUFFER_FORMATS:
       return 0;
    case PIPE_CAP_GLSL_FEATURE_LEVEL:

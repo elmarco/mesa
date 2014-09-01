@@ -1425,7 +1425,7 @@ static int grend_shader_create(struct grend_context *ctx,
    shader->id = glCreateShader(conv_shader_type(shader->sel->type));
    shader->compiled_fs_id = 0;
    shader->glsl_prog = tgsi_convert(shader->sel->tokens, &key, &shader->sel->sinfo);
-
+   shader->key = key;
    if (shader->sel->type == PIPE_SHADER_FRAGMENT || shader->sel->type == PIPE_SHADER_GEOMETRY) {
       boolean ret;
 

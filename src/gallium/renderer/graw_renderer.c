@@ -345,14 +345,12 @@ static void __report_context_error(const char *fname, struct grend_context *ctx,
 #define report_context_error(ctx, error, value) __report_context_error(__func__, ctx, error, value)
 
 #define CORE_PROFILE_WARN_NONE 0
-#define CORE_PROFILE_WARN_ALPHA_TEST 1
-#define CORE_PROFILE_WARN_ALPHA_TEXTURE 2
-#define CORE_PROFILE_WARN_STIPPLE 3
-#define CORE_PROFILE_WARN_POLYGON_MODE 4
-#define CORE_PROFILE_WARN_TWO_SIDE 5
-#define CORE_PROFILE_WARN_CLAMP 6
+#define CORE_PROFILE_WARN_STIPPLE 1
+#define CORE_PROFILE_WARN_POLYGON_MODE 2
+#define CORE_PROFILE_WARN_TWO_SIDE 3
+#define CORE_PROFILE_WARN_CLAMP 4
 
-static const char *vrend_core_profile_warn_strings[] = { "None", "Alpha Test", "Alpha Texture", "Stipple", "Polygon Mode", "Two Side", "Clamping" };
+static const char *vrend_core_profile_warn_strings[] = { "None", "Stipple", "Polygon Mode", "Two Side", "Clamping" };
 
 static void __report_core_warn(const char *fname, struct grend_context *ctx, enum virgl_ctx_errors error, uint32_t value)
 {
@@ -530,8 +528,7 @@ static void grend_alpha_test_enable(struct grend_context *ctx,
                                     GLboolean alpha_test_enable)
 {
    if (use_core_profile) {
-       if (alpha_test_enable)
-          report_core_warn(ctx, CORE_PROFILE_WARN_ALPHA_TEST, 0);
+       /* handled in shaders */
        return;
    }
    if (grend_state.alpha_test_enabled != alpha_test_enable) {
@@ -2255,9 +2252,7 @@ static void grend_hw_emit_dsa(struct grend_context *ctx)
  
    if (state->alpha.enabled) {
       grend_alpha_test_enable(ctx, GL_TRUE);
-      if (use_core_profile) {
-         fprintf(stderr, "alpha test %d %f\n", state->alpha.func, state->alpha.ref_value);
-      } else
+      if (!use_core_profile)
          glAlphaFunc(GL_NEVER + state->alpha.func, state->alpha.ref_value);
    } else
       grend_alpha_test_enable(ctx, GL_FALSE);

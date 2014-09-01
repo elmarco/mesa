@@ -474,6 +474,17 @@ grend_insert_format(struct grend_format_table *entry, uint32_t bindings)
    tex_conv_table[entry->format].bindings = bindings;
 }
 
+void
+grend_insert_format_swizzle(int override_format, struct grend_format_table *entry, uint32_t bindings, uint8_t swizzle[4])
+{
+  int i;
+   tex_conv_table[override_format] = *entry;
+   tex_conv_table[override_format].bindings = bindings;
+   tex_conv_table[override_format].flags = VREND_BIND_NEED_SWIZZLE;
+   for (i = 0; i < 4; i++)
+     tex_conv_table[override_format].swizzle[i] = swizzle[i];
+}
+
 static boolean grend_is_timer_query(GLenum gltype)
 {
 	return gltype == GL_TIMESTAMP ||
@@ -828,9 +839,6 @@ void grend_create_sampler_view(struct grend_context *ctx,
 
    grend_resource_reference(&view->texture, res);
 
-   if (view->swizzle_r != 0 && view->swizzle_g != 1 && view->swizzle_b != 2 && view->swizzle_a != 3)
-      fprintf(stderr,"%d %d swizzles %d %d %d %d\n", view->format, view->texture->base.format, view->swizzle_r, view->swizzle_g, view->swizzle_b, view->swizzle_a);      
-
    view->srgb_decode = GL_DECODE_EXT;
    if (view->format != view->texture->base.format) {
       if (util_format_is_srgb(view->texture->base.format) &&
@@ -845,6 +853,12 @@ void grend_create_sampler_view(struct grend_context *ctx,
    view->gl_swizzle_g = to_gl_swizzle(view->swizzle_g);
    view->gl_swizzle_b = to_gl_swizzle(view->swizzle_b);
 
+   if (tex_conv_table[format].flags & VREND_BIND_NEED_SWIZZLE) {
+     view->gl_swizzle_r = to_gl_swizzle(tex_conv_table[format].swizzle[0]);
+     view->gl_swizzle_g = to_gl_swizzle(tex_conv_table[format].swizzle[1]);
+     view->gl_swizzle_b = to_gl_swizzle(tex_conv_table[format].swizzle[2]);
+     view->gl_swizzle_a = to_gl_swizzle(tex_conv_table[format].swizzle[3]);
+   }
    vrend_object_insert(ctx->object_hash, view, sizeof(*view), handle, VIRGL_OBJECT_SAMPLER_VIEW);
 }
 

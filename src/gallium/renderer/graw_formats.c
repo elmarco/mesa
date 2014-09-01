@@ -234,6 +234,34 @@ static void vrend_add_formats(struct grend_format_table *table, int num_entries)
       glBindFramebuffer(GL_FRAMEBUFFER, fb_id);
 
       glTexImage2D(GL_TEXTURE_2D, 0, table[i].internalformat, 32, 32, 0, table[i].glformat, table[i].gltype, NULL);
+      status = glGetError();
+      if (status == GL_INVALID_VALUE) {
+         struct grend_format_table *entry = NULL;
+         uint8_t swizzle[4];
+         binding = VREND_BIND_SAMPLER | VREND_BIND_NEED_SWIZZLE;
+
+         switch (table[i].format) {
+         case PIPE_FORMAT_A8_UNORM:
+            entry = &rg_base_formats[0];
+            swizzle[0] = swizzle[1] = swizzle[2] = PIPE_SWIZZLE_ZERO;
+            swizzle[3] = PIPE_SWIZZLE_RED;
+            break;
+         case PIPE_FORMAT_A16_UNORM:
+            entry = &rg_base_formats[2];
+            swizzle[0] = swizzle[1] = swizzle[2] = PIPE_SWIZZLE_ZERO;
+            swizzle[3] = PIPE_SWIZZLE_RED;
+            break;
+         default:
+            break;
+         }
+
+         if (entry) {
+            grend_insert_format_swizzle(table[i].format, entry, binding, swizzle);
+         }
+         glDeleteTextures(1, &tex_id);
+         glDeleteFramebuffers(1, &fb_id);
+         continue;
+      }
 
       if (util_format_is_depth_or_stencil(table[i].format)) {
          GLenum attachment;

@@ -36,12 +36,16 @@ struct grend_resource {
 #define VREND_BIND_RENDER (1 << 1)
 #define VREND_BIND_DEPTHSTENCIL (1 << 2)
 
+#define VREND_BIND_NEED_SWIZZLE (1 << 28)
+
 struct grend_format_table {
    enum virgl_formats format;
    GLenum internalformat;
    GLenum glformat;
    GLenum gltype;
    uint32_t bindings;
+   int flags;
+   uint8_t swizzle[4];
 };
 
 struct grend_if_cbs {
@@ -54,6 +58,7 @@ struct grend_if_cbs {
 void graw_renderer_init(struct grend_if_cbs *cbs);
 
 void grend_insert_format(struct grend_format_table *entry, uint32_t bindings);
+void grend_insert_format_swizzle(int override_format, struct grend_format_table *entry, uint32_t bindings, uint8_t swizzle[4]);
 void grend_create_vs(struct grend_context *ctx,
                      uint32_t handle,
                      const struct pipe_shader_state *vs);

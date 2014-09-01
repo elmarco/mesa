@@ -1,22 +1,38 @@
 
 To use GL 3.x in the renderer we need to handle the deprecated stuff - 
 
-two sided rendering - normals in shader or something
+two sided rendering - normals in shader or something - execute shader twice.
 
 not user vertex/index arrays - should be okay
 
-no more windowpos/drawpixels - todo - avoid use in core renderer - gallium doesn't have these.
+no more windowpos/drawpixels - todo - avoid use in core renderer - gallium doesn't have these. - done
 
-non-sprite points - hmm
+non-sprite points - hmm - emulate in guest - render a point to a texture?
 
-wide lines and stiple - 
+wide lines and stiple - emulate in guest? 
 
-polygon, quads, quad_strip - we can probably do this in the guest using gallium.
+polygon, quads, quad_strip - we can probably do this in the guest using gallium. - yes can do.
 
-polygon stipple - can we fix in guest?
+polygon stipple - can we fix in guest? - seems likely
 
 pixel transfer modes + ops - maps, shift/bias - all avoidable with gallium - 24-bit depth problems.
 
 DrawPixels + PixelZoom - avoidable
 
-texture formats alpha etc. - painful - need to rewrite shaders somehow
+clamp texture mode
+
+rasteriser state bits that are affected:
+
+fill_front, fill_back - must be the same
+poly_stipple_enable
+point_quad_rasterization
+light_twoside
+line_stipple_enable, line_stipple_pattern
+clamp_vertex_color
+clamp_fragment_color
+
+fragment shader tweaking - 
+
+alpha test - done in host shaders
+
+A8/A16 textures - done in host with swizzles.

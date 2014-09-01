@@ -1430,7 +1430,7 @@ static int grend_shader_select(struct grend_context *ctx,
    memset(&key, 0, sizeof(key));
    vrend_fill_shader_key(ctx, &key);
 
-   if (sel->current && memcmp(&sel->current->key, &key, sizeof(key)))
+   if (sel->current && !memcmp(&sel->current->key, &key, sizeof(key)))
       return 0;
 
    if (sel->num_shaders > 1) {

@@ -3400,23 +3400,19 @@ static void vrend_transfer_send_readpixels(struct grend_resource *res,
       res->readback_fb_id = fb_id;
       res->readback_fb_level = level;
       res->readback_fb_z = box->z;
-
-      if (actually_invert)
-         y1 = h - box->y - box->height;
-      else
-         y1 = box->y;
-      
-      if (have_invert_mesa && actually_invert)
-         glPixelStorei(GL_PACK_INVERT_MESA, 1);
-      if (!vrend_format_is_ds(res->base.format))
-          glReadBuffer(GL_COLOR_ATTACHMENT0_EXT);
-      if (!need_temp && stride)
-         glPixelStorei(GL_PACK_ROW_LENGTH, stride);
-   } else {
-      glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
+   } else
+      glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, res->readback_fb_id);
+   if (actually_invert)
+      y1 = h - box->y - box->height;
+   else
       y1 = box->y;
-      glReadBuffer(GL_BACK);
-   }
+
+   if (have_invert_mesa && actually_invert)
+      glPixelStorei(GL_PACK_INVERT_MESA, 1);
+   if (!vrend_format_is_ds(res->base.format))
+      glReadBuffer(GL_COLOR_ATTACHMENT0_EXT);
+   if (!need_temp && stride)
+      glPixelStorei(GL_PACK_ROW_LENGTH, stride);
 
    switch (elsize) {
    case 1:

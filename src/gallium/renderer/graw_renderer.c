@@ -307,6 +307,7 @@ struct grend_context {
    boolean ctx_switch_pending;
    GLuint blit_fb_ids[2];
 
+   boolean pstip_inited;
    GLuint pstipple_tex_id;
 };
 
@@ -499,6 +500,19 @@ void grend_use_program(GLuint program_id)
       glUseProgram(program_id);
       grend_state.program_id = program_id;
    }
+}
+
+static void grend_init_pstipple_texture(struct grend_context *ctx)
+{
+   glGenTextures(1, &ctx->pstipple_tex_id);
+   glBindTexture(GL_TEXTURE_2D, ctx->pstipple_tex_id);
+   glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, 32, 32, 0, GL_RED, GL_UNSIGNED_BYTE, NULL);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+   ctx->pstip_inited = true;
 }
 
 void grend_bind_va(GLuint vaoid)
@@ -2449,8 +2463,10 @@ static void grend_hw_emit_rs(struct grend_context *ctx)
          glEnable(GL_POLYGON_STIPPLE);
       else
          glDisable(GL_POLYGON_STIPPLE);
-   } else if (state->poly_stipple_enable)
-      report_core_warn(ctx, CORE_PROFILE_WARN_STIPPLE, 0);
+   } else if (state->poly_stipple_enable) {
+      if (!ctx->pstip_inited)
+         grend_init_pstipple_texture(ctx);
+   }
 
    if (state->point_quad_rasterization) {
       if (use_core_profile == 0)
@@ -2799,7 +2815,9 @@ bool grend_destroy_context(struct grend_context *ctx)
    }
 
    if (use_core_profile) {
-      glDeleteTextures(1, &ctx->pstipple_tex_id);
+      if (ctx->pstip_inited)
+         glDeleteTextures(1, &ctx->pstipple_tex_id);
+      ctx->pstip_inited = false;
    }
    /* reset references on framebuffers */
    grend_set_framebuffer_state(ctx, 0, NULL, 0);
@@ -2865,15 +2883,6 @@ struct grend_context *grend_create_context(int id, uint32_t nlen, const char *de
 
    grctx->res_hash = vrend_object_init_ctx_table();
 
-   if (use_core_profile) {
-      glGenTextures(1, &grctx->pstipple_tex_id);
-      glBindTexture(GL_TEXTURE_2D, grctx->pstipple_tex_id);
-      glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, 32, 32, 0, GL_RED, GL_UNSIGNED_BYTE, NULL);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-   }
    grend_bind_va(grctx->vaoid);
    return grctx;
 }
@@ -3609,6 +3618,10 @@ void grend_set_polygon_stipple(struct grend_context *ctx,
       static const unsigned bit31 = 1 << 31;
       GLubyte *stip = calloc(1, 1024);
       int i, j;
+
+      if (!ctx->pstip_inited)
+         grend_init_pstipple_texture(ctx);
+
       if (!stip)
          return;
 

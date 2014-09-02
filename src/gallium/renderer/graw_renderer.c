@@ -2397,13 +2397,12 @@ static void grend_hw_emit_rs(struct grend_context *ctx)
 {
    struct pipe_rasterizer_state *state = &ctx->rs_state;
    int i;
-#if 0
+
    if (state->depth_clip) {
-      glEnable(GL_DEPTH_CLAMP);
-   } else {
       glDisable(GL_DEPTH_CLAMP);
+   } else {
+      glEnable(GL_DEPTH_CLAMP);
    }
-#endif
 
    if (state->point_size_per_vertex) {
       glEnable(GL_PROGRAM_POINT_SIZE);

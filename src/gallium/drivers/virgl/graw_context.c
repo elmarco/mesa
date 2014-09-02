@@ -371,7 +371,7 @@ static void *graw_create_fs_state(struct pipe_context *ctx,
    int ret;
    handle = graw_object_assign_handle();
 
-   /* encode VS state */
+   /* encode FS state */
    ret = graw_encode_shader_state(grctx, handle,
                                   VIRGL_OBJECT_FS, shader);
    if (ret)

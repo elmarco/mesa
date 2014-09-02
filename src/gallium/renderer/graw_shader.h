@@ -25,6 +25,7 @@ struct vrend_shader_info {
 struct vrend_shader_key {
    uint32_t coord_replace;
    boolean invert_fs_origin;
+   boolean pstipple_tex;
    boolean add_alpha_test;
    uint8_t alpha_test;
    float alpha_ref_val;

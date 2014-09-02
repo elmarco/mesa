@@ -467,6 +467,16 @@ static void emit_alpha_test(struct dump_ctx *ctx)
 
 }
 
+static void emit_pstipple_pass(struct dump_ctx *ctx)
+{
+   char buf[255];
+
+   snprintf(buf, 255, "stip_temp = texture(pstipple_sampler, vec2(gl_FragCoord.x / 32, gl_FragCoord.y / 32)).x;\n");
+   strcat(ctx->glsl_main, buf);
+   snprintf(buf, 255, "if (stip_temp > 0) {\n\tdiscard;\n}\n");
+   strcat(ctx->glsl_main, buf);
+}
+
 static void emit_prescale(struct dump_ctx *ctx)
 {
    char buf[255];
@@ -1312,6 +1322,8 @@ iter_instruction(struct tgsi_iterate_context *iter,
       } else if (iter->processor.Processor == TGSI_PROCESSOR_GEOMETRY) {
 
       } else if (iter->processor.Processor == TGSI_PROCESSOR_FRAGMENT) {
+         if (ctx->key->pstipple_tex)
+            emit_pstipple_pass(ctx);
          if (ctx->key->add_alpha_test)
             emit_alpha_test(ctx);
          if (ctx->write_all_cbufs)
@@ -1564,7 +1576,11 @@ static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
             ctx->shadow_samp_mask |= (1 << i);
          }
       }
-
+   }
+   if (ctx->prog_type == TGSI_PROCESSOR_FRAGMENT &&
+       ctx->key->pstipple_tex == true) {
+      snprintf(buf, 255, "uniform sampler2D pstipple_sampler;\nfloat stip_temp;\n");
+      strcat(glsl_final, buf);
    }
 }
 

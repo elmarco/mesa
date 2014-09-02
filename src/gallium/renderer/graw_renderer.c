@@ -122,6 +122,8 @@ struct grend_linked_shader_program {
   uint32_t shadow_samp_mask[PIPE_SHADER_TYPES];
 
   GLuint vs_ws_adjust_loc;
+
+  GLuint fs_stipple_loc;
 };
 
 struct grend_shader {
@@ -304,6 +306,8 @@ struct grend_context {
 
    boolean ctx_switch_pending;
    GLuint blit_fb_ids[2];
+
+   GLuint pstipple_tex_id;
 };
 
 static struct grend_nontimer_hw_query *grend_create_hw_query(struct grend_query *query);
@@ -633,6 +637,10 @@ static struct grend_linked_shader_program *add_shader_program(struct grend_conte
 
   list_add(&sprog->head, &ctx->programs);
 
+  if (fs->key.pstipple_tex)
+     sprog->fs_stipple_loc = glGetUniformLocation(prog_id, "pstipple_sampler");
+  else
+     sprog->fs_stipple_loc = -1;
   sprog->vs_ws_adjust_loc = glGetUniformLocation(prog_id, "winsys_adjust");
   for (id = PIPE_SHADER_VERTEX; id <= (gs ? PIPE_SHADER_GEOMETRY : PIPE_SHADER_FRAGMENT); id++) {
     if (sprog->ss[id]->sel->sinfo.samplers_used_mask) {
@@ -1398,8 +1406,12 @@ static INLINE void vrend_fill_shader_key(struct grend_context *ctx,
       key->add_alpha_test = ctx->dsa_state.alpha.enabled;
       key->alpha_test = ctx->dsa_state.alpha.func;
       key->alpha_ref_val = ctx->dsa_state.alpha.ref_value;
-   } else
+
+      key->pstipple_tex = ctx->rs_state.poly_stipple_enable;
+   } else {
       key->add_alpha_test = 0;
+      key->pstipple_tex = 0;
+   }
    key->invert_fs_origin = !ctx->inverted_fbo_content;
    key->coord_replace = ctx->rs_state.point_quad_rasterization ? ctx->rs_state.sprite_coord_enable : 0;
 }
@@ -1811,6 +1823,11 @@ void grend_draw_vbo(struct grend_context *ctx,
    }
    glUniform4f(ctx->prog->vs_ws_adjust_loc, 0.0, ctx->viewport_is_negative ? -1.0 : 1.0, ctx->depth_scale, ctx->depth_transform);
 
+   if (use_core_profile && ctx->prog->fs_stipple_loc != -1) {
+      glActiveTexture(GL_TEXTURE0 + sampler_id);
+      glBindTexture(GL_TEXTURE_2D, ctx->pstipple_tex_id);
+      glUniform1i(ctx->prog->fs_stipple_loc, sampler_id);
+   }
    num_enable = ctx->ve->count;
    enable_bitmask = 0;
    disable_bitmask = ~((1ull << num_enable) - 1);
@@ -2781,6 +2798,9 @@ bool grend_destroy_context(struct grend_context *ctx)
       grend_state.current_hw_ctx = NULL;
    }
 
+   if (use_core_profile) {
+      glDeleteTextures(1, &ctx->pstipple_tex_id);
+   }
    /* reset references on framebuffers */
    grend_set_framebuffer_state(ctx, 0, NULL, 0);
 
@@ -2845,6 +2865,15 @@ struct grend_context *grend_create_context(int id, uint32_t nlen, const char *de
 
    grctx->res_hash = vrend_object_init_ctx_table();
 
+   if (use_core_profile) {
+      glGenTextures(1, &grctx->pstipple_tex_id);
+      glBindTexture(GL_TEXTURE_2D, grctx->pstipple_tex_id);
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, 32, 32, 0, GL_RED, GL_UNSIGNED_BYTE, NULL);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+   }
    grend_bind_va(grctx->vaoid);
    return grctx;
 }
@@ -3576,8 +3605,29 @@ void grend_set_scissor_state(struct grend_context *ctx,
 void grend_set_polygon_stipple(struct grend_context *ctx,
                                struct pipe_poly_stipple *ps)
 {
-   if (use_core_profile)
+   if (use_core_profile) {
+      static const unsigned bit31 = 1 << 31;
+      GLubyte *stip = calloc(1, 1024);
+      int i, j;
+      if (!stip)
+         return;
+
+      for (i = 0; i < 32; i++) {
+         for (j = 0; j < 32; j++) {
+            if (ps->stipple[i] & (bit31 >> j))
+               stip[i * 32 + j] = 0;
+            else
+               stip[i * 32 + j] = 255;
+         }
+      }
+
+      glBindTexture(GL_TEXTURE_2D, ctx->pstipple_tex_id);
+      glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 32, 32,
+                      GL_RED, GL_UNSIGNED_BYTE, stip);
+
+      free(stip);
       return;
+   }
    glPolygonStipple((const GLubyte *)ps->stipple);
 }
 

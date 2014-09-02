@@ -459,7 +459,6 @@ static void emit_alpha_test(struct dump_ctx *ctx)
    char buf[255];
    char comp_buf[128];
 
-   fprintf(stderr, "emitting alpha %d %f\n", ctx->key->alpha_test, ctx->key->alpha_ref_val);
    snprintf(comp_buf, 128, atests[ctx->key->alpha_test], "out_c0.w", ctx->key->alpha_ref_val);
 
    snprintf(buf, 255, "if (!(%s)) {\n\tdiscard;\n}\n", comp_buf);

@@ -1747,6 +1747,10 @@ void grend_draw_vbo(struct grend_context *ctx,
      if (ctx->gs)
         grend_shader_select(ctx, ctx->gs, &gs_dirty);
 
+     if (!ctx->vs->current || !ctx->fs->current) {
+        fprintf(stderr, "failure to compile shader variants\n");
+        return;
+     }
      prog = lookup_shader_program(ctx, ctx->vs->current->id, ctx->fs->current->id, ctx->gs ? ctx->gs->current->id : 0);
      if (!prog) {
         prog = add_shader_program(ctx, ctx->vs->current, ctx->fs->current, ctx->gs ? ctx->gs->current : NULL);

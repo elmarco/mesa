@@ -68,7 +68,13 @@ enum virgl_context_cmd {
 
 #define VIRGL_CMD0(cmd, obj, len) ((cmd) | ((obj) << 8) | ((len) << 16))
 
+/* hw specification */
+#define VIRGL_MAX_COLOR_BUFS 8
+#define VIRGL_MAX_CLIP_PLANES 8
+
+/* some of these defines are a specification - not used in the code */
 /* bit offsets for blend state object */
+#define VIRGL_OBJ_BLEND_SIZE (VIRGL_MAX_COLOR_BUFS + 3)
 #define VIRGL_OBJ_BLEND_HANDLE 1
 #define VIRGL_OBJ_BLEND_S0 2
 #define VIRGL_OBJ_BLEND_S0_INDEPENDENT_BLEND_ENABLE(x) ((x) & 0x1 << 0)
@@ -79,7 +85,7 @@ enum virgl_context_cmd {
 #define VIRGL_OBJ_BLEND_S1 3
 #define VIRGL_OBJ_BLEND_S1_LOGICOP_FUNC(x) (((x) & 0xf) << 0)
 /* repeated once per number of cbufs */
-#define VIRGL_MAX_COLOR_BUFS 8
+
 #define VIRGL_OBJ_BLEND_S2(cbuf) (4 + (cbuf))
 #define VIRGL_OBJ_BLEND_S2_RT_BLEND_ENABLE(x) (((x) & 0x1) << 0)
 #define VIRGL_OBJ_BLEND_S2_RT_RGB_FUNC(x) (((x) & 0x7) << 1)
@@ -91,6 +97,7 @@ enum virgl_context_cmd {
 #define VIRGL_OBJ_BLEND_S2_RT_COLORMASK(x) (((x) & 0xf) << 27)
 
 /* bit offsets for DSA state */
+#define VIRGL_OBJ_DSA_SIZE 5
 #define VIRGL_OBJ_DSA_HANDLE 1
 #define VIRGL_OBJ_DSA_S0 2
 #define VIRGL_OBJ_DSA_S0_DEPTH_ENABLE(x) (((x) & 0x1) << 0)
@@ -110,6 +117,7 @@ enum virgl_context_cmd {
 #define VIRGL_OBJ_DSA_S3_ALPHA_REF 5
 
 /* offsets for rasterizer state */
+#define VIRGL_OBJ_RS_SIZE 9
 #define VIRGL_OBJ_RS_HANDLE 1
 #define VIRGL_OBJ_RS_S0 2
 #define VIRGL_OBJ_RS_S0_FLATSHADE(x) (((x) & 0x1) << 0)
@@ -144,7 +152,7 @@ enum virgl_context_cmd {
 #define VIRGL_OBJ_RS_S1_POINT_SIZE 3
 #define VIRGL_OBJ_RS_S2_SPRITE_COORD_ENABLE 4
 #define VIRGL_OBJ_RS_S3 5
-#define VIRGL_MAX_CLIP_PLANES 8
+
 #define VIRGL_OBJ_RS_S3_LINE_STIPPLE_PATTERN(x) (((x) & 0xffff) << 0)
 #define VIRGL_OBJ_RS_S3_LINE_STIPPLE_FACTOR(x) (((x) & 0xff) << 16)
 #define VIRGL_OBJ_RS_S3_CLIP_PLANE_ENABLE(x) (((x) & 0xff) << 24)
@@ -153,4 +161,196 @@ enum virgl_context_cmd {
 #define VIRGL_OBJ_RS_S6_OFFSET_SCALE 8
 #define VIRGL_OBJ_RS_S7_OFFSET_CLAMP 9
 
+#define VIRGL_OBJ_CLEAR_SIZE 8
+#define VIRGL_OBJ_CLEAR_BUFFERS 1
+#define VIRGL_OBJ_CLEAR_COLOR_0 2 /* color is 4 * u32/f32/i32 */
+#define VIRGL_OBJ_CLEAR_COLOR_1 3
+#define VIRGL_OBJ_CLEAR_COLOR_2 4
+#define VIRGL_OBJ_CLEAR_COLOR_3 5
+#define VIRGL_OBJ_CLEAR_DEPTH_0 6 /* depth is a double precision float */
+#define VIRGL_OBJ_CLEAR_DEPTH_1 7
+#define VIRGL_OBJ_CLEAR_STENCIL 8
+
+/* viewport state */
+#define VIRGL_SET_VIEWPORT_STATE_SIZE 8
+#define VIRGL_SET_VIEWPORT_STATE_SCALE_0 1
+#define VIRGL_SET_VIEWPORT_STATE_SCALE_1 2
+#define VIRGL_SET_VIEWPORT_STATE_SCALE_2 3 
+#define VIRGL_SET_VIEWPORT_STATE_SCALE_3 4
+#define VIRGL_SET_VIEWPORT_STATE_TRANSLATE_0 5
+#define VIRGL_SET_VIEWPORT_STATE_TRANSLATE_1 6
+#define VIRGL_SET_VIEWPORT_STATE_TRANSLATE_2 7 
+#define VIRGL_SET_VIEWPORT_STATE_TRANSLATE_3 8
+
+/* framebuffer state */
+#define VIRGL_SET_FRAMEBUFFER_STATE_SIZE(nr_cbufs) (nr_cbufs + 2)
+#define VIRGL_SET_FRAMEBUFFER_STATE_NR_CBUFS 1
+#define VIRGL_SET_FRAMEBUFFER_STATE_NR_ZSURF_HANDLE 2
+#define VIRGL_SET_FRAMEBUFFER_STATE_CBUF0_HANDLE 3
+
+/* vertex elements object */
+#define VIRGL_OBJ_VERTEX_ELEMENTS_SIZE(num_elements) (((num_elements) * 4) + 1)
+#define VIRGL_OBJ_VERTEX_ELEMENTS_HANDLE 1
+#define VIRGL_OBJ_VERTEX_ELEMENTS_V0_SRC_OFFSET 2 /* repeated per VE */
+#define VIRGL_OBJ_VERTEX_ELEMENTS_V0_INSTANCE_DIVISOR 3
+#define VIRGL_OBJ_VERTEX_ELEMENTS_V0_VERTEX_BUFFER_INDEX 4
+#define VIRGL_OBJ_VERTEX_ELEMENTS_V0_SRC_FORMAT 5
+
+/* vertex buffers */
+#define VIRGL_SET_VERTEX_BUFFERS_SIZE(num_buffers) ((num_buffers) * 3)
+#define VIRGL_SET_VERTEX_BUFFER_STRIDE 1
+#define VIRGL_SET_VERTEX_BUFFER_OFFSET 2
+#define VIRGL_SET_VERTEX_BUFFER_HANDLE 3
+
+/* index buffer */
+#define VIRGL_SET_INDEX_BUFFER_SIZE(ib) (((ib) ? 2 : 0) + 1)
+#define VIRGL_SET_INDEX_BUFFER_HANDLE 1
+#define VIRGL_SET_INDEX_BUFFER_INDEX_SIZE 2 /* only if sending an IB handle */
+#define VIRGL_SET_INDEX_BUFFER_OFFSET 3     /* only if sending an IB handle */
+
+/* draw VBO */
+#define VIRGL_DRAW_VBO_SIZE 11
+#define VIRGL_DRAW_VBO_START 1
+#define VIRGL_DRAW_VBO_COUNT 2
+#define VIRGL_DRAW_VBO_MODE 3
+#define VIRGL_DRAW_VBO_INDEXED 4
+#define VIRGL_DRAW_VBO_INSTANCE_COUNT 5
+#define VIRGL_DRAW_VBO_INDEX_BIAS 6
+#define VIRGL_DRAW_VBO_START_INSTANCE 7
+#define VIRGL_DRAW_VBO_PRIMITIVE_RESTART 8
+#define VIRGL_DRAW_VBO_RESTART_INDEX 9
+#define VIRGL_DRAW_VBO_MIN_INDEX 10
+#define VIRGL_DRAW_VBO_MAX_INDEX 11
+
+/* create surface */
+#define VIRGL_OBJ_SURFACE_SIZE 5
+#define VIRGL_OBJ_SURFACE_HANDLE 1
+#define VIRGL_OBJ_SURFACE_RES_HANDLE 2
+#define VIRGL_OBJ_SURFACE_FORMAT 3
+#define VIRGL_OBJ_SURFACE_BUFFER_FIRST_ELEMENT 4
+#define VIRGL_OBJ_SURFACE_BUFFER_LAST_ELEMENT 5
+#define VIRGL_OBJ_SURFACE_TEXTURE_LEVEL 4
+#define VIRGL_OBJ_SURFACE_TEXTURE_LAYERS 5
+
+/* create streamout target */
+#define VIRGL_OBJ_STREAMOUT_SIZE 4
+#define VIRGL_OBJ_STREAMOUT_HANDLE 1
+#define VIRGL_OBJ_STREAMOUT_RES_HANDLE 2
+#define VIRGL_OBJ_STREAMOUT_BUFFER_OFFSET 3
+#define VIRGL_OBJ_STREAMOUT_BUFFER_SIZE 4
+
+/* sampler state */
+#define VIRGL_OBJ_SAMPLER_STATE_SIZE 9
+#define VIRGL_OBJ_SAMPLER_STATE_HANDLE 1
+#define VIRGL_OBJ_SAMPLER_STATE_S0 2
+#define VIRGL_OBJ_SAMPLE_STATE_S0_WRAP_S(x) (((x) & 0x7) << 0)
+#define VIRGL_OBJ_SAMPLE_STATE_S0_WRAP_T(x) (((x) & 0x7) << 3)
+#define VIRGL_OBJ_SAMPLE_STATE_S0_WRAP_R(x) (((x) & 0x7) << 6)
+#define VIRGL_OBJ_SAMPLE_STATE_S0_MIN_IMG_FILTER(x) (((x) & 0x3) << 9)
+#define VIRGL_OBJ_SAMPLE_STATE_S0_MIN_MIP_FILTER(x) (((x) & 0x3) << 11)
+#define VIRGL_OBJ_SAMPLE_STATE_S0_MAG_IMG_FILTER(x) (((x) & 0x3) << 13)
+#define VIRGL_OBJ_SAMPLE_STATE_S0_COMPARE_MODE(x) (((x) & 0x1) << 15)
+#define VIRGL_OBJ_SAMPLE_STATE_S0_COMPARE_FUNC(x) (((x) & 0x7) << 16)
+
+#define VIRGL_OBJ_SAMPLER_STATE_LOD_BIAS 3
+#define VIRGL_OBJ_SAMPLER_STATE_MIN_LOD 4
+#define VIRGL_OBJ_SAMPLER_STATE_MAX_LOD 5
+#define VIRGL_OBJ_SAMPLER_STATE_BORDER_COLOR_0 6
+#define VIRGL_OBJ_SAMPLER_STATE_BORDER_COLOR_1 7
+#define VIRGL_OBJ_SAMPLER_STATE_BORDER_COLOR_2 8
+#define VIRGL_OBJ_SAMPLER_STATE_BORDER_COLOR_3 9
+
+/* sampler view */
+#define VIRGL_OBJ_SAMPLER_VIEW_SIZE 6
+#define VIRGL_OBJ_SAMPLER_VIEW_HANDLE 1
+#define VIRGL_OBJ_SAMPLER_VIEW_RES_HANDLE 2
+#define VIRGL_OBJ_SAMPLER_VIEW_FORMAT 3
+#define VIRGL_OBJ_SAMPLER_VIEW_BUFFER_FIRST_ELEMENT 4
+#define VIRGL_OBJ_SAMPLER_VIEW_BUFFER_LAST_ELEMENT 5
+#define VIRGL_OBJ_SAMPLER_VIEW_TEXTURE_LAYER 4
+#define VIRGL_OBJ_SAMPLER_VIEW_TEXTURE_LEVEL 5
+#define VIRGL_OBJ_SAMPLER_VIEW_SWIZZLE 6
+#define VIRGL_OBJ_SAMPLER_VIEW_SWIZZLE_R(x) (((x) & 0x7) << 0)
+#define VIRGL_OBJ_SAMPLER_VIEW_SWIZZLE_G(x) (((x) & 0x7) << 3)
+#define VIRGL_OBJ_SAMPLER_VIEW_SWIZZLE_B(x) (((x) & 0x7) << 6)
+#define VIRGL_OBJ_SAMPLER_VIEW_SWIZZLE_A(x) (((x) & 0x7) << 9)
+
+/* set sampler views */
+#define VIRGL_SET_SAMPLER_VIEWS_SIZE(num_views) ((num_views) + 2)
+#define VIRGL_SET_SAMPLER_VIEWS_SHADER_TYPE 1
+#define VIRGL_SET_SAMPLER_VIEWS_START_SLOT 2
+#define VIRGL_SET_SAMPLER_VIEWS_V0_HANDLE 3
+
+/* bind sampler states */
+#define VIRGL_BIND_SAMPLER_STATES(num_states) ((num_states) + 2)
+#define VIRGL_BIND_SAMPLER_STATES_SHADER_TYPE 1
+#define VIRGL_BIND_SAMPLER_STATES_START_SLOT 2
+#define VIRGL_BIND_SAMPLER_STATES_S0_HANDLE 3
+
+/* set stencil reference */
+#define VIRGL_SET_STENCIL_REF_SIZE 1
+#define VIRGL_STENCIL_REF_VAL(f, s) ((f & 0xff) | (((s & 0xff) << 8)))
+
+/* set blend color */
+#define VIRGL_SET_BLEND_COLOR_SIZE 4
+
+/* set scissor state */
+#define VIRGL_SET_SCISSOR_STATE 2
+#define VIRGL_SET_SCISSOR_MINX_MINY 1
+#define VIRGL_SET_SCISSOR_MAXX_MAXY 1
+
+/* resource copy region */
+#define VIRGL_CMD_RESOURCE_COPY_REGION_SIZE 13
+#define VIRGL_CMD_RCR_DST_RES_HANDLE 1
+#define VIRGL_CMD_RCR_DST_LEVEL 2
+#define VIRGL_CMD_RCR_DST_X 3
+#define VIRGL_CMD_RCR_DST_Y 4
+#define VIRGL_CMD_RCR_DST_Z 5
+#define VIRGL_CMD_RCR_SRC_RES_HANDLE 6
+#define VIRGL_CMD_RCR_SRC_LEVEL 7
+#define VIRGL_CMD_RCR_SRC_X 8
+#define VIRGL_CMD_RCR_SRC_Y 9
+#define VIRGL_CMD_RCR_SRC_Z 10
+#define VIRGL_CMD_RCR_SRC_W 11
+#define VIRGL_CMD_RCR_SRC_H 12
+#define VIRGL_CMD_RCR_SRC_D 13
+
+/* blit - compress this can make this 21 bytes */
+#define VIRGL_CMD_BLIT_SIZE 23
+#define VIRGL_CMD_BLIT_MASK 1
+#define VIRGL_CMD_BLIT_FILTER 2
+#define VIRGL_CMD_BLIT_SCISSOR_ENABLE 3
+#define VIRGL_CMD_BLIT_SCISSOR_MINX_MINY 4
+#define VIRGL_CMD_BLIT_SCISSOR_MAXX_MAXY 5
+#define VIRGL_CMD_BLIT_DST_RES_HANDLE 6
+#define VIRGL_CMD_BLIT_DST_LEVEL 7
+#define VIRGL_CMD_BLIT_DST_FORMAT 8
+#define VIRGL_CMD_BLIT_DST_X 9
+#define VIRGL_CMD_BLIT_DST_Y 10
+#define VIRGL_CMD_BLIT_DST_Z 11
+#define VIRGL_CMD_BLIT_DST_W 12
+#define VIRGL_CMD_BLIT_DST_H 13
+#define VIRGL_CMD_BLIT_DST_D 14
+#define VIRGL_CMD_BLIT_SRC_RES_HANDLE 15
+#define VIRGL_CMD_BLIT_SRC_LEVEL 16
+#define VIRGL_CMD_BLIT_SRC_FORMAT 17
+#define VIRGL_CMD_BLIT_SRC_X 18
+#define VIRGL_CMD_BLIT_SRC_Y 19
+#define VIRGL_CMD_BLIT_SRC_Z 20
+#define VIRGL_CMD_BLIT_SRC_W 21
+#define VIRGL_CMD_BLIT_SRC_H 22
+#define VIRGL_CMD_BLIT_SRC_D 23
+
+/* query object */
+#define VIRGL_OBJ_QUERY_SIZE 4
+#define VIRGL_OBJ_QUERY_HANDLE 1
+#define VIRGL_OBJ_QUERY_TYPE 2
+#define VIRGL_OBJ_QUERY_OFFSET 3
+#define VIRGL_OBJ_QUERY_RES_HANDLE 4
+
+/* render condition */
+#define VIRGL_RENDER_CONDITION_SIZE 3
+#define VIRGL_RENDER_CONDITION_HANDLE 1
+#define VIRGL_RENDER_CONDITION_CONDITION 2
+#define VIRGL_RENDER_CONDITION_MODE 3
 #endif

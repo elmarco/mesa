@@ -1,10 +1,10 @@
 #include "util/u_memory.h"
 #include "util/u_inlines.h"
 #include "virgl_resource.h"
-#include "graw_context.h"
-#include "graw_encode.h"
+#include "virgl_context.h"
+#include "virgl_encode.h"
 
-struct graw_query {
+struct virgl_query {
    uint32_t handle;
    struct virgl_resource *buf;
 
@@ -13,27 +13,27 @@ struct graw_query {
    unsigned result_gotten_sent;
 };
 
-static void graw_render_condition(struct pipe_context *ctx,
+static void virgl_render_condition(struct pipe_context *ctx,
                                   struct pipe_query *q,
                                   boolean condition,
                                   uint mode)
 {
-   struct graw_context *grctx = (struct graw_context *)ctx;
-   struct graw_query *query = (struct graw_query *)q;
+   struct virgl_context *vctx = (struct virgl_context *)ctx;
+   struct virgl_query *query = (struct virgl_query *)q;
    uint32_t handle = 0;
    if (q)
       handle = query->handle;
-   graw_encoder_render_condition(grctx, handle, condition, mode);
+   virgl_encoder_render_condition(vctx, handle, condition, mode);
 }
 
-static struct pipe_query *graw_create_query(struct pipe_context *ctx,
+static struct pipe_query *virgl_create_query(struct pipe_context *ctx,
                                             unsigned query_type)
 {
-   struct graw_context *grctx = (struct graw_context *)ctx;
-   struct graw_query *query;
+   struct virgl_context *vctx = (struct virgl_context *)ctx;
+   struct virgl_query *query;
    uint32_t handle;
 
-   query = CALLOC_STRUCT(graw_query);
+   query = CALLOC_STRUCT(virgl_query);
    if (!query)
       return NULL;
 
@@ -45,67 +45,67 @@ static struct pipe_query *graw_create_query(struct pipe_context *ctx,
       return NULL;
    }
    
-   handle = graw_object_assign_handle();
+   handle = virgl_object_assign_handle();
    query->type = query_type;
    query->handle = handle;
    query->buf->clean = FALSE;
-   graw_encoder_create_query(grctx, handle, query_type, query->buf, 0);
+   virgl_encoder_create_query(vctx, handle, query_type, query->buf, 0);
 
    return (struct pipe_query *)query;
 }
 
-static void graw_destroy_query(struct pipe_context *ctx,
+static void virgl_destroy_query(struct pipe_context *ctx,
                         struct pipe_query *q)
 {
-   struct graw_context *grctx = (struct graw_context *)ctx;
-   struct graw_query *query = (struct graw_query *)q;
+   struct virgl_context *vctx = (struct virgl_context *)ctx;
+   struct virgl_query *query = (struct virgl_query *)q;
 
-   graw_encode_delete_object(grctx, query->handle, VIRGL_OBJECT_QUERY);
+   virgl_encode_delete_object(vctx, query->handle, VIRGL_OBJECT_QUERY);
 
    pipe_resource_reference((struct pipe_resource **)&query->buf, NULL);
    FREE(query);
 }
 
-static void graw_begin_query(struct pipe_context *ctx,
+static void virgl_begin_query(struct pipe_context *ctx,
                              struct pipe_query *q)
 {
-   struct graw_context *grctx = (struct graw_context *)ctx;
-   struct graw_query *query = (struct graw_query *)q;
+   struct virgl_context *vctx = (struct virgl_context *)ctx;
+   struct virgl_query *query = (struct virgl_query *)q;
 
    query->buf->clean = FALSE;
-   graw_encoder_begin_query(grctx, query->handle);
+   virgl_encoder_begin_query(vctx, query->handle);
 }
 
-static void graw_end_query(struct pipe_context *ctx,
+static void virgl_end_query(struct pipe_context *ctx,
                            struct pipe_query *q)
 {
-   struct graw_context *grctx = (struct graw_context *)ctx;
-   struct graw_query *query = (struct graw_query *)q;
+   struct virgl_context *vctx = (struct virgl_context *)ctx;
+   struct virgl_query *query = (struct virgl_query *)q;
    struct pipe_box box;
 
    uint32_t qs = VIRGL_QUERY_STATE_WAIT_HOST;
    u_box_1d(0, 4, &box);
-   graw_transfer_inline_write(ctx, &query->buf->u.b, 0, PIPE_TRANSFER_WRITE,
+   virgl_transfer_inline_write(ctx, &query->buf->u.b, 0, PIPE_TRANSFER_WRITE,
                               &box, &qs, 0, 0);
 
 
-   graw_encoder_end_query(grctx, query->handle);
+   virgl_encoder_end_query(vctx, query->handle);
 }
 
-static boolean graw_get_query_result(struct pipe_context *ctx,
+static boolean virgl_get_query_result(struct pipe_context *ctx,
                                      struct pipe_query *q,
                                      boolean wait,
                                      union pipe_query_result *result)
 {
-   struct graw_context *grctx = (struct graw_context *)ctx;
-   struct graw_query *query = (struct graw_query *)q;
+   struct virgl_context *vctx = (struct virgl_context *)ctx;
+   struct virgl_query *query = (struct virgl_query *)q;
    struct pipe_transfer *transfer;
    struct virgl_host_query_state *host_state;
 
    /* ask host for query result */
    if (!query->result_gotten_sent) {
       query->result_gotten_sent = 1;
-      graw_encoder_get_query_result(grctx, query->handle, 0);
+      virgl_encoder_get_query_result(vctx, query->handle, 0);
       ctx->flush(ctx, NULL, 0);
    }
 
@@ -133,12 +133,12 @@ static boolean graw_get_query_result(struct pipe_context *ctx,
    return TRUE;
 }
 
-void graw_init_query_functions(struct graw_context *grctx)
+void virgl_init_query_functions(struct virgl_context *vctx)
 {
-   grctx->base.render_condition = graw_render_condition;
-   grctx->base.create_query = graw_create_query;
-   grctx->base.destroy_query = graw_destroy_query;
-   grctx->base.begin_query = graw_begin_query;
-   grctx->base.end_query = graw_end_query;
-   grctx->base.get_query_result = graw_get_query_result;
+   vctx->base.render_condition = virgl_render_condition;
+   vctx->base.create_query = virgl_create_query;
+   vctx->base.destroy_query = virgl_destroy_query;
+   vctx->base.begin_query = virgl_begin_query;
+   vctx->base.end_query = virgl_end_query;
+   vctx->base.get_query_result = virgl_get_query_result;
 }

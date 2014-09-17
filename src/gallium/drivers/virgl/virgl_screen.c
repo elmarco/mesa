@@ -15,7 +15,7 @@
 #include "virgl.h"
 #include "virgl_resource.h"
 #include "virgl_public.h"
-#include "graw_context.h"
+#include "virgl_context.h"
 
 #define SP_MAX_TEXTURE_2D_LEVELS 15  /* 16K x 16K */
 #define SP_MAX_TEXTURE_3D_LEVELS 9   /* 512 x 512 x 512 */
@@ -468,7 +468,7 @@ virgl_create_screen(struct virgl_winsys *vws)
    screen->base.get_paramf = virgl_get_paramf;
    screen->base.is_format_supported = virgl_is_format_supported;
    screen->base.destroy = virgl_destroy_screen;
-   screen->base.context_create = graw_context_create;
+   screen->base.context_create = virgl_context_create;
    screen->base.flush_frontbuffer = virgl_flush_frontbuffer;
    screen->base.get_timestamp = virgl_get_timestamp;
    screen->base.fence_reference = virgl_fence_reference;

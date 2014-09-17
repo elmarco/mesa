@@ -35,7 +35,7 @@ libvirgl_la_SOURCES = \
         virgl_resource.c \
         virgl_buffer.c \
         virgl_texture.c \
-	graw_context.c \
-	graw_encode.c \
-        graw_query.c \
-        graw_streamout.c
+	virgl_context.c \
+	virgl_encode.c \
+        virgl_query.c \
+        virgl_streamout.c

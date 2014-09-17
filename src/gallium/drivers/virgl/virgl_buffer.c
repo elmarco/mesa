@@ -1,6 +1,6 @@
 
 #include "util/u_memory.h"
-#include "graw_context.h"
+#include "virgl_context.h"
 #include "virgl_resource.h"
 
 
@@ -21,7 +21,7 @@ static void *virgl_buffer_transfer_map(struct pipe_context *ctx,
                                        const struct pipe_box *box,
                                        struct pipe_transfer **transfer)
 {
-   struct graw_context *grctx = (struct graw_context *)ctx;
+   struct virgl_context *vctx = (struct virgl_context *)ctx;
    struct virgl_screen *vs = virgl_screen(ctx->screen);
    struct virgl_buffer *vbuf = virgl_buffer(resource);
    struct virgl_transfer *trans;
@@ -29,12 +29,12 @@ static void *virgl_buffer_transfer_map(struct pipe_context *ctx,
    boolean readback = TRUE;
    uint32_t offset;
 
-   if ((!(usage & PIPE_TRANSFER_UNSYNCHRONIZED)) && vs->vws->res_is_referenced(vs->vws, grctx->cbuf, vbuf->base.hw_res))
+   if ((!(usage & PIPE_TRANSFER_UNSYNCHRONIZED)) && vs->vws->res_is_referenced(vs->vws, vctx->cbuf, vbuf->base.hw_res))
       ctx->flush(ctx, NULL, 0);
    else if ((usage & PIPE_TRANSFER_READ) && (vbuf->on_list == TRUE))
       ctx->flush(ctx, NULL, 0);
 
-   trans = util_slab_alloc(&grctx->texture_transfer_pool);
+   trans = util_slab_alloc(&vctx->texture_transfer_pool);
    if (trans == NULL)
       return NULL;
 
@@ -79,7 +79,7 @@ static void *virgl_buffer_transfer_map(struct pipe_context *ctx,
 static void virgl_buffer_transfer_unmap(struct pipe_context *ctx,
                                         struct pipe_transfer *transfer)
 {
-   struct graw_context *grctx = (struct graw_context *)ctx;
+   struct virgl_context *vctx = (struct virgl_context *)ctx;
    struct virgl_transfer *trans = (struct virgl_transfer *)transfer;
    struct virgl_buffer *vbuf = virgl_buffer(transfer->resource);
 
@@ -87,7 +87,7 @@ static void virgl_buffer_transfer_unmap(struct pipe_context *ctx,
       if (!(transfer->usage & PIPE_TRANSFER_FLUSH_EXPLICIT)) {
          struct virgl_screen *vs = virgl_screen(ctx->screen);
          vbuf->base.clean = FALSE;
-         grctx->num_transfers++;
+         vctx->num_transfers++;
          vs->vws->transfer_put(vs->vws, vbuf->base.hw_res,
                                &transfer->box, trans->base.stride, trans->base.layer_stride, trans->offset, transfer->level);
 
@@ -95,21 +95,21 @@ static void virgl_buffer_transfer_unmap(struct pipe_context *ctx,
       
    }
 
-   util_slab_free(&grctx->texture_transfer_pool, trans);
+   util_slab_free(&vctx->texture_transfer_pool, trans);
 }
 
 static void virgl_buffer_transfer_flush_region(struct pipe_context *ctx,
                                                struct pipe_transfer *transfer,
                                                const struct pipe_box *box)
 {
-   struct graw_context *grctx = (struct graw_context *)ctx;
+   struct virgl_context *vctx = (struct virgl_context *)ctx;
    struct virgl_buffer *vbuf = virgl_buffer(transfer->resource);
    uint32_t start, end, cstart, cend;
    
    if (!vbuf->on_list) {
        struct pipe_resource *res = NULL;
 
-       list_addtail(&vbuf->flush_list, &grctx->to_flush_bufs);
+       list_addtail(&vbuf->flush_list, &vctx->to_flush_bufs);
        vbuf->on_list = TRUE;
        pipe_resource_reference(&res, &vbuf->base.u.b);
    }
@@ -137,7 +137,7 @@ static const struct u_resource_vtbl virgl_buffer_vtbl =
 	virgl_buffer_transfer_map,		/* transfer_map */
 	virgl_buffer_transfer_flush_region,	/* transfer_flush_region */
 	virgl_buffer_transfer_unmap,		/* transfer_unmap */
-	graw_transfer_inline_write      /* transfer_inline_write */
+	virgl_transfer_inline_write      /* transfer_inline_write */
 };
 
 struct pipe_resource *virgl_buffer_create(struct virgl_screen *vs,

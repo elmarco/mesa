@@ -2,7 +2,7 @@
 #include "util/u_format.h"
 #include "virgl.h"
 #include "virgl_resource.h"
-#include "graw_context.h"
+#include "virgl_context.h"
 
 static unsigned
 vrend_get_tex_image_offset(const struct virgl_texture *res,
@@ -36,7 +36,7 @@ static void *virgl_texture_transfer_map(struct pipe_context *ctx,
                                         const struct pipe_box *box,
                                         struct pipe_transfer **transfer)
 {
-   struct graw_context *grctx = (struct graw_context *)ctx;
+   struct virgl_context *vctx = (struct virgl_context *)ctx;
    struct virgl_screen *vs = virgl_screen(ctx->screen);
    struct virgl_texture *vtex = (struct virgl_texture *)resource;
    enum pipe_format format = resource->format;
@@ -47,10 +47,10 @@ static void *virgl_texture_transfer_map(struct pipe_context *ctx,
    const unsigned h = u_minify(vtex->base.u.b.height0, level);
    const unsigned nblocksy = util_format_get_nblocksy(format, h);
 
-   if ((!(usage & PIPE_TRANSFER_UNSYNCHRONIZED)) && vs->vws->res_is_referenced(vs->vws, grctx->cbuf, vtex->base.hw_res))
+   if ((!(usage & PIPE_TRANSFER_UNSYNCHRONIZED)) && vs->vws->res_is_referenced(vs->vws, vctx->cbuf, vtex->base.hw_res))
       ctx->flush(ctx, NULL, 0);
 
-   trans = util_slab_alloc(&grctx->texture_transfer_pool);
+   trans = util_slab_alloc(&vctx->texture_transfer_pool);
    if (trans == NULL)
       return NULL;
 
@@ -96,7 +96,7 @@ static void *virgl_texture_transfer_map(struct pipe_context *ctx,
 static void virgl_texture_transfer_unmap(struct pipe_context *ctx,
                                          struct pipe_transfer *transfer)
 {
-   struct graw_context *grctx = (struct graw_context *)ctx;
+   struct virgl_context *vctx = (struct virgl_context *)ctx;
    struct virgl_transfer *trans = (struct virgl_transfer *)transfer;
    struct virgl_texture *vtex = (struct virgl_texture *)transfer->resource;
 
@@ -104,7 +104,7 @@ static void virgl_texture_transfer_unmap(struct pipe_context *ctx,
       if (!(transfer->usage & PIPE_TRANSFER_FLUSH_EXPLICIT)) {
          struct virgl_screen *vs = virgl_screen(ctx->screen);
          vtex->base.clean = FALSE;
-         grctx->num_transfers++;
+         vctx->num_transfers++;
          vs->vws->transfer_put(vs->vws, vtex->base.hw_res,
                                &transfer->box, trans->base.stride, trans->base.layer_stride, trans->offset, transfer->level);
 
@@ -112,7 +112,7 @@ static void virgl_texture_transfer_unmap(struct pipe_context *ctx,
       
    }
 
-   util_slab_free(&grctx->texture_transfer_pool, trans);
+   util_slab_free(&vctx->texture_transfer_pool, trans);
 }
 
 

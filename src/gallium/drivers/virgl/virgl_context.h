@@ -1,5 +1,5 @@
-#ifndef GRAW_CONTEXT_H
-#define GRAW_CONTEXT_H
+#ifndef VIRGL_CONTEXT_H
+#define VIRGL_CONTEXT_H
 
 #include "pipe/p_state.h"
 #include "pipe/p_context.h"
@@ -13,53 +13,30 @@
 struct virgl_resource;
 struct virgl_buffer;
 
-struct graw_vertex_element {
-   unsigned count;
-   struct pipe_vertex_element elements[PIPE_MAX_ATTRIBS];
-   uint32_t vboids[PIPE_MAX_ATTRIBS];
-};
-
-struct graw_shader_state {
-   uint id;
-   unsigned type;
-   char *glsl_prog;
-};
-
-struct graw_sampler_view {
+struct virgl_sampler_view {
    struct pipe_sampler_view base;
    uint32_t handle;
 };
 
-struct graw_vs_state {
-   uint32_t shader_handle;
-   uint32_t so_handle;
-};
-
-struct graw_so_target {
+struct virgl_so_target {
    struct pipe_stream_output_target base;
    uint32_t handle;
 };
 
-struct graw_textures_info {
-   struct graw_sampler_view *views[16];
+struct virgl_textures_info {
+   struct virgl_sampler_view *views[16];
    uint32_t enabled_mask;
 };
    
-struct graw_context {
+struct virgl_context {
    struct pipe_context base;
    struct virgl_cmd_buf *cbuf;
    uint32_t vaoid;
 
-   struct graw_vertex_element *ve;
    int num_vbos;
    struct pipe_vertex_buffer vbo[PIPE_MAX_ATTRIBS];
 
-   struct graw_shader_state *vs;
-   struct graw_shader_state *fs;
-
-   struct graw_encoder_state *eq;
-
-   struct graw_textures_info samplers[PIPE_SHADER_TYPES];
+   struct virgl_textures_info samplers[PIPE_SHADER_TYPES];
 
    struct pipe_framebuffer_state framebuffer;
 
@@ -80,14 +57,14 @@ struct graw_context {
    struct primconvert_context *primconvert;
 };
 
-struct pipe_context *graw_context_create(struct pipe_screen *pscreen,
+struct pipe_context *virgl_context_create(struct pipe_screen *pscreen,
                                          void *priv);
 
-void graw_init_blit_functions(struct graw_context *grctx);
-void graw_init_query_functions(struct graw_context *grctx);
-void graw_init_so_functions(struct graw_context *grctx);
+void virgl_init_blit_functions(struct virgl_context *vctx);
+void virgl_init_query_functions(struct virgl_context *vctx);
+void virgl_init_so_functions(struct virgl_context *vctx);
 
-void graw_transfer_inline_write(struct pipe_context *ctx,
+void virgl_transfer_inline_write(struct pipe_context *ctx,
                                 struct pipe_resource *res,
                                 unsigned level,
                                 unsigned usage,

@@ -1,6 +1,6 @@
 #include "util/u_inlines.h"
 #include "virgl_resource.h"
-#include "graw_context.h"
+#include "virgl_context.h"
 
 static struct pipe_resource *virgl_resource_create(struct pipe_screen *screen,
                                                    const struct pipe_resource *templ)

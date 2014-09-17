@@ -628,35 +628,36 @@ static void graw_decode_blit(struct grend_decode_ctx *ctx)
 {
    struct pipe_blit_info info;
    uint32_t dst_handle, src_handle, temp;
-
-   info.mask = ctx->ds->buf[ctx->ds->buf_offset + 1];
-   info.filter = ctx->ds->buf[ctx->ds->buf_offset + 2];
-   info.scissor_enable = ctx->ds->buf[ctx->ds->buf_offset + 3] & 1;
-   temp = ctx->ds->buf[ctx->ds->buf_offset + 4];
+   
+   temp = ctx->ds->buf[ctx->ds->buf_offset + 1];
+   info.mask = temp & 0xff;
+   info.filter = (temp >> 8) & 0x3;
+   info.scissor_enable = (temp >> 10) & 0x1;
+   temp = ctx->ds->buf[ctx->ds->buf_offset + 2];
    info.scissor.minx = temp & 0xffff;
    info.scissor.miny = (temp >> 16) & 0xffff;
-   temp = ctx->ds->buf[ctx->ds->buf_offset + 5];
+   temp = ctx->ds->buf[ctx->ds->buf_offset + 3];
    info.scissor.maxx = temp & 0xffff;
    info.scissor.maxy = (temp >> 16) & 0xffff;
-   dst_handle = ctx->ds->buf[ctx->ds->buf_offset + 6];
-   info.dst.level = ctx->ds->buf[ctx->ds->buf_offset + 7];
-   info.dst.format = ctx->ds->buf[ctx->ds->buf_offset + 8];
-   info.dst.box.x = ctx->ds->buf[ctx->ds->buf_offset + 9];
-   info.dst.box.y = ctx->ds->buf[ctx->ds->buf_offset + 10];
-   info.dst.box.z = ctx->ds->buf[ctx->ds->buf_offset + 11];
-   info.dst.box.width = ctx->ds->buf[ctx->ds->buf_offset + 12];
-   info.dst.box.height = ctx->ds->buf[ctx->ds->buf_offset + 13];
-   info.dst.box.depth = ctx->ds->buf[ctx->ds->buf_offset + 14];
+   dst_handle = ctx->ds->buf[ctx->ds->buf_offset + 4];
+   info.dst.level = ctx->ds->buf[ctx->ds->buf_offset + 5];
+   info.dst.format = ctx->ds->buf[ctx->ds->buf_offset + 6];
+   info.dst.box.x = ctx->ds->buf[ctx->ds->buf_offset + 7];
+   info.dst.box.y = ctx->ds->buf[ctx->ds->buf_offset + 8];
+   info.dst.box.z = ctx->ds->buf[ctx->ds->buf_offset + 9];
+   info.dst.box.width = ctx->ds->buf[ctx->ds->buf_offset + 10];
+   info.dst.box.height = ctx->ds->buf[ctx->ds->buf_offset + 11];
+   info.dst.box.depth = ctx->ds->buf[ctx->ds->buf_offset + 12];
 
-   src_handle = ctx->ds->buf[ctx->ds->buf_offset + 15];
-   info.src.level = ctx->ds->buf[ctx->ds->buf_offset + 16];
-   info.src.format = ctx->ds->buf[ctx->ds->buf_offset + 17];
-   info.src.box.x = ctx->ds->buf[ctx->ds->buf_offset + 18];
-   info.src.box.y = ctx->ds->buf[ctx->ds->buf_offset + 19];
-   info.src.box.z = ctx->ds->buf[ctx->ds->buf_offset + 20];
-   info.src.box.width = ctx->ds->buf[ctx->ds->buf_offset + 21];
-   info.src.box.height = ctx->ds->buf[ctx->ds->buf_offset + 22];
-   info.src.box.depth = ctx->ds->buf[ctx->ds->buf_offset + 23]; 
+   src_handle = ctx->ds->buf[ctx->ds->buf_offset + 13];
+   info.src.level = ctx->ds->buf[ctx->ds->buf_offset + 14];
+   info.src.format = ctx->ds->buf[ctx->ds->buf_offset + 15];
+   info.src.box.x = ctx->ds->buf[ctx->ds->buf_offset + 16];
+   info.src.box.y = ctx->ds->buf[ctx->ds->buf_offset + 17];
+   info.src.box.z = ctx->ds->buf[ctx->ds->buf_offset + 18];
+   info.src.box.width = ctx->ds->buf[ctx->ds->buf_offset + 19];
+   info.src.box.height = ctx->ds->buf[ctx->ds->buf_offset + 20];
+   info.src.box.depth = ctx->ds->buf[ctx->ds->buf_offset + 21];
 
    graw_renderer_blit(ctx->grctx, dst_handle, src_handle, &info);
 }

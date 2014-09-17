@@ -187,9 +187,6 @@ int virgl_encoder_end_query(struct virgl_context *ctx,
 int virgl_encoder_get_query_result(struct virgl_context *ctx,
                                   uint32_t handle, boolean wait);
 
-int virgl_encoder_set_query_state(struct virgl_context *ctx,
-                                 boolean query_enabled);
-
 int virgl_encoder_render_condition(struct virgl_context *ctx,
                                   uint32_t handle, boolean condition,
                                   uint mode);

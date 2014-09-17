@@ -4385,12 +4385,6 @@ void grend_render_condition(struct grend_context *ctx,
    
 }
 
-void grend_set_query_state(struct grend_context *ctx,
-                           boolean enabled)
-{
-
-}
-
 void grend_create_so_target(struct grend_context *ctx,
                             uint32_t handle,
                             uint32_t res_handle,

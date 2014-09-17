@@ -271,8 +271,6 @@ void grend_begin_query(struct grend_context *ctx, uint32_t handle);
 void grend_end_query(struct grend_context *ctx, uint32_t handle);
 void grend_get_query_result(struct grend_context *ctx, uint32_t handle,
                             uint32_t wait);
-void grend_set_query_state(struct grend_context *ctx,
-                           boolean enabled);
 void grend_render_condition(struct grend_context *ctx,
                             uint32_t handle,
                             boolean condtion,

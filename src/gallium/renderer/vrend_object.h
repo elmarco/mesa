@@ -6,8 +6,6 @@
 void vrend_object_init_resource_table(void);
 void vrend_object_fini_resource_table(void);
 
-struct grend_context;
-
 struct util_hash_table *vrend_object_init_ctx_table(void);
 void vrend_object_fini_ctx_table(struct util_hash_table *ctx_hash);
 

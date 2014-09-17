@@ -13,14 +13,14 @@ AM_CFLAGS = \
 	$(EPOXY_CFLAGS) \
 	$(VISIBILITY_CFLAGS)
 
-libgrend_la_SOURCES = \
-        graw_renderer.c \
-        graw_shader.c \
+libvrend_la_SOURCES = \
+        vrend_renderer.c \
+        vrend_shader.c \
         vrend_object.c \
-        graw_decode.c \
-        graw_formats.c \
+        vrend_decode.c \
+        vrend_formats.c \
         iov.c \
-        graw_renderer_helper.c \
+        vrend_renderer_helper.c \
 	virglrenderer.c \
 	virgl_egl_context.c
 
@@ -28,13 +28,13 @@ pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = virglrenderer.pc
 
 lib_LTLIBRARIES = libvirglrenderer.la
-noinst_LTLIBRARIES = libgrend.la
+noinst_LTLIBRARIES = libvrend.la
 
 GM_LDFLAGS = -Wl,-Bsymbolic -version-number 0:1 -no-undefined
 
-libvirglrenderer_la_SOURCES = graw_virtio_lib_renderer.c
+libvirglrenderer_la_SOURCES = vrend_virtio_lib_renderer.c
 libvirglrenderer_ladir = $(libdir)
-libvirglrenderer_la_LIBADD = libgrend.la
+libvirglrenderer_la_LIBADD = libvrend.la
 libvirglrenderer_la_LDFLAGS = $(GM_LDFLAGS) $(EPOXY_LDFLAGS)
 
 if HAVE_MESA_LLVM

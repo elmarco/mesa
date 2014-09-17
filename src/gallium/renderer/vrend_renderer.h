@@ -1,19 +1,19 @@
-#ifndef GRAW_RENDERER_H
-#define GRAW_RENDERER_H
+#ifndef VREND_RENDERER_H
+#define VREND_RENDERER_H
 
 #include "pipe/p_state.h"
 #include "util/u_inlines.h"
 #include "virgl_protocol.h"
-#include "graw_iov.h"
+#include "vrend_iov.h"
 #include "virgl_hw.h"
 
 typedef void *virgl_gl_context;
 typedef void *virgl_gl_drawable;
 
 extern int vrend_dump_shaders;
-struct grend_context;
+struct vrend_context;
 
-struct grend_resource {
+struct vrend_resource {
    struct pipe_resource base;
    GLuint id;
    GLenum target;
@@ -38,7 +38,7 @@ struct grend_resource {
 
 #define VREND_BIND_NEED_SWIZZLE (1 << 28)
 
-struct grend_format_table {
+struct vrend_format_table {
    enum virgl_formats format;
    GLenum internalformat;
    GLenum glformat;
@@ -48,63 +48,63 @@ struct grend_format_table {
    uint8_t swizzle[4];
 };
 
-struct grend_if_cbs {
+struct vrend_if_cbs {
    void (*write_fence)(unsigned fence_id);
 
    virgl_gl_context (*create_gl_context)(int scanout, bool shared);
    void (*destroy_gl_context)(virgl_gl_context ctx);
    int (*make_current)(int scanout, virgl_gl_context ctx);
 };
-void graw_renderer_init(struct grend_if_cbs *cbs);
+void vrend_renderer_init(struct vrend_if_cbs *cbs);
 
-void grend_insert_format(struct grend_format_table *entry, uint32_t bindings);
-void grend_insert_format_swizzle(int override_format, struct grend_format_table *entry, uint32_t bindings, uint8_t swizzle[4]);
-void grend_create_vs(struct grend_context *ctx,
+void vrend_insert_format(struct vrend_format_table *entry, uint32_t bindings);
+void vrend_insert_format_swizzle(int override_format, struct vrend_format_table *entry, uint32_t bindings, uint8_t swizzle[4]);
+void vrend_create_vs(struct vrend_context *ctx,
                      uint32_t handle,
                      const struct pipe_shader_state *vs);
 
-void grend_create_gs(struct grend_context *ctx,
+void vrend_create_gs(struct vrend_context *ctx,
                      uint32_t handle,
                      const struct pipe_shader_state *gs);
 
-void grend_create_fs(struct grend_context *ctx,
+void vrend_create_fs(struct vrend_context *ctx,
                      uint32_t handle,
                      const struct pipe_shader_state *vs);
 
-void grend_bind_vs(struct grend_context *ctx,
+void vrend_bind_vs(struct vrend_context *ctx,
                    uint32_t handle);
 
-void grend_bind_gs(struct grend_context *ctx,
+void vrend_bind_gs(struct vrend_context *ctx,
                    uint32_t handle);
 
-void grend_bind_fs(struct grend_context *ctx,
+void vrend_bind_fs(struct vrend_context *ctx,
                    uint32_t handle);
 
-void grend_bind_vs_so(struct grend_context *ctx,
+void vrend_bind_vs_so(struct vrend_context *ctx,
                       uint32_t handle);
-void grend_clear(struct grend_context *ctx,
+void vrend_clear(struct vrend_context *ctx,
                  unsigned buffers,
                  const union pipe_color_union *color,
                  double depth, unsigned stencil);
 
-void grend_draw_vbo(struct grend_context *ctx,
+void vrend_draw_vbo(struct vrend_context *ctx,
                     const struct pipe_draw_info *info);
 
-void grend_set_framebuffer_state(struct grend_context *ctx,
+void vrend_set_framebuffer_state(struct vrend_context *ctx,
                                  uint32_t nr_cbufs, uint32_t surf_handle[8],
    uint32_t zsurf_handle);
 
-void grend_flush(struct grend_context *ctx);
+void vrend_flush(struct vrend_context *ctx);
 
 
-void grend_flush_frontbuffer(uint32_t res_handle);
-struct grend_context *grend_create_context(int id, uint32_t nlen, const char *debug_name);
-bool grend_destroy_context(struct grend_context *ctx);
-void graw_renderer_context_create(uint32_t handle, uint32_t nlen, const char *name);
-void graw_renderer_context_create_internal(uint32_t handle, uint32_t nlen, const char *name);
-void graw_renderer_context_destroy(uint32_t handle);
+void vrend_flush_frontbuffer(uint32_t res_handle);
+struct vrend_context *vrend_create_context(int id, uint32_t nlen, const char *debug_name);
+bool vrend_destroy_context(struct vrend_context *ctx);
+void vrend_renderer_context_create(uint32_t handle, uint32_t nlen, const char *name);
+void vrend_renderer_context_create_internal(uint32_t handle, uint32_t nlen, const char *name);
+void vrend_renderer_context_destroy(uint32_t handle);
 
-struct graw_renderer_resource_create_args {
+struct vrend_renderer_resource_create_args {
    uint32_t handle;
    enum pipe_texture_target target;
    uint32_t format;
@@ -118,45 +118,45 @@ struct graw_renderer_resource_create_args {
    uint32_t flags;
 };
      
-void graw_renderer_resource_create(struct graw_renderer_resource_create_args *args, struct iovec *iov, uint32_t num_iovs);
+void vrend_renderer_resource_create(struct vrend_renderer_resource_create_args *args, struct iovec *iov, uint32_t num_iovs);
 
-void graw_renderer_resource_unref(uint32_t handle);
+void vrend_renderer_resource_unref(uint32_t handle);
 
-void grend_create_surface(struct grend_context *ctx,
+void vrend_create_surface(struct vrend_context *ctx,
                           uint32_t handle,
                           uint32_t res_handle, uint32_t format,
                           uint32_t val0, uint32_t val1);
-void grend_create_sampler_view(struct grend_context *ctx,
+void vrend_create_sampler_view(struct vrend_context *ctx,
                                uint32_t handle,
                                uint32_t res_handle, uint32_t format,
                                uint32_t val0, uint32_t val1, uint32_t swizzle_packed);
 
-void grend_create_so_target(struct grend_context *ctx,
+void vrend_create_so_target(struct vrend_context *ctx,
                             uint32_t handle,
                             uint32_t res_handle,
                             uint32_t buffer_offset,
                             uint32_t buffer_size);
-void grend_set_streamout_targets(struct grend_context *ctx,
+void vrend_set_streamout_targets(struct vrend_context *ctx,
                                  uint32_t append_bitmask,
                                  uint32_t num_targets,
                                  uint32_t *handles);
 
-void grend_create_vertex_elements_state(struct grend_context *ctx,
+void vrend_create_vertex_elements_state(struct vrend_context *ctx,
                                         uint32_t handle,
                                         unsigned num_elements,
                                         const struct pipe_vertex_element *elements);
-void grend_bind_vertex_elements_state(struct grend_context *ctx,
+void vrend_bind_vertex_elements_state(struct vrend_context *ctx,
                                       uint32_t handle);
 
-void grend_set_single_vbo(struct grend_context *ctx,
+void vrend_set_single_vbo(struct vrend_context *ctx,
                          int index,
                          uint32_t stride,
                          uint32_t buffer_offset,
                          uint32_t res_handle);
-void grend_set_num_vbo(struct grend_context *ctx,
+void vrend_set_num_vbo(struct vrend_context *ctx,
                       int num_vbo);
 
-void grend_transfer_inline_write(struct grend_context *ctx,
+void vrend_transfer_inline_write(struct vrend_context *ctx,
                                  uint32_t res_handle,
                                  unsigned level,
                                  unsigned usage,
@@ -165,35 +165,35 @@ void grend_transfer_inline_write(struct grend_context *ctx,
                                  unsigned stride,
                                  unsigned layer_stride);
 
-void grend_set_viewport_state(struct grend_context *ctx,
+void vrend_set_viewport_state(struct vrend_context *ctx,
                               const struct pipe_viewport_state *state);
-void grend_set_num_sampler_views(struct grend_context *ctx,
+void vrend_set_num_sampler_views(struct vrend_context *ctx,
                                  uint32_t shader_type,
                                  uint32_t start_slot,
                                  int num_sampler_views);
-void grend_set_single_sampler_view(struct grend_context *ctx,
+void vrend_set_single_sampler_view(struct vrend_context *ctx,
                                    uint32_t shader_type,
                                    int index,
                                    uint32_t res_handle);
 
-void grend_object_bind_blend(struct grend_context *ctx,
+void vrend_object_bind_blend(struct vrend_context *ctx,
                              uint32_t handle);
-void grend_object_bind_dsa(struct grend_context *ctx,
+void vrend_object_bind_dsa(struct vrend_context *ctx,
                              uint32_t handle);
-void grend_object_bind_rasterizer(struct grend_context *ctx,
+void vrend_object_bind_rasterizer(struct vrend_context *ctx,
                                   uint32_t handle);
 
-void grend_bind_sampler_states(struct grend_context *ctx,
+void vrend_bind_sampler_states(struct vrend_context *ctx,
                                uint32_t shader_type,
                                uint32_t start_slot,
                                uint32_t num_states,
                                uint32_t *handles);
-void grend_set_index_buffer(struct grend_context *ctx,
+void vrend_set_index_buffer(struct vrend_context *ctx,
                             uint32_t res_handle,
                             uint32_t index_size,
                             uint32_t offset);
 
-void graw_renderer_transfer_write_iov(uint32_t handle, 
+void vrend_renderer_transfer_write_iov(uint32_t handle, 
                                       uint32_t ctx_id,
                                       int level,
                                       uint32_t stride,
@@ -203,41 +203,41 @@ void graw_renderer_transfer_write_iov(uint32_t handle,
                                       struct iovec *iovec,
                                       unsigned int iovec_cnt);
 
-void graw_renderer_resource_copy_region(struct grend_context *ctx,
+void vrend_renderer_resource_copy_region(struct vrend_context *ctx,
                                         uint32_t dst_handle, uint32_t dst_level,
                                         uint32_t dstx, uint32_t dsty, uint32_t dstz,
                                         uint32_t src_handle, uint32_t src_level,
                                         const struct pipe_box *src_box);
 
-void graw_renderer_blit(struct grend_context *ctx,
+void vrend_renderer_blit(struct vrend_context *ctx,
                         uint32_t dst_handle, uint32_t src_handle,
                         const struct pipe_blit_info *info);
 
-void graw_renderer_transfer_send_iov(uint32_t handle, uint32_t ctx_id,
+void vrend_renderer_transfer_send_iov(uint32_t handle, uint32_t ctx_id,
                                      uint32_t level, uint32_t stride,
                                      uint32_t layer_stride,
                                      struct pipe_box *box,
                                      uint64_t offset, struct iovec *iov,
                                      int iovec_cnt);
-void grend_set_stencil_ref(struct grend_context *ctx, struct pipe_stencil_ref *ref);
-void grend_set_blend_color(struct grend_context *ctx, struct pipe_blend_color *color);
-void grend_set_scissor_state(struct grend_context *ctx, struct pipe_scissor_state *ss);
+void vrend_set_stencil_ref(struct vrend_context *ctx, struct pipe_stencil_ref *ref);
+void vrend_set_blend_color(struct vrend_context *ctx, struct pipe_blend_color *color);
+void vrend_set_scissor_state(struct vrend_context *ctx, struct pipe_scissor_state *ss);
 
-void grend_set_polygon_stipple(struct grend_context *ctx, struct pipe_poly_stipple *ps);
+void vrend_set_polygon_stipple(struct vrend_context *ctx, struct pipe_poly_stipple *ps);
 
-void grend_set_clip_state(struct grend_context *ctx, struct pipe_clip_state *ucp);
-void grend_set_sample_mask(struct grend_context *ctx, unsigned sample_mask);
+void vrend_set_clip_state(struct vrend_context *ctx, struct pipe_clip_state *ucp);
+void vrend_set_sample_mask(struct vrend_context *ctx, unsigned sample_mask);
 
-void grend_set_constants(struct grend_context *ctx,
+void vrend_set_constants(struct vrend_context *ctx,
                          uint32_t shader,
                          uint32_t index,
                          uint32_t num_constant,
                          float *data);
 
-void graw_transfer_write_return(void *data, uint32_t bytes, uint64_t offset,
+void vrend_transfer_write_return(void *data, uint32_t bytes, uint64_t offset,
                                 struct iovec *iov, int iovec_cnt);
 
-void graw_transfer_write_tex_return(struct pipe_resource *res,
+void vrend_transfer_write_tex_return(struct pipe_resource *res,
 				    struct pipe_box *box,
                                     uint32_t level,
                                     uint32_t dst_stride,
@@ -246,77 +246,77 @@ void graw_transfer_write_tex_return(struct pipe_resource *res,
                                     int num_iovs,
 				    void *myptr, int size, int invert);
 
-void graw_renderer_fini(void);
-void graw_reset_decode(void);
+void vrend_renderer_fini(void);
+void vrend_reset_decode(void);
 
-void graw_decode_block(uint32_t ctx_id, uint32_t *block, int ndw);
-struct grend_context *vrend_lookup_renderer_ctx(uint32_t ctx_id);
+void vrend_decode_block(uint32_t ctx_id, uint32_t *block, int ndw);
+struct vrend_context *vrend_lookup_renderer_ctx(uint32_t ctx_id);
 
-int graw_renderer_create_fence(int client_fence_id, uint32_t ctx_id);
+int vrend_renderer_create_fence(int client_fence_id, uint32_t ctx_id);
 
-void graw_renderer_check_fences(void);
-void graw_renderer_check_queries(void);
-void grend_stop_current_queries(void);
+void vrend_renderer_check_fences(void);
+void vrend_renderer_check_queries(void);
+void vrend_stop_current_queries(void);
 
-boolean grend_hw_switch_context(struct grend_context *ctx, boolean now);
-void graw_renderer_object_insert(struct grend_context *ctx, void *data,
+boolean vrend_hw_switch_context(struct vrend_context *ctx, boolean now);
+void vrend_renderer_object_insert(struct vrend_context *ctx, void *data,
                                  uint32_t size, uint32_t handle, enum virgl_object_type type);
-void graw_renderer_object_destroy(struct grend_context *ctx, uint32_t handle);
+void vrend_renderer_object_destroy(struct vrend_context *ctx, uint32_t handle);
 
-void grend_create_query(struct grend_context *ctx, uint32_t handle,
+void vrend_create_query(struct vrend_context *ctx, uint32_t handle,
                         uint32_t query_type, uint32_t res_handle,
                         uint32_t offset);
 
-void grend_begin_query(struct grend_context *ctx, uint32_t handle);
-void grend_end_query(struct grend_context *ctx, uint32_t handle);
-void grend_get_query_result(struct grend_context *ctx, uint32_t handle,
+void vrend_begin_query(struct vrend_context *ctx, uint32_t handle);
+void vrend_end_query(struct vrend_context *ctx, uint32_t handle);
+void vrend_get_query_result(struct vrend_context *ctx, uint32_t handle,
                             uint32_t wait);
-void grend_render_condition(struct grend_context *ctx,
+void vrend_render_condition(struct vrend_context *ctx,
                             uint32_t handle,
                             boolean condtion,
                             uint mode);
-void *graw_renderer_get_cursor_contents(uint32_t res_handle, uint32_t *width, uint32_t *height);
-void grend_use_program(GLuint program_id);
-void grend_blend_enable(GLboolean blend_enable);
-void grend_depth_test_enable(GLboolean depth_test_enable);
-void grend_bind_va(GLuint vaoid);
-int graw_renderer_flush_buffer_res(struct grend_resource *res,
+void *vrend_renderer_get_cursor_contents(uint32_t res_handle, uint32_t *width, uint32_t *height);
+void vrend_use_program(GLuint program_id);
+void vrend_blend_enable(GLboolean blend_enable);
+void vrend_depth_test_enable(GLboolean depth_test_enable);
+void vrend_bind_va(GLuint vaoid);
+int vrend_renderer_flush_buffer_res(struct vrend_resource *res,
                                    struct pipe_box *box);
 
-void graw_renderer_fill_caps(uint32_t set, uint32_t version,
+void vrend_renderer_fill_caps(uint32_t set, uint32_t version,
                              union virgl_caps *caps);
 
-GLint64 graw_renderer_get_timestamp(void);
+GLint64 vrend_renderer_get_timestamp(void);
 /* formats */
 void vrend_build_format_list(void);
 
-int graw_renderer_resource_attach_iov(int res_handle, struct iovec *iov,
+int vrend_renderer_resource_attach_iov(int res_handle, struct iovec *iov,
                                        int num_iovs);
-void graw_renderer_resource_invalid_iov(int res_handle);
-void graw_renderer_resource_zap_iov(int res_handle,
+void vrend_renderer_resource_invalid_iov(int res_handle);
+void vrend_renderer_resource_zap_iov(int res_handle,
                                     struct iovec **iov_p,
                                     int *num_iovs_p);
-void graw_renderer_resource_destroy(struct grend_resource *res);
+void vrend_renderer_resource_destroy(struct vrend_resource *res);
 
 static INLINE void
-grend_resource_reference(struct grend_resource **ptr, struct grend_resource *tex)
+vrend_resource_reference(struct vrend_resource **ptr, struct vrend_resource *tex)
 {
-   struct grend_resource *old_tex = *ptr;
+   struct vrend_resource *old_tex = *ptr;
 
    if (pipe_reference(&(*ptr)->base.reference, &tex->base.reference))
-      graw_renderer_resource_destroy(old_tex);
+      vrend_renderer_resource_destroy(old_tex);
    *ptr = tex;
 }
 
-void graw_renderer_force_ctx_0(void);
+void vrend_renderer_force_ctx_0(void);
 
-void graw_renderer_get_rect(int resource_id, struct iovec *iov, unsigned int num_iovs,
+void vrend_renderer_get_rect(int resource_id, struct iovec *iov, unsigned int num_iovs,
                             uint32_t offset, int x, int y, int width, int height);
-void graw_renderer_attach_res_ctx(int ctx_id, int resource_id);
-void graw_renderer_detach_res_ctx(int ctx_id, int resource_id);
+void vrend_renderer_attach_res_ctx(int ctx_id, int resource_id);
+void vrend_renderer_detach_res_ctx(int ctx_id, int resource_id);
 
 
-struct graw_renderer_resource_info {
+struct vrend_renderer_resource_info {
    uint32_t handle;
    uint32_t format;
    uint32_t width;
@@ -327,11 +327,11 @@ struct graw_renderer_resource_info {
    uint32_t stride;
 };
 
-int graw_renderer_resource_get_info(int res_handle,
-                                     struct graw_renderer_resource_info *info);
+int vrend_renderer_resource_get_info(int res_handle,
+                                     struct vrend_renderer_resource_info *info);
 
-#define GRAW_CAP_SET 1
+#define VREND_CAP_SET 1
 
-void graw_renderer_get_cap_set(uint32_t cap_set, uint32_t *max_ver,
+void vrend_renderer_get_cap_set(uint32_t cap_set, uint32_t *max_ver,
                                uint32_t *max_size);
 #endif

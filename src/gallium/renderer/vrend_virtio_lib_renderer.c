@@ -14,7 +14,7 @@
 #include "pipe/p_state.h"
 #include "util/u_format.h"
 #include "util/u_math.h"
-#include "graw_renderer.h"
+#include "vrend_renderer.h"
 
 #include "virglrenderer.h"
 #include "virgl_egl.h"
@@ -25,15 +25,15 @@ static void *dev_cookie;
 extern int localrender;
 static int use_egl_context;
 struct virgl_egl *egl_info;
-static struct grend_if_cbs virgl_cbs;
+static struct vrend_if_cbs virgl_cbs;
 
-void graw_transfer_write_return(void *data, uint32_t bytes, uint64_t offset,
+void vrend_transfer_write_return(void *data, uint32_t bytes, uint64_t offset,
                                 struct iovec *iov, int num_iovs)
 {
-   graw_iov_from_buf(iov, num_iovs, offset, data, bytes);
+   vrend_iov_from_buf(iov, num_iovs, offset, data, bytes);
 }
 
-void graw_transfer_write_tex_return(struct pipe_resource *res,
+void vrend_transfer_write_tex_return(struct pipe_resource *res,
 				    struct pipe_box *box,
                                     uint32_t level,
                                     uint32_t dst_stride,
@@ -49,17 +49,17 @@ void graw_transfer_write_tex_return(struct pipe_resource *res,
 //   uint32_t stride = dst_stride ? dst_stride : util_format_get_nblocksx(res->format, box->width) * elsize;
 
    if (!invert && (stride == util_format_get_nblocksx(res->format, box->width) * elsize))
-      graw_iov_from_buf(iov, num_iovs, offset, myptr, size);
+      vrend_iov_from_buf(iov, num_iovs, offset, myptr, size);
    else if (invert) {
       for (h = box->height - 1; h >= 0; h--) {
          void *sptr = myptr + (h * elsize * box->width);
-         graw_iov_from_buf(iov, num_iovs, myoffset, sptr, box->width * elsize);
+         vrend_iov_from_buf(iov, num_iovs, myoffset, sptr, box->width * elsize);
          myoffset += stride;
       }
    } else {
       for (h = 0; h < box->height; h++) {
          void *sptr = myptr + (h * elsize * box->width);
-         graw_iov_from_buf(iov, num_iovs, myoffset, sptr, box->width * elsize);
+         vrend_iov_from_buf(iov, num_iovs, myoffset, sptr, box->width * elsize);
          myoffset += stride;
       }
    }
@@ -91,7 +91,7 @@ static int make_current(int scanout_idx, virgl_gl_context ctx)
     return rcbs->make_current(dev_cookie, scanout_idx, ctx);
 }
 
-static struct grend_if_cbs virgl_cbs = {
+static struct vrend_if_cbs virgl_cbs = {
    virgl_write_fence,
    create_gl_context,
    destroy_gl_context,
@@ -100,14 +100,14 @@ static struct grend_if_cbs virgl_cbs = {
 
 void *virgl_get_cursor_data(uint32_t resource_id, uint32_t *width, uint32_t *height)
 {
-   return graw_renderer_get_cursor_contents(resource_id, width, height);
+   return vrend_renderer_get_cursor_contents(resource_id, width, height);
 }
 
 void virgl_renderer_poll(void)
 {
    virgl_renderer_force_ctx_0();
-   graw_renderer_check_queries();
-   graw_renderer_check_fences();
+   vrend_renderer_check_queries();
+   vrend_renderer_check_fences();
 }
 
 int virgl_renderer_init(void *cookie, int flags, struct virgl_renderer_callbacks *cbs)
@@ -125,7 +125,7 @@ int virgl_renderer_init(void *cookie, int flags, struct virgl_renderer_callbacks
 
    if (cbs->version != 1)
       return -1;
-   graw_renderer_init(&virgl_cbs);
+   vrend_renderer_init(&virgl_cbs);
    return 0;
 }
 

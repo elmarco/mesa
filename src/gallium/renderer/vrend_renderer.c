@@ -18,10 +18,9 @@
 #include "state_tracker/graw.h"
 
 #include "vrend_object.h"
-#include "graw_shader.h"
+#include "vrend_shader.h"
 
-#include "graw_renderer.h"
-#include "graw_decode.h"
+#include "vrend_renderer.h"
 
 #include "virgl_hw.h"
 /* transfer boxes from the guest POV are in y = 0 = top orientation */
@@ -29,37 +28,37 @@
 
 /* since we are storing things in OpenGL FBOs we need to flip transfer operations by default */
 
-static struct grend_resource *graw_renderer_ctx_res_lookup(struct grend_context *ctx, int res_handle);
-static void grend_update_viewport_state(struct grend_context *ctx);
-static void grend_update_scissor_state(struct grend_context *ctx);
-static void grend_ctx_restart_queries(struct grend_context *ctx);
-static void grend_destroy_query_object(void *obj_ptr);
-static void grend_finish_context_switch(struct grend_context *ctx);
-static void grend_patch_blend_func(struct grend_context *ctx);
-static void grend_update_frontface_state(struct grend_context *ctx);
+static struct vrend_resource *vrend_renderer_ctx_res_lookup(struct vrend_context *ctx, int res_handle);
+static void vrend_update_viewport_state(struct vrend_context *ctx);
+static void vrend_update_scissor_state(struct vrend_context *ctx);
+static void vrend_ctx_restart_queries(struct vrend_context *ctx);
+static void vrend_destroy_query_object(void *obj_ptr);
+static void vrend_finish_context_switch(struct vrend_context *ctx);
+static void vrend_patch_blend_func(struct vrend_context *ctx);
+static void vrend_update_frontface_state(struct vrend_context *ctx);
 
-extern int graw_shader_use_explicit;
+extern int vrend_shader_use_explicit;
 int localrender;
 static int have_invert_mesa = 0;
 static int use_core_profile = 0;
 int vrend_dump_shaders;
 
-static struct grend_if_cbs *clicbs;
+static struct vrend_if_cbs *clicbs;
 
-struct grend_fence {
+struct vrend_fence {
    uint32_t fence_id;
    uint32_t ctx_id;
    GLsync syncobj;
    struct list_head fences;
 };
 
-struct grend_nontimer_hw_query {
+struct vrend_nontimer_hw_query {
    struct list_head query_list;
    GLuint id;
    uint64_t result;
 };
 
-struct grend_query {
+struct vrend_query {
    struct list_head waiting_queries;
    struct list_head ctx_queries;
 
@@ -68,7 +67,7 @@ struct grend_query {
    GLuint type;
    GLuint gltype;
    int ctx_id;
-   struct grend_resource *res;
+   struct vrend_resource *res;
    uint64_t current_total;
    boolean active_hw;
 };
@@ -87,8 +86,8 @@ struct global_renderer_state {
    GLboolean stencil_test_enabled;
    GLuint program_id;
    struct list_head fence_list;
-   struct grend_context *current_ctx;
-   struct grend_context *current_hw_ctx;
+   struct vrend_context *current_ctx;
+   struct vrend_context *current_hw_ctx;
    struct list_head waiting_query_list;
 
    boolean have_robustness;
@@ -102,13 +101,13 @@ struct global_renderer_state {
    boolean have_nv_prim_restart, have_gl_prim_restart, have_bit_encoding;
 };
 
-static struct global_renderer_state grend_state;
+static struct global_renderer_state vrend_state;
 
-struct grend_linked_shader_program {
+struct vrend_linked_shader_program {
   struct list_head head;
   GLuint id;
 
-  struct grend_shader *ss[PIPE_SHADER_TYPES];
+  struct vrend_shader *ss[PIPE_SHADER_TYPES];
 
   uint32_t samplers_used_mask[PIPE_SHADER_TYPES];
   GLuint *samp_locs[PIPE_SHADER_TYPES];
@@ -126,9 +125,9 @@ struct grend_linked_shader_program {
   GLuint fs_stipple_loc;
 };
 
-struct grend_shader {
-   struct grend_shader *next_variant;
-   struct grend_shader_selector *sel;
+struct vrend_shader {
+   struct vrend_shader *next_variant;
+   struct vrend_shader_selector *sel;
 
    GLchar *glsl_prog;
    GLuint id;
@@ -136,9 +135,9 @@ struct grend_shader {
    struct vrend_shader_key key;
 };
 
-struct grend_shader_selector {
+struct vrend_shader_selector {
    struct pipe_reference reference;
-   struct grend_shader *current;
+   struct vrend_shader *current;
    struct tgsi_token *tokens;
 
    struct vrend_shader_info sinfo;
@@ -147,12 +146,12 @@ struct grend_shader_selector {
    unsigned type;
 };
 
-struct grend_buffer {
-   struct grend_resource base;
+struct vrend_buffer {
+   struct vrend_resource base;
 };
 
-struct grend_texture {
-   struct grend_resource base;
+struct vrend_texture {
+   struct vrend_resource base;
    struct pipe_sampler_state state;
    GLenum cur_swizzle_r;
    GLenum cur_swizzle_g;
@@ -161,28 +160,28 @@ struct grend_texture {
    GLuint srgb_decode;
 };
 
-struct grend_surface {
+struct vrend_surface {
    struct pipe_reference reference;
    GLuint id;
    GLuint res_handle;
    GLuint format;
    GLuint val0, val1;
-   struct grend_resource *texture;
+   struct vrend_resource *texture;
 };
 
-struct grend_sampler {
+struct vrend_sampler {
 
 };
 
-struct grend_so_target {
+struct vrend_so_target {
    struct pipe_reference reference;
    GLuint res_handle;
    unsigned buffer_offset;
    unsigned buffer_size;
-   struct grend_resource *buffer;
+   struct vrend_resource *buffer;
 };
 
-struct grend_sampler_view {
+struct vrend_sampler_view {
    struct pipe_reference reference;
    GLuint id;
    GLuint res_handle;
@@ -197,36 +196,36 @@ struct grend_sampler_view {
    GLuint gl_swizzle_b;
    GLuint gl_swizzle_a;
    GLuint cur_base, cur_max;
-   struct grend_resource *texture;
+   struct vrend_resource *texture;
    GLenum depth_texture_mode;
    GLuint srgb_decode;
 };
 
-struct grend_vertex_element {
+struct vrend_vertex_element {
    struct pipe_vertex_element base;
    GLenum type;
    GLboolean norm;
    GLuint nr_chan;
 };
 
-struct grend_vertex_element_array {
+struct vrend_vertex_element_array {
    unsigned count;
-   struct grend_vertex_element elements[PIPE_MAX_ATTRIBS];
+   struct vrend_vertex_element elements[PIPE_MAX_ATTRIBS];
 };
 
-struct grend_constants {
+struct vrend_constants {
    float *consts;
    uint32_t num_consts;
 };
 
-struct grend_shader_view {
+struct vrend_shader_view {
    int num_views;
-   struct grend_sampler_view *views[PIPE_MAX_SHADER_SAMPLER_VIEWS];
+   struct vrend_sampler_view *views[PIPE_MAX_SHADER_SAMPLER_VIEWS];
    uint32_t res_id[PIPE_MAX_SHADER_SAMPLER_VIEWS];
    uint32_t old_ids[PIPE_MAX_SHADER_SAMPLER_VIEWS];
 };
 
-struct grend_context {
+struct vrend_context {
    char debug_name[64];
 
    virgl_gl_context gl_context;
@@ -239,23 +238,23 @@ struct grend_context {
    struct util_hash_table *object_hash;
    /* resource bounds to this context */
    struct util_hash_table *res_hash;
-   struct grend_vertex_element_array *ve;
+   struct vrend_vertex_element_array *ve;
    int num_vbos;
    struct pipe_vertex_buffer vbo[PIPE_MAX_ATTRIBS];
    uint32_t vbo_res_ids[PIPE_MAX_ATTRIBS];
-   struct grend_shader_selector *vs;
-   struct grend_shader_selector *gs;
-   struct grend_shader_selector *fs;
+   struct vrend_shader_selector *vs;
+   struct vrend_shader_selector *gs;
+   struct vrend_shader_selector *fs;
 
    bool shader_dirty;
-   struct grend_linked_shader_program *prog;
+   struct vrend_linked_shader_program *prog;
 
-   struct grend_shader_view views[PIPE_SHADER_TYPES];
+   struct vrend_shader_view views[PIPE_SHADER_TYPES];
 
    struct pipe_index_buffer ib;
    uint32_t index_buffer_res_id;
 
-   struct grend_constants consts[PIPE_SHADER_TYPES];
+   struct vrend_constants consts[PIPE_SHADER_TYPES];
    bool const_dirty[PIPE_SHADER_TYPES];
    struct pipe_sampler_state *sampler_state[PIPE_SHADER_TYPES][PIPE_MAX_SAMPLERS];
 
@@ -283,8 +282,8 @@ struct grend_context {
 
    uint32_t fb_id;
    int nr_cbufs, old_nr_cbufs;
-   struct grend_surface *zsurf;
-   struct grend_surface *surf[8];
+   struct vrend_surface *zsurf;
+   struct vrend_surface *surf[8];
    
    struct pipe_scissor_state ss;
 
@@ -295,7 +294,7 @@ struct grend_context {
    struct pipe_blend_color blend_color;
 
    int num_so_targets;
-   struct grend_so_target *so_targets[16];
+   struct vrend_so_target *so_targets[16];
 
    struct list_head active_nontimer_query_list;
    boolean query_on_hw;
@@ -311,9 +310,9 @@ struct grend_context {
    GLuint pstipple_tex_id;
 };
 
-static struct grend_nontimer_hw_query *grend_create_hw_query(struct grend_query *query);
+static struct vrend_nontimer_hw_query *vrend_create_hw_query(struct vrend_query *query);
 
-static struct grend_format_table tex_conv_table[VIRGL_FORMAT_MAX];
+static struct vrend_format_table tex_conv_table[VIRGL_FORMAT_MAX];
 
 static INLINE boolean vrend_format_can_sample(enum virgl_formats format)
 {
@@ -341,7 +340,7 @@ static inline const char *pipe_shader_to_prefix(int shader_type)
 
 static const char *vrend_ctx_error_strings[] = { "None", "Unknown", "Illegal shader", "Illegal handle", "Illegal resource", "Illegal surface", "Illegal vertex format" };
 
-static void __report_context_error(const char *fname, struct grend_context *ctx, enum virgl_ctx_errors error, uint32_t value)
+static void __report_context_error(const char *fname, struct vrend_context *ctx, enum virgl_ctx_errors error, uint32_t value)
 {
    ctx->in_error = TRUE;
    ctx->last_error = error;
@@ -357,12 +356,12 @@ static void __report_context_error(const char *fname, struct grend_context *ctx,
 
 static const char *vrend_core_profile_warn_strings[] = { "None", "Stipple", "Polygon Mode", "Two Side", "Clamping" };
 
-static void __report_core_warn(const char *fname, struct grend_context *ctx, enum virgl_ctx_errors error, uint32_t value)
+static void __report_core_warn(const char *fname, struct vrend_context *ctx, enum virgl_ctx_errors error, uint32_t value)
 {
    fprintf(stderr,"%s: core profile violation reported %d \"%s\" %s %d\n", fname, ctx->ctx_id, ctx->debug_name, vrend_core_profile_warn_strings[error], value);
 }
 #define report_core_warn(ctx, error, value) __report_core_warn(__func__, ctx, error, value)
-static INLINE boolean should_invert_viewport(struct grend_context *ctx)
+static INLINE boolean should_invert_viewport(struct vrend_context *ctx)
 {
    /* if we have a negative viewport then gallium wanted to invert it,
       however since we are rendering to GL FBOs we need to invert it
@@ -372,68 +371,68 @@ static INLINE boolean should_invert_viewport(struct grend_context *ctx)
    return !(ctx->viewport_is_negative ^ ctx->inverted_fbo_content);
 }
 
-static void grend_destroy_surface(struct grend_surface *surf)
+static void vrend_destroy_surface(struct vrend_surface *surf)
 {
-   grend_resource_reference(&surf->texture, NULL);
+   vrend_resource_reference(&surf->texture, NULL);
    free(surf);
 }
 
 static INLINE void
-grend_surface_reference(struct grend_surface **ptr, struct grend_surface *surf)
+vrend_surface_reference(struct vrend_surface **ptr, struct vrend_surface *surf)
 {
-   struct grend_surface *old_surf = *ptr;
+   struct vrend_surface *old_surf = *ptr;
 
    if (pipe_reference(&(*ptr)->reference, &surf->reference))
-      grend_destroy_surface(old_surf);
+      vrend_destroy_surface(old_surf);
    *ptr = surf;
 }
 
-static void grend_destroy_sampler_view(struct grend_sampler_view *samp)
+static void vrend_destroy_sampler_view(struct vrend_sampler_view *samp)
 {
-   grend_resource_reference(&samp->texture, NULL);
+   vrend_resource_reference(&samp->texture, NULL);
    free(samp);
 }
 
 static INLINE void
-grend_sampler_view_reference(struct grend_sampler_view **ptr, struct grend_sampler_view *view)
+vrend_sampler_view_reference(struct vrend_sampler_view **ptr, struct vrend_sampler_view *view)
 {
-   struct grend_sampler_view *old_view = *ptr;
+   struct vrend_sampler_view *old_view = *ptr;
 
    if (pipe_reference(&(*ptr)->reference, &view->reference))
-      grend_destroy_sampler_view(old_view);
+      vrend_destroy_sampler_view(old_view);
    *ptr = view;
 }
 
-static void grend_destroy_so_target(struct grend_so_target *target)
+static void vrend_destroy_so_target(struct vrend_so_target *target)
 {
-   grend_resource_reference(&target->buffer, NULL);
+   vrend_resource_reference(&target->buffer, NULL);
    free(target);
 }
 
 static INLINE void
-grend_so_target_reference(struct grend_so_target **ptr, struct grend_so_target *target)
+vrend_so_target_reference(struct vrend_so_target **ptr, struct vrend_so_target *target)
 {
-   struct grend_so_target *old_target = *ptr;
+   struct vrend_so_target *old_target = *ptr;
 
    if (pipe_reference(&(*ptr)->reference, &target->reference))
-      grend_destroy_so_target(old_target);
+      vrend_destroy_so_target(old_target);
    *ptr = target;
 }
 
-static void grend_shader_destroy(struct grend_shader *shader)
+static void vrend_shader_destroy(struct vrend_shader *shader)
 {
    glDeleteShader(shader->id);
    free(shader->glsl_prog);
    free(shader);
 }
 
-static void grend_destroy_shader_selector(struct grend_shader_selector *sel)
+static void vrend_destroy_shader_selector(struct vrend_shader_selector *sel)
 {
-   struct grend_shader *p = sel->current, *c;
+   struct vrend_shader *p = sel->current, *c;
 
    while (p) {
       c = p->next_variant;
-      grend_shader_destroy(p);
+      vrend_shader_destroy(p);
       p = c;
    }
    free(sel->sinfo.interpinfo);
@@ -441,8 +440,8 @@ static void grend_destroy_shader_selector(struct grend_shader_selector *sel)
    free(sel);
 }
 
-static boolean grend_compile_shader(struct grend_context *ctx,
-                                struct grend_shader *shader)
+static boolean vrend_compile_shader(struct vrend_context *ctx,
+                                struct vrend_shader *shader)
 {
    GLint param;
    glShaderSource(shader->id, 1, (const char **)&shader->glsl_prog, NULL);
@@ -461,24 +460,24 @@ static boolean grend_compile_shader(struct grend_context *ctx,
 }
 
 static INLINE void
-grend_shader_state_reference(struct grend_shader_selector **ptr, struct grend_shader_selector *shader)
+vrend_shader_state_reference(struct vrend_shader_selector **ptr, struct vrend_shader_selector *shader)
 {
-   struct grend_shader_selector *old_shader = *ptr;
+   struct vrend_shader_selector *old_shader = *ptr;
 
    if (pipe_reference(&(*ptr)->reference, &shader->reference))
-      grend_destroy_shader_selector(old_shader);
+      vrend_destroy_shader_selector(old_shader);
    *ptr = shader;
 }
 
 void
-grend_insert_format(struct grend_format_table *entry, uint32_t bindings)
+vrend_insert_format(struct vrend_format_table *entry, uint32_t bindings)
 {
    tex_conv_table[entry->format] = *entry;
    tex_conv_table[entry->format].bindings = bindings;
 }
 
 void
-grend_insert_format_swizzle(int override_format, struct grend_format_table *entry, uint32_t bindings, uint8_t swizzle[4])
+vrend_insert_format_swizzle(int override_format, struct vrend_format_table *entry, uint32_t bindings, uint8_t swizzle[4])
 {
   int i;
    tex_conv_table[override_format] = *entry;
@@ -488,21 +487,21 @@ grend_insert_format_swizzle(int override_format, struct grend_format_table *entr
      tex_conv_table[override_format].swizzle[i] = swizzle[i];
 }
 
-static boolean grend_is_timer_query(GLenum gltype)
+static boolean vrend_is_timer_query(GLenum gltype)
 {
 	return gltype == GL_TIMESTAMP ||
                gltype == GL_TIME_ELAPSED;
 }
 
-void grend_use_program(GLuint program_id)
+void vrend_use_program(GLuint program_id)
 {
-   if (grend_state.program_id != program_id) {
+   if (vrend_state.program_id != program_id) {
       glUseProgram(program_id);
-      grend_state.program_id = program_id;
+      vrend_state.program_id = program_id;
    }
 }
 
-static void grend_init_pstipple_texture(struct grend_context *ctx)
+static void vrend_init_pstipple_texture(struct vrend_context *ctx)
 {
    glGenTextures(1, &ctx->pstipple_tex_id);
    glBindTexture(GL_TEXTURE_2D, ctx->pstipple_tex_id);
@@ -515,15 +514,15 @@ static void grend_init_pstipple_texture(struct grend_context *ctx)
    ctx->pstip_inited = true;
 }
 
-void grend_bind_va(GLuint vaoid)
+void vrend_bind_va(GLuint vaoid)
 {
    glBindVertexArray(vaoid);
 }
 
-void grend_blend_enable(GLboolean blend_enable)
+void vrend_blend_enable(GLboolean blend_enable)
 {
-   if (grend_state.blend_enabled != blend_enable) {
-      grend_state.blend_enabled = blend_enable;
+   if (vrend_state.blend_enabled != blend_enable) {
+      vrend_state.blend_enabled = blend_enable;
       if (blend_enable)
          glEnable(GL_BLEND);
       else
@@ -531,10 +530,10 @@ void grend_blend_enable(GLboolean blend_enable)
    }
 }
 
-void grend_depth_test_enable(GLboolean depth_test_enable)
+void vrend_depth_test_enable(GLboolean depth_test_enable)
 {
-   if (grend_state.depth_test_enabled != depth_test_enable) {
-      grend_state.depth_test_enabled = depth_test_enable;
+   if (vrend_state.depth_test_enabled != depth_test_enable) {
+      vrend_state.depth_test_enabled = depth_test_enable;
       if (depth_test_enable)
          glEnable(GL_DEPTH_TEST);
       else
@@ -542,25 +541,25 @@ void grend_depth_test_enable(GLboolean depth_test_enable)
    }
 }
 
-static void grend_alpha_test_enable(struct grend_context *ctx,
+static void vrend_alpha_test_enable(struct vrend_context *ctx,
                                     GLboolean alpha_test_enable)
 {
    if (use_core_profile) {
        /* handled in shaders */
        return;
    }
-   if (grend_state.alpha_test_enabled != alpha_test_enable) {
-      grend_state.alpha_test_enabled = alpha_test_enable;
+   if (vrend_state.alpha_test_enabled != alpha_test_enable) {
+      vrend_state.alpha_test_enabled = alpha_test_enable;
       if (alpha_test_enable)
          glEnable(GL_ALPHA_TEST);
       else
          glDisable(GL_ALPHA_TEST);
    }
 }
-static void grend_stencil_test_enable(GLboolean stencil_test_enable)
+static void vrend_stencil_test_enable(GLboolean stencil_test_enable)
 {
-   if (grend_state.stencil_test_enabled != stencil_test_enable) {
-      grend_state.stencil_test_enabled = stencil_test_enable;
+   if (vrend_state.stencil_test_enabled != stencil_test_enable) {
+      vrend_state.stencil_test_enabled = stencil_test_enable;
       if (stencil_test_enable)
          glEnable(GL_STENCIL_TEST);
       else
@@ -590,12 +589,12 @@ static void set_stream_out_varyings(int prog_id, struct pipe_stream_output_info 
          free(varyings[i]);
 }
 
-static struct grend_linked_shader_program *add_shader_program(struct grend_context *ctx,
-                                                              struct grend_shader *vs,
-                                                              struct grend_shader *fs,
-                                                              struct grend_shader *gs)
+static struct vrend_linked_shader_program *add_shader_program(struct vrend_context *ctx,
+                                                              struct vrend_shader *vs,
+                                                              struct vrend_shader *fs,
+                                                              struct vrend_shader *gs)
 {
-   struct grend_linked_shader_program *sprog = CALLOC_STRUCT(grend_linked_shader_program);
+   struct vrend_linked_shader_program *sprog = CALLOC_STRUCT(vrend_linked_shader_program);
   char name[16];
   int i;
   GLuint prog_id;
@@ -608,7 +607,7 @@ static struct grend_linked_shader_program *add_shader_program(struct grend_conte
                                             &vs->sel->sinfo,
                                             &fs->sel->sinfo);
      boolean ret;
-     ret = grend_compile_shader(ctx, vs);
+     ret = vrend_compile_shader(ctx, vs);
      if (ret == FALSE) {
         glDeleteShader(vs->id);
         free(sprog);
@@ -726,10 +725,10 @@ static struct grend_linked_shader_program *add_shader_program(struct grend_conte
   return sprog;
 }
 
-static struct grend_linked_shader_program *lookup_shader_program(struct grend_context *ctx,
+static struct vrend_linked_shader_program *lookup_shader_program(struct vrend_context *ctx,
                                                                  GLuint vs_id, GLuint fs_id, GLuint gs_id)
 {
-  struct grend_linked_shader_program *ent;
+  struct vrend_linked_shader_program *ent;
   LIST_FOR_EACH_ENTRY(ent, &ctx->programs, head) {
      if (ent->ss[PIPE_SHADER_VERTEX]->id == vs_id && ent->ss[PIPE_SHADER_FRAGMENT]->id == fs_id) {
         if (!ent->ss[PIPE_SHADER_GEOMETRY] && gs_id == 0)
@@ -741,16 +740,16 @@ static struct grend_linked_shader_program *lookup_shader_program(struct grend_co
   return 0;
 }
 
-static void grend_free_programs(struct grend_context *ctx)
+static void vrend_free_programs(struct vrend_context *ctx)
 {
-   struct grend_linked_shader_program *ent, *tmp;
+   struct vrend_linked_shader_program *ent, *tmp;
    int i;
    LIST_FOR_EACH_ENTRY_SAFE(ent, tmp, &ctx->programs, head) {
       glDeleteProgram(ent->id);
       list_del(&ent->head);
 
       for (i = PIPE_SHADER_VERTEX; i <= PIPE_SHADER_GEOMETRY; i++) {
-//         grend_shader_state_reference(&ent->ss[i], NULL);
+//         vrend_shader_state_reference(&ent->ss[i], NULL);
          free(ent->shadow_samp_mask_locs[i]);
          free(ent->shadow_samp_add_locs[i]);
          free(ent->samp_locs[i]);
@@ -761,59 +760,59 @@ static void grend_free_programs(struct grend_context *ctx)
    }
 }  
 
-static void grend_apply_sampler_state(struct grend_context *ctx,
-                                      struct grend_resource *res,
+static void vrend_apply_sampler_state(struct vrend_context *ctx,
+                                      struct vrend_resource *res,
                                       uint32_t shader_type,
                                       int id);
 
-void grend_update_stencil_state(struct grend_context *ctx);
+void vrend_update_stencil_state(struct vrend_context *ctx);
 
-void grend_create_surface(struct grend_context *ctx,
+void vrend_create_surface(struct vrend_context *ctx,
                           uint32_t handle,
                           uint32_t res_handle, uint32_t format,
                           uint32_t val0, uint32_t val1)
    
 {
-   struct grend_surface *surf;
-   struct grend_resource *res;
+   struct vrend_surface *surf;
+   struct vrend_resource *res;
 
-   res = graw_renderer_ctx_res_lookup(ctx, res_handle);
+   res = vrend_renderer_ctx_res_lookup(ctx, res_handle);
    if (!res) {
       report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, res_handle);
       return;
    }
 
-   surf = CALLOC_STRUCT(grend_surface);
+   surf = CALLOC_STRUCT(vrend_surface);
    surf->res_handle = res_handle;
    surf->format = format;
    surf->val0 = val0;
    surf->val1 = val1;
    pipe_reference_init(&surf->reference, 1);
 
-   grend_resource_reference(&surf->texture, res);
+   vrend_resource_reference(&surf->texture, res);
 
    vrend_object_insert(ctx->object_hash, surf, sizeof(*surf), handle, VIRGL_OBJECT_SURFACE);
 }
 
-static void grend_destroy_surface_object(void *obj_ptr)
+static void vrend_destroy_surface_object(void *obj_ptr)
 {
-   struct grend_surface *surface = obj_ptr;
+   struct vrend_surface *surface = obj_ptr;
 
-   grend_surface_reference(&surface, NULL);
+   vrend_surface_reference(&surface, NULL);
 }
 
-static void grend_destroy_sampler_view_object(void *obj_ptr)
+static void vrend_destroy_sampler_view_object(void *obj_ptr)
 {
-   struct grend_sampler_view *samp = obj_ptr;
+   struct vrend_sampler_view *samp = obj_ptr;
 
-   grend_sampler_view_reference(&samp, NULL);
+   vrend_sampler_view_reference(&samp, NULL);
 }
 
-static void grend_destroy_so_target_object(void *obj_ptr)
+static void vrend_destroy_so_target_object(void *obj_ptr)
 {
-   struct grend_so_target *target = obj_ptr;
+   struct vrend_so_target *target = obj_ptr;
 
-   grend_so_target_reference(&target, NULL);
+   vrend_so_target_reference(&target, NULL);
 }
 
 static inline GLenum to_gl_swizzle(int swizzle)
@@ -829,21 +828,21 @@ static inline GLenum to_gl_swizzle(int swizzle)
    assert(0);
    return 0;
 }
-void grend_create_sampler_view(struct grend_context *ctx,
+void vrend_create_sampler_view(struct vrend_context *ctx,
                                uint32_t handle,
                                uint32_t res_handle, uint32_t format,
                                uint32_t val0, uint32_t val1, uint32_t swizzle_packed)
 {
-   struct grend_sampler_view *view;
-   struct grend_resource *res;
+   struct vrend_sampler_view *view;
+   struct vrend_resource *res;
 
-   res = graw_renderer_ctx_res_lookup(ctx, res_handle);
+   res = vrend_renderer_ctx_res_lookup(ctx, res_handle);
    if (!res) {
       report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, res_handle);
       return;
    }
    
-   view = CALLOC_STRUCT(grend_sampler_view);
+   view = CALLOC_STRUCT(vrend_sampler_view);
    pipe_reference_init(&view->reference, 1);
    view->res_handle = res_handle;
    view->format = format;
@@ -856,7 +855,7 @@ void grend_create_sampler_view(struct grend_context *ctx,
    view->cur_base = -1;
    view->cur_max = 10000;
 
-   grend_resource_reference(&view->texture, res);
+   vrend_resource_reference(&view->texture, res);
 
    view->srgb_decode = GL_DECODE_EXT;
    if (view->format != view->texture->base.format) {
@@ -881,7 +880,7 @@ void grend_create_sampler_view(struct grend_context *ctx,
    vrend_object_insert(ctx->object_hash, view, sizeof(*view), handle, VIRGL_OBJECT_SAMPLER_VIEW);
 }
 
-static void grend_fb_bind_texture(struct grend_resource *res,
+static void vrend_fb_bind_texture(struct vrend_resource *res,
                                   int idx,
                                   uint32_t level, uint32_t layer)
 {
@@ -931,9 +930,9 @@ static void grend_fb_bind_texture(struct grend_resource *res,
                                   0, 0, 0);
 }
 
-static void grend_hw_set_zsurf_texture(struct grend_context *ctx)
+static void vrend_hw_set_zsurf_texture(struct vrend_context *ctx)
 {
-   struct grend_resource *tex;
+   struct vrend_resource *tex;
 
    if (!ctx->zsurf) {
       glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_STENCIL_ATTACHMENT,
@@ -945,12 +944,12 @@ static void grend_hw_set_zsurf_texture(struct grend_context *ctx)
    if (!tex)
       return;
 
-   grend_fb_bind_texture(tex, 0, ctx->zsurf->val0, ctx->zsurf->val1 & 0xffff);
+   vrend_fb_bind_texture(tex, 0, ctx->zsurf->val0, ctx->zsurf->val1 & 0xffff);
 }
 
-static void grend_hw_set_color_surface(struct grend_context *ctx, int index)
+static void vrend_hw_set_color_surface(struct vrend_context *ctx, int index)
 {
-   struct grend_resource *tex;
+   struct vrend_resource *tex;
 
    if (!ctx->surf[index]) {
       GLenum attachment = GL_COLOR_ATTACHMENT0 + index;
@@ -959,7 +958,7 @@ static void grend_hw_set_color_surface(struct grend_context *ctx, int index)
                                 GL_TEXTURE_2D, 0, 0);
    } else {
        tex = ctx->surf[index]->texture;
-       grend_fb_bind_texture(tex, index, ctx->surf[index]->val0,
+       vrend_fb_bind_texture(tex, index, ctx->surf[index]->val0,
                              ctx->surf[index]->val1 & 0xffff);
 
    }
@@ -967,7 +966,7 @@ static void grend_hw_set_color_surface(struct grend_context *ctx, int index)
 
 }
 
-static void grend_hw_emit_framebuffer_state(struct grend_context *ctx)
+static void vrend_hw_emit_framebuffer_state(struct vrend_context *ctx)
 {
    static const GLenum buffers[8] = {
       GL_COLOR_ATTACHMENT0_EXT,
@@ -986,11 +985,11 @@ static void grend_hw_emit_framebuffer_state(struct grend_context *ctx)
    glDrawBuffers(ctx->nr_cbufs, buffers);
 }
 
-void grend_set_framebuffer_state(struct grend_context *ctx,
+void vrend_set_framebuffer_state(struct vrend_context *ctx,
                                  uint32_t nr_cbufs, uint32_t surf_handle[8],
                                  uint32_t zsurf_handle)
 {
-   struct grend_surface *surf, *zsurf;
+   struct vrend_surface *surf, *zsurf;
    int i;
    int old_num;
    GLenum status;
@@ -1009,8 +1008,8 @@ void grend_set_framebuffer_state(struct grend_context *ctx,
       zsurf = NULL;
 
    if (ctx->zsurf != zsurf) {
-      grend_surface_reference(&ctx->zsurf, zsurf);
-      grend_hw_set_zsurf_texture(ctx);
+      vrend_surface_reference(&ctx->zsurf, zsurf);
+      vrend_hw_set_zsurf_texture(ctx);
    }
 
    old_num = ctx->nr_cbufs;
@@ -1024,15 +1023,15 @@ void grend_set_framebuffer_state(struct grend_context *ctx,
          return;
       }
       if (ctx->surf[i] != surf) {
-         grend_surface_reference(&ctx->surf[i], surf);
-         grend_hw_set_color_surface(ctx, i);
+         vrend_surface_reference(&ctx->surf[i], surf);
+         vrend_hw_set_color_surface(ctx, i);
       }
    }
 
    if (old_num > ctx->nr_cbufs) {
       for (i = ctx->nr_cbufs; i < old_num; i++) {
-         grend_surface_reference(&ctx->surf[i], NULL);
-         grend_hw_set_color_surface(ctx, i);
+         vrend_surface_reference(&ctx->surf[i], NULL);
+         vrend_hw_set_color_surface(ctx, i);
       }
    }
 
@@ -1058,7 +1057,7 @@ void grend_set_framebuffer_state(struct grend_context *ctx,
       }
    }
 
-   grend_hw_emit_framebuffer_state(ctx);
+   vrend_hw_emit_framebuffer_state(ctx);
 
    if (ctx->nr_cbufs > 0 || ctx->zsurf) {
       status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
@@ -1067,7 +1066,7 @@ void grend_set_framebuffer_state(struct grend_context *ctx,
    }
 }
 
-static void grend_hw_emit_depth_range(struct grend_context *ctx)
+static void vrend_hw_emit_depth_range(struct vrend_context *ctx)
 {
    glDepthRange(ctx->view_near_val, ctx->view_far_val);
 }
@@ -1076,7 +1075,7 @@ static void grend_hw_emit_depth_range(struct grend_context *ctx)
  * if the viewport Y scale factor is > 0 then we are rendering to
  * an FBO already so don't need to invert rendering?
  */
-void grend_set_viewport_state(struct grend_context *ctx,
+void vrend_set_viewport_state(struct vrend_context *ctx,
                               const struct pipe_viewport_state *state)
 {
    /* convert back to glViewport */
@@ -1115,16 +1114,16 @@ void grend_set_viewport_state(struct grend_context *ctx,
        ctx->view_far_val != far_val) {
       ctx->view_near_val = near_val;
       ctx->view_far_val = far_val;
-      grend_hw_emit_depth_range(ctx);
+      vrend_hw_emit_depth_range(ctx);
    }
 }
 
-void grend_create_vertex_elements_state(struct grend_context *ctx,
+void vrend_create_vertex_elements_state(struct vrend_context *ctx,
                                         uint32_t handle,
                                         unsigned num_elements,
                                         const struct pipe_vertex_element *elements)
 {
-   struct grend_vertex_element_array *v = CALLOC_STRUCT(grend_vertex_element_array);
+   struct vrend_vertex_element_array *v = CALLOC_STRUCT(vrend_vertex_element_array);
    const struct util_format_description *desc;
    GLenum type;
    int i;
@@ -1185,14 +1184,14 @@ void grend_create_vertex_elements_state(struct grend_context *ctx,
          v->elements[i].nr_chan = desc->nr_channels;
    }
 
-   vrend_object_insert(ctx->object_hash, v, sizeof(struct grend_vertex_element), handle,
+   vrend_object_insert(ctx->object_hash, v, sizeof(struct vrend_vertex_element), handle,
                       VIRGL_OBJECT_VERTEX_ELEMENTS);
 }
 
-void grend_bind_vertex_elements_state(struct grend_context *ctx,
+void vrend_bind_vertex_elements_state(struct vrend_context *ctx,
                                       uint32_t handle)
 {
-   struct grend_vertex_element_array *v;
+   struct vrend_vertex_element_array *v;
 
    if (!handle) {
       ctx->ve = NULL;
@@ -1206,13 +1205,13 @@ void grend_bind_vertex_elements_state(struct grend_context *ctx,
    ctx->ve = v;
 }
 
-void grend_set_constants(struct grend_context *ctx,
+void vrend_set_constants(struct vrend_context *ctx,
                          uint32_t shader,
                          uint32_t index,
                          uint32_t num_constant,
                          float *data)
 {
-   struct grend_constants *consts;
+   struct vrend_constants *consts;
    int i;
 
    consts = &ctx->consts[shader];
@@ -1227,59 +1226,59 @@ void grend_set_constants(struct grend_context *ctx,
       consts->consts[i] = data[i];
 }
 
-void grend_set_index_buffer(struct grend_context *ctx,
+void vrend_set_index_buffer(struct vrend_context *ctx,
                             uint32_t res_handle,
                             uint32_t index_size,
                             uint32_t offset)
 {
-   struct grend_resource *res;
+   struct vrend_resource *res;
 
    ctx->ib.index_size = index_size;
    ctx->ib.offset = offset;
    if (res_handle) {
       if (ctx->index_buffer_res_id != res_handle) {
-         res = graw_renderer_ctx_res_lookup(ctx, res_handle);
+         res = vrend_renderer_ctx_res_lookup(ctx, res_handle);
          if (!res) {
-            grend_resource_reference((struct grend_resource **)&ctx->ib.buffer, NULL);
+            vrend_resource_reference((struct vrend_resource **)&ctx->ib.buffer, NULL);
             ctx->index_buffer_res_id = 0;
             report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, res_handle);
             return;
          }
-         grend_resource_reference((struct grend_resource **)&ctx->ib.buffer, res);
+         vrend_resource_reference((struct vrend_resource **)&ctx->ib.buffer, res);
          ctx->index_buffer_res_id = res_handle;
       }
    } else {
-      grend_resource_reference((struct grend_resource **)&ctx->ib.buffer, NULL);
+      vrend_resource_reference((struct vrend_resource **)&ctx->ib.buffer, NULL);
       ctx->index_buffer_res_id = 0;
    }
 }
 
-void grend_set_single_vbo(struct grend_context *ctx,
+void vrend_set_single_vbo(struct vrend_context *ctx,
                          int index,
                          uint32_t stride,
                          uint32_t buffer_offset,
                          uint32_t res_handle)
 {
-   struct grend_resource *res;
+   struct vrend_resource *res;
    ctx->vbo[index].stride = stride;
    ctx->vbo[index].buffer_offset = buffer_offset;
 
    if (res_handle == 0) {
-      grend_resource_reference((struct grend_resource **)&ctx->vbo[index].buffer, NULL);
+      vrend_resource_reference((struct vrend_resource **)&ctx->vbo[index].buffer, NULL);
       ctx->vbo_res_ids[index] = 0;
    } else if (ctx->vbo_res_ids[index] != res_handle) {
-      res = graw_renderer_ctx_res_lookup(ctx, res_handle);
+      res = vrend_renderer_ctx_res_lookup(ctx, res_handle);
       if (!res) {
          report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, res_handle);
          ctx->vbo_res_ids[index] = 0;
          return;
       }
-      grend_resource_reference((struct grend_resource **)&ctx->vbo[index].buffer, res);
+      vrend_resource_reference((struct vrend_resource **)&ctx->vbo[index].buffer, res);
       ctx->vbo_res_ids[index] = res_handle;
    }
 }
 
-void grend_set_num_vbo(struct grend_context *ctx,
+void vrend_set_num_vbo(struct vrend_context *ctx,
                       int num_vbo)
 {                                              
    int old_num = ctx->num_vbos;
@@ -1287,19 +1286,19 @@ void grend_set_num_vbo(struct grend_context *ctx,
    ctx->num_vbos = num_vbo;
 
    for (i = num_vbo; i < old_num; i++) {
-      grend_resource_reference((struct grend_resource **)&ctx->vbo[i].buffer, NULL);
+      vrend_resource_reference((struct vrend_resource **)&ctx->vbo[i].buffer, NULL);
       ctx->vbo_res_ids[i] = 0;
    }
 
 }
 
-void grend_set_single_sampler_view(struct grend_context *ctx,
+void vrend_set_single_sampler_view(struct vrend_context *ctx,
                                    uint32_t shader_type,
                                    int index,
                                    uint32_t handle)
 {
-   struct grend_sampler_view *view = NULL;
-   struct grend_texture *tex;
+   struct vrend_sampler_view *view = NULL;
+   struct vrend_texture *tex;
 
    if (handle) {
       view = vrend_object_lookup(ctx->object_hash, handle, VIRGL_OBJECT_SAMPLER_VIEW);
@@ -1308,14 +1307,14 @@ void grend_set_single_sampler_view(struct grend_context *ctx,
          report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_HANDLE, handle);
          return;
       }
-      tex = (struct grend_texture *)graw_renderer_ctx_res_lookup(ctx, view->res_handle);
+      tex = (struct vrend_texture *)vrend_renderer_ctx_res_lookup(ctx, view->res_handle);
       if (!tex) {
          fprintf(stderr,"cannot find texture to back resource view %d %d\n", handle, view->res_handle);
          return;
       }
       glBindTexture(view->texture->target, view->texture->id);
       if (view->texture->target != PIPE_BUFFER) {
-         tex = (struct grend_texture *)view->texture;
+         tex = (struct vrend_texture *)view->texture;
          if (util_format_is_depth_or_stencil(view->format)) {
             if (view->depth_texture_mode != GL_RED) {
                glTexParameteri(view->texture->target, GL_DEPTH_TEXTURE_MODE, GL_RED);
@@ -1355,10 +1354,10 @@ void grend_set_single_sampler_view(struct grend_context *ctx,
       }
    }
 
-   grend_sampler_view_reference(&ctx->views[shader_type].views[index], view);
+   vrend_sampler_view_reference(&ctx->views[shader_type].views[index], view);
 }
 
-void grend_set_num_sampler_views(struct grend_context *ctx,
+void vrend_set_num_sampler_views(struct vrend_context *ctx,
                                     uint32_t shader_type,
                                     uint32_t start_slot,
                                     int num_sampler_views)
@@ -1366,12 +1365,12 @@ void grend_set_num_sampler_views(struct grend_context *ctx,
    if (start_slot + num_sampler_views < ctx->views[shader_type].num_views) {
       int i;
       for (i = start_slot + num_sampler_views; i < ctx->views[shader_type].num_views; i++)
-         grend_sampler_view_reference(&ctx->views[shader_type].views[i], NULL);
+         vrend_sampler_view_reference(&ctx->views[shader_type].views[i], NULL);
    }
    ctx->views[shader_type].num_views = start_slot + num_sampler_views;
 }
 
-void grend_transfer_inline_write(struct grend_context *ctx,
+void vrend_transfer_inline_write(struct vrend_context *ctx,
                                  uint32_t res_handle,
                                  unsigned level,
                                  unsigned usage,
@@ -1380,9 +1379,9 @@ void grend_transfer_inline_write(struct grend_context *ctx,
                                  unsigned stride,
                                  unsigned layer_stride)
 {
-   struct grend_resource *res;
+   struct vrend_resource *res;
 
-   res = graw_renderer_ctx_res_lookup(ctx, res_handle);
+   res = vrend_renderer_ctx_res_lookup(ctx, res_handle);
    if (!res) {
       report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, res_handle);
       return;
@@ -1406,14 +1405,14 @@ void grend_transfer_inline_write(struct grend_context *ctx,
 }
 
 
-static void grend_destroy_shader_object(void *obj_ptr)
+static void vrend_destroy_shader_object(void *obj_ptr)
 {
-   struct grend_shader_selector *state = obj_ptr;
+   struct vrend_shader_selector *state = obj_ptr;
 
-   grend_shader_state_reference(&state, NULL);
+   vrend_shader_state_reference(&state, NULL);
 }
 
-static INLINE void vrend_fill_shader_key(struct grend_context *ctx,
+static INLINE void vrend_fill_shader_key(struct vrend_context *ctx,
                                          struct vrend_shader_key *key)
 {
    if (use_core_profile == 1) {
@@ -1440,8 +1439,8 @@ static INLINE int conv_shader_type(int type)
    return 0;
 }
 
-static int grend_shader_create(struct grend_context *ctx,
-                               struct grend_shader *shader,
+static int vrend_shader_create(struct vrend_context *ctx,
+                               struct vrend_shader *shader,
                                struct vrend_shader_key key)
 {
 
@@ -1452,7 +1451,7 @@ static int grend_shader_create(struct grend_context *ctx,
    if (shader->sel->type == PIPE_SHADER_FRAGMENT || shader->sel->type == PIPE_SHADER_GEOMETRY) {
       boolean ret;
 
-      ret = grend_compile_shader(ctx, shader);
+      ret = vrend_compile_shader(ctx, shader);
       if (ret == FALSE) {
          glDeleteShader(shader->id);
          free(shader->glsl_prog);
@@ -1462,12 +1461,12 @@ static int grend_shader_create(struct grend_context *ctx,
    return 0;
 }
 
-static int grend_shader_select(struct grend_context *ctx,
-                               struct grend_shader_selector *sel,
+static int vrend_shader_select(struct vrend_context *ctx,
+                               struct vrend_shader_selector *sel,
                                boolean *dirty)
 {
    struct vrend_shader_key key;
-   struct grend_shader *shader = NULL;
+   struct vrend_shader *shader = NULL;
    int r;
 
    memset(&key, 0, sizeof(key));
@@ -1477,7 +1476,7 @@ static int grend_shader_select(struct grend_context *ctx,
       return 0;
 
    if (sel->num_shaders > 1) {
-      struct grend_shader *p = sel->current, *c = p->next_variant;
+      struct vrend_shader *p = sel->current, *c = p->next_variant;
       while (c && memcmp(&c->key, &key, sizeof(key)) != 0) {
          p = c;
          c = c->next_variant;
@@ -1489,10 +1488,10 @@ static int grend_shader_select(struct grend_context *ctx,
    }
 
    if (!shader) {
-      shader = CALLOC_STRUCT(grend_shader);
+      shader = CALLOC_STRUCT(vrend_shader);
       shader->sel = sel;
 
-      r = grend_shader_create(ctx, shader, key);
+      r = vrend_shader_create(ctx, shader, key);
       if (r) {
          sel->current = NULL;
          FREE(shader);
@@ -1508,11 +1507,11 @@ static int grend_shader_select(struct grend_context *ctx,
    return 0;
 }
 
-static void *grend_create_shader_state(struct grend_context *ctx,
+static void *vrend_create_shader_state(struct vrend_context *ctx,
                                        const struct pipe_shader_state *state,
                                        unsigned pipe_shader_type)
 {
-   struct grend_shader_selector *sel = CALLOC_STRUCT(grend_shader_selector);
+   struct vrend_shader_selector *sel = CALLOC_STRUCT(vrend_shader_selector);
    int r;
 
    sel->type = pipe_shader_type;
@@ -1520,88 +1519,88 @@ static void *grend_create_shader_state(struct grend_context *ctx,
    sel->tokens = tgsi_dup_tokens(state->tokens);
    pipe_reference_init(&sel->reference, 1);
 
-   r = grend_shader_select(ctx, sel, NULL);
+   r = vrend_shader_select(ctx, sel, NULL);
    if (r)
       return NULL;
    return sel;
 }
 
-void grend_create_vs(struct grend_context *ctx,
+void vrend_create_vs(struct vrend_context *ctx,
                      uint32_t handle,
                      const struct pipe_shader_state *vs)
 {
-   struct grend_shader_selector *sel;
+   struct vrend_shader_selector *sel;
 
-   sel = grend_create_shader_state(ctx, vs, PIPE_SHADER_VERTEX);
+   sel = vrend_create_shader_state(ctx, vs, PIPE_SHADER_VERTEX);
 
    vrend_object_insert(ctx->object_hash, sel, sizeof(*sel), handle, VIRGL_OBJECT_VS);
 
    return;
 }
 
-void grend_create_gs(struct grend_context *ctx,
+void vrend_create_gs(struct vrend_context *ctx,
                      uint32_t handle,
                      const struct pipe_shader_state *gs)
 {
-   struct grend_shader_selector *sel;
+   struct vrend_shader_selector *sel;
 
-   sel = grend_create_shader_state(ctx, gs, PIPE_SHADER_GEOMETRY);
+   sel = vrend_create_shader_state(ctx, gs, PIPE_SHADER_GEOMETRY);
 
    vrend_object_insert(ctx->object_hash, sel, sizeof(*sel), handle, VIRGL_OBJECT_GS);
 
    return;
 }
 
-void grend_create_fs(struct grend_context *ctx,
+void vrend_create_fs(struct vrend_context *ctx,
                      uint32_t handle,
                      const struct pipe_shader_state *fs)
 {
-   struct grend_shader_selector *sel;
+   struct vrend_shader_selector *sel;
 
-   sel = grend_create_shader_state(ctx, fs, PIPE_SHADER_FRAGMENT);
+   sel = vrend_create_shader_state(ctx, fs, PIPE_SHADER_FRAGMENT);
 
    vrend_object_insert(ctx->object_hash, sel, sizeof(*sel), handle, VIRGL_OBJECT_FS);
 
    return;
 }
 
-void grend_bind_vs(struct grend_context *ctx,
+void vrend_bind_vs(struct vrend_context *ctx,
                    uint32_t handle)
 {
-   struct grend_shader_selector *sel;
+   struct vrend_shader_selector *sel;
 
    sel = vrend_object_lookup(ctx->object_hash, handle, VIRGL_OBJECT_VS);
 
    if (ctx->vs != sel)
       ctx->shader_dirty = true;
-   grend_shader_state_reference(&ctx->vs, sel);
+   vrend_shader_state_reference(&ctx->vs, sel);
 }
 
-void grend_bind_gs(struct grend_context *ctx,
+void vrend_bind_gs(struct vrend_context *ctx,
                    uint32_t handle)
 {
-   struct grend_shader_selector *sel;
+   struct vrend_shader_selector *sel;
 
    sel = vrend_object_lookup(ctx->object_hash, handle, VIRGL_OBJECT_GS);
 
    if (ctx->gs != sel)
       ctx->shader_dirty = true;
-   grend_shader_state_reference(&ctx->gs, sel);
+   vrend_shader_state_reference(&ctx->gs, sel);
 }
 
-void grend_bind_fs(struct grend_context *ctx,
+void vrend_bind_fs(struct vrend_context *ctx,
                    uint32_t handle)
 {
-   struct grend_shader_selector *sel;
+   struct vrend_shader_selector *sel;
 
    sel = vrend_object_lookup(ctx->object_hash, handle, VIRGL_OBJECT_FS);
 
    if (ctx->fs != sel)
       ctx->shader_dirty = true;
-   grend_shader_state_reference(&ctx->fs, sel);
+   vrend_shader_state_reference(&ctx->fs, sel);
 }
 
-void grend_clear(struct grend_context *ctx,
+void vrend_clear(struct vrend_context *ctx,
                  unsigned buffers,
                  const union pipe_color_union *color,
                  double depth, unsigned stencil)
@@ -1612,19 +1611,19 @@ void grend_clear(struct grend_context *ctx,
       return;
 
    if (ctx->ctx_switch_pending)
-      grend_finish_context_switch(ctx);
+      vrend_finish_context_switch(ctx);
 
    glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, ctx->fb_id);
 
-   grend_update_frontface_state(ctx);
+   vrend_update_frontface_state(ctx);
    if (ctx->stencil_state_dirty)
-      grend_update_stencil_state(ctx);
-   if (ctx->scissor_state_dirty || grend_state.scissor_dirty)
-      grend_update_scissor_state(ctx);
-   if (ctx->viewport_state_dirty || grend_state.viewport_dirty)
-      grend_update_viewport_state(ctx);
+      vrend_update_stencil_state(ctx);
+   if (ctx->scissor_state_dirty || vrend_state.scissor_dirty)
+      vrend_update_scissor_state(ctx);
+   if (ctx->viewport_state_dirty || vrend_state.viewport_dirty)
+      vrend_update_viewport_state(ctx);
 
-   grend_use_program(0);
+   vrend_use_program(0);
 
    if (buffers & PIPE_CLEAR_COLOR)
       glClearColor(color->f[0], color->f[1], color->f[2], color->f[3]);
@@ -1651,7 +1650,7 @@ void grend_clear(struct grend_context *ctx,
          glDepthMask(GL_FALSE);
 }
 
-static void grend_update_scissor_state(struct grend_context *ctx)
+static void vrend_update_scissor_state(struct vrend_context *ctx)
 {
    struct pipe_scissor_state *ss = &ctx->ss;
    struct pipe_rasterizer_state *state = &ctx->rs_state;
@@ -1668,10 +1667,10 @@ static void grend_update_scissor_state(struct grend_context *ctx)
 
    glScissor(ss->minx, y, ss->maxx - ss->minx, ss->maxy - ss->miny);
    ctx->scissor_state_dirty = FALSE;
-   grend_state.scissor_dirty = FALSE;
+   vrend_state.scissor_dirty = FALSE;
 }
 
-static void grend_update_viewport_state(struct grend_context *ctx)
+static void vrend_update_viewport_state(struct vrend_context *ctx)
 {
    GLint cy;
    if (ctx->viewport_is_negative)
@@ -1681,7 +1680,7 @@ static void grend_update_viewport_state(struct grend_context *ctx)
    glViewport(ctx->view_cur_x, cy, ctx->view_width, ctx->view_height);
 
    ctx->viewport_state_dirty = FALSE;
-   grend_state.viewport_dirty = FALSE;
+   vrend_state.viewport_dirty = FALSE;
 }
 
 static GLenum get_xfb_mode(GLenum mode)
@@ -1705,7 +1704,7 @@ static GLenum get_xfb_mode(GLenum mode)
    return GL_POINTS;
 }
 
-void grend_draw_vbo(struct grend_context *ctx,
+void vrend_draw_vbo(struct vrend_context *ctx,
                     const struct pipe_draw_info *info)
 {
    int i;
@@ -1720,21 +1719,21 @@ void grend_draw_vbo(struct grend_context *ctx,
       return;
 
    if (ctx->ctx_switch_pending)
-      grend_finish_context_switch(ctx);
+      vrend_finish_context_switch(ctx);
 
-   grend_update_frontface_state(ctx);
+   vrend_update_frontface_state(ctx);
    if (ctx->stencil_state_dirty)
-      grend_update_stencil_state(ctx);
-   if (ctx->scissor_state_dirty || grend_state.scissor_dirty)
-      grend_update_scissor_state(ctx);
+      vrend_update_stencil_state(ctx);
+   if (ctx->scissor_state_dirty || vrend_state.scissor_dirty)
+      vrend_update_scissor_state(ctx);
 
-   if (ctx->viewport_state_dirty || grend_state.viewport_dirty)
-      grend_update_viewport_state(ctx);
+   if (ctx->viewport_state_dirty || vrend_state.viewport_dirty)
+      vrend_update_viewport_state(ctx);
 
-   grend_patch_blend_func(ctx);
+   vrend_patch_blend_func(ctx);
 
    if (ctx->shader_dirty) {
-     struct grend_linked_shader_program *prog;
+     struct vrend_linked_shader_program *prog;
      boolean fs_dirty, vs_dirty, gs_dirty;
 
      if (!ctx->vs || !ctx->fs) {
@@ -1742,10 +1741,10 @@ void grend_draw_vbo(struct grend_context *ctx,
         return;
      }
 
-     grend_shader_select(ctx, ctx->fs, &fs_dirty);
-     grend_shader_select(ctx, ctx->vs, &vs_dirty);
+     vrend_shader_select(ctx, ctx->fs, &fs_dirty);
+     vrend_shader_select(ctx, ctx->vs, &vs_dirty);
      if (ctx->gs)
-        grend_shader_select(ctx, ctx->gs, &gs_dirty);
+        vrend_shader_select(ctx, ctx->gs, &gs_dirty);
 
      if (!ctx->vs->current || !ctx->fs->current) {
         fprintf(stderr, "failure to compile shader variants\n");
@@ -1765,7 +1764,7 @@ void grend_draw_vbo(struct grend_context *ctx,
 
    glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, ctx->fb_id);
    
-   grend_use_program(ctx->prog->id);
+   vrend_use_program(ctx->prog->id);
 
    for (shader_type = PIPE_SHADER_VERTEX; shader_type <= (ctx->gs ? PIPE_SHADER_GEOMETRY : PIPE_SHADER_FRAGMENT); shader_type++) {
       if (ctx->prog->const_locs[shader_type] && (ctx->const_dirty[shader_type] || new_program)) {
@@ -1789,7 +1788,7 @@ void grend_draw_vbo(struct grend_context *ctx,
    for (shader_type = PIPE_SHADER_VERTEX; shader_type <= PIPE_SHADER_FRAGMENT; shader_type++) {
       int index = 0;
       for (i = 0; i < ctx->views[shader_type].num_views; i++) {
-         struct grend_resource *texture = NULL;
+         struct vrend_resource *texture = NULL;
 
          if (ctx->views[shader_type].views[i]) {
             texture = ctx->views[shader_type].views[i]->texture;
@@ -1802,7 +1801,7 @@ void grend_draw_vbo(struct grend_context *ctx,
             glUniform1i(ctx->prog->samp_locs[shader_type][index], sampler_id);
 
          if (ctx->prog->shadow_samp_mask[shader_type] & (1 << i)) {
-            struct grend_sampler_view *tview = ctx->views[shader_type].views[i];
+            struct vrend_sampler_view *tview = ctx->views[shader_type].views[i];
             glUniform4f(ctx->prog->shadow_samp_mask_locs[shader_type][index], 
                         tview->gl_swizzle_r == GL_ZERO ? 0.0 : 1.0, 
                         tview->gl_swizzle_g == GL_ZERO ? 0.0 : 1.0, 
@@ -1819,7 +1818,7 @@ void grend_draw_vbo(struct grend_context *ctx,
          if (texture) {
             glBindTexture(texture->target, texture->id);
             if (ctx->views[shader_type].old_ids[i] != texture->id || ctx->sampler_state_dirty) {
-               grend_apply_sampler_state(ctx, texture, shader_type, i);
+               vrend_apply_sampler_state(ctx, texture, shader_type, i);
                ctx->views[shader_type].old_ids[i] = texture->id;
             }
             if (ctx->rs_state.point_quad_rasterization) {
@@ -1850,9 +1849,9 @@ void grend_draw_vbo(struct grend_context *ctx,
    enable_bitmask = 0;
    disable_bitmask = ~((1ull << num_enable) - 1);
    for (i = 0; i < ctx->ve->count; i++) {
-      struct grend_vertex_element *ve = &ctx->ve->elements[i];
+      struct vrend_vertex_element *ve = &ctx->ve->elements[i];
       int vbo_index = ctx->ve->elements[i].base.vertex_buffer_index;
-      struct grend_buffer *buf;
+      struct vrend_buffer *buf;
       GLint loc;
 
       if (i >= ctx->prog->ss[PIPE_SHADER_VERTEX]->sel->sinfo.num_inputs) {
@@ -1860,14 +1859,14 @@ void grend_draw_vbo(struct grend_context *ctx,
          num_enable = ctx->prog->ss[PIPE_SHADER_VERTEX]->sel->sinfo.num_inputs;
          break;
       }
-      buf = (struct grend_buffer *)ctx->vbo[vbo_index].buffer;
+      buf = (struct vrend_buffer *)ctx->vbo[vbo_index].buffer;
 
       if (!buf) {
            fprintf(stderr,"cannot find vbo buf %d %d %d\n", i, ctx->ve->count, ctx->prog->ss[PIPE_SHADER_VERTEX]->sel->sinfo.num_inputs);
            continue;
       }
 
-      if (graw_shader_use_explicit) {
+      if (vrend_shader_use_explicit) {
          loc = i;
       } else {
 	if (ctx->prog->attrib_locs) {
@@ -1944,19 +1943,19 @@ void grend_draw_vbo(struct grend_context *ctx,
    }
 
    if (info->indexed) {
-      struct grend_resource *res = (struct grend_resource *)ctx->ib.buffer;
+      struct vrend_resource *res = (struct vrend_resource *)ctx->ib.buffer;
       glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, res->id);
    } else
       glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
-//   grend_ctx_restart_queries(ctx);
+//   vrend_ctx_restart_queries(ctx);
 
    if (ctx->num_so_targets) {
       glBeginTransformFeedback(get_xfb_mode(info->mode));
    }
 
    if (info->primitive_restart) {
-      if (grend_state.have_nv_prim_restart) {
+      if (vrend_state.have_nv_prim_restart) {
          glEnableClientState(GL_PRIMITIVE_RESTART_NV);
          glPrimitiveRestartIndexNV(info->restart_index);
       } else {
@@ -2003,9 +2002,9 @@ void grend_draw_vbo(struct grend_context *ctx,
       glEndTransformFeedback();
 
    if (info->primitive_restart) {
-      if (grend_state.have_nv_prim_restart)
+      if (vrend_state.have_nv_prim_restart)
          glDisableClientState(GL_PRIMITIVE_RESTART_NV);
-      else if (grend_state.have_gl_prim_restart)
+      else if (vrend_state.have_gl_prim_restart)
          glDisable(GL_PRIMITIVE_RESTART);
    }
 }
@@ -2124,7 +2123,7 @@ static INLINE int conv_dst_blend(int blend_factor)
    return blend_factor;
 }
 
-static void grend_patch_blend_func(struct grend_context *ctx)
+static void vrend_patch_blend_func(struct vrend_context *ctx)
 {
    struct pipe_blend_state *state = &ctx->blend_state;
    int i;
@@ -2176,12 +2175,12 @@ static void grend_patch_blend_func(struct grend_context *ctx)
    }
 }
 
-static void grend_hw_emit_blend(struct grend_context *ctx)
+static void vrend_hw_emit_blend(struct vrend_context *ctx)
 {
    struct pipe_blend_state *state = &ctx->blend_state;
 
-   if (state->logicop_enable != grend_state.hw_blend_state.logicop_enable) {
-      grend_state.hw_blend_state.logicop_enable = state->logicop_enable;
+   if (state->logicop_enable != vrend_state.hw_blend_state.logicop_enable) {
+      vrend_state.hw_blend_state.logicop_enable = state->logicop_enable;
       if (state->logicop_enable) {
          glEnable(GL_COLOR_LOGIC_OP);
          glLogicOp(translate_logicop(state->logicop_func));
@@ -2205,8 +2204,8 @@ static void grend_hw_emit_blend(struct grend_context *ctx)
          } else
             glDisableIndexedEXT(GL_BLEND, i);
 
-         if (state->rt[i].colormask != grend_state.hw_blend_state.rt[i].colormask) {
-            grend_state.hw_blend_state.rt[i].colormask = state->rt[i].colormask;
+         if (state->rt[i].colormask != vrend_state.hw_blend_state.rt[i].colormask) {
+            vrend_state.hw_blend_state.rt[i].colormask = state->rt[i].colormask;
             glColorMaskIndexedEXT(i, state->rt[i].colormask & PIPE_MASK_R ? GL_TRUE : GL_FALSE,
                                   state->rt[i].colormask & PIPE_MASK_G ? GL_TRUE : GL_FALSE,
                                   state->rt[i].colormask & PIPE_MASK_B ? GL_TRUE : GL_FALSE,
@@ -2221,15 +2220,15 @@ static void grend_hw_emit_blend(struct grend_context *ctx)
                              translate_blend_factor(state->rt[0].alpha_dst_factor));
          glBlendEquationSeparate(translate_blend_func(state->rt[0].rgb_func),
                                  translate_blend_func(state->rt[0].alpha_func));
-         grend_blend_enable(GL_TRUE);
+         vrend_blend_enable(GL_TRUE);
       } 
       else
-         grend_blend_enable(GL_FALSE);
+         vrend_blend_enable(GL_FALSE);
 
-      if (state->rt[0].colormask != grend_state.hw_blend_state.rt[0].colormask) {
+      if (state->rt[0].colormask != vrend_state.hw_blend_state.rt[0].colormask) {
          int i;
          for (i = 0; i < PIPE_MAX_COLOR_BUFS; i++)
-            grend_state.hw_blend_state.rt[i].colormask = state->rt[i].colormask;
+            vrend_state.hw_blend_state.rt[i].colormask = state->rt[i].colormask;
          glColorMask(state->rt[0].colormask & PIPE_MASK_R ? GL_TRUE : GL_FALSE,
                      state->rt[0].colormask & PIPE_MASK_G ? GL_TRUE : GL_FALSE,
                      state->rt[0].colormask & PIPE_MASK_B ? GL_TRUE : GL_FALSE,
@@ -2237,7 +2236,7 @@ static void grend_hw_emit_blend(struct grend_context *ctx)
       }
    }
 
-   if (grend_state.have_multisample) {
+   if (vrend_state.have_multisample) {
       if (state->alpha_to_coverage)
          glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE);
       else
@@ -2250,14 +2249,14 @@ static void grend_hw_emit_blend(struct grend_context *ctx)
    }
 }
 
-void grend_object_bind_blend(struct grend_context *ctx,
+void vrend_object_bind_blend(struct vrend_context *ctx,
                              uint32_t handle)
 {
    struct pipe_blend_state *state;
 
    if (handle == 0) {
       memset(&ctx->blend_state, 0, sizeof(ctx->blend_state));
-      grend_blend_enable(GL_FALSE);
+      vrend_blend_enable(GL_FALSE);
       return;
    }
    state = vrend_object_lookup(ctx->object_hash, handle, VIRGL_OBJECT_BLEND);
@@ -2268,33 +2267,33 @@ void grend_object_bind_blend(struct grend_context *ctx,
 
    ctx->blend_state = *state;
 
-   grend_hw_emit_blend(ctx);
+   vrend_hw_emit_blend(ctx);
 }
 
-static void grend_hw_emit_dsa(struct grend_context *ctx)
+static void vrend_hw_emit_dsa(struct vrend_context *ctx)
 {
    struct pipe_depth_stencil_alpha_state *state = &ctx->dsa_state;
 
    if (state->depth.enabled) {
-      grend_depth_test_enable(GL_TRUE);
+      vrend_depth_test_enable(GL_TRUE);
       glDepthFunc(GL_NEVER + state->depth.func);
       if (state->depth.writemask)
          glDepthMask(GL_TRUE);
       else
          glDepthMask(GL_FALSE);
    } else
-      grend_depth_test_enable(GL_FALSE);
+      vrend_depth_test_enable(GL_FALSE);
  
    if (state->alpha.enabled) {
-      grend_alpha_test_enable(ctx, GL_TRUE);
+      vrend_alpha_test_enable(ctx, GL_TRUE);
       if (!use_core_profile)
          glAlphaFunc(GL_NEVER + state->alpha.func, state->alpha.ref_value);
    } else
-      grend_alpha_test_enable(ctx, GL_FALSE);
+      vrend_alpha_test_enable(ctx, GL_FALSE);
 
 
 }
-void grend_object_bind_dsa(struct grend_context *ctx,
+void vrend_object_bind_dsa(struct vrend_context *ctx,
                            uint32_t handle)
 {
    struct pipe_depth_stencil_alpha_state *state;
@@ -2304,7 +2303,7 @@ void grend_object_bind_dsa(struct grend_context *ctx,
       ctx->dsa = NULL;
       ctx->stencil_state_dirty = TRUE;
       ctx->shader_dirty = TRUE;
-      grend_hw_emit_dsa(ctx);
+      vrend_hw_emit_dsa(ctx);
       return;
    }
 
@@ -2321,17 +2320,17 @@ void grend_object_bind_dsa(struct grend_context *ctx,
    ctx->dsa_state = *state;
    ctx->dsa = state;
 
-   grend_hw_emit_dsa(ctx);
+   vrend_hw_emit_dsa(ctx);
 }
 
-static void grend_update_frontface_state(struct grend_context *ctx)
+static void vrend_update_frontface_state(struct vrend_context *ctx)
 {
    struct pipe_rasterizer_state *state = &ctx->rs_state;
    int front_ccw = state->front_ccw;
 
    front_ccw ^= (ctx->viewport_is_negative ?  1 : 0);
-//   if (front_ccw != grend_state.hw_rs_state.front_ccw) {
-//      grend_state.hw_rs_state.front_ccw = front_ccw;
+//   if (front_ccw != vrend_state.hw_rs_state.front_ccw) {
+//      vrend_state.hw_rs_state.front_ccw = front_ccw;
       if (front_ccw)
          glFrontFace(GL_CCW);
       else
@@ -2339,7 +2338,7 @@ static void grend_update_frontface_state(struct grend_context *ctx)
 //   }
 }
 
-void grend_update_stencil_state(struct grend_context *ctx)
+void vrend_update_stencil_state(struct vrend_context *ctx)
 {
    struct pipe_depth_stencil_alpha_state *state = ctx->dsa;
    int i;
@@ -2348,7 +2347,7 @@ void grend_update_stencil_state(struct grend_context *ctx)
 
    if (!state->stencil[1].enabled) {
       if (state->stencil[0].enabled) {
-         grend_stencil_test_enable(GL_TRUE);
+         vrend_stencil_test_enable(GL_TRUE);
 
          glStencilOp(translate_stencil_op(state->stencil[0].fail_op), 
                      translate_stencil_op(state->stencil[0].zfail_op),
@@ -2359,9 +2358,9 @@ void grend_update_stencil_state(struct grend_context *ctx)
                        state->stencil[0].valuemask);
          glStencilMask(state->stencil[0].writemask);
       } else
-         grend_stencil_test_enable(GL_FALSE);
+         vrend_stencil_test_enable(GL_FALSE);
    } else {
-      grend_stencil_test_enable(GL_TRUE);
+      vrend_stencil_test_enable(GL_TRUE);
 
       for (i = 0; i < 2; i++) {
          GLenum face = (i == 1) ? GL_BACK : GL_FRONT;
@@ -2393,7 +2392,7 @@ static inline GLenum translate_fill(uint32_t mode)
    return 0;
 }
 
-static void grend_hw_emit_rs(struct grend_context *ctx)
+static void vrend_hw_emit_rs(struct vrend_context *ctx)
 {
    struct pipe_rasterizer_state *state = &ctx->rs_state;
    int i;
@@ -2412,8 +2411,8 @@ static void grend_hw_emit_rs(struct grend_context *ctx)
           glPointSize(state->point_size);
    }
 
-   if (state->rasterizer_discard != grend_state.hw_rs_state.rasterizer_discard) {
-      grend_state.hw_rs_state.rasterizer_discard = state->rasterizer_discard;
+   if (state->rasterizer_discard != vrend_state.hw_rs_state.rasterizer_discard) {
+      vrend_state.hw_rs_state.rasterizer_discard = state->rasterizer_discard;
       if (state->rasterizer_discard)
          glEnable(GL_RASTERIZER_DISCARD);
       else
@@ -2443,8 +2442,8 @@ static void grend_hw_emit_rs(struct grend_context *ctx)
    else
       glDisable(GL_POLYGON_OFFSET_POINT);
    
-   if (state->flatshade != grend_state.hw_rs_state.flatshade) {
-      grend_state.hw_rs_state.flatshade = state->flatshade;
+   if (state->flatshade != vrend_state.hw_rs_state.flatshade) {
+      vrend_state.hw_rs_state.flatshade = state->flatshade;
       if (state->flatshade) {
          glShadeModel(GL_FLAT);
       } else {
@@ -2452,8 +2451,8 @@ static void grend_hw_emit_rs(struct grend_context *ctx)
       }
    }
 
-   if (state->flatshade_first != grend_state.hw_rs_state.flatshade_first) {
-      grend_state.hw_rs_state.flatshade_first = state->flatshade_first;
+   if (state->flatshade_first != vrend_state.hw_rs_state.flatshade_first) {
+      vrend_state.hw_rs_state.flatshade_first = state->flatshade_first;
       if (state->flatshade_first)
          glProvokingVertexEXT(GL_FIRST_VERTEX_CONVENTION_EXT);
       else
@@ -2468,7 +2467,7 @@ static void grend_hw_emit_rs(struct grend_context *ctx)
          glDisable(GL_POLYGON_STIPPLE);
    } else if (state->poly_stipple_enable) {
       if (!ctx->pstip_inited)
-         grend_init_pstipple_texture(ctx);
+         vrend_init_pstipple_texture(ctx);
    }
 
    if (state->point_quad_rasterization) {
@@ -2504,8 +2503,8 @@ static void grend_hw_emit_rs(struct grend_context *ctx)
    } else if (state->light_twoside)
       report_core_warn(ctx, CORE_PROFILE_WARN_TWO_SIDE, 0);
 
-   if (state->clip_plane_enable != grend_state.hw_rs_state.clip_plane_enable) {
-      grend_state.hw_rs_state.clip_plane_enable = state->clip_plane_enable;
+   if (state->clip_plane_enable != vrend_state.hw_rs_state.clip_plane_enable) {
+      vrend_state.hw_rs_state.clip_plane_enable = state->clip_plane_enable;
       for (i = 0; i < 8; i++) {
          if (state->clip_plane_enable & (1 << i))
             glEnable(GL_CLIP_PLANE0 + i);
@@ -2547,7 +2546,7 @@ static void grend_hw_emit_rs(struct grend_context *ctx)
          report_core_warn(ctx, CORE_PROFILE_WARN_CLAMP, 0);
    }
 
-   if (grend_state.have_multisample) {
+   if (vrend_state.have_multisample) {
       if (state->multisample) {
          glEnable(GL_MULTISAMPLE);
          glEnable(GL_SAMPLE_MASK);
@@ -2558,7 +2557,7 @@ static void grend_hw_emit_rs(struct grend_context *ctx)
    }
 }
 
-void grend_object_bind_rasterizer(struct grend_context *ctx,
+void vrend_object_bind_rasterizer(struct vrend_context *ctx,
                                   uint32_t handle)
 {
    struct pipe_rasterizer_state *state;
@@ -2577,7 +2576,7 @@ void grend_object_bind_rasterizer(struct grend_context *ctx,
 
    ctx->rs_state = *state;
    ctx->scissor_state_dirty = TRUE;
-   grend_hw_emit_rs(ctx);
+   vrend_hw_emit_rs(ctx);
 }
 
 static GLuint convert_wrap(int wrap)
@@ -2599,7 +2598,7 @@ static GLuint convert_wrap(int wrap)
    }
 } 
 
-void grend_bind_sampler_states(struct grend_context *ctx,
+void vrend_bind_sampler_states(struct vrend_context *ctx,
                                uint32_t shader_type,
                                uint32_t start_slot,
                                uint32_t num_states,
@@ -2647,12 +2646,12 @@ static inline GLenum convert_min_filter(unsigned int filter, unsigned int mip_fi
    return 0;
 }
 
-static void grend_apply_sampler_state(struct grend_context *ctx, 
-                                      struct grend_resource *res,
+static void vrend_apply_sampler_state(struct vrend_context *ctx, 
+                                      struct vrend_resource *res,
                                       uint32_t shader_type,
                                       int id)
 {
-   struct grend_texture *tex = (struct grend_texture *)res;
+   struct vrend_texture *tex = (struct vrend_texture *)res;
    struct pipe_sampler_state *state = ctx->sampler_state[shader_type][id];
    bool set_all = FALSE;
    GLenum target = tex->base.target;
@@ -2699,12 +2698,12 @@ static void grend_apply_sampler_state(struct grend_context *ctx,
    tex->state = *state;
 }
 
-void grend_flush(struct grend_context *ctx)
+void vrend_flush(struct vrend_context *ctx)
 {
    glFlush();
 }
 
-void grend_flush_frontbuffer(uint32_t res_handle)
+void vrend_flush_frontbuffer(uint32_t res_handle)
 {
 }
 
@@ -2739,7 +2738,7 @@ static int inited;
 
 #define glewIsSupported epoxy_has_gl_extension
 
-void graw_renderer_init(struct grend_if_cbs *cbs)
+void vrend_renderer_init(struct vrend_if_cbs *cbs)
 {
    int gl_ver;
    virgl_gl_context gl_context;
@@ -2761,44 +2760,44 @@ void graw_renderer_init(struct grend_if_cbs *cbs)
    }
 
    if (glewIsSupported("GL_ARB_robustness"))
-      grend_state.have_robustness = TRUE;
+      vrend_state.have_robustness = TRUE;
    else
       fprintf(stderr,"WARNING: running without ARB robustness in place may crash\n");
 
    if (gl_ver >= 33 || glewIsSupported("GL_ARB_shader_bit_encoding"))
-      grend_state.have_bit_encoding = TRUE;
+      vrend_state.have_bit_encoding = TRUE;
    if (gl_ver >= 31)
-      grend_state.have_gl_prim_restart = TRUE;
+      vrend_state.have_gl_prim_restart = TRUE;
    else if (glewIsSupported("GL_NV_primitive_restart"))
-      grend_state.have_nv_prim_restart = TRUE;
+      vrend_state.have_nv_prim_restart = TRUE;
    
    if (glewIsSupported("GL_EXT_framebuffer_multisample") && glewIsSupported("GL_ARB_texture_multisample")) {
-      grend_state.have_multisample = true;
+      vrend_state.have_multisample = true;
    }
 
    /* callbacks for when we are cleaning up the object table */
-   vrend_object_set_destroy_callback(VIRGL_OBJECT_QUERY, grend_destroy_query_object);
-   vrend_object_set_destroy_callback(VIRGL_OBJECT_SURFACE, grend_destroy_surface_object);
-   vrend_object_set_destroy_callback(VIRGL_OBJECT_VS, grend_destroy_shader_object);
-   vrend_object_set_destroy_callback(VIRGL_OBJECT_FS, grend_destroy_shader_object);
-   vrend_object_set_destroy_callback(VIRGL_OBJECT_GS, grend_destroy_shader_object);
-   vrend_object_set_destroy_callback(VIRGL_OBJECT_SAMPLER_VIEW, grend_destroy_sampler_view_object);
-   vrend_object_set_destroy_callback(VIRGL_OBJECT_STREAMOUT_TARGET, grend_destroy_so_target_object);
+   vrend_object_set_destroy_callback(VIRGL_OBJECT_QUERY, vrend_destroy_query_object);
+   vrend_object_set_destroy_callback(VIRGL_OBJECT_SURFACE, vrend_destroy_surface_object);
+   vrend_object_set_destroy_callback(VIRGL_OBJECT_VS, vrend_destroy_shader_object);
+   vrend_object_set_destroy_callback(VIRGL_OBJECT_FS, vrend_destroy_shader_object);
+   vrend_object_set_destroy_callback(VIRGL_OBJECT_GS, vrend_destroy_shader_object);
+   vrend_object_set_destroy_callback(VIRGL_OBJECT_SAMPLER_VIEW, vrend_destroy_sampler_view_object);
+   vrend_object_set_destroy_callback(VIRGL_OBJECT_STREAMOUT_TARGET, vrend_destroy_so_target_object);
 
    vrend_build_format_list();
 
    clicbs->destroy_gl_context(gl_context);
-   grend_state.viewport_dirty = grend_state.scissor_dirty = TRUE;
-   grend_state.program_id = (GLuint)-1;
-   list_inithead(&grend_state.fence_list);
-   list_inithead(&grend_state.waiting_query_list);
+   vrend_state.viewport_dirty = vrend_state.scissor_dirty = TRUE;
+   vrend_state.program_id = (GLuint)-1;
+   list_inithead(&vrend_state.fence_list);
+   list_inithead(&vrend_state.waiting_query_list);
 
    /* create 0 context */
-   graw_renderer_context_create_internal(0, 0, NULL);
+   vrend_renderer_context_create_internal(0, 0, NULL);
 }
 
 void
-graw_renderer_fini(void)
+vrend_renderer_fini(void)
 {
    if (!inited)
       return;
@@ -2807,14 +2806,14 @@ graw_renderer_fini(void)
    inited = 0;
 }
 
-bool grend_destroy_context(struct grend_context *ctx)
+bool vrend_destroy_context(struct vrend_context *ctx)
 {
-   bool switch_0 = (ctx == grend_state.current_ctx);
+   bool switch_0 = (ctx == vrend_state.current_ctx);
    int i;
 
    if (switch_0) {
-      grend_state.current_ctx = NULL;
-      grend_state.current_hw_ctx = NULL;
+      vrend_state.current_ctx = NULL;
+      vrend_state.current_hw_ctx = NULL;
    }
 
    if (use_core_profile) {
@@ -2823,16 +2822,16 @@ bool grend_destroy_context(struct grend_context *ctx)
       ctx->pstip_inited = false;
    }
    /* reset references on framebuffers */
-   grend_set_framebuffer_state(ctx, 0, NULL, 0);
+   vrend_set_framebuffer_state(ctx, 0, NULL, 0);
 
-   grend_set_num_sampler_views(ctx, PIPE_SHADER_VERTEX, 0, 0);
-   grend_set_num_sampler_views(ctx, PIPE_SHADER_FRAGMENT, 0, 0);
-   grend_set_num_sampler_views(ctx, PIPE_SHADER_GEOMETRY, 0, 0);
+   vrend_set_num_sampler_views(ctx, PIPE_SHADER_VERTEX, 0, 0);
+   vrend_set_num_sampler_views(ctx, PIPE_SHADER_FRAGMENT, 0, 0);
+   vrend_set_num_sampler_views(ctx, PIPE_SHADER_GEOMETRY, 0, 0);
 
-   grend_set_streamout_targets(ctx, 0, 0, NULL);
-   grend_set_num_vbo(ctx, 0);
+   vrend_set_streamout_targets(ctx, 0, 0, NULL);
+   vrend_set_num_vbo(ctx, 0);
 
-   grend_set_index_buffer(ctx, 0, 0, 0);
+   vrend_set_index_buffer(ctx, 0, 0, 0);
 
    if (ctx->fb_id)
       glDeleteFramebuffers(1, &ctx->fb_id);
@@ -2848,11 +2847,11 @@ bool grend_destroy_context(struct grend_context *ctx)
       glDisableVertexAttribArray(i);
    }
 
-   grend_bind_va(0);
+   vrend_bind_va(0);
 
    glDeleteVertexArrays(1, &ctx->vaoid);
 
-   grend_free_programs(ctx);
+   vrend_free_programs(ctx);
 
    /* need to free any objects still in hash table - TODO */
    vrend_object_fini_ctx_table(ctx->object_hash);
@@ -2865,9 +2864,9 @@ bool grend_destroy_context(struct grend_context *ctx)
    return switch_0;
 }
 
-struct grend_context *grend_create_context(int id, uint32_t nlen, const char *debug_name)
+struct vrend_context *vrend_create_context(int id, uint32_t nlen, const char *debug_name)
 {
-   struct grend_context *grctx = CALLOC_STRUCT(grend_context);
+   struct vrend_context *grctx = CALLOC_STRUCT(vrend_context);
 
    if (nlen) {
       strncpy(grctx->debug_name, debug_name, 64);
@@ -2886,14 +2885,14 @@ struct grend_context *grend_create_context(int id, uint32_t nlen, const char *de
 
    grctx->res_hash = vrend_object_init_ctx_table();
 
-   grend_bind_va(grctx->vaoid);
+   vrend_bind_va(grctx->vaoid);
    return grctx;
 }
 
-int graw_renderer_resource_attach_iov(int res_handle, struct iovec *iov,
+int vrend_renderer_resource_attach_iov(int res_handle, struct iovec *iov,
                                       int num_iovs)
 {
-   struct grend_resource *res;
+   struct vrend_resource *res;
    
    res = vrend_resource_lookup(res_handle, 0);
    if (!res)
@@ -2905,11 +2904,11 @@ int graw_renderer_resource_attach_iov(int res_handle, struct iovec *iov,
    return 0;
 }
 
-void graw_renderer_resource_zap_iov(int res_handle,
+void vrend_renderer_resource_zap_iov(int res_handle,
                                     struct iovec **iov_p,
                                     int *num_iovs_p)
 {
-   struct grend_resource *res;
+   struct vrend_resource *res;
    res = vrend_resource_lookup(res_handle, 0);
    if (!res) {
       return;
@@ -2921,9 +2920,9 @@ void graw_renderer_resource_zap_iov(int res_handle,
    res->num_iovs = 0;
 }
 
-void graw_renderer_resource_create(struct graw_renderer_resource_create_args *args, struct iovec *iov, uint32_t num_iovs)
+void vrend_renderer_resource_create(struct vrend_renderer_resource_create_args *args, struct iovec *iov, uint32_t num_iovs)
 {
-   struct grend_resource *gr = (struct grend_resource *)CALLOC_STRUCT(grend_texture);
+   struct vrend_resource *gr = (struct vrend_resource *)CALLOC_STRUCT(vrend_texture);
    int level;
 
    gr->handle = args->handle;
@@ -2962,7 +2961,7 @@ void graw_renderer_resource_create(struct graw_renderer_resource_create_args *ar
       glBindBufferARB(gr->target, gr->id);
       glBufferData(gr->target, args->width, NULL, GL_STREAM_DRAW);
    } else {
-      struct grend_texture *gt = (struct grend_texture *)gr;
+      struct vrend_texture *gt = (struct vrend_texture *)gr;
       GLenum internalformat, glformat, gltype;
       gr->target = tgsitargettogltarget(args->target, args->nr_samples);
       glGenTextures(1, &gr->id);
@@ -3030,7 +3029,7 @@ void graw_renderer_resource_create(struct graw_renderer_resource_create_args *ar
    vrend_resource_insert(gr, sizeof(*gr), args->handle);
 }
 
-void graw_renderer_resource_destroy(struct grend_resource *res)
+void vrend_renderer_resource_destroy(struct vrend_resource *res)
 {
 //   if (res->scannedout) TODO
 //      (*clicbs->scanout_resource_info)(0, res->id, 0, 0, 0, 0, 0);
@@ -3055,9 +3054,9 @@ void graw_renderer_resource_destroy(struct grend_resource *res)
 }
 
 
-void graw_renderer_resource_unref(uint32_t res_handle)
+void vrend_renderer_resource_unref(uint32_t res_handle)
 {
-   struct grend_resource *res;
+   struct vrend_resource *res;
 
    res = vrend_resource_lookup(res_handle, 0);
    if (!res)
@@ -3066,7 +3065,7 @@ void graw_renderer_resource_unref(uint32_t res_handle)
    vrend_resource_remove(res->handle);
    res->handle = 0;
 
-   grend_resource_reference(&res, NULL);
+   vrend_resource_reference(&res, NULL);
 }
 
 static int use_sub_data = 0;
@@ -3090,7 +3089,7 @@ static void copy_transfer_data(struct pipe_resource *res,
                                uint64_t offset, bool invert)
 {
    int blsize = util_format_get_blocksize(res->format);
-   GLuint size = graw_iov_size(iov, num_iovs);
+   GLuint size = vrend_iov_size(iov, num_iovs);
    GLuint send_size = util_format_get_nblocks(res->format, box->width,
                                               box->height) * blsize * box->depth;
    GLuint bwx = util_format_get_nblocksx(res->format, box->width) * blsize;
@@ -3099,25 +3098,25 @@ static void copy_transfer_data(struct pipe_resource *res,
    uint32_t myoffset = offset;
 
    if ((send_size == size || bh == 1) && !invert)
-      graw_iov_to_buf(iov, num_iovs, offset, data, send_size);
+      vrend_iov_to_buf(iov, num_iovs, offset, data, send_size);
    else {
       if (invert) {
 	 for (h = bh - 1; h >= 0; h--) {
 	    void *ptr = data + (h * bwx);
-	    graw_iov_to_buf(iov, num_iovs, myoffset, ptr, bwx);
+	    vrend_iov_to_buf(iov, num_iovs, myoffset, ptr, bwx);
 	    myoffset += src_stride;
 	 }
       } else {
 	 for (h = 0; h < bh; h++) {
 	    void *ptr = data + (h * bwx);
-	    graw_iov_to_buf(iov, num_iovs, myoffset, ptr, bwx);
+	    vrend_iov_to_buf(iov, num_iovs, myoffset, ptr, bwx);
 	    myoffset += src_stride;
 	 }
       }
    }
 }
 
-void graw_renderer_transfer_write_iov(uint32_t res_handle,
+void vrend_renderer_transfer_write_iov(uint32_t res_handle,
                                       uint32_t ctx_id,
                                       int level,
                                       uint32_t stride,
@@ -3127,13 +3126,13 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
                                       struct iovec *iov,
                                       unsigned int num_iovs)
 {
-   struct grend_resource *res;
+   struct vrend_resource *res;
 
    void *data;
 
    res = vrend_resource_lookup(res_handle, ctx_id);
    if (res == NULL) {
-      struct grend_context *ctx = vrend_lookup_renderer_ctx(ctx_id);
+      struct vrend_context *ctx = vrend_lookup_renderer_ctx(ctx_id);
       report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, res_handle);
       return;
    }
@@ -3144,15 +3143,15 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
    }
 
    if (!iov) {
-      struct grend_context *ctx = vrend_lookup_renderer_ctx(ctx_id);
+      struct vrend_context *ctx = vrend_lookup_renderer_ctx(ctx_id);
       report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, res_handle);
       return;
    }
 
-   grend_hw_switch_context(vrend_lookup_renderer_ctx(0), TRUE);
+   vrend_hw_switch_context(vrend_lookup_renderer_ctx(0), TRUE);
 
    if (res->target == 0 && res->ptr) {
-      graw_iov_to_buf(iov, num_iovs, offset, res->ptr + box->x, box->width);
+      vrend_iov_to_buf(iov, num_iovs, offset, res->ptr + box->x, box->width);
       return;
    }
    if (res->target == GL_TRANSFORM_FEEDBACK_BUFFER ||
@@ -3164,19 +3163,19 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
 
       glBindBufferARB(res->target, res->id);
       if (use_sub_data == 1) {
-         graw_iov_to_buf_cb(iov, num_iovs, offset, box->width, &iov_buffer_upload, &d);
+         vrend_iov_to_buf_cb(iov, num_iovs, offset, box->width, &iov_buffer_upload, &d);
       } else {
          data = glMapBufferRange(res->target, box->x, box->width, GL_MAP_INVALIDATE_RANGE_BIT | GL_MAP_UNSYNCHRONIZED_BIT | GL_MAP_WRITE_BIT);
          if (data == NULL) {
             fprintf(stderr,"map failed for element buffer\n");
-            graw_iov_to_buf_cb(iov, num_iovs, offset, box->width, &iov_buffer_upload, &d);
+            vrend_iov_to_buf_cb(iov, num_iovs, offset, box->width, &iov_buffer_upload, &d);
          } else {
-            graw_iov_to_buf(iov, num_iovs, offset, data, box->width);
+            vrend_iov_to_buf(iov, num_iovs, offset, data, box->width);
             glUnmapBuffer(res->target);
          }
       }
    } else {
-      struct grend_context *ctx = vrend_lookup_renderer_ctx(ctx_id);
+      struct vrend_context *ctx = vrend_lookup_renderer_ctx(ctx_id);
       GLenum glformat;
       GLenum gltype;
       int need_temp = 0;
@@ -3184,7 +3183,7 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
       int x = 0, y = 0;
       boolean compressed;
       bool invert = false;
-      grend_use_program(0);
+      vrend_use_program(0);
 
       if (!stride)
          stride = util_format_get_nblocksx(res->base.format, u_minify(res->base.width0, level)) * elsize;
@@ -3241,7 +3240,7 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
             
             glGenFramebuffers(1, &fb_id);
             glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fb_id);
-            grend_fb_bind_texture(res, 0, level, 0);
+            vrend_fb_bind_texture(res, 0, level, 0);
 
             res->readback_fb_id = fb_id;
             res->readback_fb_level = level;
@@ -3249,10 +3248,10 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
             glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, res->readback_fb_id);
          }
          glDrawBuffer(GL_COLOR_ATTACHMENT0_EXT);
-         grend_blend_enable(GL_FALSE);
-         grend_depth_test_enable(GL_FALSE);
-         grend_alpha_test_enable(ctx, GL_FALSE);
-         grend_stencil_test_enable(GL_FALSE);
+         vrend_blend_enable(GL_FALSE);
+         vrend_depth_test_enable(GL_FALSE);
+         vrend_alpha_test_enable(ctx, GL_FALSE);
+         vrend_stencil_test_enable(GL_FALSE);
          glPixelZoom(1.0f, res->y_0_top ? -1.0f : 1.0f);
          glWindowPos2i(box->x, res->y_0_top ? res->base.height0 - box->y : box->y);
          glDrawPixels(box->width, box->height, glformat, gltype,
@@ -3335,7 +3334,7 @@ void graw_renderer_transfer_write_iov(uint32_t res_handle,
 
 }
 
-static void vrend_transfer_send_getteximage(struct grend_resource *res,
+static void vrend_transfer_send_getteximage(struct vrend_resource *res,
                                             uint32_t level, uint32_t stride,
                                             struct pipe_box *box, uint64_t offset,
                                             struct iovec *iov, int num_iovs)
@@ -3394,12 +3393,12 @@ static void vrend_transfer_send_getteximage(struct grend_resource *res,
       target = res->target;
       
    if (compressed) {
-      if (grend_state.have_robustness)
+      if (vrend_state.have_robustness)
          glGetnCompressedTexImageARB(target, level, tex_size, data);
       else
          glGetCompressedTexImage(target, level, data);
    } else {
-      if (grend_state.have_robustness)
+      if (vrend_state.have_robustness)
          glGetnTexImageARB(target, level, format, type, tex_size, data);
       else
          glGetTexImage(target, level, format, type, data);
@@ -3407,11 +3406,11 @@ static void vrend_transfer_send_getteximage(struct grend_resource *res,
       
    glPixelStorei(GL_PACK_ALIGNMENT, 4);
 
-   graw_transfer_write_tex_return(&res->base, box, level, stride, offset, iov, num_iovs, data + send_offset, send_size, FALSE);
+   vrend_transfer_write_tex_return(&res->base, box, level, stride, offset, iov, num_iovs, data + send_offset, send_size, FALSE);
    free(data);
 }
 
-static void vrend_transfer_send_readpixels(struct grend_resource *res,
+static void vrend_transfer_send_readpixels(struct vrend_resource *res,
                                            uint32_t level, uint32_t stride,
                                            struct pipe_box *box, uint64_t offset,
                                            struct iovec *iov, int num_iovs)
@@ -3427,7 +3426,7 @@ static void vrend_transfer_send_readpixels(struct grend_resource *res,
    uint32_t h = u_minify(res->base.height0, level);
    int elsize = util_format_get_blocksize(res->base.format);
 
-   grend_use_program(0);
+   vrend_use_program(0);
 
    format = tex_conv_table[res->base.format].glformat;
    type = tex_conv_table[res->base.format].gltype; 
@@ -3458,7 +3457,7 @@ static void vrend_transfer_send_readpixels(struct grend_resource *res,
       glGenFramebuffers(1, &fb_id);
       glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fb_id);
 
-      grend_fb_bind_texture(res, 0, level, box->z);
+      vrend_fb_bind_texture(res, 0, level, box->z);
 
       res->readback_fb_id = fb_id;
       res->readback_fb_level = level;
@@ -3499,7 +3498,7 @@ static void vrend_transfer_send_readpixels(struct grend_resource *res,
          as 32-bit scaled integers, so we need to scale them here */
       glPixelTransferf(GL_DEPTH_SCALE, 1.0/256.0);
    }
-   if (grend_state.have_robustness)
+   if (vrend_state.have_robustness)
       glReadnPixelsARB(box->x, y1, box->width, box->height, format, type, send_size, data);
    else
       glReadPixels(box->x, y1, box->width, box->height, format, type, data);
@@ -3512,20 +3511,20 @@ static void vrend_transfer_send_readpixels(struct grend_resource *res,
       glPixelStorei(GL_PACK_ROW_LENGTH, 0);
    glPixelStorei(GL_PACK_ALIGNMENT, 4);
    if (need_temp) {
-      graw_transfer_write_tex_return(&res->base, box, level, stride, offset, iov, num_iovs, data, send_size, separate_invert);
+      vrend_transfer_write_tex_return(&res->base, box, level, stride, offset, iov, num_iovs, data, send_size, separate_invert);
       free(data);
    }
 }
 
-void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t ctx_id,
+void vrend_renderer_transfer_send_iov(uint32_t res_handle, uint32_t ctx_id,
                                      uint32_t level, uint32_t stride,
                                      uint32_t layer_stride,
                                      struct pipe_box *box,
                                      uint64_t offset, struct iovec *iov,
                                      int num_iovs)
 {
-   struct grend_resource *res;
-   struct grend_context *ctx = vrend_lookup_renderer_ctx(ctx_id);
+   struct vrend_resource *res;
+   struct vrend_context *ctx = vrend_lookup_renderer_ctx(ctx_id);
 
    res = vrend_resource_lookup(res_handle, ctx_id);
    if (!res) {
@@ -3537,7 +3536,7 @@ void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t ctx_id,
        box->height + box->y > u_minify(res->base.height0, level))
        return;
 
-   grend_hw_switch_context(vrend_lookup_renderer_ctx(0), TRUE);
+   vrend_hw_switch_context(vrend_lookup_renderer_ctx(0), TRUE);
 
    if (res->iov && (!iov || num_iovs == 0)) {
       iov = res->iov;
@@ -3551,7 +3550,7 @@ void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t ctx_id,
 
    if (res->target == 0 && res->ptr) {
       uint32_t send_size = box->width * util_format_get_blocksize(res->base.format);      
-      graw_transfer_write_return(res->ptr + box->x, send_size, offset, iov, num_iovs);
+      vrend_transfer_write_return(res->ptr + box->x, send_size, offset, iov, num_iovs);
    } else if (res->target == GL_ELEMENT_ARRAY_BUFFER_ARB ||
        res->target == GL_ARRAY_BUFFER_ARB ||
        res->target == GL_TRANSFORM_FEEDBACK_BUFFER) {
@@ -3562,7 +3561,7 @@ void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t ctx_id,
       if (!data)
          fprintf(stderr,"unable to open buffer for reading %d\n", res->target);
       else
-         graw_transfer_write_return(data, send_size, offset, iov, num_iovs);
+         vrend_transfer_write_return(data, send_size, offset, iov, num_iovs);
       glUnmapBuffer(res->target);
    } else {
       boolean can_readpixels = TRUE;
@@ -3581,7 +3580,7 @@ void graw_renderer_transfer_send_iov(uint32_t res_handle, uint32_t ctx_id,
    }
 }
 
-void grend_set_stencil_ref(struct grend_context *ctx,
+void vrend_set_stencil_ref(struct vrend_context *ctx,
                            struct pipe_stencil_ref *ref)
 {
    if (ctx->stencil_refs[0] != ref->ref_value[0] ||
@@ -3593,28 +3592,28 @@ void grend_set_stencil_ref(struct grend_context *ctx,
    
 }
 
-static void grend_hw_emit_blend_color(struct grend_context *ctx)
+static void vrend_hw_emit_blend_color(struct vrend_context *ctx)
 {
    struct pipe_blend_color *color = &ctx->blend_color;
    glBlendColor(color->color[0], color->color[1], color->color[2],
                 color->color[3]);
 }
 
-void grend_set_blend_color(struct grend_context *ctx,
+void vrend_set_blend_color(struct vrend_context *ctx,
                            struct pipe_blend_color *color)
 {
    ctx->blend_color = *color;
-   grend_hw_emit_blend_color(ctx);
+   vrend_hw_emit_blend_color(ctx);
 }
 
-void grend_set_scissor_state(struct grend_context *ctx,
+void vrend_set_scissor_state(struct vrend_context *ctx,
                              struct pipe_scissor_state *ss)
 {
    ctx->ss = *ss;
    ctx->scissor_state_dirty = TRUE;
 }
 
-void grend_set_polygon_stipple(struct grend_context *ctx,
+void vrend_set_polygon_stipple(struct vrend_context *ctx,
                                struct pipe_poly_stipple *ps)
 {
    if (use_core_profile) {
@@ -3623,7 +3622,7 @@ void grend_set_polygon_stipple(struct grend_context *ctx,
       int i, j;
 
       if (!ctx->pstip_inited)
-         grend_init_pstipple_texture(ctx);
+         vrend_init_pstipple_texture(ctx);
 
       if (!stip)
          return;
@@ -3647,7 +3646,7 @@ void grend_set_polygon_stipple(struct grend_context *ctx,
    glPolygonStipple((const GLubyte *)ps->stipple);
 }
 
-void grend_set_clip_state(struct grend_context *ctx, struct pipe_clip_state *ucp)
+void vrend_set_clip_state(struct vrend_context *ctx, struct pipe_clip_state *ucp)
 {
    int i, j;
    GLdouble val[4];
@@ -3659,13 +3658,13 @@ void grend_set_clip_state(struct grend_context *ctx, struct pipe_clip_state *ucp
    }
 }
 
-void grend_set_sample_mask(struct grend_context *ctx, unsigned sample_mask)
+void vrend_set_sample_mask(struct vrend_context *ctx, unsigned sample_mask)
 {
    glSampleMaski(0, sample_mask);
 }
 
 
-static void grend_hw_emit_streamout_targets(struct grend_context *ctx)
+static void vrend_hw_emit_streamout_targets(struct vrend_context *ctx)
 {
    int i;
 
@@ -3677,12 +3676,12 @@ static void grend_hw_emit_streamout_targets(struct grend_context *ctx)
    }
 }
 
-void grend_set_streamout_targets(struct grend_context *ctx,
+void vrend_set_streamout_targets(struct vrend_context *ctx,
                                  uint32_t append_bitmask,
                                  uint32_t num_targets,
                                  uint32_t *handles)
 {
-   struct grend_so_target *target;
+   struct vrend_so_target *target;
    int i;
    int old_num = ctx->num_so_targets;
 
@@ -3693,18 +3692,18 @@ void grend_set_streamout_targets(struct grend_context *ctx,
          report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_HANDLE, handles[i]);
          return;
       }
-      grend_so_target_reference(&ctx->so_targets[i], target);
+      vrend_so_target_reference(&ctx->so_targets[i], target);
    }
 
    for (i = num_targets; i < old_num; i++)
-      grend_so_target_reference(&ctx->so_targets[i], NULL);
+      vrend_so_target_reference(&ctx->so_targets[i], NULL);
 
-   grend_hw_emit_streamout_targets(ctx);
+   vrend_hw_emit_streamout_targets(ctx);
 }
 
-static void vrend_resource_buffer_copy(struct grend_context *ctx,
-                                       struct grend_resource *src_res,
-                                       struct grend_resource *dst_res,
+static void vrend_resource_buffer_copy(struct vrend_context *ctx,
+                                       struct vrend_resource *src_res,
+                                       struct vrend_resource *dst_res,
                                        uint32_t dstx, uint32_t srcx,
                                        uint32_t width)
 {
@@ -3717,9 +3716,9 @@ static void vrend_resource_buffer_copy(struct grend_context *ctx,
    glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
 }
 
-static void vrend_resource_copy_fallback(struct grend_context *ctx,
-                                         struct grend_resource *src_res,
-                                         struct grend_resource *dst_res,
+static void vrend_resource_copy_fallback(struct vrend_context *ctx,
+                                         struct vrend_resource *src_res,
+                                         struct vrend_resource *dst_res,
                                          uint32_t dst_level,
                                          uint32_t dstx, uint32_t dsty,
                                          uint32_t dstz, uint32_t src_level,
@@ -3767,12 +3766,12 @@ static void vrend_resource_copy_fallback(struct grend_context *ctx,
    }
    glBindTexture(src_res->target, src_res->id);
    if (compressed) {
-      if (grend_state.have_robustness)
+      if (vrend_state.have_robustness)
          glGetnCompressedTexImageARB(src_res->target, src_level, transfer_size, tptr);
       else
          glGetCompressedTexImage(src_res->target, src_level, tptr);
    } else {
-      if (grend_state.have_robustness)
+      if (vrend_state.have_robustness)
          glGetnTexImageARB(src_res->target, src_level, glformat, gltype, transfer_size, tptr);
       else
          glGetTexImage(src_res->target, src_level, glformat, gltype, tptr);
@@ -3808,21 +3807,21 @@ static void vrend_resource_copy_fallback(struct grend_context *ctx,
    free(tptr);
 }
 
-void graw_renderer_resource_copy_region(struct grend_context *ctx,
+void vrend_renderer_resource_copy_region(struct vrend_context *ctx,
                                         uint32_t dst_handle, uint32_t dst_level,
                                         uint32_t dstx, uint32_t dsty, uint32_t dstz,
                                         uint32_t src_handle, uint32_t src_level,
                                         const struct pipe_box *src_box)
 {
-   struct grend_resource *src_res, *dst_res;   
+   struct vrend_resource *src_res, *dst_res;   
    GLbitfield glmask = 0;
    GLint sy1, sy2, dy1, dy2;
 
    if (ctx->in_error)
       return;
 
-   src_res = graw_renderer_ctx_res_lookup(ctx, src_handle);
-   dst_res = graw_renderer_ctx_res_lookup(ctx, dst_handle);
+   src_res = vrend_renderer_ctx_res_lookup(ctx, src_handle);
+   dst_res = vrend_renderer_ctx_res_lookup(ctx, dst_handle);
 
    if (!src_res) {
       report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, src_handle);
@@ -3849,10 +3848,10 @@ void graw_renderer_resource_copy_region(struct grend_context *ctx,
    }
 
    glBindFramebuffer(GL_FRAMEBUFFER_EXT, ctx->blit_fb_ids[0]);
-   grend_fb_bind_texture(src_res, 0, src_level, src_box->z);
+   vrend_fb_bind_texture(src_res, 0, src_level, src_box->z);
       
    glBindFramebuffer(GL_FRAMEBUFFER_EXT, ctx->blit_fb_ids[1]);
-   grend_fb_bind_texture(dst_res, 0, dst_level, dstz);
+   vrend_fb_bind_texture(dst_res, 0, dst_level, dstz);
    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, ctx->blit_fb_ids[1]);
 
    glBindFramebuffer(GL_READ_FRAMEBUFFER, ctx->blit_fb_ids[0]);
@@ -3886,19 +3885,19 @@ void graw_renderer_resource_copy_region(struct grend_context *ctx,
 
 }
 
-static void graw_renderer_blit_int(struct grend_context *ctx,
+static void vrend_renderer_blit_int(struct vrend_context *ctx,
                                    uint32_t dst_handle, uint32_t src_handle,
                                    const struct pipe_blit_info *info)
 {
-   struct grend_resource *src_res, *dst_res;
+   struct vrend_resource *src_res, *dst_res;
    GLbitfield glmask = 0;
    int src_y1, src_y2, dst_y1, dst_y2;
 
    if (ctx->in_error)
       return;
 
-   src_res = graw_renderer_ctx_res_lookup(ctx, src_handle);
-   dst_res = graw_renderer_ctx_res_lookup(ctx, dst_handle);
+   src_res = vrend_renderer_ctx_res_lookup(ctx, src_handle);
+   dst_res = vrend_renderer_ctx_res_lookup(ctx, dst_handle);
 
    if (!src_res) {
       report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, src_handle);
@@ -3911,11 +3910,11 @@ static void graw_renderer_blit_int(struct grend_context *ctx,
 
    glBindFramebuffer(GL_FRAMEBUFFER_EXT, ctx->blit_fb_ids[0]);
 
-   grend_fb_bind_texture(src_res, 0, info->src.level, info->src.box.z);
+   vrend_fb_bind_texture(src_res, 0, info->src.level, info->src.box.z);
 
    glBindFramebuffer(GL_FRAMEBUFFER_EXT, ctx->blit_fb_ids[1]);
 
-   grend_fb_bind_texture(dst_res, 0, info->dst.level, info->dst.box.z);
+   vrend_fb_bind_texture(dst_res, 0, info->dst.level, info->dst.box.z);
    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, ctx->blit_fb_ids[1]);
 
    glBindFramebuffer(GL_READ_FRAMEBUFFER, ctx->blit_fb_ids[0]);
@@ -3962,38 +3961,38 @@ static void graw_renderer_blit_int(struct grend_context *ctx,
 
 }
 
-void graw_renderer_blit(struct grend_context *ctx,
+void vrend_renderer_blit(struct vrend_context *ctx,
                         uint32_t dst_handle, uint32_t src_handle,
                         const struct pipe_blit_info *info)
 {
-   graw_renderer_blit_int(ctx, dst_handle, src_handle, info);
+   vrend_renderer_blit_int(ctx, dst_handle, src_handle, info);
 }
 
-int graw_renderer_create_fence(int client_fence_id, uint32_t ctx_id)
+int vrend_renderer_create_fence(int client_fence_id, uint32_t ctx_id)
 {
-   struct grend_fence *fence;
+   struct vrend_fence *fence;
 
-   fence = malloc(sizeof(struct grend_fence));
+   fence = malloc(sizeof(struct vrend_fence));
    if (!fence)
       return -1;
 
    fence->ctx_id = ctx_id;
    fence->fence_id = client_fence_id;
    fence->syncobj = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
-   list_addtail(&fence->fences, &grend_state.fence_list);
+   list_addtail(&fence->fences, &vrend_state.fence_list);
    return 0;
 }
 
-void graw_renderer_check_fences(void)
+void vrend_renderer_check_fences(void)
 {
-   struct grend_fence *fence, *stor;
+   struct vrend_fence *fence, *stor;
    uint32_t latest_id = 0;
    GLenum glret;
 
    if (!inited)
       return;
 
-   LIST_FOR_EACH_ENTRY_SAFE(fence, stor, &grend_state.fence_list, fences) {
+   LIST_FOR_EACH_ENTRY_SAFE(fence, stor, &vrend_state.fence_list, fences) {
       glret = glClientWaitSync(fence->syncobj, 0, 0);
       if (glret == GL_ALREADY_SIGNALED){
          latest_id = fence->fence_id;
@@ -4012,7 +4011,7 @@ void graw_renderer_check_fences(void)
    clicbs->write_fence(latest_id);
 }
 
-static boolean graw_get_one_query_result(GLuint query_id, bool use_64, uint64_t *result)
+static boolean vrend_get_one_query_result(GLuint query_id, bool use_64, uint64_t *result)
 {
    GLint ready;
    GLuint passed;
@@ -4033,15 +4032,15 @@ static boolean graw_get_one_query_result(GLuint query_id, bool use_64, uint64_t 
    return TRUE;
 }
 
-static boolean graw_check_query(struct grend_query *query)
+static boolean vrend_check_query(struct vrend_query *query)
 {
    uint64_t result;
    struct virgl_host_query_state *state;
-   struct grend_nontimer_hw_query *hwq, *stor;
+   struct vrend_nontimer_hw_query *hwq, *stor;
    boolean ret;
 
-   if (grend_is_timer_query(query->gltype)) {
-       ret = graw_get_one_query_result(query->timer_query_id, TRUE, &result);
+   if (vrend_is_timer_query(query->gltype)) {
+       ret = vrend_get_one_query_result(query->timer_query_id, TRUE, &result);
        if (ret == FALSE)
            return FALSE;
        goto out_write_val;
@@ -4049,7 +4048,7 @@ static boolean graw_check_query(struct grend_query *query)
 
    /* for non-timer queries we have to iterate over all hw queries and remove and total them */
    LIST_FOR_EACH_ENTRY_SAFE(hwq, stor, &query->hw_queries, query_list) {
-       ret = graw_get_one_query_result(hwq->id, FALSE, &result);
+       ret = vrend_get_one_query_result(hwq->id, FALSE, &result);
        if (ret == FALSE)
            return FALSE;
        
@@ -4072,39 +4071,39 @@ out_write_val:
    return TRUE;
 }
 
-void graw_renderer_check_queries(void)
+void vrend_renderer_check_queries(void)
 {
-   struct grend_query *query, *stor;
+   struct vrend_query *query, *stor;
    if (!inited)
       return;   
    
-   LIST_FOR_EACH_ENTRY_SAFE(query, stor, &grend_state.waiting_query_list, waiting_queries) {
-      grend_hw_switch_context(vrend_lookup_renderer_ctx(query->ctx_id), TRUE);
-      if (graw_check_query(query) == TRUE)
+   LIST_FOR_EACH_ENTRY_SAFE(query, stor, &vrend_state.waiting_query_list, waiting_queries) {
+      vrend_hw_switch_context(vrend_lookup_renderer_ctx(query->ctx_id), TRUE);
+      if (vrend_check_query(query) == TRUE)
          list_delinit(&query->waiting_queries);
    }
 }
 
-static void grend_do_end_query(struct grend_query *q)
+static void vrend_do_end_query(struct vrend_query *q)
 {
    glEndQuery(q->gltype);
    q->active_hw = FALSE;
 }
 
-static void grend_ctx_finish_queries(struct grend_context *ctx)
+static void vrend_ctx_finish_queries(struct vrend_context *ctx)
 {
-   struct grend_query *query;
+   struct vrend_query *query;
 
    LIST_FOR_EACH_ENTRY(query, &ctx->active_nontimer_query_list, ctx_queries) {
       if (query->active_hw == TRUE)
-         grend_do_end_query(query);
+         vrend_do_end_query(query);
    }
 }
 
-static void grend_ctx_restart_queries(struct grend_context *ctx)
+static void vrend_ctx_restart_queries(struct vrend_context *ctx)
 {
-   struct grend_query *query;
-   struct grend_nontimer_hw_query *hwq;
+   struct vrend_query *query;
+   struct vrend_nontimer_hw_query *hwq;
 
    if (ctx->query_on_hw == TRUE)
       return;
@@ -4112,7 +4111,7 @@ static void grend_ctx_restart_queries(struct grend_context *ctx)
    ctx->query_on_hw = TRUE;
    LIST_FOR_EACH_ENTRY(query, &ctx->active_nontimer_query_list, ctx_queries) {
       if (query->active_hw == FALSE) {
-         hwq = grend_create_hw_query(query);
+         hwq = vrend_create_hw_query(query);
          glBeginQuery(query->gltype, hwq->id);
          query->active_hw = TRUE;
       }
@@ -4120,17 +4119,17 @@ static void grend_ctx_restart_queries(struct grend_context *ctx)
 }
 
 /* stop all the nontimer queries running in the current context */
-void grend_stop_current_queries(void)
+void vrend_stop_current_queries(void)
 {
-   if (grend_state.current_ctx && grend_state.current_ctx->query_on_hw) {
-      grend_ctx_finish_queries(grend_state.current_ctx);
-      grend_state.current_ctx->query_on_hw = FALSE;
+   if (vrend_state.current_ctx && vrend_state.current_ctx->query_on_hw) {
+      vrend_ctx_finish_queries(vrend_state.current_ctx);
+      vrend_state.current_ctx->query_on_hw = FALSE;
    }
 }
 
-boolean grend_hw_switch_context(struct grend_context *ctx, boolean now)
+boolean vrend_hw_switch_context(struct vrend_context *ctx, boolean now)
 {
-   if (ctx == grend_state.current_ctx && ctx->ctx_switch_pending == FALSE)
+   if (ctx == vrend_state.current_ctx && ctx->ctx_switch_pending == FALSE)
       return TRUE;
 
    if (ctx->ctx_id != 0 && ctx->in_error) {
@@ -4139,34 +4138,34 @@ boolean grend_hw_switch_context(struct grend_context *ctx, boolean now)
 
    ctx->ctx_switch_pending = TRUE;
    if (now == TRUE) {
-      grend_finish_context_switch(ctx);
+      vrend_finish_context_switch(ctx);
    }
-   grend_state.current_ctx = ctx;
+   vrend_state.current_ctx = ctx;
    return TRUE;
 }
 
-static void grend_finish_context_switch(struct grend_context *ctx)
+static void vrend_finish_context_switch(struct vrend_context *ctx)
 {
    if (ctx->ctx_switch_pending == FALSE)
       return;
    ctx->ctx_switch_pending = FALSE;
 
-   if (grend_state.current_hw_ctx == ctx)
+   if (vrend_state.current_hw_ctx == ctx)
       return;
 
-   grend_state.current_hw_ctx = ctx;
+   vrend_state.current_hw_ctx = ctx;
 
    clicbs->make_current(0, ctx->gl_context);
 
 #if 0
    /* re-emit all the state */
-   grend_hw_emit_framebuffer_state(ctx);
-   grend_hw_emit_depth_range(ctx);
-   grend_hw_emit_blend(ctx);
-   grend_hw_emit_dsa(ctx);
-   grend_hw_emit_rs(ctx);
-   grend_hw_emit_blend_color(ctx);
-   grend_hw_emit_streamout_targets(ctx);
+   vrend_hw_emit_framebuffer_state(ctx);
+   vrend_hw_emit_depth_range(ctx);
+   vrend_hw_emit_blend(ctx);
+   vrend_hw_emit_dsa(ctx);
+   vrend_hw_emit_rs(ctx);
+   vrend_hw_emit_blend_color(ctx);
+   vrend_hw_emit_streamout_targets(ctx);
 
    ctx->stencil_state_dirty = TRUE;
    ctx->scissor_state_dirty = TRUE;
@@ -4177,22 +4176,22 @@ static void grend_finish_context_switch(struct grend_context *ctx)
 
 
 void
-graw_renderer_object_destroy(struct grend_context *ctx, uint32_t handle)
+vrend_renderer_object_destroy(struct vrend_context *ctx, uint32_t handle)
 {
    vrend_object_remove(ctx->object_hash, handle, 0);
 }
 
-void graw_renderer_object_insert(struct grend_context *ctx, void *data,
+void vrend_renderer_object_insert(struct vrend_context *ctx, void *data,
                                  uint32_t size, uint32_t handle, enum virgl_object_type type)
 {
    vrend_object_insert(ctx->object_hash, data, size, handle, type);
 }
 
-static struct grend_nontimer_hw_query *grend_create_hw_query(struct grend_query *query)
+static struct vrend_nontimer_hw_query *vrend_create_hw_query(struct vrend_query *query)
 {
-   struct grend_nontimer_hw_query *hwq;
+   struct vrend_nontimer_hw_query *hwq;
 
-   hwq = CALLOC_STRUCT(grend_nontimer_hw_query);
+   hwq = CALLOC_STRUCT(vrend_nontimer_hw_query);
    if (!hwq)
       return NULL;
 
@@ -4203,20 +4202,20 @@ static struct grend_nontimer_hw_query *grend_create_hw_query(struct grend_query 
 }
 
 
-void grend_create_query(struct grend_context *ctx, uint32_t handle,
+void vrend_create_query(struct vrend_context *ctx, uint32_t handle,
                         uint32_t query_type, uint32_t res_handle,
                         uint32_t offset)
 {
-   struct grend_query *q;
-   struct grend_resource *res;
+   struct vrend_query *q;
+   struct vrend_resource *res;
 
-   res = graw_renderer_ctx_res_lookup(ctx, res_handle);
+   res = vrend_renderer_ctx_res_lookup(ctx, res_handle);
    if (!res) {
       report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, res_handle);
       return;
    }
 
-   q = CALLOC_STRUCT(grend_query);
+   q = CALLOC_STRUCT(vrend_query);
    if (!q)
       return;
 
@@ -4226,7 +4225,7 @@ void grend_create_query(struct grend_context *ctx, uint32_t handle,
    q->type = query_type;
    q->ctx_id = ctx->ctx_id;
 
-   grend_resource_reference(&q->res, res);
+   vrend_resource_reference(&q->res, res);
 
    switch (q->type) {
    case PIPE_QUERY_OCCLUSION_COUNTER:
@@ -4252,21 +4251,21 @@ void grend_create_query(struct grend_context *ctx, uint32_t handle,
       break;
    }
 
-   if (grend_is_timer_query(q->gltype))
+   if (vrend_is_timer_query(q->gltype))
       glGenQueries(1, &q->timer_query_id);
 
-   graw_renderer_object_insert(ctx, q, sizeof(struct grend_query), handle,
+   vrend_renderer_object_insert(ctx, q, sizeof(struct vrend_query), handle,
                                VIRGL_OBJECT_QUERY);
 }
 
-static void grend_destroy_query(struct grend_query *query)
+static void vrend_destroy_query(struct vrend_query *query)
 {
-   struct grend_nontimer_hw_query *hwq, *stor;
+   struct vrend_nontimer_hw_query *hwq, *stor;
 
-   grend_resource_reference(&query->res, NULL);
+   vrend_resource_reference(&query->res, NULL);
    list_del(&query->ctx_queries);
    list_del(&query->waiting_queries);
-   if (grend_is_timer_query(query->gltype)) {
+   if (vrend_is_timer_query(query->gltype)) {
        glDeleteQueries(1, &query->timer_query_id);
        return;
    }
@@ -4277,16 +4276,16 @@ static void grend_destroy_query(struct grend_query *query)
    free(query);
 }
 
-static void grend_destroy_query_object(void *obj_ptr)
+static void vrend_destroy_query_object(void *obj_ptr)
 {
-   struct grend_query *query = obj_ptr;
-   grend_destroy_query(query);
+   struct vrend_query *query = obj_ptr;
+   vrend_destroy_query(query);
 }
 
-void grend_begin_query(struct grend_context *ctx, uint32_t handle)
+void vrend_begin_query(struct vrend_context *ctx, uint32_t handle)
 {
-   struct grend_query *q;
-   struct grend_nontimer_hw_query *hwq;
+   struct vrend_query *q;
+   struct vrend_nontimer_hw_query *hwq;
 
    q = vrend_object_lookup(ctx->object_hash, handle, VIRGL_OBJECT_QUERY);
    if (!q)
@@ -4295,11 +4294,11 @@ void grend_begin_query(struct grend_context *ctx, uint32_t handle)
    if (q->gltype == GL_TIMESTAMP)
       return;
 
-   if (grend_is_timer_query(q->gltype)) {
+   if (vrend_is_timer_query(q->gltype)) {
       glBeginQuery(q->gltype, q->timer_query_id);
       return;
    }
-   hwq = grend_create_hw_query(q);
+   hwq = vrend_create_hw_query(q);
    
    /* add to active query list for this context */
    glBeginQuery(q->gltype, hwq->id);
@@ -4308,14 +4307,14 @@ void grend_begin_query(struct grend_context *ctx, uint32_t handle)
    list_addtail(&q->ctx_queries, &ctx->active_nontimer_query_list);
 }
 
-void grend_end_query(struct grend_context *ctx, uint32_t handle)
+void vrend_end_query(struct vrend_context *ctx, uint32_t handle)
 {
-   struct grend_query *q;
+   struct vrend_query *q;
    q = vrend_object_lookup(ctx->object_hash, handle, VIRGL_OBJECT_QUERY);
    if (!q)
       return;
 
-   if (grend_is_timer_query(q->gltype)) {
+   if (vrend_is_timer_query(q->gltype)) {
       if (q->gltype == GL_TIMESTAMP)
          glQueryCounter(q->timer_query_id, q->gltype);
          /* remove from active query list for this context */
@@ -4325,34 +4324,34 @@ void grend_end_query(struct grend_context *ctx, uint32_t handle)
    }
 
    if (q->active_hw)
-      grend_do_end_query(q);
+      vrend_do_end_query(q);
 
    list_delinit(&q->ctx_queries);
 }
 
-void grend_get_query_result(struct grend_context *ctx, uint32_t handle,
+void vrend_get_query_result(struct vrend_context *ctx, uint32_t handle,
                             uint32_t wait)
 {
-   struct grend_query *q;
+   struct vrend_query *q;
    boolean ret;
 
    q = vrend_object_lookup(ctx->object_hash, handle, VIRGL_OBJECT_QUERY);
    if (!q)
       return;
 
-   ret = graw_check_query(q);
+   ret = vrend_check_query(q);
    if (ret == FALSE)
-      list_addtail(&q->waiting_queries, &grend_state.waiting_query_list);
+      list_addtail(&q->waiting_queries, &vrend_state.waiting_query_list);
 }
 
-void grend_render_condition(struct grend_context *ctx,
+void vrend_render_condition(struct vrend_context *ctx,
                             uint32_t handle,
                             boolean condtion,
                             uint mode)
 {
-   struct grend_query *q;
+   struct vrend_query *q;
    GLenum glmode;
-   struct grend_nontimer_hw_query *hwq, *last;
+   struct vrend_nontimer_hw_query *hwq, *last;
 
    if (handle == 0) {
       glEndConditionalRenderNV();
@@ -4385,22 +4384,22 @@ void grend_render_condition(struct grend_context *ctx,
    
 }
 
-void grend_create_so_target(struct grend_context *ctx,
+void vrend_create_so_target(struct vrend_context *ctx,
                             uint32_t handle,
                             uint32_t res_handle,
                             uint32_t buffer_offset,
                             uint32_t buffer_size)
 {
-   struct grend_so_target *target;
-   struct grend_resource *res;
+   struct vrend_so_target *target;
+   struct vrend_resource *res;
 
-   res = graw_renderer_ctx_res_lookup(ctx, res_handle);
+   res = vrend_renderer_ctx_res_lookup(ctx, res_handle);
    if (!res) {
       report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, res_handle);
       return;
    }
 
-   target = CALLOC_STRUCT(grend_so_target);
+   target = CALLOC_STRUCT(vrend_so_target);
    if (!target)
       return;
 
@@ -4409,7 +4408,7 @@ void grend_create_so_target(struct grend_context *ctx,
    target->buffer_offset = buffer_offset;
    target->buffer_size = buffer_size;
 
-   grend_resource_reference(&target->buffer, res);
+   vrend_resource_reference(&target->buffer, res);
 
    vrend_object_insert(ctx->object_hash, target, sizeof(*target), handle,
                        VIRGL_OBJECT_STREAMOUT_TARGET);
@@ -4432,7 +4431,7 @@ static void vrender_get_glsl_version(int *major, int *minor)
       *minor = minor_local;
 }
 
-void graw_renderer_fill_caps(uint32_t set, uint32_t version,
+void vrend_renderer_fill_caps(uint32_t set, uint32_t version,
                              union virgl_caps *caps)
 {
    int i;
@@ -4475,7 +4474,7 @@ void graw_renderer_fill_caps(uint32_t set, uint32_t version,
          caps->v1.bset.instanceid = 1;
    }
 
-   if (grend_state.have_nv_prim_restart || grend_state.have_gl_prim_restart)
+   if (vrend_state.have_nv_prim_restart || vrend_state.have_gl_prim_restart)
       caps->v1.bset.primitive_restart = 1;
 
    if (gl_ver >= 32) {
@@ -4560,17 +4559,17 @@ void graw_renderer_fill_caps(uint32_t set, uint32_t version,
 
 }
 
-GLint64 graw_renderer_get_timestamp(void)
+GLint64 vrend_renderer_get_timestamp(void)
 {
    GLint64 v;
    glGetInteger64v(GL_TIMESTAMP, &v);
    return v;
 }
 
-void *graw_renderer_get_cursor_contents(uint32_t res_handle, uint32_t *width, uint32_t *height)
+void *vrend_renderer_get_cursor_contents(uint32_t res_handle, uint32_t *width, uint32_t *height)
 {
    GLenum format, type;
-   struct grend_resource *res;
+   struct vrend_resource *res;
    int blsize;
    void *data, *data2;
    int size;
@@ -4609,19 +4608,19 @@ void *graw_renderer_get_cursor_contents(uint32_t res_handle, uint32_t *width, ui
    return data2;
 }
 
-void graw_renderer_force_ctx_0(void)
+void vrend_renderer_force_ctx_0(void)
 {
-   struct grend_context *ctx0 = vrend_lookup_renderer_ctx(0);
-   grend_state.current_ctx = NULL;
-   grend_state.current_hw_ctx = NULL;
-   grend_hw_switch_context(ctx0, TRUE);
+   struct vrend_context *ctx0 = vrend_lookup_renderer_ctx(0);
+   vrend_state.current_ctx = NULL;
+   vrend_state.current_hw_ctx = NULL;
+   vrend_hw_switch_context(ctx0, TRUE);
    clicbs->make_current(0, ctx0->gl_context);
 }
 
-void graw_renderer_get_rect(int res_handle, struct iovec *iov, unsigned int num_iovs,
+void vrend_renderer_get_rect(int res_handle, struct iovec *iov, unsigned int num_iovs,
                             uint32_t offset, int x, int y, int width, int height)
 {
-   struct grend_resource *res = vrend_resource_lookup(res_handle, 0);
+   struct vrend_resource *res = vrend_resource_lookup(res_handle, 0);
    struct pipe_box box;
    int elsize;
    int stride;
@@ -4635,22 +4634,22 @@ void graw_renderer_get_rect(int res_handle, struct iovec *iov, unsigned int num_
    box.depth = 1;
 
    stride = util_format_get_nblocksx(res->base.format, res->base.width0) * elsize;
-   graw_renderer_transfer_send_iov(res->handle, 0,
+   vrend_renderer_transfer_send_iov(res->handle, 0,
                                    0, stride, 0, &box, offset, iov, num_iovs);
 }
                                    
-void graw_renderer_attach_res_ctx(int ctx_id, int resource_id)
+void vrend_renderer_attach_res_ctx(int ctx_id, int resource_id)
 {
-   struct grend_context *ctx = vrend_lookup_renderer_ctx(ctx_id);
-   struct grend_resource *res = vrend_resource_lookup(resource_id, 0);
+   struct vrend_context *ctx = vrend_lookup_renderer_ctx(ctx_id);
+   struct vrend_resource *res = vrend_resource_lookup(resource_id, 0);
 
    vrend_object_insert_nofree(ctx->res_hash, res, sizeof(*res), resource_id, 1, false);
 }
 
-void graw_renderer_detach_res_ctx(int ctx_id, int res_handle)
+void vrend_renderer_detach_res_ctx(int ctx_id, int res_handle)
 {
-   struct grend_context *ctx = vrend_lookup_renderer_ctx(ctx_id);
-   struct grend_resource *res = vrend_object_lookup(ctx->res_hash, res_handle, 1);
+   struct vrend_context *ctx = vrend_lookup_renderer_ctx(ctx_id);
+   struct vrend_resource *res = vrend_object_lookup(ctx->res_hash, res_handle, 1);
 
    if (!res)
       return;
@@ -4658,17 +4657,17 @@ void graw_renderer_detach_res_ctx(int ctx_id, int res_handle)
    vrend_object_remove(ctx->res_hash, res_handle, 1);
 }
 
-static struct grend_resource *graw_renderer_ctx_res_lookup(struct grend_context *ctx, int res_handle)
+static struct vrend_resource *vrend_renderer_ctx_res_lookup(struct vrend_context *ctx, int res_handle)
 {
-   struct grend_resource *res = vrend_object_lookup(ctx->res_hash, res_handle, 1);
+   struct vrend_resource *res = vrend_object_lookup(ctx->res_hash, res_handle, 1);
 
    return res;
 }
 
-int graw_renderer_resource_get_info(int res_handle,
-                                     struct graw_renderer_resource_info *info)
+int vrend_renderer_resource_get_info(int res_handle,
+                                     struct vrend_renderer_resource_info *info)
 {
-   struct grend_resource *res = vrend_resource_lookup(res_handle, 0);
+   struct vrend_resource *res = vrend_resource_lookup(res_handle, 0);
    int elsize;
 
    if (!res)
@@ -4688,10 +4687,10 @@ int graw_renderer_resource_get_info(int res_handle,
    return 0;
 }
 
-void graw_renderer_get_cap_set(uint32_t cap_set, uint32_t *max_ver,
+void vrend_renderer_get_cap_set(uint32_t cap_set, uint32_t *max_ver,
                                uint32_t *max_size)
 { 
-   if (cap_set != GRAW_CAP_SET) {
+   if (cap_set != VREND_CAP_SET) {
       *max_ver = 0;
       *max_size = 0;
       return;

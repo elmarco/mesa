@@ -22,14 +22,14 @@
 #include <sys/types.h>
 
 
-#include "graw_iov.h"
+#include "vrend_iov.h"
 
 #ifndef MIN
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
 #endif
 
 
-size_t graw_iov_from_buf(const struct iovec *iov, unsigned int iov_cnt,
+size_t vrend_iov_from_buf(const struct iovec *iov, unsigned int iov_cnt,
                     size_t offset, const void *buf, size_t bytes)
 {
     size_t done;
@@ -48,7 +48,7 @@ size_t graw_iov_from_buf(const struct iovec *iov, unsigned int iov_cnt,
     return done;
 }
 
-size_t graw_iov_to_buf(const struct iovec *iov, const unsigned int iov_cnt,
+size_t vrend_iov_to_buf(const struct iovec *iov, const unsigned int iov_cnt,
                   size_t offset, void *buf, size_t bytes)
 {
     size_t done;
@@ -67,7 +67,7 @@ size_t graw_iov_to_buf(const struct iovec *iov, const unsigned int iov_cnt,
     return done;
 }
 
-size_t graw_iov_to_buf_cb(const struct iovec *iov, const unsigned int iov_cnt,
+size_t vrend_iov_to_buf_cb(const struct iovec *iov, const unsigned int iov_cnt,
                           size_t offset, size_t bytes, IOCallback iovcb,
                           void *cookie)
 {
@@ -107,7 +107,7 @@ size_t iov_memset(const struct iovec *iov, const unsigned int iov_cnt,
     return done;
 }
 #endif
-size_t graw_iov_size(const struct iovec *iov, const unsigned int iov_cnt)
+size_t vrend_iov_size(const struct iovec *iov, const unsigned int iov_cnt)
 {
     size_t len;
     unsigned int i;

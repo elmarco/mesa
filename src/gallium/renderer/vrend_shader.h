@@ -1,5 +1,5 @@
-#ifndef GRAW_SHADER_H
-#define GRAW_SHADER_H
+#ifndef VREND_SHADER_H
+#define VREND_SHADER_H
 
 #include "pipe/p_state.h"
 

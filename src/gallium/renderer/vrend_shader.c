@@ -4,7 +4,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
-#include "graw_shader.h"
+#include "vrend_shader.h"
 extern int vrend_dump_shaders;
 /*
  * TODO list
@@ -17,9 +17,9 @@ extern int vrend_dump_shaders;
 
 #define INTERP_PREFIX "               "
 
-int graw_shader_use_explicit = 0;
+int vrend_shader_use_explicit = 0;
 
-struct graw_shader_io {
+struct vrend_shader_io {
    unsigned		name;
    unsigned		gpr;
    unsigned		done;
@@ -33,7 +33,7 @@ struct graw_shader_io {
    char glsl_name[64];
 };
 
-struct graw_shader_sampler {
+struct vrend_shader_sampler {
    int tgsi_sampler_type;
 };
 
@@ -55,14 +55,14 @@ struct dump_ctx {
 
    int num_interps;
    int num_inputs;
-   struct graw_shader_io inputs[32];
+   struct vrend_shader_io inputs[32];
    int num_outputs;
-   struct graw_shader_io outputs[32];
+   struct vrend_shader_io outputs[32];
    int num_system_values;
-   struct graw_shader_io system_values[32];
+   struct vrend_shader_io system_values[32];
 
    int num_temps;
-   struct graw_shader_sampler samplers[32];
+   struct vrend_shader_sampler samplers[32];
    uint32_t samplers_used;
    int num_consts;
 
@@ -1392,7 +1392,7 @@ static void emit_header(struct dump_ctx *ctx, char *glsl_final)
       strcat(glsl_final, "#version 150\n");
    else
       strcat(glsl_final, "#version 130\n");
-   if (ctx->prog_type == TGSI_PROCESSOR_VERTEX && graw_shader_use_explicit)
+   if (ctx->prog_type == TGSI_PROCESSOR_VERTEX && vrend_shader_use_explicit)
       strcat(glsl_final, "#extension GL_ARB_explicit_attrib_location : enable\n");
    if (ctx->prog_type == TGSI_PROCESSOR_FRAGMENT && fs_emit_layout(ctx))
       strcat(glsl_final, "#extension GL_ARB_fragment_coord_conventions : enable\n");
@@ -1473,7 +1473,7 @@ static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
    }
    for (i = 0; i < ctx->num_inputs; i++) {
       if (!ctx->inputs[i].glsl_predefined_no_emit) { 
-         if (ctx->prog_type == TGSI_PROCESSOR_VERTEX && graw_shader_use_explicit) {
+         if (ctx->prog_type == TGSI_PROCESSOR_VERTEX && vrend_shader_use_explicit) {
             snprintf(buf, 255, "layout(location=%d) ", ctx->inputs[i].first);
             strcat(glsl_final, buf);
          }

@@ -55,12 +55,12 @@ struct virgl_renderer_resource_create_args {
 
 /* new API */
    
-VIRGL_EXPORT void virgl_renderer_resource_create(struct virgl_renderer_resource_create_args *args, struct iovec *iov, uint32_t num_iovs);
+VIRGL_EXPORT int virgl_renderer_resource_create(struct virgl_renderer_resource_create_args *args, struct iovec *iov, uint32_t num_iovs);
 VIRGL_EXPORT void virgl_renderer_resource_unref(uint32_t res_handle);
 
 VIRGL_EXPORT void virgl_renderer_check_fences(void);
 
-VIRGL_EXPORT void virgl_renderer_context_create(uint32_t handle, uint32_t nlen, const char *name);
+VIRGL_EXPORT int virgl_renderer_context_create(uint32_t handle, uint32_t nlen, const char *name);
 VIRGL_EXPORT void virgl_renderer_context_destroy(uint32_t handle);
 
 VIRGL_EXPORT void virgl_renderer_submit_cmd(void *buffer,

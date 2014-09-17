@@ -20,9 +20,10 @@
 #include "virgl_egl.h"
 /* new API - just wrap internal API for now */
 
-void virgl_renderer_resource_create(struct virgl_renderer_resource_create_args *args, struct iovec *iov, uint32_t num_iovs)
+int virgl_renderer_resource_create(struct virgl_renderer_resource_create_args *args, struct iovec *iov, uint32_t num_iovs)
 {
    vrend_renderer_resource_create((struct vrend_renderer_resource_create_args *)args, iov, num_iovs);
+   return 0;
 }
 
 void virgl_renderer_resource_unref(uint32_t res_handle)
@@ -36,9 +37,10 @@ void virgl_renderer_fill_caps(uint32_t set, uint32_t version,
    vrend_renderer_fill_caps(set, version, caps);
 }
 
-void virgl_renderer_context_create(uint32_t handle, uint32_t nlen, const char *name)
+int virgl_renderer_context_create(uint32_t handle, uint32_t nlen, const char *name)
 {
    vrend_renderer_context_create(handle, nlen, name);
+   return 0;
 }
 
 void virgl_renderer_context_destroy(uint32_t handle)

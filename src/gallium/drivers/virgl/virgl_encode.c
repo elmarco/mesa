@@ -75,26 +75,28 @@ int virgl_encode_blend_state(struct virgl_context *ctx,
    virgl_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_CREATE_OBJECT, VIRGL_OBJECT_BLEND, 2 + 1 + PIPE_MAX_COLOR_BUFS));
    virgl_encoder_write_dword(ctx->cbuf, handle);
 
-   tmp = (blend_state->independent_blend_enable << 0) |
-      (blend_state->logicop_enable << 1) |
-      (blend_state->dither << 2) |
-      (blend_state->alpha_to_coverage << 3) |
-      (blend_state->alpha_to_one << 4);
+   tmp = 
+      VIRGL_OBJ_BLEND_S0_INDEPENDENT_BLEND_ENABLE(blend_state->independent_blend_enable) |
+      VIRGL_OBJ_BLEND_S0_LOGICOP_ENABLE(blend_state->logicop_enable) |
+      VIRGL_OBJ_BLEND_S0_DITHER(blend_state->dither) |
+      VIRGL_OBJ_BLEND_S0_ALPHA_TO_COVERAGE(blend_state->alpha_to_coverage) |
+      VIRGL_OBJ_BLEND_S0_ALPHA_TO_ONE(blend_state->alpha_to_one);
 
    virgl_encoder_write_dword(ctx->cbuf, tmp);
 
-   tmp = blend_state->logicop_func << 0;
+   tmp = VIRGL_OBJ_BLEND_S1_LOGICOP_FUNC(blend_state->logicop_func);
    virgl_encoder_write_dword(ctx->cbuf, tmp);
 
-   for (i = 0; i < PIPE_MAX_COLOR_BUFS; i++) {
-      tmp = ((blend_state->rt[i].blend_enable << 0) |
-             (blend_state->rt[i].rgb_func << 1) |
-             (blend_state->rt[i].rgb_src_factor << 4) |
-             (blend_state->rt[i].rgb_dst_factor << 9) |
-             (blend_state->rt[i].alpha_func << 14) |
-             (blend_state->rt[i].alpha_src_factor << 17) |
-             (blend_state->rt[i].alpha_dst_factor << 22) |
-             (blend_state->rt[i].colormask << 27));
+   for (i = 0; i < VIRGL_MAX_COLOR_BUFS; i++) {
+      tmp =
+         VIRGL_OBJ_BLEND_S2_RT_BLEND_ENABLE(blend_state->rt[i].blend_enable) |
+         VIRGL_OBJ_BLEND_S2_RT_RGB_FUNC(blend_state->rt[i].rgb_func) |
+         VIRGL_OBJ_BLEND_S2_RT_RGB_SRC_FACTOR(blend_state->rt[i].rgb_src_factor) |
+         VIRGL_OBJ_BLEND_S2_RT_RGB_DST_FACTOR(blend_state->rt[i].rgb_dst_factor)|
+         VIRGL_OBJ_BLEND_S2_RT_ALPHA_FUNC(blend_state->rt[i].alpha_func) |
+         VIRGL_OBJ_BLEND_S2_RT_ALPHA_SRC_FACTOR(blend_state->rt[i].alpha_src_factor) |
+         VIRGL_OBJ_BLEND_S2_RT_ALPHA_DST_FACTOR(blend_state->rt[i].alpha_dst_factor) |
+         VIRGL_OBJ_BLEND_S2_RT_COLORMASK(blend_state->rt[i].colormask);
       virgl_encoder_write_dword(ctx->cbuf, tmp);
    }
    return 0;
@@ -109,21 +111,21 @@ int virgl_encode_dsa_state(struct virgl_context *ctx,
    virgl_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_CREATE_OBJECT, VIRGL_OBJECT_DSA, 1 + 4));
    virgl_encoder_write_dword(ctx->cbuf, handle);
 
-   tmp = dsa_state->depth.enabled |
-      dsa_state->depth.writemask << 1 |
-      dsa_state->depth.func << 2 |
-      dsa_state->alpha.enabled << 8 |
-      dsa_state->alpha.func << 9;
+   tmp = VIRGL_OBJ_DSA_S0_DEPTH_ENABLE(dsa_state->depth.enabled) |
+      VIRGL_OBJ_DSA_S0_DEPTH_WRITEMASK(dsa_state->depth.writemask) |
+      VIRGL_OBJ_DSA_S0_DEPTH_FUNC(dsa_state->depth.func) |
+      VIRGL_OBJ_DSA_S0_ALPHA_ENABLED(dsa_state->alpha.enabled) |
+      VIRGL_OBJ_DSA_S0_ALPHA_FUNC(dsa_state->alpha.func);
    virgl_encoder_write_dword(ctx->cbuf, tmp);
 
    for (i = 0; i < 2; i++) {
-      tmp = dsa_state->stencil[i].enabled |
-         dsa_state->stencil[i].func << 1 |
-         dsa_state->stencil[i].fail_op << 4 |
-         dsa_state->stencil[i].zpass_op << 7 |
-         dsa_state->stencil[i].zfail_op << 10 |
-         dsa_state->stencil[i].valuemask << 13 |
-         dsa_state->stencil[i].writemask << 21;
+      tmp = VIRGL_OBJ_DSA_S1_STENCIL_ENABLED(dsa_state->stencil[i].enabled) |
+         VIRGL_OBJ_DSA_S1_STENCIL_FUNC(dsa_state->stencil[i].func) |
+         VIRGL_OBJ_DSA_S1_STENCIL_FAIL_OP(dsa_state->stencil[i].fail_op) |
+         VIRGL_OBJ_DSA_S1_STENCIL_ZPASS_OP(dsa_state->stencil[i].zpass_op) |
+         VIRGL_OBJ_DSA_S1_STENCIL_ZFAIL_OP(dsa_state->stencil[i].zfail_op) |
+         VIRGL_OBJ_DSA_S1_STENCIL_VALUEMASK(dsa_state->stencil[i].valuemask) |
+         VIRGL_OBJ_DSA_S1_STENCIL_WRITEMASK(dsa_state->stencil[i].writemask);
       virgl_encoder_write_dword(ctx->cbuf, tmp);
    }
       
@@ -139,43 +141,46 @@ int virgl_encode_rasterizer_state(struct virgl_context *ctx,
    virgl_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_CREATE_OBJECT, VIRGL_OBJECT_RASTERIZER, 1 + 8));
    virgl_encoder_write_dword(ctx->cbuf, handle);
 
-   tmp = (state->flatshade << 0) |
-      (state->depth_clip << 1) |
-      (state->clip_halfz << 2) |
-      (state->rasterizer_discard << 3) |
-      (state->flatshade_first << 4) |
-      (state->light_twoside << 5) |
-      (state->sprite_coord_mode << 6) |
-      (state->point_quad_rasterization << 7) |
-      (state->cull_face << 8) |
-      (state->fill_front << 10) |
-      (state->fill_back << 12) |
-      (state->scissor << 14) |
-      (state->front_ccw << 15) |
-      (state->clamp_vertex_color << 16) |
-      (state->clamp_fragment_color << 17) |
-      (state->offset_line << 18) |
-      (state->offset_point << 19) |
-      (state->offset_tri << 20) |
-      (state->poly_smooth << 21) |
-      (state->poly_stipple_enable << 22) |
-      (state->point_smooth << 23) |
-      (state->point_size_per_vertex << 24) |
-      (state->multisample << 25) |
-      (state->line_smooth << 26) |
-      (state->line_stipple_enable << 27) |
-      (state->line_last_pixel << 28) |
-      (state->half_pixel_center << 29) |
-      (state->bottom_edge_rule << 30);
+   tmp = VIRGL_OBJ_RS_S0_FLATSHADE(state->flatshade) |
+      VIRGL_OBJ_RS_S0_DEPTH_CLIP(state->depth_clip) |
+      VIRGL_OBJ_RS_S0_CLIP_HALFZ(state->clip_halfz) |
+      VIRGL_OBJ_RS_S0_RASTERIZER_DISCARD(state->rasterizer_discard) |
+      VIRGL_OBJ_RS_S0_FLATSHADE_FIRST(state->flatshade_first) |
+      VIRGL_OBJ_RS_S0_LIGHT_TWOSIZE(state->light_twoside) |
+      VIRGL_OBJ_RS_S0_SPRITE_COORD_MODE(state->sprite_coord_mode) |
+      VIRGL_OBJ_RS_S0_POINT_QUAD_RASTERIZATION(state->point_quad_rasterization) |
+      VIRGL_OBJ_RS_S0_CULL_FACE(state->cull_face) |
+      VIRGL_OBJ_RS_S0_FILL_FRONT(state->fill_front) |
+      VIRGL_OBJ_RS_S0_FILL_BACK(state->fill_back) |
+      VIRGL_OBJ_RS_S0_SCISSOR(state->scissor) |
+      VIRGL_OBJ_RS_S0_FRONT_CCW(state->front_ccw) |
+      VIRGL_OBJ_RS_S0_CLAMP_VERTEX_COLOR(state->clamp_vertex_color) |
+      VIRGL_OBJ_RS_S0_CLAMP_FRAGMENT_COLOR(state->clamp_fragment_color) |
+      VIRGL_OBJ_RS_S0_OFFSET_LINE(state->offset_line) |
+      VIRGL_OBJ_RS_S0_OFFSET_POINT(state->offset_point) |
+      VIRGL_OBJ_RS_S0_OFFSET_TRI(state->offset_tri) |
+      VIRGL_OBJ_RS_S0_POLY_SMOOTH(state->poly_smooth) |
+      VIRGL_OBJ_RS_S0_POLY_STIPPLE_ENABLE(state->poly_stipple_enable) |
+      VIRGL_OBJ_RS_S0_POINT_SMOOTH(state->point_smooth) |
+      VIRGL_OBJ_RS_S0_POINT_SIZE_PER_VERTEX(state->point_size_per_vertex) |
+      VIRGL_OBJ_RS_S0_MULTISAMPLE(state->multisample) |
+      VIRGL_OBJ_RS_S0_LINE_SMOOTH(state->line_smooth) |
+      VIRGL_OBJ_RS_S0_LINE_STIPPLE_ENABLE(state->line_stipple_enable) |
+      VIRGL_OBJ_RS_S0_LINE_LAST_PIXEL(state->line_last_pixel) |
+      VIRGL_OBJ_RS_S0_HALF_PIXEL_CENTER(state->half_pixel_center) |
+      VIRGL_OBJ_RS_S0_BOTTOM_EDGE_RULE(state->bottom_edge_rule);
    
-   virgl_encoder_write_dword(ctx->cbuf, tmp);
-   virgl_encoder_write_dword(ctx->cbuf, uif(state->point_size));
-   virgl_encoder_write_dword(ctx->cbuf, state->sprite_coord_enable);
-   virgl_encoder_write_dword(ctx->cbuf, state->line_stipple_pattern | (state->line_stipple_factor << 16) | (state->clip_plane_enable << 24));
-   virgl_encoder_write_dword(ctx->cbuf, uif(state->line_width));
-   virgl_encoder_write_dword(ctx->cbuf, uif(state->offset_units));
-   virgl_encoder_write_dword(ctx->cbuf, uif(state->offset_scale));
-   virgl_encoder_write_dword(ctx->cbuf, uif(state->offset_clamp));
+   virgl_encoder_write_dword(ctx->cbuf, tmp); /* S0 */
+   virgl_encoder_write_dword(ctx->cbuf, uif(state->point_size)); /* S1 */
+   virgl_encoder_write_dword(ctx->cbuf, state->sprite_coord_enable); /* S2 */
+   tmp = VIRGL_OBJ_RS_S3_LINE_STIPPLE_PATTERN(state->line_stipple_pattern) |
+      VIRGL_OBJ_RS_S3_LINE_STIPPLE_FACTOR(state->line_stipple_factor) |
+      VIRGL_OBJ_RS_S3_CLIP_PLANE_ENABLE(state->clip_plane_enable);
+   virgl_encoder_write_dword(ctx->cbuf, tmp); /* S3 */
+   virgl_encoder_write_dword(ctx->cbuf, uif(state->line_width)); /* S4 */
+   virgl_encoder_write_dword(ctx->cbuf, uif(state->offset_units)); /* S5 */
+   virgl_encoder_write_dword(ctx->cbuf, uif(state->offset_scale)); /* S6 */
+   virgl_encoder_write_dword(ctx->cbuf, uif(state->offset_clamp)); /* S7 */
    return 0;
 }
 

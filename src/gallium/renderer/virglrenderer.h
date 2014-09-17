@@ -92,7 +92,7 @@ VIRGL_EXPORT void virgl_renderer_fill_caps(uint32_t set, uint32_t version,
 
 VIRGL_EXPORT int virgl_renderer_resource_attach_iov(int res_handle, struct iovec *iov,
                                        int num_iovs);
-VIRGL_EXPORT void virgl_renderer_resource_zap_iov(int res_handle, struct iovec **iov, int *num_iovs);
+VIRGL_EXPORT void virgl_renderer_resource_detach_iov(int res_handle, struct iovec **iov, int *num_iovs);
 
 VIRGL_EXPORT int virgl_renderer_create_fence(int client_fence_id, uint32_t ctx_id);
 

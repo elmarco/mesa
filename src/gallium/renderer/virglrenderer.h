@@ -4,6 +4,7 @@
 #define VIRGLRENDERER_H
 
 #include <stdint.h>
+#include <stdbool.h>
 
 struct virgl_box;
 struct iovec;

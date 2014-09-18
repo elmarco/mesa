@@ -82,11 +82,6 @@ void virgl_renderer_transfer_read_iov(uint32_t handle, uint32_t ctx_id,
                                    offset, iov, iovec_cnt);
 }
 
-void virgl_renderer_check_fences()
-{
-   vrend_renderer_check_fences();
-}
-
 int virgl_renderer_resource_attach_iov(int res_handle, struct iovec *iov,
                                       int num_iovs)
 {

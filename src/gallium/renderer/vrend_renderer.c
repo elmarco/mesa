@@ -3086,7 +3086,7 @@ static void copy_transfer_data(struct pipe_resource *res,
                                uint64_t offset, bool invert)
 {
    int blsize = util_format_get_blocksize(res->format);
-   GLuint size = vrend_iov_size(iov, num_iovs);
+   GLuint size = vrend_get_iovec_size(iov, num_iovs);
    GLuint send_size = util_format_get_nblocks(res->format, box->width,
                                               box->height) * blsize * box->depth;
    GLuint bwx = util_format_get_nblocksx(res->format, box->width) * blsize;
@@ -3095,18 +3095,18 @@ static void copy_transfer_data(struct pipe_resource *res,
    uint32_t myoffset = offset;
 
    if ((send_size == size || bh == 1) && !invert)
-      vrend_iov_to_buf(iov, num_iovs, offset, data, send_size);
+      vrend_read_from_iovec(iov, num_iovs, offset, data, send_size);
    else {
       if (invert) {
 	 for (h = bh - 1; h >= 0; h--) {
 	    void *ptr = data + (h * bwx);
-	    vrend_iov_to_buf(iov, num_iovs, myoffset, ptr, bwx);
+	    vrend_read_from_iovec(iov, num_iovs, myoffset, ptr, bwx);
 	    myoffset += src_stride;
 	 }
       } else {
 	 for (h = 0; h < bh; h++) {
 	    void *ptr = data + (h * bwx);
-	    vrend_iov_to_buf(iov, num_iovs, myoffset, ptr, bwx);
+	    vrend_read_from_iovec(iov, num_iovs, myoffset, ptr, bwx);
 	    myoffset += src_stride;
 	 }
       }
@@ -3148,7 +3148,7 @@ void vrend_renderer_transfer_write_iov(uint32_t res_handle,
    vrend_hw_switch_context(vrend_lookup_renderer_ctx(0), TRUE);
 
    if (res->target == 0 && res->ptr) {
-      vrend_iov_to_buf(iov, num_iovs, offset, res->ptr + box->x, box->width);
+      vrend_read_from_iovec(iov, num_iovs, offset, res->ptr + box->x, box->width);
       return;
    }
    if (res->target == GL_TRANSFORM_FEEDBACK_BUFFER ||
@@ -3160,14 +3160,14 @@ void vrend_renderer_transfer_write_iov(uint32_t res_handle,
 
       glBindBufferARB(res->target, res->id);
       if (use_sub_data == 1) {
-         vrend_iov_to_buf_cb(iov, num_iovs, offset, box->width, &iov_buffer_upload, &d);
+         vrend_read_from_iovec_cb(iov, num_iovs, offset, box->width, &iov_buffer_upload, &d);
       } else {
          data = glMapBufferRange(res->target, box->x, box->width, GL_MAP_INVALIDATE_RANGE_BIT | GL_MAP_UNSYNCHRONIZED_BIT | GL_MAP_WRITE_BIT);
          if (data == NULL) {
             fprintf(stderr,"map failed for element buffer\n");
-            vrend_iov_to_buf_cb(iov, num_iovs, offset, box->width, &iov_buffer_upload, &d);
+            vrend_read_from_iovec_cb(iov, num_iovs, offset, box->width, &iov_buffer_upload, &d);
          } else {
-            vrend_iov_to_buf(iov, num_iovs, offset, data, box->width);
+            vrend_read_from_iovec(iov, num_iovs, offset, data, box->width);
             glUnmapBuffer(res->target);
          }
       }

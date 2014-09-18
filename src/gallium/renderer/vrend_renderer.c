@@ -9,13 +9,10 @@
 #include "pipe/p_state.h"
 #include "util/u_inlines.h"
 #include "util/u_memory.h"
-#include "util/u_transfer.h"
+
 #include "util/u_double_list.h"
 #include "util/u_format.h"
-#include "tgsi/tgsi_text.h"
-#include "tgsi/tgsi_info.h"
 #include "tgsi/tgsi_parse.h"
-#include "state_tracker/graw.h"
 
 #include "vrend_object.h"
 #include "vrend_shader.h"

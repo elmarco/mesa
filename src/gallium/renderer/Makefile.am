@@ -21,7 +21,6 @@ libvrend_la_SOURCES = \
         vrend_formats.c \
         iov.c \
         vrend_renderer_helper.c \
-	virglrenderer.c \
 	virgl_egl_context.c
 
 pkgconfigdir = $(libdir)/pkgconfig
@@ -32,7 +31,7 @@ noinst_LTLIBRARIES = libvrend.la
 
 GM_LDFLAGS = -Wl,-Bsymbolic -version-number 0:1 -no-undefined
 
-libvirglrenderer_la_SOURCES = vrend_virtio_lib_renderer.c
+libvirglrenderer_la_SOURCES = virglrenderer.c
 libvirglrenderer_ladir = $(libdir)
 libvirglrenderer_la_LIBADD = libvrend.la
 libvirglrenderer_la_LDFLAGS = $(GM_LDFLAGS) $(EPOXY_LDFLAGS)

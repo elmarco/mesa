@@ -98,7 +98,7 @@ static struct vrend_if_cbs virgl_cbs = {
    make_current,
 };
 
-void *virgl_get_cursor_data(uint32_t resource_id, uint32_t *width, uint32_t *height)
+void *virgl_renderer_get_cursor_data(uint32_t resource_id, uint32_t *width, uint32_t *height)
 {
    return vrend_renderer_get_cursor_contents(resource_id, width, height);
 }

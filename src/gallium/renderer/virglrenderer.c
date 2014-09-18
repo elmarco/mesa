@@ -32,9 +32,9 @@ void virgl_renderer_resource_unref(uint32_t res_handle)
 }
 
 void virgl_renderer_fill_caps(uint32_t set, uint32_t version,
-                              union virgl_caps *caps)
+                              void *caps)
 {
-   vrend_renderer_fill_caps(set, version, caps);
+   vrend_renderer_fill_caps(set, version, (union virgl_caps *)caps);
 }
 
 int virgl_renderer_context_create(uint32_t handle, uint32_t nlen, const char *name)

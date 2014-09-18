@@ -85,7 +85,7 @@ VIRGL_EXPORT void virgl_renderer_get_cap_set(uint32_t set, uint32_t *max_ver,
                                              uint32_t *max_size);
 
 VIRGL_EXPORT void virgl_renderer_fill_caps(uint32_t set, uint32_t version,
-                                           union virgl_caps *caps);
+                                           void *caps);
 
 VIRGL_EXPORT int virgl_renderer_resource_attach_iov(int res_handle, struct iovec *iov,
                                        int num_iovs);

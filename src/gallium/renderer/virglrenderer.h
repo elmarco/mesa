@@ -6,21 +6,20 @@
 #include <stdint.h>
 
 struct virgl_box;
-union virgl_caps;
 struct iovec;
 
 #define VIRGL_EXPORT  __attribute__((visibility("default")))
 
-typedef void *virgl_gl_context;
+typedef void *virgl_renderer_gl_context;
 
 struct virgl_renderer_callbacks {
    int version;
    void (*write_fence)(void *cookie, uint32_t fence);
 
    /* interact with GL implementation */
-   virgl_gl_context (*create_gl_context)(void *cookie, int scanout_idx, bool shared);
-   void (*destroy_gl_context)(void *cookie, virgl_gl_context ctx);
-   int (*make_current)(void *cookie, int scanout_idx, virgl_gl_context ctx);
+   virgl_renderer_gl_context (*create_gl_context)(void *cookie, int scanout_idx, bool shared);
+   void (*destroy_gl_context)(void *cookie, virgl_renderer_gl_context ctx);
+   int (*make_current)(void *cookie, int scanout_idx, virgl_renderer_gl_context ctx);
 };
 
 /* virtio-gpu compatible interface */

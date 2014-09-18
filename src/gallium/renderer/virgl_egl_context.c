@@ -196,7 +196,7 @@ void virgl_egl_destroy(struct virgl_egl *d)
         free(d);
 }
 
-virgl_gl_context virgl_egl_create_context(struct virgl_egl *ve)
+virgl_renderer_gl_context virgl_egl_create_context(struct virgl_egl *ve)
 {
     EGLContext eglctx;
     static const EGLint ctx_att[] = {
@@ -207,16 +207,16 @@ virgl_gl_context virgl_egl_create_context(struct virgl_egl *ve)
 			      ve->egl_conf,
                               ve->egl_ctx,
 			      ctx_att);
-    return (virgl_gl_context)eglctx;
+    return (virgl_renderer_gl_context)eglctx;
 }
 
-void virgl_egl_destroy_context(struct virgl_egl *ve, virgl_gl_context virglctx)
+void virgl_egl_destroy_context(struct virgl_egl *ve, virgl_renderer_gl_context virglctx)
 {
     EGLContext eglctx = (EGLContext)virglctx;
     eglDestroyContext(ve->egl_display, eglctx);
 }
 
-int virgl_egl_make_context_current(struct virgl_egl *ve, virgl_gl_context virglctx)
+int virgl_egl_make_context_current(struct virgl_egl *ve, virgl_renderer_gl_context virglctx)
 {
     EGLContext eglctx = (EGLContext)virglctx;
 
@@ -224,10 +224,10 @@ int virgl_egl_make_context_current(struct virgl_egl *ve, virgl_gl_context virglc
                              eglctx);
 }
 
-virgl_gl_context virgl_egl_get_current_context(struct virgl_egl *ve)
+virgl_renderer_gl_context virgl_egl_get_current_context(struct virgl_egl *ve)
 {
    EGLContext eglctx = eglGetCurrentContext();
-   return (virgl_gl_context)eglctx;
+   return (virgl_renderer_gl_context)eglctx;
 }
 
 int virgl_egl_get_fd_for_texture(struct virgl_egl *ve, uint32_t tex_id, int *fd)

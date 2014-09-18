@@ -70,21 +70,21 @@ static void virgl_write_fence(uint32_t fence_id)
    rcbs->write_fence(dev_cookie, fence_id);   
 }
 
-static virgl_gl_context create_gl_context(int scanout_idx, bool shared)
+static virgl_renderer_gl_context create_gl_context(int scanout_idx, bool shared)
 {
     if (use_egl_context)
         return virgl_egl_create_context(egl_info);
     return rcbs->create_gl_context(dev_cookie, scanout_idx, shared);
 }
 
-static void destroy_gl_context(virgl_gl_context ctx)
+static void destroy_gl_context(virgl_renderer_gl_context ctx)
 {
     if (use_egl_context)
         return virgl_egl_destroy_context(egl_info, ctx);
     return rcbs->destroy_gl_context(dev_cookie, ctx);
 }
 
-static int make_current(int scanout_idx, virgl_gl_context ctx)
+static int make_current(int scanout_idx, virgl_renderer_gl_context ctx)
 {
     if (use_egl_context)
         return virgl_egl_make_context_current(egl_info, ctx);

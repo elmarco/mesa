@@ -623,10 +623,11 @@ static struct vrend_linked_shader_program *add_shader_program(struct vrend_conte
   int id;
 
   /* need to rewrite VS code to add interpolation params */
-  if (!vs->compiled_fs_id != fs->id) {
-     vrend_patch_vertex_shader_interpolants(vs->glsl_prog,
-                                            &vs->sel->sinfo,
-                                            &fs->sel->sinfo);
+  if (vs->compiled_fs_id != fs->id) {
+     if (!gs)
+        vrend_patch_vertex_shader_interpolants(vs->glsl_prog,
+                                               &vs->sel->sinfo,
+                                               &fs->sel->sinfo);
      boolean ret;
      ret = vrend_compile_shader(ctx, vs);
      if (ret == FALSE) {

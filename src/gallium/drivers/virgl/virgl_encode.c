@@ -189,14 +189,24 @@ int virgl_encode_shader_state(struct virgl_context *ctx,
 			     uint32_t type,
                              const struct pipe_shader_state *shader)
 {
-   static char str[65536];
+   char *str;
    uint32_t shader_len, len;
    int i;
+   int ret;
    uint32_t tmp;
    int num_tokens = tgsi_num_tokens(shader->tokens);
+   int str_total_size = 65536;
 
-   memset(str, 0, 65536);
-   tgsi_dump_str(shader->tokens, TGSI_DUMP_FLOAT_AS_HEX, str, sizeof(str));
+   str = CALLOC(1, str_total_size);
+   if (!str)
+      return -1;
+
+   ret = tgsi_dump_str(shader->tokens, TGSI_DUMP_FLOAT_AS_HEX, str, str_total_size);
+   if (ret == -1) {
+      fprintf(stderr, "Failed to translate shader in available space\n");
+      FREE(str);
+      return -1;
+   }
 
    shader_len = strlen(str) + 1;
    len = ((shader_len + 3) / 4) + VIRGL_OBJ_SHADER_HDR_SIZE(shader->stream_output.num_outputs);
@@ -220,6 +230,8 @@ int virgl_encode_shader_state(struct virgl_context *ctx,
       }
    }
    virgl_encoder_write_block(ctx->cbuf, (uint8_t *)str, shader_len);
+
+   FREE(str);
    return 0;
 }
 

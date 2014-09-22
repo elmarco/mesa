@@ -1260,7 +1260,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
          ctx->uses_cube_array = TRUE;
       if (inst->Texture.Texture == TGSI_TEXTURE_2D_MSAA || inst->Texture.Texture == TGSI_TEXTURE_2D_ARRAY_MSAA) {
          ctx->uses_sampler_ms = TRUE;
-      } else
+      } else if (inst->Texture.Texture != TGSI_TEXTURE_RECT)
          snprintf(bias, 64, ", int(%s.w)", srcs[0]);
       sampler_index = 1;
       snprintf(buf, 255, "%s = %s(%s(textureSize(%s%s)));\n", dsts[0], dstconv, dtypeprefix, srcs[sampler_index], bias);

@@ -1338,9 +1338,12 @@ void vrend_set_single_sampler_view(struct vrend_context *ctx,
       if (view->texture->target != PIPE_BUFFER) {
          tex = (struct vrend_texture *)view->texture;
          if (util_format_is_depth_or_stencil(view->format)) {
-            if (view->depth_texture_mode != GL_RED) {
-               glTexParameteri(view->texture->target, GL_DEPTH_TEXTURE_MODE, GL_RED);
-               view->depth_texture_mode = GL_RED;
+            if (use_core_profile == 0) {
+               /* setting depth texture mode is deprecated in core profile */
+               if (view->depth_texture_mode != GL_RED) {
+                  glTexParameteri(view->texture->target, GL_DEPTH_TEXTURE_MODE, GL_RED);
+                  view->depth_texture_mode = GL_RED;
+               }
             }
          }
 

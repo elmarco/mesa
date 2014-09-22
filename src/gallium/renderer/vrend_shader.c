@@ -537,6 +537,9 @@ static void emit_so_movs(struct dump_ctx *ctx)
       else
          snprintf(outtype, 6, "vec%d", ctx->so->output[i].num_components);
 
+      if (ctx->so->output[i].register_index >= 255)
+         continue;
+
       if (ctx->outputs[ctx->so->output[i].register_index].name == TGSI_SEMANTIC_CLIPDIST) {
          snprintf(buf, 255, "tfout%d = %s(clip_dist_temp[%d]%s);\n", i, outtype, ctx->outputs[ctx->so->output[i].register_index].sid,
                   writemask);

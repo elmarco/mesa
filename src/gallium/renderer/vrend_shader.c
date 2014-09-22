@@ -1058,6 +1058,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
          txfi = "int";
          break;
       case TGSI_TEXTURE_2D:
+      case TGSI_TEXTURE_RECT:
       case TGSI_TEXTURE_1D_ARRAY:
          twm = ".xy";
          txfi = "ivec2";
@@ -1126,7 +1127,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
             snprintf(bias, 64, ", %s.x", srcs[1]);
       } else if (inst->Instruction.Opcode == TGSI_OPCODE_TXB || inst->Instruction.Opcode == TGSI_OPCODE_TXL)
          snprintf(bias, 64, ", %s.w", srcs[0]);
-      else if (inst->Instruction.Opcode == TGSI_OPCODE_TXF) {
+      else if (inst->Instruction.Opcode == TGSI_OPCODE_TXF && inst->Texture.Texture != TGSI_TEXTURE_RECT) {
          snprintf(bias, 64, ", int(%s.w)", srcs[0]);
       } else if (inst->Instruction.Opcode == TGSI_OPCODE_TXD) {
          snprintf(bias, 64, ", %s%s, %s%s", srcs[1], gwm, srcs[2], gwm);

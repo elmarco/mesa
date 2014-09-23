@@ -1383,7 +1383,12 @@ void vrend_set_single_sampler_view(struct vrend_context *ctx,
             tex->srgb_decode = view->srgb_decode;
          }
       } else {
+	GLenum internalformat;
+         tex = (struct vrend_texture *)view->texture;
+
          glBindTexture(GL_TEXTURE_BUFFER, view->texture->tbo_tex_id);
+         internalformat = tex_conv_table[view->format].internalformat;
+	glTexBuffer(GL_TEXTURE_BUFFER, internalformat, view->texture->id);
       }
    }
 

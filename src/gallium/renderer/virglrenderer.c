@@ -162,7 +162,6 @@ void virgl_renderer_get_rect(int resource_id, struct iovec *iov, unsigned int nu
 static struct virgl_renderer_callbacks *rcbs;
 
 static void *dev_cookie;
-extern int localrender;
 static int use_egl_context;
 struct virgl_egl *egl_info;
 static struct vrend_if_cbs virgl_cbs;
@@ -254,7 +253,6 @@ int virgl_renderer_init(void *cookie, int flags, struct virgl_renderer_callbacks
 {
    dev_cookie = cookie;
    rcbs = cbs;
-   localrender = 1;
 
    if (flags & VIRGL_RENDERER_USE_EGL) {
        egl_info = virgl_egl_init();

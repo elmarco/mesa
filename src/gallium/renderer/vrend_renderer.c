@@ -59,7 +59,6 @@ static void vrend_patch_blend_func(struct vrend_context *ctx);
 static void vrend_update_frontface_state(struct vrend_context *ctx);
 
 extern int vrend_shader_use_explicit;
-int localrender;
 static int have_invert_mesa = 0;
 static int use_core_profile = 0;
 int vrend_dump_shaders;

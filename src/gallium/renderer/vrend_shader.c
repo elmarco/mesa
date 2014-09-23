@@ -1175,6 +1175,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
             snprintf(offbuf, 25, ", int(%d)", imd->val[inst->TexOffsets[0].SwizzleX].i);
             break;
          case TGSI_TEXTURE_2D:
+         case TGSI_TEXTURE_RECT:
          case TGSI_TEXTURE_2D_ARRAY:
          case TGSI_TEXTURE_SHADOW2D:
          case TGSI_TEXTURE_SHADOW2D_ARRAY:

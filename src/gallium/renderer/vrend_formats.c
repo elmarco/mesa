@@ -74,8 +74,8 @@ static struct vrend_format_table base_la_formats[] = {
 };
 
 static struct vrend_format_table rg_base_formats[] = {
-   { VIRGL_FORMAT_R8_UNORM, GL_RED, GL_RED, GL_UNSIGNED_BYTE },
-   { VIRGL_FORMAT_R8G8_UNORM, GL_RG, GL_RG, GL_UNSIGNED_BYTE },
+   { VIRGL_FORMAT_R8_UNORM, GL_R8, GL_RED, GL_UNSIGNED_BYTE },
+   { VIRGL_FORMAT_R8G8_UNORM, GL_RG8, GL_RG, GL_UNSIGNED_BYTE },
    { VIRGL_FORMAT_R16_UNORM, GL_R16, GL_RED, GL_UNSIGNED_SHORT },
    { VIRGL_FORMAT_R16G16_UNORM, GL_RG16, GL_RG, GL_UNSIGNED_SHORT },
 };

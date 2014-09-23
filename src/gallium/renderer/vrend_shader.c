@@ -98,6 +98,7 @@ struct dump_ctx {
    struct pipe_stream_output_info *so;
    boolean uses_cube_array;
    boolean uses_sampler_ms;
+   boolean uses_sampler_buf;
    /* create a shader with lower left if upper left is primary variant
       or vice versa */
    uint32_t shadow_samp_mask;
@@ -1049,11 +1050,14 @@ iter_instruction(struct tgsi_iterate_context *iter,
 
       if (inst->Texture.Texture == TGSI_TEXTURE_CUBE_ARRAY || inst->Texture.Texture == TGSI_TEXTURE_SHADOWCUBE_ARRAY)
          ctx->uses_cube_array = TRUE;
-      if (inst->Texture.Texture == TGSI_TEXTURE_2D_MSAA || inst->Texture.Texture == TGSI_TEXTURE_2D_ARRAY_MSAA)
+      else if (inst->Texture.Texture == TGSI_TEXTURE_2D_MSAA || inst->Texture.Texture == TGSI_TEXTURE_2D_ARRAY_MSAA)
          ctx->uses_sampler_ms = TRUE;
+      else if (inst->Texture.Texture == TGSI_TEXTURE_BUFFER)
+         ctx->uses_sampler_buf = TRUE;
 
       switch (inst->Texture.Texture) {
       case TGSI_TEXTURE_1D:
+      case TGSI_TEXTURE_BUFFER:
          twm = ".x";
          txfi = "int";
          break;
@@ -1127,8 +1131,16 @@ iter_instruction(struct tgsi_iterate_context *iter,
             snprintf(bias, 64, ", %s.x", srcs[1]);
       } else if (inst->Instruction.Opcode == TGSI_OPCODE_TXB || inst->Instruction.Opcode == TGSI_OPCODE_TXL)
          snprintf(bias, 64, ", %s.w", srcs[0]);
-      else if (inst->Instruction.Opcode == TGSI_OPCODE_TXF && inst->Texture.Texture != TGSI_TEXTURE_RECT) {
-         snprintf(bias, 64, ", int(%s.w)", srcs[0]);
+      else if (inst->Instruction.Opcode == TGSI_OPCODE_TXF) {
+         if (inst->Texture.Texture == TGSI_TEXTURE_1D ||
+             inst->Texture.Texture == TGSI_TEXTURE_2D ||
+             inst->Texture.Texture == TGSI_TEXTURE_2D_MSAA ||
+             inst->Texture.Texture == TGSI_TEXTURE_2D_ARRAY_MSAA ||
+             inst->Texture.Texture == TGSI_TEXTURE_3D ||
+             inst->Texture.Texture == TGSI_TEXTURE_1D_ARRAY ||
+             inst->Texture.Texture == TGSI_TEXTURE_2D_ARRAY) {
+            snprintf(bias, 64, ", int(%s.w)", srcs[0]);
+         }
       } else if (inst->Instruction.Opcode == TGSI_OPCODE_TXD) {
          snprintf(bias, 64, ", %s%s, %s%s", srcs[1], gwm, srcs[2], gwm);
          sampler_index = 3;
@@ -1260,7 +1272,9 @@ iter_instruction(struct tgsi_iterate_context *iter,
          ctx->uses_cube_array = TRUE;
       if (inst->Texture.Texture == TGSI_TEXTURE_2D_MSAA || inst->Texture.Texture == TGSI_TEXTURE_2D_ARRAY_MSAA) {
          ctx->uses_sampler_ms = TRUE;
-      } else if (inst->Texture.Texture != TGSI_TEXTURE_RECT)
+      } else if (inst->Texture.Texture == TGSI_TEXTURE_BUFFER)
+         ctx->uses_sampler_buf = TRUE;
+      else if (inst->Texture.Texture != TGSI_TEXTURE_RECT)
          snprintf(bias, 64, ", int(%s.w)", srcs[0]);
       sampler_index = 1;
       snprintf(buf, 255, "%s = %s(%s(textureSize(%s%s)));\n", dsts[0], dstconv, dtypeprefix, srcs[sampler_index], bias);
@@ -1417,6 +1431,8 @@ static void emit_header(struct dump_ctx *ctx, char *glsl_final)
 {
    if (ctx->prog_type == TGSI_PROCESSOR_GEOMETRY)
       strcat(glsl_final, "#version 150\n");
+   else if (ctx->uses_sampler_buf)
+      strcat(glsl_final, "#version 140\n");
    else
       strcat(glsl_final, "#version 130\n");
    if (ctx->prog_type == TGSI_PROCESSOR_VERTEX && vrend_shader_use_explicit)
@@ -1437,6 +1453,7 @@ static void emit_header(struct dump_ctx *ctx, char *glsl_final)
 static const char *samplertypeconv(int sampler_type, int *is_shad)
 {
 	switch (sampler_type) {
+	case TGSI_TEXTURE_BUFFER: return "Buffer";
 	case TGSI_TEXTURE_1D: return "1D";
 	case TGSI_TEXTURE_2D: return "2D";
 	case TGSI_TEXTURE_3D: return "3D";

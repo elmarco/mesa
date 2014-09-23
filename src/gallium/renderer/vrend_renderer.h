@@ -59,6 +59,7 @@ struct vrend_resource {
    boolean y_0_top;
 
    boolean scannedout;
+   GLuint tbo_tex_id;/* tbos have two ids to track */
 };
 
 /* assume every format is sampler friendly */

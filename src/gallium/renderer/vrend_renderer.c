@@ -1339,9 +1339,10 @@ void vrend_set_single_sampler_view(struct vrend_context *ctx,
          fprintf(stderr,"cannot find texture to back resource view %d %d\n", handle, view->res_handle);
          return;
       }
-      glBindTexture(view->texture->target, view->texture->id);
-      if (view->texture->target != PIPE_BUFFER) {
+      if (view->texture->target != GL_TEXTURE_BUFFER) {
          tex = (struct vrend_texture *)view->texture;
+         glBindTexture(view->texture->target, view->texture->id);
+
          if (util_format_is_depth_or_stencil(view->format)) {
             if (use_core_profile == 0) {
                /* setting depth texture mode is deprecated in core profile */
@@ -1381,6 +1382,8 @@ void vrend_set_single_sampler_view(struct vrend_context *ctx,
                             view->srgb_decode);
             tex->srgb_decode = view->srgb_decode;
          }
+      } else {
+         glBindTexture(GL_TEXTURE_BUFFER, view->texture->tbo_tex_id);
       }
    }
 
@@ -1419,8 +1422,10 @@ void vrend_transfer_inline_write(struct vrend_context *ctx,
    if (res->ptr) {
       memcpy(res->ptr + box->x, data, box->width);
    } else if (res->target == GL_ELEMENT_ARRAY_BUFFER_ARB ||
-       res->target == GL_ARRAY_BUFFER_ARB ||
-       res->target == GL_TRANSFORM_FEEDBACK_BUFFER) {
+              res->target == GL_ARRAY_BUFFER_ARB ||
+              res->target == GL_TEXTURE_BUFFER ||
+              res->target == GL_UNIFORM_BUFFER ||
+              res->target == GL_TRANSFORM_FEEDBACK_BUFFER) {
       glBindBufferARB(res->target, res->id);
       glBufferSubData(res->target, box->x, box->width, data);
    } else {
@@ -1846,10 +1851,17 @@ void vrend_draw_vbo(struct vrend_context *ctx,
             
          glActiveTexture(GL_TEXTURE0 + sampler_id);
          if (texture) {
-            glBindTexture(texture->target, texture->id);
-            if (ctx->views[shader_type].old_ids[i] != texture->id || ctx->sampler_state_dirty) {
+            int id;
+
+            if (texture->target == GL_TEXTURE_BUFFER)
+               id = texture->tbo_tex_id;
+            else
+               id = texture->id;
+
+            glBindTexture(texture->target, id);
+            if (ctx->views[shader_type].old_ids[i] != id || ctx->sampler_state_dirty) {
                vrend_apply_sampler_state(ctx, texture, shader_type, i);
-               ctx->views[shader_type].old_ids[i] = texture->id;
+               ctx->views[shader_type].old_ids[i] = id;
             }
             if (ctx->rs_state.point_quad_rasterization) {
                if (ctx->rs_state.sprite_coord_enable & (1 << i))
@@ -2695,6 +2707,11 @@ static void vrend_apply_sampler_state(struct vrend_context *ctx,
       return;
    }
 
+   if (target == GL_TEXTURE_BUFFER) {
+      tex->state = *state;
+      return;
+   }
+
    if (tex->state.max_lod == -1)
       set_all = TRUE;
 
@@ -2996,10 +3013,26 @@ void vrend_renderer_resource_create(struct vrend_renderer_resource_create_args *
       glGenBuffersARB(1, &gr->id);
       glBindBuffer(gr->target, gr->id);
       glBufferData(gr->target, args->width, NULL, GL_STREAM_DRAW);
-   } else if (args->target == PIPE_BUFFER) {
+   } else if (args->bind == PIPE_BIND_VERTEX_BUFFER) {
       gr->target = GL_ARRAY_BUFFER_ARB;
       glGenBuffersARB(1, &gr->id);
       glBindBufferARB(gr->target, gr->id);
+      glBufferData(gr->target, args->width, NULL, GL_STREAM_DRAW);
+   } else if (args->bind == PIPE_BIND_CONSTANT_BUFFER) {
+      gr->target = GL_UNIFORM_BUFFER;
+      glGenBuffersARB(1, &gr->id);
+      glBindBufferARB(gr->target, gr->id);
+      glBufferData(gr->target, args->width, NULL, GL_STREAM_DRAW);
+   } else if (args->target == PIPE_BUFFER && args->bind == PIPE_BIND_SAMPLER_VIEW) {
+      GLenum internalformat;
+      gr->target = GL_TEXTURE_BUFFER;
+      glGenBuffersARB(1, &gr->id);
+      glBindBufferARB(gr->target, gr->id);
+      glGenTextures(1, &gr->tbo_tex_id);
+      glBindTexture(gr->target, gr->tbo_tex_id);
+
+      internalformat = tex_conv_table[args->format].internalformat;
+      glTexBuffer(gr->target, internalformat, gr->id);
       glBufferData(gr->target, args->width, NULL, GL_STREAM_DRAW);
    } else {
       struct vrend_texture *gt = (struct vrend_texture *)gr;
@@ -3083,8 +3116,12 @@ void vrend_renderer_resource_destroy(struct vrend_resource *res)
    if (res->id) {
       if (res->target == GL_ELEMENT_ARRAY_BUFFER_ARB ||
           res->target == GL_ARRAY_BUFFER_ARB ||
+          res->target == GL_UNIFORM_BUFFER||
+          res->target == GL_TEXTURE_BUFFER||
           res->target == GL_TRANSFORM_FEEDBACK_BUFFER) {
          glDeleteBuffers(1, &res->id);
+         if (res->target == GL_TEXTURE_BUFFER)
+            glDeleteTextures(1, &res->tbo_tex_id);
       } else
          glDeleteTextures(1, &res->id);
    }
@@ -3211,7 +3248,9 @@ void vrend_renderer_transfer_write_iov(uint32_t res_handle,
    }
    if (res->target == GL_TRANSFORM_FEEDBACK_BUFFER ||
        res->target == GL_ELEMENT_ARRAY_BUFFER_ARB ||
-       res->target == GL_ARRAY_BUFFER_ARB) {
+       res->target == GL_ARRAY_BUFFER_ARB ||
+       res->target == GL_TEXTURE_BUFFER ||
+       res->target == GL_UNIFORM_BUFFER) {
       struct virgl_sub_upload_data d;
       d.box = box;
       d.target = res->target;
@@ -3622,8 +3661,10 @@ void vrend_renderer_transfer_send_iov(uint32_t res_handle, uint32_t ctx_id,
       uint32_t send_size = box->width * util_format_get_blocksize(res->base.format);      
       vrend_transfer_write_return(res->ptr + box->x, send_size, offset, iov, num_iovs);
    } else if (res->target == GL_ELEMENT_ARRAY_BUFFER_ARB ||
-       res->target == GL_ARRAY_BUFFER_ARB ||
-       res->target == GL_TRANSFORM_FEEDBACK_BUFFER) {
+              res->target == GL_ARRAY_BUFFER_ARB ||
+              res->target == GL_TRANSFORM_FEEDBACK_BUFFER ||
+              res->target == GL_TEXTURE_BUFFER ||
+              res->target == GL_UNIFORM_BUFFER) {
       uint32_t send_size = box->width * util_format_get_blocksize(res->base.format);      
       void *data;
       glBindBufferARB(res->target, res->id);

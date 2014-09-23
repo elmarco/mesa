@@ -37,12 +37,19 @@ struct iovec;
 
 typedef void *virgl_renderer_gl_context;
 
+struct virgl_renderer_gl_ctx_param {
+   int version;
+   bool shared;
+   int major_ver;
+   int minor_ver;
+};
+
 struct virgl_renderer_callbacks {
    int version;
    void (*write_fence)(void *cookie, uint32_t fence);
 
    /* interact with GL implementation */
-   virgl_renderer_gl_context (*create_gl_context)(void *cookie, int scanout_idx, bool shared);
+   virgl_renderer_gl_context (*create_gl_context)(void *cookie, int scanout_idx, struct virgl_renderer_gl_ctx_param *param);
    void (*destroy_gl_context)(void *cookie, virgl_renderer_gl_context ctx);
    int (*make_current)(void *cookie, int scanout_idx, virgl_renderer_gl_context ctx);
 };

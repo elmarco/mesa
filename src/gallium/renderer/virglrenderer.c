@@ -209,11 +209,16 @@ static void virgl_write_fence(uint32_t fence_id)
    rcbs->write_fence(dev_cookie, fence_id);   
 }
 
-static virgl_renderer_gl_context create_gl_context(int scanout_idx, bool shared)
+static virgl_renderer_gl_context create_gl_context(int scanout_idx, struct virgl_gl_ctx_param *param)
 {
+    struct virgl_renderer_gl_ctx_param vparam;
     if (use_egl_context)
         return virgl_egl_create_context(egl_info);
-    return rcbs->create_gl_context(dev_cookie, scanout_idx, shared);
+    vparam.version = 1;
+    vparam.shared = param->shared;
+    vparam.major_ver = param->major_ver;
+    vparam.minor_ver = param->minor_ver;
+    return rcbs->create_gl_context(dev_cookie, scanout_idx, &vparam);
 }
 
 static void destroy_gl_context(virgl_renderer_gl_context ctx)

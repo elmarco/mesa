@@ -61,7 +61,13 @@ static void vrend_update_frontface_state(struct vrend_context *ctx);
 extern int vrend_shader_use_explicit;
 static int have_invert_mesa = 0;
 static int use_core_profile = 0;
+
+static int renderer_gl_major, renderer_gl_minor;
 int vrend_dump_shaders;
+
+/* define major/minor that the renderer can take advantage of */
+#define VREND_GL_VER_MAJOR 3
+#define VREND_GL_VER_MINOR 1
 
 static struct vrend_if_cbs *clicbs;
 
@@ -2766,16 +2772,23 @@ void vrend_renderer_init(struct vrend_if_cbs *cbs)
 {
    int gl_ver;
    virgl_gl_context gl_context;
+   struct virgl_gl_ctx_param ctx_params;
    if (!inited) {
       inited = 1;
       vrend_object_init_resource_table();
       clicbs = cbs;
    }
 
-   gl_context = clicbs->create_gl_context(0, false);
+   ctx_params.shared = false;
+   ctx_params.major_ver = VREND_GL_VER_MAJOR;
+   ctx_params.minor_ver = VREND_GL_VER_MINOR;
+
+   gl_context = clicbs->create_gl_context(0, &ctx_params);
    clicbs->make_current(0, gl_context);
    gl_ver = epoxy_gl_version();
 
+   renderer_gl_major = gl_ver / 10;
+   renderer_gl_minor = gl_ver % 10;
    if (gl_ver > 30 && !glewIsSupported("GL_ARB_compatibility")) {
       fprintf(stderr, "gl_version %d - core profile enabled\n", gl_ver);
       use_core_profile = 1;
@@ -2891,12 +2904,16 @@ bool vrend_destroy_context(struct vrend_context *ctx)
 struct vrend_context *vrend_create_context(int id, uint32_t nlen, const char *debug_name)
 {
    struct vrend_context *grctx = CALLOC_STRUCT(vrend_context);
+   struct virgl_gl_ctx_param ctx_params;
 
    if (nlen) {
       strncpy(grctx->debug_name, debug_name, 64);
    }
 
-   grctx->gl_context = clicbs->create_gl_context(0, id == 0 ? false : true);
+   ctx_params.shared = id == 0 ? false : true;
+   ctx_params.major_ver = renderer_gl_major;
+   ctx_params.minor_ver = renderer_gl_minor;
+   grctx->gl_context = clicbs->create_gl_context(0, &ctx_params);
    clicbs->make_current(0, grctx->gl_context);
 
    grctx->ctx_id = id;
@@ -4567,8 +4584,9 @@ void vrend_renderer_fill_caps(uint32_t set, uint32_t version,
    if (glewIsSupported("GL_ARB_shader_stencil_export"))
       caps->v1.bset.shader_stencil_export = 1;
 
+   /* we only support up to GLSL 1.40 features now */
    if (use_core_profile)
-      caps->v1.glsl_level = 330;
+      caps->v1.glsl_level = 140;
    else
       caps->v1.glsl_level = 130;
    if (glewIsSupported("GL_EXT_texture_array"))

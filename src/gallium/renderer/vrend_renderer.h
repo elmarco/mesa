@@ -34,6 +34,12 @@
 typedef void *virgl_gl_context;
 typedef void *virgl_gl_drawable;
 
+struct virgl_gl_ctx_param {
+   bool shared;
+   int major_ver;
+   int minor_ver;
+};
+
 extern int vrend_dump_shaders;
 struct vrend_context;
 
@@ -75,7 +81,7 @@ struct vrend_format_table {
 struct vrend_if_cbs {
    void (*write_fence)(unsigned fence_id);
 
-   virgl_gl_context (*create_gl_context)(int scanout, bool shared);
+   virgl_gl_context (*create_gl_context)(int scanout, struct virgl_gl_ctx_param *params);
    void (*destroy_gl_context)(virgl_gl_context ctx);
    int (*make_current)(int scanout, virgl_gl_context ctx);
 };

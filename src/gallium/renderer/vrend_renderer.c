@@ -3105,6 +3105,20 @@ static void iov_buffer_upload(void *cookie, uint32_t doff, void *src, int len)
    glBufferSubData(d->target, d->box->x + doff, len, src);
 }
 
+static void vrend_scale_depth(void *ptr, int size, float scale_val)
+{
+   GLfloat *pf = ptr;
+   GLuint *ival = ptr;
+   const GLfloat myscale = 1.0f / 0xffffff;
+   int i;
+   for (i = 0; i < size / 4; i++) {
+      GLuint value = ival[i];
+      GLfloat d = ((float)(value >> 8) * myscale) * scale_val;
+      d = CLAMP(d, 0.0F, 1.0F);
+      ival[i] = (int)(d / myscale) << 8;
+   }
+}
+
 static void copy_transfer_data(struct pipe_resource *res,
                                struct iovec *iov,
                                unsigned int num_iovs,
@@ -3208,6 +3222,8 @@ void vrend_renderer_transfer_write_iov(uint32_t res_handle,
       int x = 0, y = 0;
       boolean compressed;
       bool invert = false;
+      float depth_scale;
+      GLuint send_size = 0;
       vrend_use_program(0);
 
       if (!stride)
@@ -3215,17 +3231,18 @@ void vrend_renderer_transfer_write_iov(uint32_t res_handle,
 
       compressed = util_format_is_compressed(res->base.format);
       if (num_iovs > 1 || compressed) {
-         need_temp = 1;
+         need_temp = true;
       }
 
-      if (use_core_profile == 1 && res->y_0_top) {
+      if (use_core_profile == 1 && (res->y_0_top || (res->base.format == (enum pipe_format)VIRGL_FORMAT_Z24X8_UNORM))) {
 	 need_temp = true;
-	 invert = true;
+         if (res->y_0_top)
+            invert = true;
       }
 
       if (need_temp) {
-         GLuint send_size = util_format_get_nblocks(res->base.format, box->width,
-                                                    box->height) * util_format_get_blocksize(res->base.format) * box->depth;
+         send_size = util_format_get_nblocks(res->base.format, box->width,
+                                             box->height) * elsize * box->depth;
          data = malloc(send_size);
          copy_transfer_data(&res->base, iov, num_iovs, data, stride,
                             box, offset, invert);
@@ -3303,7 +3320,11 @@ void vrend_renderer_transfer_write_iov(uint32_t res_handle,
             /* we get values from the guest as 24-bit scaled integers
                but we give them to the host GL and it interprets them
                as 32-bit scaled integers, so we need to scale them here */
-            glPixelTransferf(GL_DEPTH_SCALE, 256.0);
+            depth_scale = 256.0;
+            if (!use_core_profile)
+               glPixelTransferf(GL_DEPTH_SCALE, depth_scale);
+            else
+               vrend_scale_depth(data, send_size, depth_scale);
          }
          if (res->target == GL_TEXTURE_CUBE_MAP) {
             GLenum ctarget = GL_TEXTURE_CUBE_MAP_POSITIVE_X + box->z;
@@ -3346,7 +3367,8 @@ void vrend_renderer_transfer_write_iov(uint32_t res_handle,
             }
          }
          if (res->base.format == (enum pipe_format)VIRGL_FORMAT_Z24X8_UNORM) {
-            glPixelTransferf(GL_DEPTH_SCALE, 1.0);
+            if (!use_core_profile)
+               glPixelTransferf(GL_DEPTH_SCALE, 1.0);
          }
       }
       if (stride && !need_temp)
@@ -3450,7 +3472,7 @@ static void vrend_transfer_send_readpixels(struct vrend_resource *res,
    uint32_t send_size = 0;
    uint32_t h = u_minify(res->base.height0, level);
    int elsize = util_format_get_blocksize(res->base.format);
-
+   float depth_scale;
    vrend_use_program(0);
 
    format = tex_conv_table[res->base.format].glformat;
@@ -3521,15 +3543,22 @@ static void vrend_transfer_send_readpixels(struct vrend_resource *res,
       /* we get values from the guest as 24-bit scaled integers
          but we give them to the host GL and it interprets them
          as 32-bit scaled integers, so we need to scale them here */
-      glPixelTransferf(GL_DEPTH_SCALE, 1.0/256.0);
+      depth_scale = 1.0 / 256.0;
+      if (!use_core_profile) {
+         glPixelTransferf(GL_DEPTH_SCALE, depth_scale);
+      }
    }
    if (vrend_state.have_robustness)
       glReadnPixelsARB(box->x, y1, box->width, box->height, format, type, send_size, data);
    else
       glReadPixels(box->x, y1, box->width, box->height, format, type, data);
 
-   if (res->base.format == (enum pipe_format)VIRGL_FORMAT_Z24X8_UNORM)
-      glPixelTransferf(GL_DEPTH_SCALE, 1.0);
+   if (res->base.format == (enum pipe_format)VIRGL_FORMAT_Z24X8_UNORM) {
+      if (!use_core_profile)
+         glPixelTransferf(GL_DEPTH_SCALE, 1.0);
+      else
+         vrend_scale_depth(data, send_size, depth_scale);
+   }
    if (have_invert_mesa && actually_invert)
       glPixelStorei(GL_PACK_INVERT_MESA, 0);
    if (!need_temp && stride)

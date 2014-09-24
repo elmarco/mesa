@@ -1105,9 +1105,9 @@ iter_instruction(struct tgsi_iterate_context *iter,
 
       case TGSI_TEXTURE_SHADOWCUBE:
       case TGSI_TEXTURE_SHADOW2D_ARRAY:
+      case TGSI_TEXTURE_SHADOWCUBE_ARRAY:
          is_shad = TRUE;
       case TGSI_TEXTURE_CUBE_ARRAY:
-      case TGSI_TEXTURE_SHADOWCUBE_ARRAY:
       default:
          twm = "";
          txfi = "";
@@ -1146,6 +1146,8 @@ iter_instruction(struct tgsi_iterate_context *iter,
          sampler_index = 2;
          if (inst->Instruction.Opcode != TGSI_OPCODE_TEX2)
             snprintf(bias, 64, ", %s.x", srcs[1]);
+         else if (inst->Texture.Texture == TGSI_TEXTURE_SHADOWCUBE_ARRAY)
+            snprintf(bias, 64, ", float(%s)", srcs[1]);
       } else if (inst->Instruction.Opcode == TGSI_OPCODE_TXB || inst->Instruction.Opcode == TGSI_OPCODE_TXL)
          snprintf(bias, 64, ", %s.w", srcs[0]);
       else if (inst->Instruction.Opcode == TGSI_OPCODE_TXF) {

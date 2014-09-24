@@ -93,6 +93,9 @@ struct dump_ctx {
    struct immed imm[32];
    unsigned fragcoord_input;
 
+   int num_ubo;
+   int ubo_idx[32];
+   int ubo_sizes[32];
    int num_address;
    
    struct pipe_stream_output_info *so;
@@ -350,12 +353,17 @@ iter_declaration(struct tgsi_iterate_context *iter,
       ctx->samplers_used |= (1 << decl->Range.Last);
       break;
    case TGSI_FILE_CONSTANT:
-      if (decl->Range.Last) {
-         if (decl->Range.Last + 1 > ctx->num_consts)
-            ctx->num_consts = decl->Range.Last + 1;
-      } else
-         ctx->num_consts++;
-
+      if (decl->Declaration.Dimension) {
+         ctx->ubo_idx[ctx->num_ubo] = decl->Dim.Index2D;
+         ctx->ubo_sizes[ctx->num_ubo] = decl->Range.Last;
+         ctx->num_ubo++;
+      } else {
+         if (decl->Range.Last) {
+            if (decl->Range.Last + 1 > ctx->num_consts)
+               ctx->num_consts = decl->Range.Last + 1;
+         } else
+            ctx->num_consts++;
+      }
       break;
    case TGSI_FILE_ADDRESS:
       ctx->num_address = 1;
@@ -739,10 +747,19 @@ iter_instruction(struct tgsi_iterate_context *iter,
             snprintf(srcs[i], 255, "%s%c%stemps[%d]%s%c", stypeprefix, stprefix ? '(' : ' ', prefix, src->Register.Index, swizzle, stprefix ? ')' : ' ');
       } else if (src->Register.File == TGSI_FILE_CONSTANT) {
           const char *cname = tgsi_proc_to_prefix(ctx->prog_type);
-          if (src->Register.Indirect) {
-             snprintf(srcs[i], 255, "%s(%s%sconst[addr0 + %d]%s)", stypeprefix, prefix, cname, src->Register.Index, swizzle);
-          } else
-             snprintf(srcs[i], 255, "%s(%s%sconst[%d]%s)", stypeprefix, prefix, cname, src->Register.Index, swizzle);
+          int dim = 0;
+          if (src->Register.Dimension) {
+             dim = src->Dimension.Index;
+             if (src->Register.Indirect) {
+                snprintf(srcs[i], 255, "%s(%s%subo%dcontents[addr0 + %d]%s)", stypeprefix, prefix, cname, dim, src->Register.Index, swizzle);
+             } else
+                snprintf(srcs[i], 255, "%s(%s%subo%dcontents[%d]%s)", stypeprefix, prefix, cname, dim, src->Register.Index, swizzle);
+          } else {
+             if (src->Register.Indirect) {
+                snprintf(srcs[i], 255, "%s(%s%sconst%d[addr0 + %d]%s)", stypeprefix, prefix, cname, dim, src->Register.Index, swizzle);
+             } else
+                snprintf(srcs[i], 255, "%s(%s%sconst%d[%d]%s)", stypeprefix, prefix, cname, dim, src->Register.Index, swizzle);
+          }
       } else if (src->Register.File == TGSI_FILE_SAMPLER) {
           const char *cname = tgsi_proc_to_prefix(ctx->prog_type);
           snprintf(srcs[i], 255, "%ssamp%d%s", cname, src->Register.Index, swizzle);
@@ -1449,6 +1466,8 @@ static void emit_header(struct dump_ctx *ctx, char *glsl_final)
       strcat(glsl_final, "#extension GL_ARB_texture_multisample : require\n");
    if (ctx->has_instanceid)
       strcat(glsl_final, "#extension GL_ARB_draw_instanced : require\n");
+   if (ctx->num_ubo)
+      strcat(glsl_final, "#extension GL_ARB_uniform_buffer_object : require\n");
 }
 
 static const char *samplertypeconv(int sampler_type, int *is_shad)
@@ -1594,8 +1613,16 @@ static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
    }
    if (ctx->num_consts) {
       const char *cname = tgsi_proc_to_prefix(ctx->prog_type);
-      snprintf(buf, 255, "uniform vec4 %sconst[%d];\n", cname, ctx->num_consts);
+      snprintf(buf, 255, "uniform vec4 %sconst0[%d];\n", cname, ctx->num_consts);
       strcat(glsl_final, buf);
+   }
+
+   if (ctx->num_ubo) {
+      for (i = 0; i < ctx->num_ubo; i++) {
+         const char *cname = tgsi_proc_to_prefix(ctx->prog_type);
+         snprintf(buf, 255, "uniform %subo%d { vec4 %subo%dcontents[%d]; };\n", cname, ctx->ubo_idx[i], cname, ctx->ubo_idx[i], ctx->ubo_sizes[i]);
+         strcat(glsl_final, buf);
+      }
    }
    for (i = 0; i < 32; i++) {
       int is_shad = 0;
@@ -1715,6 +1742,7 @@ char *tgsi_convert(const struct tgsi_token *tokens,
    free(ctx.glsl_main);
    sinfo->samplers_used_mask = ctx.samplers_used;
    sinfo->num_consts = ctx.num_consts;
+   sinfo->num_ubos = ctx.num_ubo;
    sinfo->num_inputs = ctx.num_inputs;
    sinfo->num_interps = ctx.num_interps;
    sinfo->num_outputs = ctx.num_outputs;

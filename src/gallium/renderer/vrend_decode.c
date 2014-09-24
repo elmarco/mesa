@@ -195,11 +195,21 @@ static void vrend_decode_set_index_buffer(struct vrend_decode_ctx *ctx)
 
 static void vrend_decode_set_constant_buffer(struct vrend_decode_ctx *ctx, uint16_t length)
 {
-   int offset = get_buf_entry(ctx, VIRGL_SET_CONSTANT_BUFFER_OFFSET);
    uint32_t shader = get_buf_entry(ctx, VIRGL_SET_CONSTANT_BUFFER_SHADER_TYPE);
    uint32_t index = get_buf_entry(ctx, VIRGL_SET_CONSTANT_BUFFER_INDEX);
    int nc = (length - 2);
    vrend_set_constants(ctx->grctx, shader, index, nc, get_buf_ptr(ctx, VIRGL_SET_CONSTANT_BUFFER_DATA_START));
+}
+
+static void vrend_decode_set_uniform_buffer(struct vrend_decode_ctx *ctx)
+{
+   uint32_t shader = get_buf_entry(ctx, VIRGL_SET_UNIFORM_BUFFER_SHADER_TYPE);
+   uint32_t index = get_buf_entry(ctx, VIRGL_SET_UNIFORM_BUFFER_INDEX);
+   uint32_t offset = get_buf_entry(ctx, VIRGL_SET_UNIFORM_BUFFER_OFFSET);
+   uint32_t length = get_buf_entry(ctx, VIRGL_SET_UNIFORM_BUFFER_LENGTH);
+   uint32_t handle = get_buf_entry(ctx, VIRGL_SET_UNIFORM_BUFFER_RES_HANDLE);
+
+   vrend_set_uniform_buffer(ctx->grctx, shader, index, offset, length, handle);
 }
 
 static void vrend_decode_set_vertex_buffers(struct vrend_decode_ctx *ctx, uint16_t length)
@@ -919,6 +929,9 @@ void vrend_decode_block(uint32_t ctx_id, uint32_t *block, int ndw)
       case VIRGL_CCMD_SET_RENDER_CONDITION:
 	 vrend_decode_set_render_condition(gdctx);
 	 break;
+      case VIRGL_CCMD_SET_UNIFORM_BUFFER:
+         vrend_decode_set_uniform_buffer(gdctx);
+         break;
       }
       gdctx->ds->buf_offset += (header >> 16) + 1;
       

@@ -139,6 +139,13 @@ int virgl_encoder_write_constant_buffer(struct virgl_context *ctx,
                                        uint32_t index,
                                        uint32_t size,
                                        const void *data);
+
+int virgl_encoder_set_uniform_buffer(struct virgl_context *ctx,
+                                     uint32_t shader,
+                                     uint32_t index,
+                                     uint32_t offset,
+                                     uint32_t length,
+                                     struct virgl_resource *res);
 int virgl_encode_dsa_state(struct virgl_context *ctx,
                           uint32_t handle,
                           const struct pipe_depth_stencil_alpha_state *dsa_state);

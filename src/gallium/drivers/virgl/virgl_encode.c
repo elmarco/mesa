@@ -560,6 +560,23 @@ int virgl_encoder_write_constant_buffer(struct virgl_context *ctx,
    return 0;
 }
 
+int virgl_encoder_set_uniform_buffer(struct virgl_context *ctx,
+                                     uint32_t shader,
+                                     uint32_t index,
+                                     uint32_t offset,
+                                     uint32_t length,
+                                     struct virgl_resource *res)
+{
+   virgl_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_SET_UNIFORM_BUFFER, 0, VIRGL_SET_UNIFORM_BUFFER_SIZE));
+   virgl_encoder_write_dword(ctx->cbuf, shader);
+   virgl_encoder_write_dword(ctx->cbuf, index);
+   virgl_encoder_write_dword(ctx->cbuf, offset);
+   virgl_encoder_write_dword(ctx->cbuf, length);
+   virgl_encoder_write_res(ctx, res);
+   return 0;
+}
+
+
 int virgl_encoder_set_stencil_ref(struct virgl_context *ctx,
                                  const struct pipe_stencil_ref *ref)
 {

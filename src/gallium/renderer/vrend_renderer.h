@@ -265,6 +265,10 @@ void vrend_set_constants(struct vrend_context *ctx,
                          uint32_t num_constant,
                          float *data);
 
+void vrend_set_uniform_buffer(struct vrend_context *ctx, uint32_t shader,
+                              uint32_t index, uint32_t offset, uint32_t length,
+                              uint32_t res_handle);
+
 void vrend_transfer_write_return(void *data, uint32_t bytes, uint64_t offset,
                                 struct iovec *iov, int iovec_cnt);
 

@@ -125,6 +125,8 @@ struct global_renderer_state {
    struct pipe_blend_state hw_blend_state;
 
    boolean have_nv_prim_restart, have_gl_prim_restart, have_bit_encoding;
+
+   uint32_t max_uniform_blocks;
 };
 
 static struct global_renderer_state vrend_state;
@@ -146,6 +148,7 @@ struct vrend_linked_shader_program {
   GLuint *attrib_locs;
   uint32_t shadow_samp_mask[PIPE_SHADER_TYPES];
 
+  GLuint *ubo_locs[PIPE_SHADER_TYPES];
   GLuint vs_ws_adjust_loc;
 
   GLuint fs_stipple_loc;
@@ -283,6 +286,9 @@ struct vrend_context {
    struct vrend_constants consts[PIPE_SHADER_TYPES];
    bool const_dirty[PIPE_SHADER_TYPES];
    struct pipe_sampler_state *sampler_state[PIPE_SHADER_TYPES][PIPE_MAX_SAMPLERS];
+
+   struct pipe_constant_buffer cbs[PIPE_SHADER_TYPES][PIPE_MAX_CONSTANT_BUFFERS];
+   uint32_t const_bufs_used_mask[PIPE_SHADER_TYPES];
 
    int num_sampler_states[PIPE_SHADER_TYPES];
    boolean sampler_state_dirty;
@@ -726,7 +732,7 @@ static struct vrend_linked_shader_program *add_shader_program(struct vrend_conte
         if (sprog->const_locs[id]) {
            const char *prefix = pipe_shader_to_prefix(id);
            for (i = 0; i < sprog->ss[id]->sel->sinfo.num_consts; i++) {
-              snprintf(name, 16, "%sconst[%d]", prefix, i);
+              snprintf(name, 16, "%sconst0[%d]", prefix, i);
               sprog->const_locs[id][i] = glGetUniformLocation(prog_id, name);
            }
         }
@@ -744,7 +750,20 @@ static struct vrend_linked_shader_program *add_shader_program(struct vrend_conte
     }
   } else
     sprog->attrib_locs = NULL;
-   
+
+  for (id = PIPE_SHADER_VERTEX; id <= (gs ? PIPE_SHADER_GEOMETRY : PIPE_SHADER_FRAGMENT); id++) {
+     sprog->ubo_locs[id] = calloc(sprog->ss[id]->sel->sinfo.num_ubos, sizeof(uint32_t));
+     if (sprog->ss[id]->sel->sinfo.num_ubos) {
+        const char *prefix = pipe_shader_to_prefix(id);
+
+        for (i = 0; i < sprog->ss[id]->sel->sinfo.num_ubos; i++) {
+           snprintf(name, 16, "%subo%d", prefix, i + 1);
+           sprog->ubo_locs[id][i] = glGetUniformBlockIndex(prog_id, name);
+        }
+     } else
+        sprog->ubo_locs[id] = NULL;
+  }
+
   if (fs->sel->sinfo.num_outputs > 1) {
      glBindFragDataLocationIndexed(prog_id, 0, 0, "out_c0");
      glBindFragDataLocationIndexed(prog_id, 0, 1, "out_c1");
@@ -781,6 +800,8 @@ static void vrend_free_programs(struct vrend_context *ctx)
          free(ent->shadow_samp_add_locs[i]);
          free(ent->samp_locs[i]);
          free(ent->const_locs[i]);
+         free(ent->ubo_locs[i]);
+
       }
       free(ent->attrib_locs);
       free(ent);
@@ -1253,6 +1274,34 @@ void vrend_set_constants(struct vrend_context *ctx,
       consts->consts[i] = data[i];
 }
 
+void vrend_set_uniform_buffer(struct vrend_context *ctx,
+                              uint32_t shader,
+                              uint32_t index,
+                              uint32_t offset,
+                              uint32_t length,
+                              uint32_t res_handle)
+{
+   struct vrend_resource *res;
+
+   if (res_handle) {
+      res = vrend_renderer_ctx_res_lookup(ctx, res_handle);
+
+      if (!res) {
+            report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, res_handle);
+            return;
+      }
+      vrend_resource_reference((struct vrend_resource **)&ctx->cbs[shader][index].buffer, res);
+      ctx->cbs[shader][index].buffer_offset = offset;
+      ctx->cbs[shader][index].buffer_size = length;
+
+      ctx->const_bufs_used_mask[shader] |= (1 << index);
+   } else {
+      vrend_resource_reference((struct vrend_resource **)&ctx->cbs[shader][index].buffer, NULL);
+      ctx->cbs[shader][index].buffer_offset = 0;
+      ctx->cbs[shader][index].buffer_size = 0;
+      ctx->const_bufs_used_mask[shader] &= ~(1 << index);
+   }
+}
 void vrend_set_index_buffer(struct vrend_context *ctx,
                             uint32_t res_handle,
                             uint32_t index_size,
@@ -1749,6 +1798,7 @@ void vrend_draw_vbo(struct vrend_context *ctx,
 {
    int i;
    int sampler_id;
+   int ubo_id;
    bool new_program = FALSE;
    uint32_t shader_type;
    uint32_t num_enable;
@@ -1879,6 +1929,33 @@ void vrend_draw_vbo(struct vrend_context *ctx,
          index++;
       }
    } 
+
+   ubo_id = 0;
+   for (shader_type = PIPE_SHADER_VERTEX; shader_type <= PIPE_SHADER_FRAGMENT; shader_type++) {
+      uint32_t mask;
+      int shader_ubo_idx = 0;
+      struct pipe_constant_buffer *cb;
+      struct vrend_resource *res;
+      if (!ctx->const_bufs_used_mask[shader_type])
+         continue;
+
+      if (!ctx->prog->ubo_locs[shader_type])
+         continue;
+
+      mask = ctx->const_bufs_used_mask[shader_type];
+      while (mask) {
+         i = u_bit_scan(&mask);
+
+         cb = &ctx->cbs[shader_type][i];
+         res = (struct vrend_resource *)cb->buffer;
+         glBindBufferRange(GL_UNIFORM_BUFFER, ubo_id, res->id,
+                           cb->buffer_offset, cb->buffer_size);
+         glUniformBlockBinding(ctx->prog->id, ctx->prog->ubo_locs[shader_type][shader_ubo_idx], ubo_id);
+         shader_ubo_idx++;
+         ubo_id++;
+      }
+   }
+
    ctx->sampler_state_dirty = FALSE;
 
    if (!ctx->ve) {
@@ -4584,6 +4661,7 @@ void vrend_renderer_fill_caps(uint32_t set, uint32_t version,
    if (gl_ver >= 31) {
       caps->v1.bset.instanceid = 1;
       glGetIntegerv(GL_MAX_VERTEX_UNIFORM_BLOCKS, &max);
+      vrend_state.max_uniform_blocks = max;
       caps->v1.max_uniform_blocks = max + 1;
    } else {
       if (glewIsSupported("GL_ARB_draw_instanced"))

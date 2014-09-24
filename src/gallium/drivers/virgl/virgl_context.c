@@ -298,7 +298,9 @@ static void virgl_set_constant_buffer(struct pipe_context *ctx,
 
    if (buf) {
       if (!buf->user_buffer){
-         fprintf(stderr,"CONST BUFFER FAIL\n");
+         struct virgl_resource *res = (struct virgl_resource *)buf->buffer;
+         virgl_encoder_set_uniform_buffer(vctx, shader, index, buf->buffer_offset,
+                                          buf->buffer_size, res);
          return;
       }
       

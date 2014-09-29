@@ -3153,7 +3153,9 @@ void vrend_renderer_resource_create(struct vrend_renderer_resource_create_args *
                             gltype, NULL);
             }
          }
-      } else if (gr->target == GL_TEXTURE_3D || gr->target == GL_TEXTURE_2D_ARRAY || gr->target == GL_TEXTURE_CUBE_MAP_ARRAY) {
+      } else if (gr->target == GL_TEXTURE_3D ||
+                 gr->target == GL_TEXTURE_2D_ARRAY ||
+                 gr->target == GL_TEXTURE_CUBE_MAP_ARRAY) {
          for (level = 0; level <= args->last_level; level++) {
             unsigned depth_param = (gr->target == GL_TEXTURE_2D_ARRAY || gr->target == GL_TEXTURE_CUBE_MAP_ARRAY) ? args->array_size : u_minify(args->depth, level);
             unsigned mwidth = u_minify(args->width, level);

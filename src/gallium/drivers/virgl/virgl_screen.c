@@ -56,7 +56,7 @@ virgl_get_param(struct pipe_screen *screen, enum pipe_cap param)
    case PIPE_CAP_OCCLUSION_QUERY:
       return vscreen->caps.caps.v1.bset.occlusion_query;
    case PIPE_CAP_TEXTURE_MIRROR_CLAMP:
-      return 1;
+      return vscreen->caps.caps.v1.bset.mirror_clamp;
    case PIPE_CAP_TEXTURE_SHADOW_MAP:
       return 1;
    case PIPE_CAP_TEXTURE_SWIZZLE:

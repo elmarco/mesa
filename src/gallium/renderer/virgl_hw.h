@@ -196,6 +196,7 @@ struct virgl_caps_bool_set1 {
         unsigned ubo:1;
         unsigned color_clamping:1; /* not in GL 3.1 core profile */
         unsigned poly_stipple:1; /* not in GL 3.1 core profile */
+        unsigned mirror_clamp:1;
 };
 
 /* endless expansion capabilites - current gallium has 252 formats */

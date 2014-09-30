@@ -4715,6 +4715,10 @@ void vrend_renderer_fill_caps(uint32_t set, uint32_t version,
       caps->v1.glsl_level = 140;
    else
       caps->v1.glsl_level = 130;
+
+   if (glewIsSupported("GL_EXT_texture_mirror_clamp"))
+      caps->v1.bset.mirror_clamp = true;
+
    if (glewIsSupported("GL_EXT_texture_array")) {
       glGetIntegerv(GL_MAX_ARRAY_TEXTURE_LAYERS, &max);
       caps->v1.max_texture_array_layers = max;

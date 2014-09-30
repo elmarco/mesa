@@ -43,3 +43,19 @@ clamping - done in guest TGSI settings.
 
 quads/polygons - done in guest using u_primconvert
 
+known half-debugged bug:
+========================
+
+gl_frontcolor fail in emitting transform feedback - 
+./bin/ext_transform_feedback-separate attrib
+
+cubemap array fallback texture is wrong sized
+GL 3.2 - 
+
+clear layered rendering - need to handle layered framebuffer bind
+
+geometry shader support - need to handle input/output naming in light of geom shaders.
+
+mipmap generation for 3D textures is broken due to the blitter code not handling it right
+we probably should make the renderer blitter use the 3D paths in some cases where glBlitFramebuffer
+can't deal. 3D texture and Depth textures

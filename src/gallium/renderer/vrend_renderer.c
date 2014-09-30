@@ -33,6 +33,7 @@
 #include "pipe/p_state.h"
 #include "util/u_inlines.h"
 #include "util/u_memory.h"
+#include "util/u_dual_blend.h"
 
 #include "util/u_double_list.h"
 #include "util/u_format.h"
@@ -135,6 +136,7 @@ struct vrend_linked_shader_program {
   struct list_head head;
   GLuint id;
 
+  boolean dual_src_linked;
   struct vrend_shader *ss[PIPE_SHADER_TYPES];
 
   uint32_t samplers_used_mask[PIPE_SHADER_TYPES];
@@ -659,9 +661,17 @@ static struct vrend_linked_shader_program *add_shader_program(struct vrend_conte
   glAttachShader(prog_id, fs->id);
 
   if (fs->sel->sinfo.num_outputs > 1) {
-     glBindFragDataLocationIndexed(prog_id, 0, 0, "out_c0");
-     glBindFragDataLocationIndexed(prog_id, 0, 1, "out_c1");
-  }
+     if (util_blend_state_is_dual(&ctx->blend_state, 0)) {
+        glBindFragDataLocationIndexed(prog_id, 0, 0, "out_c0");
+        glBindFragDataLocationIndexed(prog_id, 0, 1, "out_c1");
+        sprog->dual_src_linked = true;
+     } else {
+        glBindFragDataLocationIndexed(prog_id, 0, 0, "out_c0");
+        glBindFragDataLocationIndexed(prog_id, 1, 0, "out_c1");
+        sprog->dual_src_linked = false;
+     }
+  } else
+     sprog->dual_src_linked = false;
 
   glLinkProgram(prog_id);
 
@@ -774,10 +784,12 @@ static struct vrend_linked_shader_program *add_shader_program(struct vrend_conte
 }
 
 static struct vrend_linked_shader_program *lookup_shader_program(struct vrend_context *ctx,
-                                                                 GLuint vs_id, GLuint fs_id, GLuint gs_id)
+                                                                 GLuint vs_id, GLuint fs_id, GLuint gs_id, GLboolean dual_src)
 {
   struct vrend_linked_shader_program *ent;
   LIST_FOR_EACH_ENTRY(ent, &ctx->programs, head) {
+     if (ent->dual_src_linked != dual_src)
+        continue;
      if (ent->ss[PIPE_SHADER_VERTEX]->id == vs_id && ent->ss[PIPE_SHADER_FRAGMENT]->id == fs_id) {
         if (!ent->ss[PIPE_SHADER_GEOMETRY] && gs_id == 0)
            return ent;
@@ -1827,7 +1839,7 @@ void vrend_draw_vbo(struct vrend_context *ctx,
    if (ctx->shader_dirty) {
      struct vrend_linked_shader_program *prog;
      boolean fs_dirty, vs_dirty, gs_dirty;
-
+     boolean dual_src = util_blend_state_is_dual(&ctx->blend_state, 0);
      if (!ctx->vs || !ctx->fs) {
         fprintf(stderr,"dropping rendering due to missing shaders\n");
         return;
@@ -1842,7 +1854,7 @@ void vrend_draw_vbo(struct vrend_context *ctx,
         fprintf(stderr, "failure to compile shader variants\n");
         return;
      }
-     prog = lookup_shader_program(ctx, ctx->vs->current->id, ctx->fs->current->id, ctx->gs ? ctx->gs->current->id : 0);
+     prog = lookup_shader_program(ctx, ctx->vs->current->id, ctx->fs->current->id, ctx->gs ? ctx->gs->current->id : 0, dual_src);
      if (!prog) {
         prog = add_shader_program(ctx, ctx->vs->current, ctx->fs->current, ctx->gs ? ctx->gs->current : NULL);
         if (!prog)

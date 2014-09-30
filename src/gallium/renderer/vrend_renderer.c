@@ -3107,6 +3107,11 @@ void vrend_renderer_resource_create(struct vrend_renderer_resource_create_args *
       glGenBuffersARB(1, &gr->id);
       glBindBufferARB(gr->target, gr->id);
       glBufferData(gr->target, args->width, NULL, GL_STREAM_DRAW);
+   } else if (args->target == PIPE_BUFFER && args->bind == 0) {
+      gr->target = GL_ARRAY_BUFFER_ARB;
+      glGenBuffersARB(1, &gr->id);
+      glBindBufferARB(gr->target, gr->id);
+      glBufferData(gr->target, args->width, NULL, GL_STREAM_DRAW);
    } else if (args->target == PIPE_BUFFER && args->bind == PIPE_BIND_SAMPLER_VIEW) {
       GLenum internalformat;
       gr->target = GL_TEXTURE_BUFFER;

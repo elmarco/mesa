@@ -657,6 +657,12 @@ static struct vrend_linked_shader_program *add_shader_program(struct vrend_conte
   }
   set_stream_out_varyings(prog_id, &vs->sel->sinfo.so_info);
   glAttachShader(prog_id, fs->id);
+
+  if (fs->sel->sinfo.num_outputs > 1) {
+     glBindFragDataLocationIndexed(prog_id, 0, 0, "out_c0");
+     glBindFragDataLocationIndexed(prog_id, 0, 1, "out_c1");
+  }
+
   glLinkProgram(prog_id);
 
   glGetProgramiv(prog_id, GL_LINK_STATUS, &lret);
@@ -764,10 +770,6 @@ static struct vrend_linked_shader_program *add_shader_program(struct vrend_conte
         sprog->ubo_locs[id] = NULL;
   }
 
-  if (fs->sel->sinfo.num_outputs > 1) {
-     glBindFragDataLocationIndexed(prog_id, 0, 0, "out_c0");
-     glBindFragDataLocationIndexed(prog_id, 0, 1, "out_c1");
-  }
   return sprog;
 }
 

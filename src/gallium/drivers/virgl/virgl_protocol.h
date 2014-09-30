@@ -112,7 +112,7 @@ enum virgl_context_cmd {
 #define VIRGL_OBJ_DSA_S0_DEPTH_WRITEMASK(x) (((x) & 0x1) << 1)
 #define VIRGL_OBJ_DSA_S0_DEPTH_FUNC(x) (((x) & 0x7) << 2)
 #define VIRGL_OBJ_DSA_S0_ALPHA_ENABLED(x) (((x) & 0x1) << 8)
-#define VIRGL_OBJ_DSA_S0_ALPHA_FUNC(x) (((x) & 0x3) << 9)
+#define VIRGL_OBJ_DSA_S0_ALPHA_FUNC(x) (((x) & 0x7) << 9)
 #define VIRGL_OBJ_DSA_S1 3
 #define VIRGL_OBJ_DSA_S2 4
 #define VIRGL_OBJ_DSA_S1_STENCIL_ENABLED(x) (((x) & 0x1) << 0)

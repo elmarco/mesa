@@ -4087,10 +4087,12 @@ static void vrend_renderer_blit_int(struct vrend_context *ctx,
    struct vrend_resource *src_res, *dst_res;
    GLbitfield glmask = 0;
    int src_y1, src_y2, dst_y1, dst_y2;
-
+   GLenum filter;
+   int n_layers = 1, i;
    if (ctx->in_error)
       return;
 
+   filter = convert_mag_filter(info->filter);
    src_res = vrend_renderer_ctx_res_lookup(ctx, src_handle);
    dst_res = vrend_renderer_ctx_res_lookup(ctx, dst_handle);
 
@@ -4102,17 +4104,6 @@ static void vrend_renderer_blit_int(struct vrend_context *ctx,
       report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, dst_handle);
       return;
    }
-
-   glBindFramebuffer(GL_FRAMEBUFFER_EXT, ctx->blit_fb_ids[0]);
-
-   vrend_fb_bind_texture(src_res, 0, info->src.level, info->src.box.z);
-
-   glBindFramebuffer(GL_FRAMEBUFFER_EXT, ctx->blit_fb_ids[1]);
-
-   vrend_fb_bind_texture(dst_res, 0, info->dst.level, info->dst.box.z);
-   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, ctx->blit_fb_ids[1]);
-
-   glBindFramebuffer(GL_READ_FRAMEBUFFER, ctx->blit_fb_ids[0]);
 
    if (info->mask & PIPE_MASK_Z)
       glmask |= GL_DEPTH_BUFFER_BIT;
@@ -4143,16 +4134,31 @@ static void vrend_renderer_blit_int(struct vrend_context *ctx,
       glEnable(GL_SCISSOR_TEST);
    } else
       glDisable(GL_SCISSOR_TEST);
-      
-   glBlitFramebuffer(info->src.box.x,
-                     src_y1,
-                     info->src.box.x + info->src.box.width,
-                     src_y2,
-                     info->dst.box.x,
-                     dst_y1,
-                     info->dst.box.x + info->dst.box.width,
-                     dst_y2,
-                     glmask, convert_mag_filter(info->filter));
+
+   if (info->src.box.depth == info->dst.box.depth)
+      n_layers = info->dst.box.depth;
+   for (i = 0; i < n_layers; i++) {
+      glBindFramebuffer(GL_FRAMEBUFFER_EXT, ctx->blit_fb_ids[0]);
+
+      vrend_fb_bind_texture(src_res, 0, info->src.level, info->src.box.z + i);
+
+      glBindFramebuffer(GL_FRAMEBUFFER_EXT, ctx->blit_fb_ids[1]);
+
+      vrend_fb_bind_texture(dst_res, 0, info->dst.level, info->dst.box.z + i);
+      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, ctx->blit_fb_ids[1]);
+
+      glBindFramebuffer(GL_READ_FRAMEBUFFER, ctx->blit_fb_ids[0]);
+
+      glBlitFramebuffer(info->src.box.x,
+                        src_y1,
+                        info->src.box.x + info->src.box.width,
+                        src_y2,
+                        info->dst.box.x,
+                        dst_y1,
+                        info->dst.box.x + info->dst.box.width,
+                        dst_y2,
+                        glmask, filter);
+   }
 
 }
 

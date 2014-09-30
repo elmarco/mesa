@@ -1519,9 +1519,17 @@ static INLINE void vrend_fill_shader_key(struct vrend_context *ctx,
                                          struct vrend_shader_key *key)
 {
    if (use_core_profile == 1) {
-      key->add_alpha_test = ctx->dsa_state.alpha.enabled;
-      key->alpha_test = ctx->dsa_state.alpha.func;
-      key->alpha_ref_val = ctx->dsa_state.alpha.ref_value;
+      int i;
+      boolean add_alpha_test = true;
+      for (i = 0; i < ctx->nr_cbufs; i++) {
+         if (util_format_is_pure_integer(ctx->surf[i]->format))
+            add_alpha_test = false;
+      }
+      if (add_alpha_test) {
+         key->add_alpha_test = ctx->dsa_state.alpha.enabled;
+         key->alpha_test = ctx->dsa_state.alpha.func;
+         key->alpha_ref_val = ctx->dsa_state.alpha.ref_value;
+      }
 
       key->pstipple_tex = ctx->rs_state.poly_stipple_enable;
    } else {

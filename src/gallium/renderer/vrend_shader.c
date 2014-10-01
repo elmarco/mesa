@@ -99,9 +99,10 @@ struct dump_ctx {
    int num_address;
    
    struct pipe_stream_output_info *so;
-   boolean uses_cube_array;
-   boolean uses_sampler_ms;
-   boolean uses_sampler_buf;
+   bool uses_cube_array;
+   bool uses_sampler_ms;
+   bool uses_sampler_buf;
+   bool uses_sampler_rect;
    /* create a shader with lower left if upper left is primary variant
       or vice versa */
    uint32_t shadow_samp_mask;
@@ -607,7 +608,7 @@ static void translate_tex(struct dump_ctx *ctx,
                           const char *dtypeprefix)
 {
    char *twm, *gwm, *txfi;
-   boolean is_shad = FALSE;
+   bool is_shad = false;
    char buf[512];
    char offbuf[64] = {0};
    char bias[64] = {0};
@@ -616,12 +617,32 @@ static void translate_tex(struct dump_ctx *ctx,
 
    ctx->samplers[sreg_index].tgsi_sampler_type = inst->Texture.Texture;
 
-   if (inst->Texture.Texture == TGSI_TEXTURE_CUBE_ARRAY || inst->Texture.Texture == TGSI_TEXTURE_SHADOWCUBE_ARRAY)
-      ctx->uses_cube_array = TRUE;
-   else if (inst->Texture.Texture == TGSI_TEXTURE_2D_MSAA || inst->Texture.Texture == TGSI_TEXTURE_2D_ARRAY_MSAA)
-      ctx->uses_sampler_ms = TRUE;
-   else if (inst->Texture.Texture == TGSI_TEXTURE_BUFFER)
-      ctx->uses_sampler_buf = TRUE;
+   switch (inst->Texture.Texture) {
+   case TGSI_TEXTURE_SHADOWCUBE_ARRAY:
+      is_shad = true;
+   case TGSI_TEXTURE_CUBE_ARRAY:
+      ctx->uses_cube_array = true;
+      break;
+   case TGSI_TEXTURE_2D_MSAA:
+   case TGSI_TEXTURE_2D_ARRAY_MSAA:
+      ctx->uses_sampler_ms = true;
+      break;
+   case TGSI_TEXTURE_BUFFER:
+      ctx->uses_sampler_buf = true;
+      break;
+   case TGSI_TEXTURE_SHADOWRECT:
+      is_shad = true;
+   case TGSI_TEXTURE_RECT:
+      ctx->uses_sampler_rect = true;
+      break;
+   case TGSI_TEXTURE_SHADOW1D:
+   case TGSI_TEXTURE_SHADOW2D:
+   case TGSI_TEXTURE_SHADOWCUBE:
+   case TGSI_TEXTURE_SHADOW1D_ARRAY:
+   case TGSI_TEXTURE_SHADOW2D_ARRAY:
+      is_shad = true;
+      break;
+   }
 
    sampler_index = 1;
 
@@ -653,7 +674,6 @@ static void translate_tex(struct dump_ctx *ctx,
          break;
       case TGSI_TEXTURE_SHADOW1D:
       case TGSI_TEXTURE_SHADOW2D:
-         is_shad = TRUE;
       case TGSI_TEXTURE_3D:
          twm = "";
          break;
@@ -706,7 +726,6 @@ static void translate_tex(struct dump_ctx *ctx,
    case TGSI_TEXTURE_SHADOW1D:
    case TGSI_TEXTURE_SHADOW2D:
    case TGSI_TEXTURE_SHADOW1D_ARRAY:
-      is_shad = TRUE;
    case TGSI_TEXTURE_3D:
    case TGSI_TEXTURE_CUBE:
    case TGSI_TEXTURE_2D_ARRAY:
@@ -725,7 +744,6 @@ static void translate_tex(struct dump_ctx *ctx,
    case TGSI_TEXTURE_SHADOWCUBE:
    case TGSI_TEXTURE_SHADOW2D_ARRAY:
    case TGSI_TEXTURE_SHADOWCUBE_ARRAY:
-      is_shad = TRUE;
    case TGSI_TEXTURE_CUBE_ARRAY:
    default:
       twm = "";

@@ -71,6 +71,7 @@ struct immed {
 
 struct dump_ctx {
    struct tgsi_iterate_context iter;
+   struct vrend_shader_cfg *cfg;
    int prog_type;
    char *glsl_main;
    int size;
@@ -1749,6 +1750,7 @@ char *vrend_convert_shader(struct vrend_shader_cfg *cfg,
    ctx.iter.iterate_property = iter_property;
    ctx.iter.epilog = NULL;
    ctx.key = key;
+   ctx.cfg = cfg;
    if (sinfo->so_info.num_outputs) {
       ctx.so = &sinfo->so_info;
    }

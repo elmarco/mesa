@@ -597,6 +597,257 @@ static void emit_buf(struct dump_ctx *ctx, char *buf)
    strcat(ctx->glsl_main, buf);
 }
 
+static void translate_tex(struct dump_ctx *ctx,
+                          struct tgsi_full_instruction *inst,
+                          int sreg_index,
+                          char srcs[4][255],
+                          char  dsts[3][255],
+                          const char *writemask,
+                          const char *dstconv,
+                          const char *dtypeprefix)
+{
+   char *twm, *gwm, *txfi;
+   boolean is_shad = FALSE;
+   char buf[512];
+   char offbuf[64] = {0};
+   char bias[64] = {0};
+   int sampler_index;
+   char *tex_ext;
+
+   ctx->samplers[sreg_index].tgsi_sampler_type = inst->Texture.Texture;
+
+   if (inst->Texture.Texture == TGSI_TEXTURE_CUBE_ARRAY || inst->Texture.Texture == TGSI_TEXTURE_SHADOWCUBE_ARRAY)
+      ctx->uses_cube_array = TRUE;
+   else if (inst->Texture.Texture == TGSI_TEXTURE_2D_MSAA || inst->Texture.Texture == TGSI_TEXTURE_2D_ARRAY_MSAA)
+      ctx->uses_sampler_ms = TRUE;
+   else if (inst->Texture.Texture == TGSI_TEXTURE_BUFFER)
+      ctx->uses_sampler_buf = TRUE;
+
+   sampler_index = 1;
+
+   if (inst->Instruction.Opcode == TGSI_OPCODE_TXQ) {
+      /* no lod parameter for txq for these */
+      if (inst->Texture.Texture != TGSI_TEXTURE_RECT &&
+          inst->Texture.Texture != TGSI_TEXTURE_SHADOWRECT &&
+          inst->Texture.Texture != TGSI_TEXTURE_BUFFER &&
+          inst->Texture.Texture != TGSI_TEXTURE_2D_MSAA &&
+          inst->Texture.Texture != TGSI_TEXTURE_2D_ARRAY_MSAA)
+         snprintf(bias, 64, ", int(%s.w)", srcs[0]);
+      snprintf(buf, 255, "%s = %s(%s(textureSize(%s%s)));\n", dsts[0], dstconv, dtypeprefix, srcs[sampler_index], bias);
+      emit_buf(ctx, buf);
+      return;
+   }
+
+   if (inst->Instruction.Opcode == TGSI_OPCODE_TXP) {
+      switch (inst->Texture.Texture) {
+      case TGSI_TEXTURE_1D:
+         twm = ".xy";
+         break;
+      case TGSI_TEXTURE_RECT:
+      case TGSI_TEXTURE_CUBE:
+      case TGSI_TEXTURE_2D:
+      case TGSI_TEXTURE_SHADOWRECT:
+      case TGSI_TEXTURE_1D_ARRAY:
+      case TGSI_TEXTURE_2D_ARRAY:
+         twm = ".xyz";
+         break;
+      case TGSI_TEXTURE_SHADOW1D:
+      case TGSI_TEXTURE_SHADOW2D:
+         is_shad = TRUE;
+      case TGSI_TEXTURE_3D:
+         twm = "";
+         break;
+
+      case TGSI_TEXTURE_SHADOW1D_ARRAY:
+      case TGSI_TEXTURE_SHADOWCUBE:
+      case TGSI_TEXTURE_SHADOW2D_ARRAY:
+      case TGSI_TEXTURE_CUBE_ARRAY:
+      case TGSI_TEXTURE_SHADOWCUBE_ARRAY:
+
+      default:
+         fprintf(stderr,"failed to convert TXP opcode %d, invalid texture %d\n", inst->Instruction.Opcode, inst->Texture.Texture);
+         return;
+         break;
+      }
+      tex_ext = "";
+
+      if (inst->Texture.Texture == TGSI_TEXTURE_RECT)
+         snprintf(buf, 255, "%s = texture2DRectProj(%s, %s)%s;\n", dsts[0], srcs[1], srcs[0], writemask);
+      else if (inst->Texture.Texture == TGSI_TEXTURE_SHADOWRECT)
+         snprintf(buf, 255, "%s = shadow2DRectProj(%s, %s)%s;\n", dsts[0], srcs[1], srcs[0], writemask);
+      else if (inst->Texture.Texture == TGSI_TEXTURE_CUBE || inst->Texture.Texture == TGSI_TEXTURE_2D_ARRAY)
+         snprintf(buf, 255, "%s = texture(%s, %s.xyz)%s;\n", dsts[0], srcs[1], srcs[0], writemask);
+      else if (inst->Texture.Texture == TGSI_TEXTURE_1D_ARRAY)
+         snprintf(buf, 255, "%s = texture(%s, %s.xy)%s;\n", dsts[0], srcs[1], srcs[0], writemask);
+      else if (is_shad) { /* TGSI returns 1.0 in alpha */
+         const char *mname = ctx->prog_type == TGSI_PROCESSOR_VERTEX ? "vsshadmask" : "fsshadmask";
+         const char *cname = ctx->prog_type == TGSI_PROCESSOR_VERTEX ? "vsshadadd" : "fsshadadd";
+         const struct tgsi_full_src_register *src = &inst->Src[sampler_index];
+         snprintf(buf, 255, "%s = %s(vec4(vec4(textureProj%s(%s, %s%s%s)) * %s%d + %s%d)%s);\n", dsts[0], dstconv, tex_ext, srcs[sampler_index], srcs[0], twm, bias, mname, src->Register.Index, cname, src->Register.Index, writemask);
+      } else
+         snprintf(buf, 255, "%s = %s(textureProj(%s, %s)%s);\n", dsts[0], dstconv, srcs[1], srcs[0], writemask);
+
+      emit_buf(ctx, buf);
+      return;
+   }
+
+   switch (inst->Texture.Texture) {
+   case TGSI_TEXTURE_1D:
+   case TGSI_TEXTURE_BUFFER:
+      twm = ".x";
+      txfi = "int";
+      break;
+   case TGSI_TEXTURE_2D:
+   case TGSI_TEXTURE_RECT:
+   case TGSI_TEXTURE_1D_ARRAY:
+      twm = ".xy";
+      txfi = "ivec2";
+      break;
+   case TGSI_TEXTURE_SHADOW1D:
+   case TGSI_TEXTURE_SHADOW2D:
+   case TGSI_TEXTURE_SHADOW1D_ARRAY:
+      is_shad = TRUE;
+   case TGSI_TEXTURE_3D:
+   case TGSI_TEXTURE_CUBE:
+   case TGSI_TEXTURE_2D_ARRAY:
+      twm = ".xyz";
+      txfi = "ivec3";
+      break;
+   case TGSI_TEXTURE_2D_MSAA:
+      twm = ".xy";
+      txfi = "ivec2";
+      break;
+   case TGSI_TEXTURE_2D_ARRAY_MSAA:
+      twm = ".xyz";
+      txfi = "ivec3";
+      break;
+
+   case TGSI_TEXTURE_SHADOWCUBE:
+   case TGSI_TEXTURE_SHADOW2D_ARRAY:
+   case TGSI_TEXTURE_SHADOWCUBE_ARRAY:
+      is_shad = TRUE;
+   case TGSI_TEXTURE_CUBE_ARRAY:
+   default:
+      twm = "";
+      txfi = "";
+      break;
+   }
+
+   if (inst->Instruction.Opcode == TGSI_OPCODE_TXD) {
+      switch (inst->Texture.Texture) {
+      case TGSI_TEXTURE_1D:
+      case TGSI_TEXTURE_SHADOW1D:
+      case TGSI_TEXTURE_1D_ARRAY:
+      case TGSI_TEXTURE_SHADOW1D_ARRAY:
+         gwm = ".x";
+         break;
+      case TGSI_TEXTURE_2D:
+      case TGSI_TEXTURE_SHADOW2D:
+      case TGSI_TEXTURE_2D_ARRAY:
+      case TGSI_TEXTURE_SHADOW2D_ARRAY:
+         gwm = ".xy";
+         break;
+      case TGSI_TEXTURE_3D:
+      case TGSI_TEXTURE_CUBE:
+      case TGSI_TEXTURE_SHADOWCUBE:
+         gwm = ".xyz";
+         break;
+      default:
+         gwm = "";
+         break;
+      }
+   }
+
+   if (inst->Instruction.Opcode == TGSI_OPCODE_TXB2 || inst->Instruction.Opcode == TGSI_OPCODE_TXL2 || inst->Instruction.Opcode == TGSI_OPCODE_TEX2) {
+      sampler_index = 2;
+      if (inst->Instruction.Opcode != TGSI_OPCODE_TEX2)
+         snprintf(bias, 64, ", %s.x", srcs[1]);
+      else if (inst->Texture.Texture == TGSI_TEXTURE_SHADOWCUBE_ARRAY)
+         snprintf(bias, 64, ", float(%s)", srcs[1]);
+   } else if (inst->Instruction.Opcode == TGSI_OPCODE_TXB || inst->Instruction.Opcode == TGSI_OPCODE_TXL)
+      snprintf(bias, 64, ", %s.w", srcs[0]);
+   else if (inst->Instruction.Opcode == TGSI_OPCODE_TXF) {
+      if (inst->Texture.Texture == TGSI_TEXTURE_1D ||
+          inst->Texture.Texture == TGSI_TEXTURE_2D ||
+          inst->Texture.Texture == TGSI_TEXTURE_2D_MSAA ||
+          inst->Texture.Texture == TGSI_TEXTURE_2D_ARRAY_MSAA ||
+          inst->Texture.Texture == TGSI_TEXTURE_3D ||
+          inst->Texture.Texture == TGSI_TEXTURE_1D_ARRAY ||
+          inst->Texture.Texture == TGSI_TEXTURE_2D_ARRAY) {
+         snprintf(bias, 64, ", int(%s.w)", srcs[0]);
+      }
+   } else if (inst->Instruction.Opcode == TGSI_OPCODE_TXD) {
+      snprintf(bias, 64, ", %s%s, %s%s", srcs[1], gwm, srcs[2], gwm);
+      sampler_index = 3;
+   }
+   else
+      bias[0] = 0;
+
+   if (inst->Instruction.Opcode == TGSI_OPCODE_TXL || inst->Instruction.Opcode == TGSI_OPCODE_TXL2) {
+      if (inst->Texture.NumOffsets == 1)
+         tex_ext = "LodOffset";
+      else
+         tex_ext = "Lod";
+   } else if (inst->Instruction.Opcode == TGSI_OPCODE_TXD) {
+      if (inst->Texture.NumOffsets == 1)
+         tex_ext = "GradOffset";
+      else
+         tex_ext = "Grad";
+   } else {
+      if (inst->Texture.NumOffsets == 1)
+         tex_ext = "Offset";
+      else
+         tex_ext = "";
+   }
+
+   if (inst->Texture.NumOffsets == 1) {
+      struct immed *imd = &ctx->imm[(inst->TexOffsets[0].Index)];
+      switch (inst->Texture.Texture) {
+      case TGSI_TEXTURE_1D:
+      case TGSI_TEXTURE_1D_ARRAY:
+      case TGSI_TEXTURE_SHADOW1D:
+      case TGSI_TEXTURE_SHADOW1D_ARRAY:
+         snprintf(offbuf, 25, ", int(%d)", imd->val[inst->TexOffsets[0].SwizzleX].i);
+         break;
+      case TGSI_TEXTURE_RECT:
+      case TGSI_TEXTURE_2D:
+      case TGSI_TEXTURE_2D_ARRAY:
+      case TGSI_TEXTURE_SHADOW2D:
+      case TGSI_TEXTURE_SHADOW2D_ARRAY:
+         snprintf(offbuf, 25, ", ivec2(%d, %d)", imd->val[inst->TexOffsets[0].SwizzleX].i, imd->val[inst->TexOffsets[0].SwizzleY].i);
+         break;
+      case TGSI_TEXTURE_3D:
+         snprintf(offbuf, 25, ", ivec3(%d, %d, %d)", imd->val[inst->TexOffsets[0].SwizzleX].i, imd->val[inst->TexOffsets[0].SwizzleY].i,
+                  imd->val[inst->TexOffsets[0].SwizzleZ].i);
+         break;
+      }
+
+      if (inst->Instruction.Opcode == TGSI_OPCODE_TXL || inst->Instruction.Opcode == TGSI_OPCODE_TXL2 || inst->Instruction.Opcode == TGSI_OPCODE_TXD) {
+         char tmp[64];
+         strcpy(tmp, offbuf);
+         strcpy(offbuf, bias);
+         strcpy(bias, tmp);
+
+      }
+   }
+   if (inst->Instruction.Opcode == TGSI_OPCODE_TXF) {
+      snprintf(buf, 255, "%s = %s(texelFetch%s(%s, %s(%s%s)%s%s)%s);\n", dsts[0], dstconv, tex_ext, srcs[sampler_index], txfi, srcs[0], twm, bias, offbuf, ctx->outputs[0].override_no_wm ? "" : writemask);
+   }
+   /* rect is special in GLSL 1.30 */
+   else if (inst->Texture.Texture == TGSI_TEXTURE_RECT)
+      snprintf(buf, 255, "%s = texture2DRect(%s, %s.xy)%s;\n", dsts[0], srcs[sampler_index], srcs[0], writemask);
+   else if (inst->Texture.Texture == TGSI_TEXTURE_SHADOWRECT)
+      snprintf(buf, 255, "%s = shadow2DRect(%s, %s.xyz)%s;\n", dsts[0], srcs[sampler_index], srcs[0], writemask);
+   else if (is_shad) { /* TGSI returns 1.0 in alpha */
+      const char *mname = ctx->prog_type == TGSI_PROCESSOR_VERTEX ? "vsshadmask" : "fsshadmask";
+      const char *cname = ctx->prog_type == TGSI_PROCESSOR_VERTEX ? "vsshadadd" : "fsshadadd";
+      const struct tgsi_full_src_register *src = &inst->Src[sampler_index];
+      snprintf(buf, 255, "%s = %s(vec4(vec4(texture%s(%s, %s%s%s%s)) * %s%d + %s%d)%s);\n", dsts[0], dstconv, tex_ext, srcs[sampler_index], srcs[0], twm, offbuf, bias, mname, src->Register.Index, cname, src->Register.Index, writemask);
+   } else
+      snprintf(buf, 255, "%s = %s(texture%s(%s, %s%s%s%s)%s);\n", dsts[0], dstconv, tex_ext, srcs[sampler_index], srcs[0], twm, offbuf, bias, ctx->outputs[0].override_no_wm ? "" : writemask);
+   emit_buf(ctx, buf);
+}
+
 static boolean
 iter_instruction(struct tgsi_iterate_context *iter,
                  struct tgsi_full_instruction *inst)
@@ -610,12 +861,6 @@ iter_instruction(struct tgsi_iterate_context *iter,
    char dstconv[32] = {0};
    char udstconv[32] = {0};
    char writemask[6] = {0};
-   char offbuf[64] = {0};
-   char *twm, *gwm, *txfi;
-   char bias[64] = {0};
-   char *tex_ext;
-   boolean is_shad = FALSE;
-   int sampler_index;
    enum tgsi_opcode_type dtype = tgsi_opcode_infer_dst_type(inst->Instruction.Opcode);
    enum tgsi_opcode_type stype = tgsi_opcode_infer_src_type(inst->Instruction.Opcode);
    char *dtypeprefix="", *stypeprefix = "";
@@ -1063,244 +1308,10 @@ iter_instruction(struct tgsi_iterate_context *iter,
    case TGSI_OPCODE_TXL2:
    case TGSI_OPCODE_TXD:
    case TGSI_OPCODE_TXF:
-      ctx->samplers[sreg_index].tgsi_sampler_type = inst->Texture.Texture;
-
-      if (inst->Texture.Texture == TGSI_TEXTURE_CUBE_ARRAY || inst->Texture.Texture == TGSI_TEXTURE_SHADOWCUBE_ARRAY)
-         ctx->uses_cube_array = TRUE;
-      else if (inst->Texture.Texture == TGSI_TEXTURE_2D_MSAA || inst->Texture.Texture == TGSI_TEXTURE_2D_ARRAY_MSAA)
-         ctx->uses_sampler_ms = TRUE;
-      else if (inst->Texture.Texture == TGSI_TEXTURE_BUFFER)
-         ctx->uses_sampler_buf = TRUE;
-
-      switch (inst->Texture.Texture) {
-      case TGSI_TEXTURE_1D:
-      case TGSI_TEXTURE_BUFFER:
-         twm = ".x";
-         txfi = "int";
-         break;
-      case TGSI_TEXTURE_2D:
-      case TGSI_TEXTURE_RECT:
-      case TGSI_TEXTURE_1D_ARRAY:
-         twm = ".xy";
-         txfi = "ivec2";
-         break;
-      case TGSI_TEXTURE_SHADOW1D:
-      case TGSI_TEXTURE_SHADOW2D:
-      case TGSI_TEXTURE_SHADOW1D_ARRAY:
-         is_shad = TRUE;
-      case TGSI_TEXTURE_3D:
-      case TGSI_TEXTURE_CUBE:
-      case TGSI_TEXTURE_2D_ARRAY:
-         twm = ".xyz";
-         txfi = "ivec3";
-         break;
-      case TGSI_TEXTURE_2D_MSAA:
-         twm = ".xy";
-         txfi = "ivec2";
-         break;
-      case TGSI_TEXTURE_2D_ARRAY_MSAA:
-         twm = ".xyz";
-         txfi = "ivec3";
-         break;
-
-      case TGSI_TEXTURE_SHADOWCUBE:
-      case TGSI_TEXTURE_SHADOW2D_ARRAY:
-      case TGSI_TEXTURE_SHADOWCUBE_ARRAY:
-         is_shad = TRUE;
-      case TGSI_TEXTURE_CUBE_ARRAY:
-      default:
-         twm = "";
-         txfi = "";
-         break;
-      }
-
-      if (inst->Instruction.Opcode == TGSI_OPCODE_TXD) {
-         switch (inst->Texture.Texture) {
-         case TGSI_TEXTURE_1D:
-         case TGSI_TEXTURE_SHADOW1D:
-         case TGSI_TEXTURE_1D_ARRAY:
-         case TGSI_TEXTURE_SHADOW1D_ARRAY:
-            gwm = ".x";
-            break;
-         case TGSI_TEXTURE_2D:
-         case TGSI_TEXTURE_SHADOW2D:
-         case TGSI_TEXTURE_2D_ARRAY:
-         case TGSI_TEXTURE_SHADOW2D_ARRAY:
-            gwm = ".xy";
-            break;
-         case TGSI_TEXTURE_3D:
-         case TGSI_TEXTURE_CUBE:
-         case TGSI_TEXTURE_SHADOWCUBE:
-            gwm = ".xyz";
-            break;
-         default:
-            gwm = "";
-            break;
-         }
-      }
-
-
-      sampler_index = 1;
-
-      if (inst->Instruction.Opcode == TGSI_OPCODE_TXB2 || inst->Instruction.Opcode == TGSI_OPCODE_TXL2 || inst->Instruction.Opcode == TGSI_OPCODE_TEX2) {
-         sampler_index = 2;
-         if (inst->Instruction.Opcode != TGSI_OPCODE_TEX2)
-            snprintf(bias, 64, ", %s.x", srcs[1]);
-         else if (inst->Texture.Texture == TGSI_TEXTURE_SHADOWCUBE_ARRAY)
-            snprintf(bias, 64, ", float(%s)", srcs[1]);
-      } else if (inst->Instruction.Opcode == TGSI_OPCODE_TXB || inst->Instruction.Opcode == TGSI_OPCODE_TXL)
-         snprintf(bias, 64, ", %s.w", srcs[0]);
-      else if (inst->Instruction.Opcode == TGSI_OPCODE_TXF) {
-         if (inst->Texture.Texture == TGSI_TEXTURE_1D ||
-             inst->Texture.Texture == TGSI_TEXTURE_2D ||
-             inst->Texture.Texture == TGSI_TEXTURE_2D_MSAA ||
-             inst->Texture.Texture == TGSI_TEXTURE_2D_ARRAY_MSAA ||
-             inst->Texture.Texture == TGSI_TEXTURE_3D ||
-             inst->Texture.Texture == TGSI_TEXTURE_1D_ARRAY ||
-             inst->Texture.Texture == TGSI_TEXTURE_2D_ARRAY) {
-            snprintf(bias, 64, ", int(%s.w)", srcs[0]);
-         }
-      } else if (inst->Instruction.Opcode == TGSI_OPCODE_TXD) {
-         snprintf(bias, 64, ", %s%s, %s%s", srcs[1], gwm, srcs[2], gwm);
-         sampler_index = 3;
-      }
-      else
-         bias[0] = 0;
-
-      if (inst->Instruction.Opcode == TGSI_OPCODE_TXL || inst->Instruction.Opcode == TGSI_OPCODE_TXL2) {
-         if (inst->Texture.NumOffsets == 1)
-            tex_ext = "LodOffset";
-         else
-            tex_ext = "Lod";
-      } else if (inst->Instruction.Opcode == TGSI_OPCODE_TXD) {
-         if (inst->Texture.NumOffsets == 1)
-            tex_ext = "GradOffset";
-         else
-            tex_ext = "Grad";
-      } else {
-         if (inst->Texture.NumOffsets == 1)
-            tex_ext = "Offset";
-         else
-            tex_ext = "";
-      }
-
-      if (inst->Texture.NumOffsets == 1) {
-         struct immed *imd = &ctx->imm[(inst->TexOffsets[0].Index)];
-         switch (inst->Texture.Texture) {
-         case TGSI_TEXTURE_1D:
-         case TGSI_TEXTURE_1D_ARRAY:
-         case TGSI_TEXTURE_SHADOW1D:
-         case TGSI_TEXTURE_SHADOW1D_ARRAY:
-            snprintf(offbuf, 25, ", int(%d)", imd->val[inst->TexOffsets[0].SwizzleX].i);
-            break;
-         case TGSI_TEXTURE_2D:
-         case TGSI_TEXTURE_RECT:
-         case TGSI_TEXTURE_2D_ARRAY:
-         case TGSI_TEXTURE_SHADOW2D:
-         case TGSI_TEXTURE_SHADOW2D_ARRAY:
-            snprintf(offbuf, 25, ", ivec2(%d, %d)", imd->val[inst->TexOffsets[0].SwizzleX].i, imd->val[inst->TexOffsets[0].SwizzleY].i);
-            break;
-         case TGSI_TEXTURE_3D:
-            snprintf(offbuf, 25, ", ivec3(%d, %d, %d)", imd->val[inst->TexOffsets[0].SwizzleX].i, imd->val[inst->TexOffsets[0].SwizzleY].i,
-                     imd->val[inst->TexOffsets[0].SwizzleZ].i);
-            break;
-         }
-
-         if (inst->Instruction.Opcode == TGSI_OPCODE_TXL || inst->Instruction.Opcode == TGSI_OPCODE_TXL2 || inst->Instruction.Opcode == TGSI_OPCODE_TXD) {
-            char tmp[64];
-            strcpy(tmp, offbuf);
-            strcpy(offbuf, bias);
-            strcpy(bias, tmp);
-
-         }
-      }
-      if (inst->Instruction.Opcode == TGSI_OPCODE_TXF) {
-         snprintf(buf, 255, "%s = %s(texelFetch%s(%s, %s(%s%s)%s%s)%s);\n", dsts[0], dstconv, tex_ext, srcs[sampler_index], txfi, srcs[0], twm, bias, offbuf, ctx->outputs[0].override_no_wm ? "" : writemask);
-      } 
-      /* rect is special in GLSL 1.30 */
-      else if (inst->Texture.Texture == TGSI_TEXTURE_RECT)
-         snprintf(buf, 255, "%s = texture2DRect(%s, %s.xy)%s;\n", dsts[0], srcs[sampler_index], srcs[0], writemask);
-      else if (inst->Texture.Texture == TGSI_TEXTURE_SHADOWRECT)
-         snprintf(buf, 255, "%s = shadow2DRect(%s, %s.xyz)%s;\n", dsts[0], srcs[sampler_index], srcs[0], writemask);
-      else if (is_shad) { /* TGSI returns 1.0 in alpha */
-         const char *mname = ctx->prog_type == TGSI_PROCESSOR_VERTEX ? "vsshadmask" : "fsshadmask";
-         const char *cname = ctx->prog_type == TGSI_PROCESSOR_VERTEX ? "vsshadadd" : "fsshadadd";
-         const struct tgsi_full_src_register *src = &inst->Src[sampler_index];
-         snprintf(buf, 255, "%s = %s(vec4(vec4(texture%s(%s, %s%s%s%s)) * %s%d + %s%d)%s);\n", dsts[0], dstconv, tex_ext, srcs[sampler_index], srcs[0], twm, offbuf, bias, mname, src->Register.Index, cname, src->Register.Index, writemask);
-      } else
-         snprintf(buf, 255, "%s = %s(texture%s(%s, %s%s%s%s)%s);\n", dsts[0], dstconv, tex_ext, srcs[sampler_index], srcs[0], twm, offbuf, bias, ctx->outputs[0].override_no_wm ? "" : writemask);
-      emit_buf(ctx, buf);
-      break;
    case TGSI_OPCODE_TXP:
-
-      sampler_index = 1;
-      ctx->samplers[sreg_index].tgsi_sampler_type = inst->Texture.Texture;
-
-      switch (inst->Texture.Texture) {
-      case TGSI_TEXTURE_1D:
-         twm = ".xy";
-         break;
-      case TGSI_TEXTURE_RECT:
-      case TGSI_TEXTURE_CUBE:
-      case TGSI_TEXTURE_2D:
-      case TGSI_TEXTURE_SHADOWRECT:
-      case TGSI_TEXTURE_1D_ARRAY:
-      case TGSI_TEXTURE_2D_ARRAY:
-         twm = ".xyz";
-         break;
-      case TGSI_TEXTURE_SHADOW1D:
-      case TGSI_TEXTURE_SHADOW2D:
-         is_shad = TRUE;
-      case TGSI_TEXTURE_3D:
-         twm = "";
-         break;
-
-      case TGSI_TEXTURE_SHADOW1D_ARRAY:
-      case TGSI_TEXTURE_SHADOWCUBE:
-      case TGSI_TEXTURE_SHADOW2D_ARRAY:
-      case TGSI_TEXTURE_CUBE_ARRAY:
-      case TGSI_TEXTURE_SHADOWCUBE_ARRAY:
-
-      default:
-         fprintf(stderr,"failed to convert TXP opcode %d, invalid texture %d\n", inst->Instruction.Opcode, inst->Texture.Texture);
-         return FALSE;
-         break;
-      }
-      tex_ext = "";
-
-      if (inst->Texture.Texture == TGSI_TEXTURE_RECT)
-         snprintf(buf, 255, "%s = texture2DRectProj(%s, %s)%s;\n", dsts[0], srcs[1], srcs[0], writemask);
-      else if (inst->Texture.Texture == TGSI_TEXTURE_SHADOWRECT)
-         snprintf(buf, 255, "%s = shadow2DRectProj(%s, %s)%s;\n", dsts[0], srcs[1], srcs[0], writemask);
-      else if (inst->Texture.Texture == TGSI_TEXTURE_CUBE || inst->Texture.Texture == TGSI_TEXTURE_2D_ARRAY)
-         snprintf(buf, 255, "%s = texture(%s, %s.xyz)%s;\n", dsts[0], srcs[1], srcs[0], writemask);
-      else if (inst->Texture.Texture == TGSI_TEXTURE_1D_ARRAY)
-         snprintf(buf, 255, "%s = texture(%s, %s.xy)%s;\n", dsts[0], srcs[1], srcs[0], writemask);
-      else if (is_shad) { /* TGSI returns 1.0 in alpha */
-         const char *mname = ctx->prog_type == TGSI_PROCESSOR_VERTEX ? "vsshadmask" : "fsshadmask";
-         const char *cname = ctx->prog_type == TGSI_PROCESSOR_VERTEX ? "vsshadadd" : "fsshadadd";
-         const struct tgsi_full_src_register *src = &inst->Src[sampler_index];
-         snprintf(buf, 255, "%s = %s(vec4(vec4(textureProj%s(%s, %s%s%s)) * %s%d + %s%d)%s);\n", dsts[0], dstconv, tex_ext, srcs[sampler_index], srcs[0], twm, bias, mname, src->Register.Index, cname, src->Register.Index, writemask);
-      } else
-         snprintf(buf, 255, "%s = %s(textureProj(%s, %s)%s);\n", dsts[0], dstconv, srcs[1], srcs[0], writemask);
-
-      emit_buf(ctx, buf);
+   case TGSI_OPCODE_TXQ:
+      translate_tex(ctx, inst, sreg_index, srcs, dsts, writemask, dstconv, dtypeprefix);
       break;
-   case TGSI_OPCODE_TXQ: {
-      ctx->samplers[sreg_index].tgsi_sampler_type = inst->Texture.Texture;
-      if (inst->Texture.Texture == TGSI_TEXTURE_CUBE_ARRAY || inst->Texture.Texture == TGSI_TEXTURE_SHADOWCUBE_ARRAY)
-         ctx->uses_cube_array = TRUE;
-      if (inst->Texture.Texture == TGSI_TEXTURE_2D_MSAA || inst->Texture.Texture == TGSI_TEXTURE_2D_ARRAY_MSAA) {
-         ctx->uses_sampler_ms = TRUE;
-      } else if (inst->Texture.Texture == TGSI_TEXTURE_BUFFER)
-         ctx->uses_sampler_buf = TRUE;
-      else if (inst->Texture.Texture != TGSI_TEXTURE_RECT)
-         snprintf(bias, 64, ", int(%s.w)", srcs[0]);
-      sampler_index = 1;
-      snprintf(buf, 255, "%s = %s(%s(textureSize(%s%s)));\n", dsts[0], dstconv, dtypeprefix, srcs[sampler_index], bias);
-      emit_buf(ctx, buf);
-      break;
-   } 
    case TGSI_OPCODE_I2F:
       snprintf(buf, 255, "%s = %s(ivec4(%s));\n", dsts[0], dstconv, srcs[0]);
       emit_buf(ctx, buf);

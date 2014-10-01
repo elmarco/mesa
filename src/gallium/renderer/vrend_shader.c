@@ -665,72 +665,22 @@ static void translate_tex(struct dump_ctx *ctx,
       return;
    }
 
-   if (inst->Instruction.Opcode == TGSI_OPCODE_TXP) {
-      switch (inst->Texture.Texture) {
-      case TGSI_TEXTURE_1D:
-         twm = ".xy";
-         break;
-      case TGSI_TEXTURE_RECT:
-      case TGSI_TEXTURE_CUBE:
-      case TGSI_TEXTURE_2D:
-      case TGSI_TEXTURE_1D_ARRAY:
-      case TGSI_TEXTURE_2D_ARRAY:
-         twm = ".xyz";
-         break;
-
-         break;
-      case TGSI_TEXTURE_SHADOW1D:
-      case TGSI_TEXTURE_SHADOW2D:
-      case TGSI_TEXTURE_SHADOWRECT:
-      case TGSI_TEXTURE_3D:
-         twm = "";
-         break;
-
-      case TGSI_TEXTURE_SHADOW1D_ARRAY:
-      case TGSI_TEXTURE_SHADOWCUBE:
-      case TGSI_TEXTURE_SHADOW2D_ARRAY:
-      case TGSI_TEXTURE_CUBE_ARRAY:
-      case TGSI_TEXTURE_SHADOWCUBE_ARRAY:
-
-      default:
-         fprintf(stderr,"failed to convert TXP opcode %d, invalid texture %d\n", inst->Instruction.Opcode, inst->Texture.Texture);
-         return;
-         break;
-      }
-      tex_ext = "";
-
-      if (ctx->cfg->glsl_version < 140 && ctx->uses_sampler_rect) {
-         if (inst->Texture.Texture == TGSI_TEXTURE_RECT)
-            snprintf(buf, 255, "%s = texture2DRectProj(%s, %s)%s;\n", dsts[0], srcs[1], srcs[0], writemask);
-         else if (inst->Texture.Texture == TGSI_TEXTURE_SHADOWRECT)
-            snprintf(buf, 255, "%s = shadow2DRectProj(%s, %s)%s;\n", dsts[0], srcs[1], srcs[0], writemask);
-      }
-      else if (inst->Texture.Texture == TGSI_TEXTURE_CUBE || inst->Texture.Texture == TGSI_TEXTURE_2D_ARRAY)
-         snprintf(buf, 255, "%s = texture(%s, %s.xyz)%s;\n", dsts[0], srcs[1], srcs[0], writemask);
-      else if (inst->Texture.Texture == TGSI_TEXTURE_1D_ARRAY)
-         snprintf(buf, 255, "%s = texture(%s, %s.xy)%s;\n", dsts[0], srcs[1], srcs[0], writemask);
-      else if (is_shad) { /* TGSI returns 1.0 in alpha */
-         const char *mname = ctx->prog_type == TGSI_PROCESSOR_VERTEX ? "vsshadmask" : "fsshadmask";
-         const char *cname = ctx->prog_type == TGSI_PROCESSOR_VERTEX ? "vsshadadd" : "fsshadadd";
-         const struct tgsi_full_src_register *src = &inst->Src[sampler_index];
-         snprintf(buf, 255, "%s = %s(vec4(vec4(textureProj%s(%s, %s%s%s)) * %s%d + %s%d)%s);\n", dsts[0], dstconv, tex_ext, srcs[sampler_index], srcs[0], twm, bias, mname, src->Register.Index, cname, src->Register.Index, writemask);
-      } else
-         snprintf(buf, 255, "%s = %s(textureProj(%s, %s)%s);\n", dsts[0], dstconv, srcs[1], srcs[0], writemask);
-
-      emit_buf(ctx, buf);
-      return;
-   }
-
    switch (inst->Texture.Texture) {
    case TGSI_TEXTURE_1D:
    case TGSI_TEXTURE_BUFFER:
-      twm = ".x";
+      if (inst->Instruction.Opcode == TGSI_OPCODE_TXP)
+         twm = "";
+      else
+         twm = ".x";
       txfi = "int";
       break;
    case TGSI_TEXTURE_2D:
    case TGSI_TEXTURE_RECT:
    case TGSI_TEXTURE_1D_ARRAY:
-      twm = ".xy";
+      if (inst->Instruction.Opcode == TGSI_OPCODE_TXP)
+         twm = "";
+      else
+         twm = ".xy";
       txfi = "ivec2";
       break;
    case TGSI_TEXTURE_SHADOW1D:
@@ -740,7 +690,10 @@ static void translate_tex(struct dump_ctx *ctx,
    case TGSI_TEXTURE_3D:
    case TGSI_TEXTURE_CUBE:
    case TGSI_TEXTURE_2D_ARRAY:
-      twm = ".xyz";
+      if (inst->Instruction.Opcode == TGSI_OPCODE_TXP)
+         twm = "";
+      else
+         twm = ".xyz";
       txfi = "ivec3";
       break;
    case TGSI_TEXTURE_2D_MSAA:
@@ -781,6 +734,7 @@ static void translate_tex(struct dump_ctx *ctx,
       case TGSI_TEXTURE_3D:
       case TGSI_TEXTURE_CUBE:
       case TGSI_TEXTURE_SHADOWCUBE:
+      case TGSI_TEXTURE_CUBE_ARRAY:
          gwm = ".xyz";
          break;
       default:
@@ -814,7 +768,14 @@ static void translate_tex(struct dump_ctx *ctx,
    else
       bias[0] = 0;
 
-   if (inst->Instruction.Opcode == TGSI_OPCODE_TXL || inst->Instruction.Opcode == TGSI_OPCODE_TXL2) {
+   if (inst->Instruction.Opcode == TGSI_OPCODE_TXP) {
+      if (inst->Texture.Texture == TGSI_TEXTURE_CUBE || inst->Texture.Texture == TGSI_TEXTURE_2D_ARRAY || inst->Texture.Texture == TGSI_TEXTURE_1D_ARRAY)
+         tex_ext = "";
+      else if (inst->Texture.NumOffsets == 1)
+         tex_ext = "ProjOffset";
+      else
+         tex_ext = "Proj";
+   } else if (inst->Instruction.Opcode == TGSI_OPCODE_TXL || inst->Instruction.Opcode == TGSI_OPCODE_TXL2) {
       if (inst->Texture.NumOffsets == 1)
          tex_ext = "LodOffset";
       else

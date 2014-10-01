@@ -57,7 +57,7 @@ static void vrend_destroy_query_object(void *obj_ptr);
 static void vrend_finish_context_switch(struct vrend_context *ctx);
 static void vrend_patch_blend_func(struct vrend_context *ctx);
 static void vrend_update_frontface_state(struct vrend_context *ctx);
-static void vrender_get_glsl_version(int *major, int *minor);
+static void vrender_get_glsl_version(int *glsl_version);
 extern int vrend_shader_use_explicit;
 static int have_invert_mesa = 0;
 static int use_core_profile = 0;
@@ -3049,8 +3049,7 @@ struct vrend_context *vrend_create_context(int id, uint32_t nlen, const char *de
 
    grctx->res_hash = vrend_object_init_ctx_table();
 
-   vrender_get_glsl_version(&grctx->shader_cfg.glsl_major,
-                            &grctx->shader_cfg.glsl_minor);
+   vrender_get_glsl_version(&grctx->shader_cfg.glsl_version);
    vrend_bind_va(grctx->vaoid);
    return grctx;
 }
@@ -4649,21 +4648,21 @@ void vrend_create_so_target(struct vrend_context *ctx,
                        VIRGL_OBJECT_STREAMOUT_TARGET);
 }
 
-static void vrender_get_glsl_version(int *major, int *minor)
+static void vrender_get_glsl_version(int *glsl_version)
 {
    int major_local, minor_local;
    const GLubyte *version_str;
    int c;
+   int version;
 
    version_str = glGetString(GL_SHADING_LANGUAGE_VERSION);
    c = sscanf((const char *)version_str, "%i.%i",
               &major_local, &minor_local);
    assert(c == 2);
 
-   if (major)
-      *major = major_local;
-   if (minor)
-      *minor = minor_local;
+   version = (major_local * 100) + minor_local;
+   if (glsl_version)
+      *glsl_version = version;
 }
 
 void vrend_renderer_fill_caps(uint32_t set, uint32_t version,
@@ -4671,7 +4670,6 @@ void vrend_renderer_fill_caps(uint32_t set, uint32_t version,
 {
    int i;
    GLint max;
-   int glsl_major, glsl_minor;
    int gl_ver = epoxy_gl_version();
    memset(caps, 0, sizeof(*caps));
 
@@ -4679,7 +4677,7 @@ void vrend_renderer_fill_caps(uint32_t set, uint32_t version,
       caps->max_version = 0;
       return;
    }
-   vrender_get_glsl_version(&glsl_major, &glsl_minor);
+
    caps->max_version = 1;
 
    caps->v1.bset.occlusion_query = 1;

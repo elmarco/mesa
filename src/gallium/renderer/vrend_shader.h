@@ -57,7 +57,7 @@ struct vrend_shader_key {
 };
   
 struct vrend_shader_cfg {
-   int glsl_major, glsl_minor;
+   int glsl_version;
 };
 
 boolean vrend_patch_vertex_shader_interpolants(char *program,

@@ -118,6 +118,7 @@ struct dump_ctx {
    int indent_level;
    int num_clip_dist;
 
+   int glsl_ver_required;
 };
 
 static inline const char *tgsi_proc_to_prefix(int shader_type)
@@ -645,6 +646,10 @@ static void translate_tex(struct dump_ctx *ctx,
       break;
    }
 
+   if (ctx->cfg->glsl_version >= 140)
+      if (ctx->uses_sampler_rect || ctx->uses_sampler_buf)
+         ctx->glsl_ver_required = 140;
+
    sampler_index = 1;
 
    if (inst->Instruction.Opcode == TGSI_OPCODE_TXQ) {
@@ -668,13 +673,15 @@ static void translate_tex(struct dump_ctx *ctx,
       case TGSI_TEXTURE_RECT:
       case TGSI_TEXTURE_CUBE:
       case TGSI_TEXTURE_2D:
-      case TGSI_TEXTURE_SHADOWRECT:
       case TGSI_TEXTURE_1D_ARRAY:
       case TGSI_TEXTURE_2D_ARRAY:
          twm = ".xyz";
          break;
+
+         break;
       case TGSI_TEXTURE_SHADOW1D:
       case TGSI_TEXTURE_SHADOW2D:
+      case TGSI_TEXTURE_SHADOWRECT:
       case TGSI_TEXTURE_3D:
          twm = "";
          break;
@@ -692,10 +699,12 @@ static void translate_tex(struct dump_ctx *ctx,
       }
       tex_ext = "";
 
-      if (inst->Texture.Texture == TGSI_TEXTURE_RECT)
-         snprintf(buf, 255, "%s = texture2DRectProj(%s, %s)%s;\n", dsts[0], srcs[1], srcs[0], writemask);
-      else if (inst->Texture.Texture == TGSI_TEXTURE_SHADOWRECT)
-         snprintf(buf, 255, "%s = shadow2DRectProj(%s, %s)%s;\n", dsts[0], srcs[1], srcs[0], writemask);
+      if (ctx->cfg->glsl_version < 140 && ctx->uses_sampler_rect) {
+         if (inst->Texture.Texture == TGSI_TEXTURE_RECT)
+            snprintf(buf, 255, "%s = texture2DRectProj(%s, %s)%s;\n", dsts[0], srcs[1], srcs[0], writemask);
+         else if (inst->Texture.Texture == TGSI_TEXTURE_SHADOWRECT)
+            snprintf(buf, 255, "%s = shadow2DRectProj(%s, %s)%s;\n", dsts[0], srcs[1], srcs[0], writemask);
+      }
       else if (inst->Texture.Texture == TGSI_TEXTURE_CUBE || inst->Texture.Texture == TGSI_TEXTURE_2D_ARRAY)
          snprintf(buf, 255, "%s = texture(%s, %s.xyz)%s;\n", dsts[0], srcs[1], srcs[0], writemask);
       else if (inst->Texture.Texture == TGSI_TEXTURE_1D_ARRAY)
@@ -727,6 +736,7 @@ static void translate_tex(struct dump_ctx *ctx,
    case TGSI_TEXTURE_SHADOW1D:
    case TGSI_TEXTURE_SHADOW2D:
    case TGSI_TEXTURE_SHADOW1D_ARRAY:
+   case TGSI_TEXTURE_SHADOWRECT:
    case TGSI_TEXTURE_3D:
    case TGSI_TEXTURE_CUBE:
    case TGSI_TEXTURE_2D_ARRAY:
@@ -764,6 +774,8 @@ static void translate_tex(struct dump_ctx *ctx,
       case TGSI_TEXTURE_SHADOW2D:
       case TGSI_TEXTURE_2D_ARRAY:
       case TGSI_TEXTURE_SHADOW2D_ARRAY:
+      case TGSI_TEXTURE_RECT:
+      case TGSI_TEXTURE_SHADOWRECT:
          gwm = ".xy";
          break;
       case TGSI_TEXTURE_3D:
@@ -829,6 +841,7 @@ static void translate_tex(struct dump_ctx *ctx,
          snprintf(offbuf, 25, ", int(%d)", imd->val[inst->TexOffsets[0].SwizzleX].i);
          break;
       case TGSI_TEXTURE_RECT:
+      case TGSI_TEXTURE_SHADOWRECT:
       case TGSI_TEXTURE_2D:
       case TGSI_TEXTURE_2D_ARRAY:
       case TGSI_TEXTURE_SHADOW2D:
@@ -851,13 +864,13 @@ static void translate_tex(struct dump_ctx *ctx,
    }
    if (inst->Instruction.Opcode == TGSI_OPCODE_TXF) {
       snprintf(buf, 255, "%s = %s(texelFetch%s(%s, %s(%s%s)%s%s)%s);\n", dsts[0], dstconv, tex_ext, srcs[sampler_index], txfi, srcs[0], twm, bias, offbuf, ctx->outputs[0].override_no_wm ? "" : writemask);
-   }
-   /* rect is special in GLSL 1.30 */
-   else if (inst->Texture.Texture == TGSI_TEXTURE_RECT)
-      snprintf(buf, 255, "%s = texture2DRect(%s, %s.xy)%s;\n", dsts[0], srcs[sampler_index], srcs[0], writemask);
-   else if (inst->Texture.Texture == TGSI_TEXTURE_SHADOWRECT)
-      snprintf(buf, 255, "%s = shadow2DRect(%s, %s.xyz)%s;\n", dsts[0], srcs[sampler_index], srcs[0], writemask);
-   else if (is_shad) { /* TGSI returns 1.0 in alpha */
+   } else if (ctx->cfg->glsl_version < 140 && ctx->uses_sampler_rect) {
+      /* rect is special in GLSL 1.30 */
+      if (inst->Texture.Texture == TGSI_TEXTURE_RECT)
+         snprintf(buf, 255, "%s = texture2DRect(%s, %s.xy)%s;\n", dsts[0], srcs[sampler_index], srcs[0], writemask);
+      else if (inst->Texture.Texture == TGSI_TEXTURE_SHADOWRECT)
+         snprintf(buf, 255, "%s = shadow2DRect(%s, %s.xyz)%s;\n", dsts[0], srcs[sampler_index], srcs[0], writemask);
+   } else if (is_shad) { /* TGSI returns 1.0 in alpha */
       const char *mname = ctx->prog_type == TGSI_PROCESSOR_VERTEX ? "vsshadmask" : "fsshadmask";
       const char *cname = ctx->prog_type == TGSI_PROCESSOR_VERTEX ? "vsshadadd" : "fsshadadd";
       const struct tgsi_full_src_register *src = &inst->Src[sampler_index];
@@ -1481,7 +1494,7 @@ static void emit_header(struct dump_ctx *ctx, char *glsl_final)
 {
    if (ctx->prog_type == TGSI_PROCESSOR_GEOMETRY)
       strcat(glsl_final, "#version 150\n");
-   else if (ctx->uses_sampler_buf)
+   else if (ctx->glsl_ver_required == 140)
       strcat(glsl_final, "#version 140\n");
    else
       strcat(glsl_final, "#version 130\n");
@@ -1489,7 +1502,8 @@ static void emit_header(struct dump_ctx *ctx, char *glsl_final)
       strcat(glsl_final, "#extension GL_ARB_explicit_attrib_location : enable\n");
    if (ctx->prog_type == TGSI_PROCESSOR_FRAGMENT && fs_emit_layout(ctx))
       strcat(glsl_final, "#extension GL_ARB_fragment_coord_conventions : enable\n");
-   strcat(glsl_final, "#extension GL_ARB_texture_rectangle : require\n");
+   if (ctx->glsl_ver_required < 140 && ctx->uses_sampler_rect)
+      strcat(glsl_final, "#extension GL_ARB_texture_rectangle : require\n");
    if (ctx->uses_cube_array)
       strcat(glsl_final, "#extension GL_ARB_texture_cube_map_array : require\n");
    if (ctx->has_ints)

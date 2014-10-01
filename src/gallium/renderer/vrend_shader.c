@@ -1703,9 +1703,10 @@ static boolean fill_interpolants(struct dump_ctx *ctx, struct vrend_shader_info 
    return FALSE;
 }
 
-char *tgsi_convert(const struct tgsi_token *tokens,
-                   struct vrend_shader_key *key,
-                   struct vrend_shader_info *sinfo)
+char *vrend_convert_shader(struct vrend_shader_cfg *cfg,
+                           const struct tgsi_token *tokens,
+                           struct vrend_shader_key *key,
+                           struct vrend_shader_info *sinfo)
 {
    struct dump_ctx ctx;
    char *glsl_final;

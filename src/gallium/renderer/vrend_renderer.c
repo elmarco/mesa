@@ -58,7 +58,7 @@ static void vrend_destroy_query_object(void *obj_ptr);
 static void vrend_finish_context_switch(struct vrend_context *ctx);
 static void vrend_patch_blend_func(struct vrend_context *ctx);
 static void vrend_update_frontface_state(struct vrend_context *ctx);
-
+static void vrender_get_glsl_version(int *major, int *minor);
 extern int vrend_shader_use_explicit;
 static int have_invert_mesa = 0;
 static int use_core_profile = 0;
@@ -342,6 +342,8 @@ struct vrend_context {
 
    boolean pstip_inited;
    GLuint pstipple_tex_id;
+
+   struct vrend_shader_cfg shader_cfg;
 };
 
 static struct vrend_nontimer_hw_query *vrend_create_hw_query(struct vrend_query *query);
@@ -1557,7 +1559,7 @@ static int vrend_shader_create(struct vrend_context *ctx,
 
    shader->id = glCreateShader(conv_shader_type(shader->sel->type));
    shader->compiled_fs_id = 0;
-   shader->glsl_prog = tgsi_convert(shader->sel->tokens, &key, &shader->sel->sinfo);
+   shader->glsl_prog = vrend_convert_shader(&ctx->shader_cfg, shader->sel->tokens, &key, &shader->sel->sinfo);
    shader->key = key;
    if (shader->sel->type == PIPE_SHADER_FRAGMENT || shader->sel->type == PIPE_SHADER_GEOMETRY) {
       boolean ret;
@@ -3047,6 +3049,8 @@ struct vrend_context *vrend_create_context(int id, uint32_t nlen, const char *de
 
    grctx->res_hash = vrend_object_init_ctx_table();
 
+   vrender_get_glsl_version(&grctx->shader_cfg.glsl_major,
+                            &grctx->shader_cfg.glsl_minor);
    vrend_bind_va(grctx->vaoid);
    return grctx;
 }

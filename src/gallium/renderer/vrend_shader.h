@@ -55,13 +55,18 @@ struct vrend_shader_key {
    uint8_t alpha_test;
    float alpha_ref_val;
 };
-      
+  
+struct vrend_shader_cfg {
+   int glsl_major, glsl_minor;
+};
+
 boolean vrend_patch_vertex_shader_interpolants(char *program,
                                                struct vrend_shader_info *vs_info,
                                                struct vrend_shader_info *fs_info);
 
-char *tgsi_convert(const struct tgsi_token *tokens,
-                   struct vrend_shader_key *key,
-                   struct vrend_shader_info *sinfo);
+char *vrend_convert_shader(struct vrend_shader_cfg *cfg,
+                           const struct tgsi_token *tokens,
+                           struct vrend_shader_key *key,
+                           struct vrend_shader_info *sinfo);
 
 #endif

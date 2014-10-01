@@ -53,7 +53,6 @@
 static struct vrend_resource *vrend_renderer_ctx_res_lookup(struct vrend_context *ctx, int res_handle);
 static void vrend_update_viewport_state(struct vrend_context *ctx);
 static void vrend_update_scissor_state(struct vrend_context *ctx);
-static void vrend_ctx_restart_queries(struct vrend_context *ctx);
 static void vrend_destroy_query_object(void *obj_ptr);
 static void vrend_finish_context_switch(struct vrend_context *ctx);
 static void vrend_patch_blend_func(struct vrend_context *ctx);
@@ -2128,7 +2127,8 @@ void vrend_draw_vbo(struct vrend_context *ctx,
       case 2: 
          elsz = GL_UNSIGNED_SHORT;
          break;
-      case 4: 
+      case 4:
+      default:
          elsz = GL_UNSIGNED_INT;
          break;
       }
@@ -3275,7 +3275,6 @@ static void iov_buffer_upload(void *cookie, uint32_t doff, void *src, int len)
 
 static void vrend_scale_depth(void *ptr, int size, float scale_val)
 {
-   GLfloat *pf = ptr;
    GLuint *ival = ptr;
    const GLfloat myscale = 1.0f / 0xffffff;
    int i;
@@ -4332,6 +4331,7 @@ static void vrend_ctx_finish_queries(struct vrend_context *ctx)
    }
 }
 
+#if 0
 static void vrend_ctx_restart_queries(struct vrend_context *ctx)
 {
    struct vrend_query *query;
@@ -4349,6 +4349,7 @@ static void vrend_ctx_restart_queries(struct vrend_context *ctx)
       }
    }
 }
+#endif
 
 /* stop all the nontimer queries running in the current context */
 void vrend_stop_current_queries(void)
@@ -4582,8 +4583,8 @@ void vrend_render_condition(struct vrend_context *ctx,
                             uint mode)
 {
    struct vrend_query *q;
-   GLenum glmode;
-   struct vrend_nontimer_hw_query *hwq, *last;
+   GLenum glmode = 0;
+   struct vrend_nontimer_hw_query *hwq, *last = NULL;
 
    if (handle == 0) {
       glEndConditionalRenderNV();
@@ -4611,7 +4612,9 @@ void vrend_render_condition(struct vrend_context *ctx,
 
    LIST_FOR_EACH_ENTRY(hwq, &q->hw_queries, query_list)
       last = hwq;
-      
+
+   if (!last)
+      return;
    glBeginConditionalRender(last->id, glmode);
    
 }

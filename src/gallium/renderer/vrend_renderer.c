@@ -3963,7 +3963,7 @@ static void vrend_resource_copy_fallback(struct vrend_context *ctx,
 
    /* this is ugly need to do a full GetTexImage */
    transfer_size = util_format_get_nblocks(src_res->base.format, u_minify(src_res->base.width0, src_level), u_minify(src_res->base.height0, src_level)) *
-      u_minify(src_res->base.depth0, src_level) * util_format_get_blocksize(src_res->base.format);
+      u_minify(src_res->base.depth0, src_level) * util_format_get_blocksize(src_res->base.format) * src_res->base.array_size;
 
    tptr = malloc(transfer_size);
    if (!tptr)

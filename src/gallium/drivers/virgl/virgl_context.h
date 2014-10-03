@@ -55,6 +55,7 @@ struct virgl_context {
    struct list_head to_flush_bufs;
 
    struct primconvert_context *primconvert;
+   uint32_t hw_sub_ctx_id;
 };
 
 struct pipe_context *virgl_context_create(struct pipe_screen *pscreen,

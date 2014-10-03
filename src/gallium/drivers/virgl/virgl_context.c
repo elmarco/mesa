@@ -498,6 +498,8 @@ static void virgl_flush_eq(struct virgl_context *ctx, void *closure)
    ctx->num_transfers = ctx->num_draws = 0;
    rs->vws->submit_cmd(rs->vws, ctx->cbuf);
 
+   virgl_encoder_set_sub_ctx(ctx, ctx->hw_sub_ctx_id);
+
    /* add back current framebuffer resources to reference list? */
    {
       struct virgl_winsys *vws = virgl_screen(ctx->base.screen)->vws;
@@ -729,6 +731,9 @@ virgl_context_destroy( struct pipe_context *ctx )
    struct virgl_context *vctx = (struct virgl_context *)ctx;
    struct virgl_screen *rs = virgl_screen(ctx->screen);
    
+   virgl_encoder_destroy_sub_ctx(vctx, vctx->hw_sub_ctx_id);
+   virgl_flush_eq(vctx, vctx);
+
    rs->vws->cmd_buf_destroy(vctx->cbuf);
    if (vctx->blitter)
       util_blitter_destroy(vctx->blitter);
@@ -830,6 +835,10 @@ struct pipe_context *virgl_context_create(struct pipe_screen *pscreen,
 //   if (vctx->blitter == NULL)
 //      goto fail;
 
+   vctx->hw_sub_ctx_id = rs->sub_ctx_id++;
+   virgl_encoder_create_sub_ctx(vctx, vctx->hw_sub_ctx_id);
+
+   virgl_encoder_set_sub_ctx(vctx, vctx->hw_sub_ctx_id);
    return &vctx->base;
 fail:
    return NULL;

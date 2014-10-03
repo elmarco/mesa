@@ -4977,3 +4977,18 @@ void vrend_renderer_get_cap_set(uint32_t cap_set, uint32_t *max_ver,
    *max_ver = 1;
    *max_size = sizeof(union virgl_caps);
 }
+
+void vrend_renderer_create_sub_ctx(struct vrend_context *ctx, int sub_ctx_id)
+{
+
+}
+
+void vrend_renderer_destroy_sub_ctx(struct vrend_context *ctx, int sub_ctx_id)
+{
+
+}
+
+void vrend_renderer_set_sub_ctx(struct vrend_context *ctx, int sub_ctx_id)
+{
+
+}

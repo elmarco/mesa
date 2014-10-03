@@ -13,6 +13,8 @@ struct virgl_screen {
    struct virgl_winsys *vws;
 
    struct virgl_drm_caps caps;
+
+   uint32_t sub_ctx_id;
 };
 
 

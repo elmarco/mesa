@@ -760,3 +760,24 @@ int virgl_encoder_set_so_targets(struct virgl_context *ctx,
    return 0;
 }
 
+
+int virgl_encoder_set_sub_ctx(struct virgl_context *ctx, uint32_t sub_ctx_id)
+{
+   virgl_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_SET_SUB_CTX, 0, 1));
+   virgl_encoder_write_dword(ctx->cbuf, sub_ctx_id);
+   return 0;
+}
+
+int virgl_encoder_create_sub_ctx(struct virgl_context *ctx, uint32_t sub_ctx_id)
+{
+   virgl_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_CREATE_SUB_CTX, 0, 1));
+   virgl_encoder_write_dword(ctx->cbuf, sub_ctx_id);
+   return 0;
+}
+
+int virgl_encoder_destroy_sub_ctx(struct virgl_context *ctx, uint32_t sub_ctx_id)
+{
+   virgl_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_DESTROY_SUB_CTX, 0, 1));
+   virgl_encoder_write_dword(ctx->cbuf, sub_ctx_id);
+   return 0;
+}

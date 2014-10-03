@@ -749,6 +749,27 @@ static void vrend_decode_set_render_condition(struct vrend_decode_ctx *ctx)
    vrend_render_condition(ctx->grctx, handle, condition, mode);
 }
 
+static void vrend_decode_set_sub_ctx(struct vrend_decode_ctx *ctx)
+{
+   uint32_t ctx_sub_id = get_buf_entry(ctx, 1);
+
+   vrend_renderer_set_sub_ctx(ctx->grctx, ctx_sub_id);
+}
+
+static void vrend_decode_create_sub_ctx(struct vrend_decode_ctx *ctx)
+{
+   uint32_t ctx_sub_id = get_buf_entry(ctx, 1);
+
+   vrend_renderer_create_sub_ctx(ctx->grctx, ctx_sub_id);
+}
+
+static void vrend_decode_destroy_sub_ctx(struct vrend_decode_ctx *ctx)
+{
+   uint32_t ctx_sub_id = get_buf_entry(ctx, 1);
+
+   vrend_renderer_destroy_sub_ctx(ctx->grctx, ctx_sub_id);
+}
+
 static void vrend_decode_set_streamout_targets(struct vrend_decode_ctx *ctx,
                                               uint16_t length)
 {
@@ -931,6 +952,15 @@ void vrend_decode_block(uint32_t ctx_id, uint32_t *block, int ndw)
 	 break;
       case VIRGL_CCMD_SET_UNIFORM_BUFFER:
          vrend_decode_set_uniform_buffer(gdctx);
+         break;
+      case VIRGL_CCMD_SET_SUB_CTX:
+         vrend_decode_set_sub_ctx(gdctx);
+         break;
+      case VIRGL_CCMD_CREATE_SUB_CTX:
+         vrend_decode_create_sub_ctx(gdctx);
+         break;
+      case VIRGL_CCMD_DESTROY_SUB_CTX:
+         vrend_decode_destroy_sub_ctx(gdctx);
          break;
       }
       gdctx->ds->buf_offset += (header >> 16) + 1;

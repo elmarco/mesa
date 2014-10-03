@@ -3050,6 +3050,7 @@ struct vrend_context *vrend_create_context(int id, uint32_t nlen, const char *de
    grctx->res_hash = vrend_object_init_ctx_table();
 
    vrender_get_glsl_version(&grctx->shader_cfg.glsl_version);
+   grctx->shader_cfg.use_core_profile = use_core_profile;
    vrend_bind_va(grctx->vaoid);
    return grctx;
 }

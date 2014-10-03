@@ -41,6 +41,7 @@ struct vrend_shader_info {
    int num_interps;
    int num_outputs;
    int num_ubos;
+   int glsl_ver;
    uint32_t shadow_samp_mask;
    struct pipe_stream_output_info so_info;
 
@@ -58,6 +59,7 @@ struct vrend_shader_key {
   
 struct vrend_shader_cfg {
    int glsl_version;
+   bool use_core_profile;
 };
 
 boolean vrend_patch_vertex_shader_interpolants(char *program,

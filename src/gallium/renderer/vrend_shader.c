@@ -195,13 +195,16 @@ iter_declaration(struct tgsi_iterate_context *iter,
       switch (ctx->inputs[i].name) {
       case TGSI_SEMANTIC_COLOR:
          if (iter->processor.Processor == TGSI_PROCESSOR_FRAGMENT) {
-            if (decl->Semantic.Index == 0)
-               name_prefix = "gl_Color";
-            else if (decl->Semantic.Index == 1)
-               name_prefix = "gl_SecondaryColor";
-            else
-               fprintf(stderr, "got illegal color semantic index %d\n", decl->Semantic.Index);
-            ctx->inputs[i].glsl_no_index = TRUE;
+            if (ctx->glsl_ver_required < 140) {
+               if (decl->Semantic.Index == 0)
+                  name_prefix = "gl_Color";
+               else if (decl->Semantic.Index == 1)
+                  name_prefix = "gl_SecondaryColor";
+               else
+                  fprintf(stderr, "got illegal color semantic index %d\n", decl->Semantic.Index);
+               ctx->inputs[i].glsl_no_index = TRUE;
+            }
+            name_prefix = "ex";
             break;
          }
          /* fallthrough */
@@ -294,20 +297,28 @@ iter_declaration(struct tgsi_iterate_context *iter,
 
       case TGSI_SEMANTIC_COLOR:
          if (iter->processor.Processor == TGSI_PROCESSOR_VERTEX) {
-            ctx->outputs[i].glsl_no_index = TRUE;
-            if (ctx->outputs[i].sid == 0)
-               name_prefix = "gl_FrontColor";
-            else if (ctx->outputs[i].sid == 1)
-               name_prefix = "gl_FrontSecondaryColor";
+            if (ctx->glsl_ver_required < 140) {
+               ctx->outputs[i].glsl_no_index = TRUE;
+               if (ctx->outputs[i].sid == 0)
+                  name_prefix = "gl_FrontColor";
+               else if (ctx->outputs[i].sid == 1)
+                  name_prefix = "gl_FrontSecondaryColor";
+            } else
+               name_prefix = "ex";
             break;
          }
+
       case TGSI_SEMANTIC_BCOLOR:
          if (iter->processor.Processor == TGSI_PROCESSOR_VERTEX) {
-            ctx->outputs[i].glsl_no_index = TRUE;
-            if (ctx->outputs[i].sid == 0)
-               name_prefix = "gl_BackColor";
-            else if (ctx->outputs[i].sid == 1)
-               name_prefix = "gl_BackSecondaryColor";
+            if (ctx->glsl_ver_required < 140) {
+               ctx->outputs[i].glsl_no_index = TRUE;
+               if (ctx->outputs[i].sid == 0)
+                  name_prefix = "gl_BackColor";
+               else if (ctx->outputs[i].sid == 1)
+                  name_prefix = "gl_BackSecondaryColor";
+               break;
+            } else
+               name_prefix = "ex";
             break;
          }
       case TGSI_SEMANTIC_PSIZE:
@@ -1725,6 +1736,11 @@ char *vrend_convert_shader(struct vrend_shader_cfg *cfg,
    ctx.iter.epilog = NULL;
    ctx.key = key;
    ctx.cfg = cfg;
+
+   /* if we are in core profile mode we should use GLSL 1.40 */
+   if (cfg->use_core_profile && cfg->glsl_version >= 140)
+      ctx.glsl_ver_required = 140;
+
    if (sinfo->so_info.num_outputs) {
       ctx.so = &sinfo->so_info;
    }
@@ -1755,6 +1771,7 @@ char *vrend_convert_shader(struct vrend_shader_cfg *cfg,
    sinfo->num_interps = ctx.num_interps;
    sinfo->num_outputs = ctx.num_outputs;
    sinfo->shadow_samp_mask = ctx.shadow_samp_mask;
+   sinfo->glsl_ver = ctx.glsl_ver_required;
    return glsl_final;
 }
 
@@ -1794,20 +1811,24 @@ boolean vrend_patch_vertex_shader_interpolants(char *program,
          continue;
 
       switch (fs_info->interpinfo[i].semantic_name) {
+      case TGSI_SEMANTIC_COLOR:
+         /* color is a bit trickier */
+         if (fs_info->glsl_ver < 140) {
+            if (fs_info->interpinfo[i].semantic_index == 1) {
+               replace_interp(program, "gl_FrontSecondaryColor", pstring);
+               replace_interp(program, "gl_BackSecondaryColor", pstring);
+            } else {
+               replace_interp(program, "gl_FrontColor", pstring);
+               replace_interp(program, "gl_BackColor", pstring);
+            }
+         } else {
+            snprintf(glsl_name, 64, "ex_c%d", fs_info->interpinfo[i].semantic_index);
+            replace_interp(program, glsl_name, pstring);
+         }
+         break;
       case TGSI_SEMANTIC_GENERIC:
          snprintf(glsl_name, 64, "ex_g%d", fs_info->interpinfo[i].semantic_index);
          replace_interp(program, glsl_name, pstring);
-         break;
-      case TGSI_SEMANTIC_COLOR:
-         /* color is a bit trickier */
-         if (fs_info->interpinfo[i].semantic_index == 1) {
-            replace_interp(program, "gl_FrontSecondaryColor", pstring);
-            replace_interp(program, "gl_BackSecondaryColor", pstring);
-         } else {
-            replace_interp(program, "gl_FrontColor", pstring);
-            replace_interp(program, "gl_BackColor", pstring);
-         }
-
          break;
       }
    }

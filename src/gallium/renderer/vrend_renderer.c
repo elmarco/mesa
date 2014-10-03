@@ -1942,10 +1942,12 @@ void vrend_draw_vbo(struct vrend_context *ctx,
                ctx->views[shader_type].old_ids[i] = id;
             }
             if (ctx->rs_state.point_quad_rasterization) {
-               if (ctx->rs_state.sprite_coord_enable & (1 << i))
-                  glTexEnvi(GL_POINT_SPRITE_ARB, GL_COORD_REPLACE_ARB, GL_TRUE);
-               else
-                  glTexEnvi(GL_POINT_SPRITE_ARB, GL_COORD_REPLACE_ARB, GL_FALSE);
+               if (use_core_profile == 0) {
+                  if (ctx->rs_state.sprite_coord_enable & (1 << i))
+                     glTexEnvi(GL_POINT_SPRITE_ARB, GL_COORD_REPLACE_ARB, GL_TRUE);
+                  else
+                     glTexEnvi(GL_POINT_SPRITE_ARB, GL_COORD_REPLACE_ARB, GL_FALSE);
+               }
             }
             sampler_id++;
          }

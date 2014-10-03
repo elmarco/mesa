@@ -685,9 +685,12 @@ static void translate_tex(struct dump_ctx *ctx,
          twm = ".x";
       txfi = "int";
       break;
+   case TGSI_TEXTURE_1D_ARRAY:
+      twm = ".xy";
+      txfi = "ivec2";
+      break;
    case TGSI_TEXTURE_2D:
    case TGSI_TEXTURE_RECT:
-   case TGSI_TEXTURE_1D_ARRAY:
       if (inst->Instruction.Opcode == TGSI_OPCODE_TXP)
          twm = "";
       else
@@ -699,12 +702,15 @@ static void translate_tex(struct dump_ctx *ctx,
    case TGSI_TEXTURE_SHADOW1D_ARRAY:
    case TGSI_TEXTURE_SHADOWRECT:
    case TGSI_TEXTURE_3D:
-   case TGSI_TEXTURE_CUBE:
-   case TGSI_TEXTURE_2D_ARRAY:
       if (inst->Instruction.Opcode == TGSI_OPCODE_TXP)
          twm = "";
       else
          twm = ".xyz";
+      txfi = "ivec3";
+      break;
+   case TGSI_TEXTURE_CUBE:
+   case TGSI_TEXTURE_2D_ARRAY:
+      twm = ".xyz";
       txfi = "ivec3";
       break;
    case TGSI_TEXTURE_2D_MSAA:

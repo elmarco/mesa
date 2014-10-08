@@ -5100,6 +5100,7 @@ void vrend_renderer_create_sub_ctx(struct vrend_context *ctx, int sub_ctx_id)
    sub->object_hash = vrend_object_init_ctx_table();
    vrend_bind_va(sub->vaoid);
 
+   ctx->sub = sub;
    list_add(&sub->head, &ctx->sub_ctxs);
    if (sub_ctx_id == 0)
 	ctx->sub0 = sub;
@@ -5121,8 +5122,10 @@ void vrend_renderer_destroy_sub_ctx(struct vrend_context *ctx, int sub_ctx_id)
    }
 
    if (tofree) {
-      if (ctx->sub == tofree)
-	ctx->sub = ctx->sub0;
+      if (ctx->sub == tofree) {
+         ctx->sub = ctx->sub0;
+	 clicbs->make_current(0, sub->gl_context);
+      }
       vrend_destroy_sub_context(tofree);
    }
 }
@@ -5139,6 +5142,7 @@ void vrend_renderer_set_sub_ctx(struct vrend_context *ctx, int sub_ctx_id)
       if (sub->sub_ctx_id == sub_ctx_id) {
 	 ctx->sub = sub;
 	 clicbs->make_current(0, sub->gl_context);
+	 break;
       }
    }
 }	 

@@ -733,6 +733,8 @@ virgl_context_destroy( struct pipe_context *ctx )
    struct virgl_context *vctx = (struct virgl_context *)ctx;
    struct virgl_screen *rs = virgl_screen(ctx->screen);
    
+   vctx->framebuffer.zsbuf = NULL;
+   vctx->framebuffer.nr_cbufs = 0;
    virgl_encoder_destroy_sub_ctx(vctx, vctx->hw_sub_ctx_id);
    virgl_flush_eq(vctx, vctx);
 

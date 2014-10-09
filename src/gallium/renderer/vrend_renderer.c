@@ -244,7 +244,7 @@ struct vrend_vertex_element_array {
 };
 
 struct vrend_constants {
-   float *consts;
+   unsigned int *consts;
    uint32_t num_consts;
 };
 
@@ -1369,7 +1369,7 @@ void vrend_set_constants(struct vrend_context *ctx,
 
    consts->num_consts = num_constant;
    for (i = 0; i < num_constant; i++)
-      consts->consts[i] = data[i];
+      consts->consts[i] = ((unsigned int *)data)[i];
 }
 
 void vrend_set_uniform_buffer(struct vrend_context *ctx,
@@ -1975,7 +1975,7 @@ void vrend_draw_vbo(struct vrend_context *ctx,
          }
          for (i = 0; i < nc; i++) {
             if (ctx->sub->prog->const_locs[shader_type][i] != -1 && ctx->sub->consts[shader_type].consts)
-               glUniform4fv(ctx->sub->prog->const_locs[shader_type][i], 1, &ctx->sub->consts[shader_type].consts[i * 4]);
+               glUniform4uiv(ctx->sub->prog->const_locs[shader_type][i], 1, &ctx->sub->consts[shader_type].consts[i * 4]);
          }
          ctx->sub->const_dirty[shader_type] = FALSE;
       }

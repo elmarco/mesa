@@ -1076,10 +1076,19 @@ iter_instruction(struct tgsi_iterate_context *iter,
              } else
                 snprintf(srcs[i], 255, "%s(%s%subo%dcontents[%d]%s)", stypeprefix, prefix, cname, dim, src->Register.Index, swizzle);
           } else {
+             const char *csp;
+             ctx->has_ints = TRUE;
+             if (stype == TGSI_TYPE_FLOAT || stype == TGSI_TYPE_UNTYPED)
+                csp = "uintBitsToFloat";
+             else if (stype == TGSI_TYPE_SIGNED)
+                csp = "ivec4";
+             else
+                csp = "";
+
              if (src->Register.Indirect) {
-                snprintf(srcs[i], 255, "%s(%s%sconst%d[addr0 + %d]%s)", stypeprefix, prefix, cname, dim, src->Register.Index, swizzle);
+                snprintf(srcs[i], 255, "%s%s(%sconst%d[addr0 + %d]%s)", prefix, csp, cname, dim, src->Register.Index, swizzle);
              } else
-                snprintf(srcs[i], 255, "%s(%s%sconst%d[%d]%s)", stypeprefix, prefix, cname, dim, src->Register.Index, swizzle);
+                snprintf(srcs[i], 255, "%s%s(%sconst%d[%d]%s)", prefix, csp, cname, dim, src->Register.Index, swizzle);
           }
       } else if (src->Register.File == TGSI_FILE_SAMPLER) {
           const char *cname = tgsi_proc_to_prefix(ctx->prog_type);
@@ -1703,7 +1712,7 @@ static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
    }
    if (ctx->num_consts) {
       const char *cname = tgsi_proc_to_prefix(ctx->prog_type);
-      snprintf(buf, 255, "uniform vec4 %sconst0[%d];\n", cname, ctx->num_consts);
+      snprintf(buf, 255, "uniform uvec4 %sconst0[%d];\n", cname, ctx->num_consts);
       strcat(glsl_final, buf);
    }
 

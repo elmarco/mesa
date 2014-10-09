@@ -508,13 +508,15 @@ static void virgl_flush_eq(struct virgl_context *ctx, void *closure)
       surf = ctx->framebuffer.zsbuf;
       if (surf) {
          res = (struct virgl_resource *)surf->texture;
-         vws->emit_res(vws, ctx->cbuf, res->hw_res, FALSE);
+         if (res)
+            vws->emit_res(vws, ctx->cbuf, res->hw_res, FALSE);
       }
       for (i = 0; i < ctx->framebuffer.nr_cbufs; i++) {
          surf = ctx->framebuffer.cbufs[i];
          if (surf) {
             res = (struct virgl_resource *)surf->texture;
-            vws->emit_res(vws, ctx->cbuf, res->hw_res, FALSE);
+            if (res)
+               vws->emit_res(vws, ctx->cbuf, res->hw_res, FALSE);
          }
       }
    }

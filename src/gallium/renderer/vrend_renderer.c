@@ -5125,7 +5125,7 @@ void vrend_renderer_destroy_sub_ctx(struct vrend_context *ctx, int sub_ctx_id)
    if (tofree) {
       if (ctx->sub == tofree) {
          ctx->sub = ctx->sub0;
-	 clicbs->make_current(0, sub->gl_context);
+	 clicbs->make_current(0, ctx->sub->gl_context);
       }
       vrend_destroy_sub_context(tofree);
    }

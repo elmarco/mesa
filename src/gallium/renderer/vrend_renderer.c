@@ -1616,6 +1616,7 @@ static INLINE void vrend_fill_shader_key(struct vrend_context *ctx,
       }
 
       key->pstipple_tex = ctx->sub->rs_state.poly_stipple_enable;
+      key->color_two_side = ctx->sub->rs_state.light_twoside;
    } else {
       key->add_alpha_test = 0;
       key->pstipple_tex = 0;
@@ -2728,13 +2729,13 @@ static void vrend_hw_emit_rs(struct vrend_context *ctx)
    } else
       glDisable(GL_CULL_FACE);
 
+   /* two sided lighting handled in shader for core profile */
    if (use_core_profile == 0) {
       if (state->light_twoside)
          glEnable(GL_VERTEX_PROGRAM_TWO_SIDE);
       else
          glDisable(GL_VERTEX_PROGRAM_TWO_SIDE);
-   } else if (state->light_twoside)
-      report_core_warn(ctx, CORE_PROFILE_WARN_TWO_SIDE, 0);
+   }
 
    if (state->clip_plane_enable != vrend_state.hw_rs_state.clip_plane_enable) {
       vrend_state.hw_rs_state.clip_plane_enable = state->clip_plane_enable;

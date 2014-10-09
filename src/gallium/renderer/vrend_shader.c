@@ -119,6 +119,8 @@ struct dump_ctx {
    int num_clip_dist;
 
    int glsl_ver_required;
+   bool front_face_emitted;
+   int color_in_mask;
 };
 
 static inline const char *tgsi_proc_to_prefix(int shader_type)
@@ -178,6 +180,7 @@ iter_declaration(struct tgsi_iterate_context *iter,
    int i;
    int color_offset = 0;
    char *name_prefix = "";
+   bool add_two_side = false;
 
    ctx->prog_type = iter->processor.Processor;
    switch (decl->Declaration.File) {
@@ -203,6 +206,33 @@ iter_declaration(struct tgsi_iterate_context *iter,
                else
                   fprintf(stderr, "got illegal color semantic index %d\n", decl->Semantic.Index);
                ctx->inputs[i].glsl_no_index = TRUE;
+            } else {
+               if (ctx->key->color_two_side) {
+                  int j = ctx->num_inputs++;
+                  ctx->inputs[j].name = TGSI_SEMANTIC_BCOLOR;
+                  ctx->inputs[j].sid = decl->Semantic.Index;
+                  ctx->inputs[j].interpolate = decl->Interp.Interpolate;
+                  ctx->inputs[j].centroid = decl->Interp.Centroid;
+                  ctx->inputs[j].first = decl->Range.First;
+                  ctx->inputs[j].glsl_predefined_no_emit = FALSE;
+                  ctx->inputs[j].glsl_no_index = FALSE;
+                  ctx->inputs[j].override_no_wm = FALSE;
+
+                  ctx->color_in_mask |= (1 << decl->Semantic.Index);
+
+                  if (ctx->front_face_emitted == false) {
+                     int k = ctx->num_inputs++;
+                     ctx->inputs[k].name = TGSI_SEMANTIC_FACE;
+                     ctx->inputs[k].sid = 0;
+                     ctx->inputs[k].interpolate = 0;
+                     ctx->inputs[k].centroid = 0;
+                     ctx->inputs[k].first = 0;
+                     ctx->inputs[k].override_no_wm = FALSE;
+                     ctx->inputs[k].glsl_predefined_no_emit = TRUE;
+                     ctx->inputs[k].glsl_no_index = TRUE;
+                  }
+                  add_two_side = true;
+               }
             }
             name_prefix = "ex";
             break;
@@ -218,9 +248,14 @@ iter_declaration(struct tgsi_iterate_context *iter,
          /* fallthrough for vertex shader */
       case TGSI_SEMANTIC_FACE:
          if (iter->processor.Processor == TGSI_PROCESSOR_FRAGMENT) {
+            if (ctx->front_face_emitted) {
+               ctx->num_inputs--;
+               return 0;
+            }
             name_prefix = "gl_FrontFacing";
             ctx->inputs[i].glsl_predefined_no_emit = TRUE;
             ctx->inputs[i].glsl_no_index = TRUE;
+            ctx->front_face_emitted = TRUE;
             break;
          }
       case TGSI_SEMANTIC_GENERIC:
@@ -253,6 +288,13 @@ iter_declaration(struct tgsi_iterate_context *iter,
             snprintf(ctx->inputs[i].glsl_name, 64, "%s_g%d", name_prefix, ctx->inputs[i].sid);
          else
             snprintf(ctx->inputs[i].glsl_name, 64, "%s_%d", name_prefix, ctx->inputs[i].first);
+      }
+      if (add_two_side) {
+         snprintf(ctx->inputs[i + 1].glsl_name, 64, "%s_bc%d", name_prefix, ctx->inputs[i + 1].sid);
+         if (!ctx->front_face_emitted) {
+            snprintf(ctx->inputs[i + 2].glsl_name, 64, "%s", "gl_FrontFacing");
+            ctx->front_face_emitted = true;
+         }
       }
       break;
    case TGSI_FILE_OUTPUT:
@@ -348,6 +390,8 @@ iter_declaration(struct tgsi_iterate_context *iter,
             snprintf(ctx->outputs[i].glsl_name, 64, "%s_f%d", name_prefix, ctx->outputs[i].sid);
          else if (ctx->outputs[i].name == TGSI_SEMANTIC_COLOR)
             snprintf(ctx->outputs[i].glsl_name, 64, "%s_c%d", name_prefix, ctx->outputs[i].sid);
+         else if (ctx->outputs[i].name == TGSI_SEMANTIC_BCOLOR)
+            snprintf(ctx->outputs[i].glsl_name, 64, "%s_bc%d", name_prefix, ctx->outputs[i].sid);
          else if (ctx->outputs[i].name == TGSI_SEMANTIC_GENERIC)
             snprintf(ctx->outputs[i].glsl_name, 64, "%s_g%d", name_prefix, ctx->outputs[i].sid);
          else
@@ -520,6 +564,23 @@ static void emit_pstipple_pass(struct dump_ctx *ctx)
    strcat(ctx->glsl_main, buf);
    snprintf(buf, 255, "if (stip_temp > 0) {\n\tdiscard;\n}\n");
    strcat(ctx->glsl_main, buf);
+}
+
+static void emit_color_select(struct dump_ctx *ctx)
+{
+   char buf[255];
+
+   if (!ctx->key->color_two_side)
+      return;
+
+   if (ctx->color_in_mask & 1) {
+      snprintf(buf, 255, "realcolor0 = gl_FrontFacing ? ex_c0 : ex_bc0;\n");
+      strcat(ctx->glsl_main, buf);
+   }
+   if (ctx->color_in_mask & 2) {
+      snprintf(buf, 255, "realcolor1 = gl_FrontFacing ? ex_c1 : ex_bc1;\n");
+      strcat(ctx->glsl_main, buf);
+   }
 }
 
 static void emit_prescale(struct dump_ctx *ctx)
@@ -908,8 +969,11 @@ iter_instruction(struct tgsi_iterate_context *iter,
       break;
    }
 
-   if (instno == 0)
+   if (instno == 0) {
       strcat(ctx->glsl_main, "void main(void)\n{\n");
+      if (iter->processor.Processor == TGSI_PROCESSOR_FRAGMENT)
+         emit_color_select(ctx);
+   }
    for (i = 0; i < inst->Instruction.NumDstRegs; i++) {
       const struct tgsi_full_dst_register *dst = &inst->Dst[i];
       if (dst->Register.WriteMask != TGSI_WRITEMASK_XYZW) {
@@ -990,7 +1054,10 @@ iter_instruction(struct tgsi_iterate_context *iter,
       if (src->Register.File == TGSI_FILE_INPUT) {
          for (j = 0; j < ctx->num_inputs; j++)
             if (ctx->inputs[j].first == src->Register.Index) {
-               snprintf(srcs[i], 255, "%s(%s%s%s%s)", stypeprefix, prefix, ctx->inputs[j].glsl_name, arrayname, swizzle);
+               if (ctx->key->color_two_side && ctx->inputs[j].name == TGSI_SEMANTIC_COLOR)
+                  snprintf(srcs[i], 255, "%s(%s%s%d%s%s)", stypeprefix, prefix, "realcolor", ctx->inputs[j].sid, arrayname, swizzle);
+               else
+                  snprintf(srcs[i], 255, "%s(%s%s%s%s)", stypeprefix, prefix, ctx->inputs[j].glsl_name, arrayname, swizzle);
                break;
             }
       }
@@ -1640,6 +1707,16 @@ static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
       strcat(glsl_final, buf);
    }
 
+   if (ctx->key->color_two_side) {
+      if (ctx->color_in_mask & 1) {
+         snprintf(buf, 255, "vec4 realcolor0;\n");
+         strcat(glsl_final, buf);
+      }
+      if (ctx->color_in_mask & 2) {
+         snprintf(buf, 255, "vec4 realcolor1;\n");
+         strcat(glsl_final, buf);
+      }
+   }
    if (ctx->num_ubo) {
       for (i = 0; i < ctx->num_ubo; i++) {
          const char *cname = tgsi_proc_to_prefix(ctx->prog_type);

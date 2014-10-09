@@ -53,6 +53,7 @@ struct vrend_shader_key {
    boolean invert_fs_origin;
    boolean pstipple_tex;
    boolean add_alpha_test;
+   boolean color_two_side;
    uint8_t alpha_test;
    float alpha_ref_val;
 };

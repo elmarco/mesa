@@ -1907,6 +1907,8 @@ boolean vrend_patch_vertex_shader_interpolants(char *program,
          } else {
             snprintf(glsl_name, 64, "ex_c%d", fs_info->interpinfo[i].semantic_index);
             replace_interp(program, glsl_name, pstring);
+            snprintf(glsl_name, 64, "ex_bc%d", fs_info->interpinfo[i].semantic_index);
+            replace_interp(program, glsl_name, pstring);
          }
          break;
       case TGSI_SEMANTIC_GENERIC:

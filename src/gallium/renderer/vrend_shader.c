@@ -643,7 +643,7 @@ static void emit_clip_dist_movs(struct dump_ctx *ctx)
    char buf[255];
    int i;
 
-   if (ctx->num_clip_dist == 0) {
+   if (ctx->num_clip_dist == 0 && ctx->key->clip_plane_enable) {
       for (i = 0; i < 8; i++) {
          snprintf(buf, 255, "gl_ClipDistance[%d] = dot(%s, clipp[%d]);\n", i, ctx->has_clipvertex ? "clipv_tmp" : "gl_Position", i);
          strcat(ctx->glsl_main, buf);

@@ -121,6 +121,7 @@ struct dump_ctx {
    int glsl_ver_required;
    bool front_face_emitted;
    int color_in_mask;
+   bool has_clipvertex;
 };
 
 static inline const char *tgsi_proc_to_prefix(int shader_type)
@@ -335,6 +336,8 @@ iter_declaration(struct tgsi_iterate_context *iter,
          ctx->outputs[i].glsl_predefined_no_emit = TRUE;
          ctx->outputs[i].glsl_no_index = TRUE;
          ctx->outputs[i].override_no_wm = TRUE;
+         if (ctx->glsl_ver_required >= 140)
+            ctx->has_clipvertex = true;
          break;
 
       case TGSI_SEMANTIC_COLOR:
@@ -639,7 +642,15 @@ static void emit_clip_dist_movs(struct dump_ctx *ctx)
 {
    char buf[255];
    int i;
-   for (i = 0; i < ctx->num_clip_dist; i++) {
+
+   if (ctx->num_clip_dist == 0) {
+      for (i = 0; i < 8; i++) {
+         snprintf(buf, 255, "gl_ClipDistance[%d] = dot(%s, clipp[%d]);\n", i, ctx->has_clipvertex ? "clipv_tmp" : "gl_Position", i);
+         strcat(ctx->glsl_main, buf);
+      }
+      return;
+   }
+   for (i = 0; i < ctx->num_clip_dist ? ctx->num_clip_dist : 8; i++) {
       int clipidx = i < 4 ? 0 : 1;
       char swiz = i & 3;
       char wm = 0;
@@ -1001,7 +1012,9 @@ iter_instruction(struct tgsi_iterate_context *iter,
       if (dst->Register.File == TGSI_FILE_OUTPUT) {
          for (j = 0; j < ctx->num_outputs; j++) {
             if (ctx->outputs[j].first == dst->Register.Index) {
-               if (ctx->outputs[j].name == TGSI_SEMANTIC_CLIPDIST) {
+               if (ctx->glsl_ver_required >= 140 && ctx->outputs[j].name == TGSI_SEMANTIC_CLIPVERTEX) {
+                  snprintf(dsts[i], 255, "clipv_tmp");
+               } else if (ctx->outputs[j].name == TGSI_SEMANTIC_CLIPDIST) {
                   snprintf(dsts[i], 255, "clip_dist_temp[%d]", ctx->outputs[j].sid);
                } else {
                   snprintf(dsts[i], 255, "%s%s", ctx->outputs[j].glsl_name, ctx->outputs[j].override_no_wm ? "" : writemask);
@@ -1473,8 +1486,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
          emit_prescale(ctx);
          if (ctx->so)
             emit_so_movs(ctx);
-         if (ctx->num_clip_dist)
-            emit_clip_dist_movs(ctx);
+         emit_clip_dist_movs(ctx);
       } else if (iter->processor.Processor == TGSI_PROCESSOR_GEOMETRY) {
 
       } else if (iter->processor.Processor == TGSI_PROCESSOR_FRAGMENT) {
@@ -1682,8 +1694,17 @@ static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
       snprintf(buf, 255, "uniform vec4 winsys_adjust;\n");
       strcat(glsl_final, buf);
 
-      if (ctx->num_clip_dist) {
-         snprintf(buf, 255, "out float gl_ClipDistance[%d];\n", ctx->num_clip_dist);
+      if (ctx->has_clipvertex) {
+            snprintf(buf, 255, "vec4 clipv_tmp;\n");
+            strcat(glsl_final, buf);
+      }
+      if (ctx->num_clip_dist || ctx->key->clip_plane_enable) {
+
+         if (ctx->key->clip_plane_enable) {
+            snprintf(buf, 255, "uniform vec4 clipp[8];\n");
+            strcat(glsl_final, buf);
+         }
+         snprintf(buf, 255, "out float gl_ClipDistance[%d];\n", ctx->num_clip_dist ? ctx->num_clip_dist : 8);
          strcat(glsl_final, buf);
          snprintf(buf, 255, "vec4 clip_dist_temp[2];\n");
          strcat(glsl_final, buf);
@@ -1856,6 +1877,7 @@ char *vrend_convert_shader(struct vrend_shader_cfg *cfg,
    if (vrend_dump_shaders)
       fprintf(stderr,"GLSL: %s\n", glsl_final);
    free(ctx.glsl_main);
+   sinfo->num_ucp = ctx.key->clip_plane_enable ? 8 : 0;
    sinfo->samplers_used_mask = ctx.samplers_used;
    sinfo->num_consts = ctx.num_consts;
    sinfo->num_ubos = ctx.num_ubo;

@@ -153,6 +153,8 @@ struct vrend_linked_shader_program {
   GLuint vs_ws_adjust_loc;
 
   GLuint fs_stipple_loc;
+
+  GLuint clip_locs[8];
 };
 
 struct vrend_shader {
@@ -330,6 +332,8 @@ struct vrend_sub_context {
    GLuint blit_fb_ids[2];
 
    struct pipe_depth_stencil_alpha_state *dsa;
+
+   struct pipe_clip_state ucp_state;
 };
 
 struct vrend_context {
@@ -797,6 +801,12 @@ static struct vrend_linked_shader_program *add_shader_program(struct vrend_conte
         sprog->ubo_locs[id] = NULL;
   }
 
+  if (vs->sel->sinfo.num_ucp) {
+     for (i = 0; i < vs->sel->sinfo.num_ucp; i++) {
+        snprintf(name, 10, "clipp[%d]", i);
+        sprog->clip_locs[i] = glGetUniformLocation(prog_id, name);
+     }
+  }
   return sprog;
 }
 
@@ -1553,6 +1563,8 @@ static INLINE void vrend_fill_shader_key(struct vrend_context *ctx,
 
       key->pstipple_tex = ctx->sub->rs_state.poly_stipple_enable;
       key->color_two_side = ctx->sub->rs_state.light_twoside;
+
+      key->clip_plane_enable = ctx->sub->rs_state.clip_plane_enable;
    } else {
       key->add_alpha_test = 0;
       key->pstipple_tex = 0;
@@ -2093,6 +2105,11 @@ void vrend_draw_vbo(struct vrend_context *ctx,
       }
    }
 
+   if (ctx->sub->rs_state.clip_plane_enable) {
+      for (i = 0 ; i < 8; i++) {
+         glUniform4fv(ctx->sub->prog->clip_locs[i], 1, (const GLfloat *)&ctx->sub->ucp_state.ucp[i]);
+      }
+   }
    if (ctx->sub->enabled_attribs_bitmask != enable_bitmask) {
       uint32_t mask = ctx->sub->enabled_attribs_bitmask & disable_bitmask;
 
@@ -3898,13 +3915,17 @@ void vrend_set_polygon_stipple(struct vrend_context *ctx,
 
 void vrend_set_clip_state(struct vrend_context *ctx, struct pipe_clip_state *ucp)
 {
-   int i, j;
-   GLdouble val[4];
+   if (use_core_profile) {
+      ctx->sub->ucp_state = *ucp;
+   } else {
+      int i, j;
+      GLdouble val[4];
 
-   for (i = 0; i < 8; i++) {
-      for (j = 0; j < 4; j++)
-         val[j] = ucp->ucp[i][j];
-      glClipPlane(GL_CLIP_PLANE0 + i, val);
+      for (i = 0; i < 8; i++) {
+         for (j = 0; j < 4; j++)
+            val[j] = ucp->ucp[i][j];
+         glClipPlane(GL_CLIP_PLANE0 + i, val);
+      }
    }
 }
 

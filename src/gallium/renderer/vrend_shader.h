@@ -41,6 +41,7 @@ struct vrend_shader_info {
    int num_interps;
    int num_outputs;
    int num_ubos;
+   int num_ucp;
    int glsl_ver;
    uint32_t shadow_samp_mask;
    struct pipe_stream_output_info so_info;
@@ -55,6 +56,7 @@ struct vrend_shader_key {
    boolean add_alpha_test;
    boolean color_two_side;
    uint8_t alpha_test;
+   uint8_t clip_plane_enable;
    float alpha_ref_val;
 };
   

@@ -649,8 +649,8 @@ static void emit_clip_dist_movs(struct dump_ctx *ctx)
          strcat(ctx->glsl_main, buf);
       }
       return;
-   }
-   for (i = 0; i < ctx->num_clip_dist ? ctx->num_clip_dist : 8; i++) {
+   } 
+   for (i = 0; i < ctx->num_clip_dist; i++) {
       int clipidx = i < 4 ? 0 : 1;
       char swiz = i & 3;
       char wm = 0;

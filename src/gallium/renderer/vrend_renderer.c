@@ -2498,14 +2498,11 @@ static void vrend_update_frontface_state(struct vrend_context *ctx)
    struct pipe_rasterizer_state *state = &ctx->sub->rs_state;
    int front_ccw = state->front_ccw;
 
-   front_ccw ^= (ctx->sub->viewport_is_negative ?  1 : 0);
-//   if (front_ccw != vrend_state.hw_rs_state.front_ccw) {
-//      vrend_state.hw_rs_state.front_ccw = front_ccw;
-      if (front_ccw)
-         glFrontFace(GL_CCW);
-      else
-         glFrontFace(GL_CW);
-//   }
+   front_ccw ^= (ctx->sub->inverted_fbo_content ? 0 : 1);
+   if (front_ccw)
+      glFrontFace(GL_CCW);
+   else
+      glFrontFace(GL_CW);
 }
 
 void vrend_update_stencil_state(struct vrend_context *ctx)

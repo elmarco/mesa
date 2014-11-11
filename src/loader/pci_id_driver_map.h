@@ -53,9 +53,9 @@ static const int radeonsi_chip_ids[] = {
 #undef CHIPSET
 };
 
-static const int virgl_chip_ids[] = {
+static const int virtio_gpu_chip_ids[] = {
 #define CHIPSET(chip, name, family) chip,
-#include "pci_ids/virgl_pci_ids.h"
+#include "pci_ids/virtio_gpu_pci_ids.h"
 #undef CHIPSET
 };
 
@@ -85,7 +85,7 @@ static const struct {
    { 0x10de, "nouveau_vieux", NULL, -1,  _LOADER_DRI, is_nouveau_vieux },
    { 0x10de, "nouveau", NULL, -1,  _LOADER_GALLIUM },
    { 0x15ad, "vmwgfx", vmwgfx_chip_ids, ARRAY_SIZE(vmwgfx_chip_ids), _LOADER_GALLIUM },
-   { 0x1b36, "virgl", virgl_chip_ids, ARRAY_SIZE(virgl_chip_ids), _LOADER_GALLIUM },
+   { 0x1b36, "virtio_gpu", virtio_gpu_chip_ids, ARRAY_SIZE(virtio_gpu_chip_ids), _LOADER_GALLIUM },
    { 0x0000, NULL, NULL, 0 },
 };
 

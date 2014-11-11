@@ -485,6 +485,9 @@ static void virgl_draw_vbo(struct pipe_context *ctx,
            virgl_hw_set_index_buffer(ctx, &ib);
 
    virgl_encoder_draw_vbo(vctx, &info);
+
+   pipe_resource_reference(&ib.buffer, NULL);
+
 }
 
 

@@ -372,4 +372,21 @@ void vrend_renderer_get_cap_set(uint32_t cap_set, uint32_t *max_ver,
 void vrend_renderer_create_sub_ctx(struct vrend_context *ctx, int sub_ctx_id);
 void vrend_renderer_destroy_sub_ctx(struct vrend_context *ctx, int sub_ctx_id);
 void vrend_renderer_set_sub_ctx(struct vrend_context *ctx, int sub_ctx_id);
+
+void vrend_fb_bind_texture(struct vrend_resource *res,
+                           int idx,
+                           uint32_t level, uint32_t layer);
+bool vrend_is_ds_format(enum virgl_formats format);
+const char *vrend_shader_samplertypeconv(int sampler_type, int *is_shad);
+/* blitter interface */
+void vrend_renderer_blit_gl(struct vrend_context *ctx,
+                            struct vrend_resource *src_res,
+                            struct vrend_resource *dst_res,
+                            const struct pipe_blit_info *info);
+
+
+#define VREND_GL_VER_MAJOR 3
+#define VREND_GL_VER_MINOR 1
+
+extern struct vrend_if_cbs *vrend_clicbs;
 #endif

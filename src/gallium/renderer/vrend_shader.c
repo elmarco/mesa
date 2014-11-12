@@ -1581,7 +1581,7 @@ static void emit_header(struct dump_ctx *ctx, char *glsl_final)
       strcat(glsl_final, "#extension GL_ARB_uniform_buffer_object : require\n");
 }
 
-static const char *samplertypeconv(int sampler_type, int *is_shad)
+const char *vrend_shader_samplertypeconv(int sampler_type, int *is_shad)
 {
 	switch (sampler_type) {
 	case TGSI_TEXTURE_BUFFER: return "Buffer";
@@ -1761,7 +1761,7 @@ static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
       if ((ctx->samplers_used & (1 << i)) == 0)
          continue;
 
-      stc = samplertypeconv(ctx->samplers[i].tgsi_sampler_type, &is_shad);
+      stc = vrend_shader_samplertypeconv(ctx->samplers[i].tgsi_sampler_type, &is_shad);
 
       if (stc) {
          const char *sname;

@@ -73,5 +73,5 @@ char *vrend_convert_shader(struct vrend_shader_cfg *cfg,
                            const struct tgsi_token *tokens,
                            struct vrend_shader_key *key,
                            struct vrend_shader_info *sinfo);
-
+const char *vrend_shader_samplertypeconv(int sampler_type, int *is_shad);
 #endif

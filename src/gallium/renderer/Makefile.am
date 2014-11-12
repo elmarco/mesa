@@ -19,6 +19,7 @@ libvrend_la_SOURCES = \
         vrend_object.c \
         vrend_decode.c \
         vrend_formats.c \
+	vrend_blitter.c \
         iov.c \
         vrend_renderer_helper.c \
 	virgl_egl_context.c

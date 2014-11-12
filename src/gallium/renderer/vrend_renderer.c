@@ -65,11 +65,7 @@ static int use_core_profile = 0;
 static int renderer_gl_major, renderer_gl_minor;
 int vrend_dump_shaders;
 
-/* define major/minor that the renderer can take advantage of */
-#define VREND_GL_VER_MAJOR 3
-#define VREND_GL_VER_MINOR 1
-
-static struct vrend_if_cbs *clicbs;
+struct vrend_if_cbs *vrend_clicbs;
 
 struct vrend_fence {
    uint32_t fence_id;
@@ -381,6 +377,11 @@ static INLINE boolean vrend_format_can_render(enum virgl_formats format)
 static INLINE boolean vrend_format_is_ds(enum virgl_formats format)
 {
    return tex_conv_table[format].bindings & VREND_BIND_DEPTHSTENCIL;
+}
+
+bool vrend_is_ds_format(enum virgl_formats format)
+{
+   return vrend_format_is_ds(format);
 }
 
 static inline const char *pipe_shader_to_prefix(int shader_type)
@@ -972,9 +973,9 @@ void vrend_create_sampler_view(struct vrend_context *ctx,
    vrend_object_insert(ctx->sub->object_hash, view, sizeof(*view), handle, VIRGL_OBJECT_SAMPLER_VIEW);
 }
 
-static void vrend_fb_bind_texture(struct vrend_resource *res,
-                                  int idx,
-                                  uint32_t level, uint32_t layer)
+void vrend_fb_bind_texture(struct vrend_resource *res,
+                           int idx,
+                           uint32_t level, uint32_t layer)
 {
     const struct util_format_description *desc = util_format_description(res->base.format);
     GLenum attachment = GL_COLOR_ATTACHMENT0_EXT + idx;
@@ -2935,15 +2936,15 @@ void vrend_renderer_init(struct vrend_if_cbs *cbs)
    if (!inited) {
       inited = 1;
       vrend_object_init_resource_table();
-      clicbs = cbs;
+      vrend_clicbs = cbs;
    }
 
    ctx_params.shared = false;
    ctx_params.major_ver = VREND_GL_VER_MAJOR;
    ctx_params.minor_ver = VREND_GL_VER_MINOR;
 
-   gl_context = clicbs->create_gl_context(0, &ctx_params);
-   clicbs->make_current(0, gl_context);
+   gl_context = vrend_clicbs->create_gl_context(0, &ctx_params);
+   vrend_clicbs->make_current(0, gl_context);
    gl_ver = epoxy_gl_version();
 
    renderer_gl_major = gl_ver / 10;
@@ -2982,7 +2983,7 @@ void vrend_renderer_init(struct vrend_if_cbs *cbs)
 
    vrend_build_format_list();
 
-   clicbs->destroy_gl_context(gl_context);
+   vrend_clicbs->destroy_gl_context(gl_context);
    vrend_state.viewport_dirty = vrend_state.scissor_dirty = TRUE;
    vrend_state.program_id = (GLuint)-1;
    list_inithead(&vrend_state.fence_list);
@@ -3026,7 +3027,7 @@ static void vrend_destroy_sub_context(struct vrend_sub_context *sub)
    glDeleteVertexArrays(1, &sub->vaoid);
 
    vrend_object_fini_ctx_table(sub->object_hash);
-   clicbs->destroy_gl_context(sub->gl_context);
+   vrend_clicbs->destroy_gl_context(sub->gl_context);
 
    list_del(&sub->head);
    FREE(sub);
@@ -3263,7 +3264,7 @@ void vrend_renderer_resource_create(struct vrend_renderer_resource_create_args *
 void vrend_renderer_resource_destroy(struct vrend_resource *res)
 {
 //   if (res->scannedout) TODO
-//      (*clicbs->scanout_resource_info)(0, res->id, 0, 0, 0, 0, 0);
+//      (*vrend_clicbs->scanout_resource_info)(0, res->id, 0, 0, 0, 0, 0);
 
    if (res->readback_fb_id)
       glDeleteFramebuffers(1, &res->readback_fb_id);
@@ -4190,19 +4191,27 @@ void vrend_renderer_resource_copy_region(struct vrend_context *ctx,
 static void vrend_renderer_blit_int(struct vrend_context *ctx,
                                     struct vrend_resource *src_res,
                                     struct vrend_resource *dst_res,
-                                   const struct pipe_blit_info *info)
+                                    const struct pipe_blit_info *info)
 {
    GLbitfield glmask = 0;
    int src_y1, src_y2, dst_y1, dst_y2;
    GLenum filter;
    int n_layers = 1, i;
-
-   filter = convert_mag_filter(info->filter);
+   bool use_gl = false;
 
    if (!vrend_format_can_render(src_res->base.format) ||
        !vrend_format_can_render(dst_res->base.format)) {
       fprintf(stderr, "%s: possible fail due to formats %d vs %d: %s\n", __func__, src_res->base.format, dst_res->base.format, ctx->debug_name);
+      use_gl = true;
    }
+
+   if (use_gl) {
+      vrend_renderer_blit_gl(ctx, src_res, dst_res, info);
+      vrend_clicbs->make_current(0, ctx->sub->gl_context);
+      return;
+   }
+   filter = convert_mag_filter(info->filter);
+
    if (info->mask & PIPE_MASK_Z)
       glmask |= GL_DEPTH_BUFFER_BIT;
    if (info->mask & PIPE_MASK_S)
@@ -4323,7 +4332,7 @@ void vrend_renderer_check_fences(void)
 
    if (latest_id == 0)
       return;
-   clicbs->write_fence(latest_id);
+   vrend_clicbs->write_fence(latest_id);
 }
 
 static boolean vrend_get_one_query_result(GLuint query_id, bool use_64, uint64_t *result)
@@ -4472,7 +4481,7 @@ static void vrend_finish_context_switch(struct vrend_context *ctx)
 
    vrend_state.current_hw_ctx = ctx;
 
-   clicbs->make_current(0, ctx->sub->gl_context);
+   vrend_clicbs->make_current(0, ctx->sub->gl_context);
 
 #if 0
    /* re-emit all the state */
@@ -4941,7 +4950,7 @@ void vrend_renderer_force_ctx_0(void)
    vrend_state.current_ctx = NULL;
    vrend_state.current_hw_ctx = NULL;
    vrend_hw_switch_context(ctx0, TRUE);
-   clicbs->make_current(0, ctx0->sub->gl_context);
+   vrend_clicbs->make_current(0, ctx0->sub->gl_context);
 }
 
 void vrend_renderer_get_rect(int res_handle, struct iovec *iov, unsigned int num_iovs,
@@ -5045,8 +5054,8 @@ void vrend_renderer_create_sub_ctx(struct vrend_context *ctx, int sub_ctx_id)
    ctx_params.shared = (ctx->ctx_id == 0 && sub_ctx_id == 0) ? false : true;
    ctx_params.major_ver = renderer_gl_major;
    ctx_params.minor_ver = renderer_gl_minor;
-   sub->gl_context = clicbs->create_gl_context(0, &ctx_params);
-   clicbs->make_current(0, sub->gl_context);
+   sub->gl_context = vrend_clicbs->create_gl_context(0, &ctx_params);
+   vrend_clicbs->make_current(0, sub->gl_context);
 
    sub->sub_ctx_id = sub_ctx_id;
 
@@ -5082,7 +5091,7 @@ void vrend_renderer_destroy_sub_ctx(struct vrend_context *ctx, int sub_ctx_id)
    if (tofree) {
       if (ctx->sub == tofree) {
          ctx->sub = ctx->sub0;
-	 clicbs->make_current(0, ctx->sub->gl_context);
+	 vrend_clicbs->make_current(0, ctx->sub->gl_context);
       }
       vrend_destroy_sub_context(tofree);
    }
@@ -5099,7 +5108,7 @@ void vrend_renderer_set_sub_ctx(struct vrend_context *ctx, int sub_ctx_id)
    LIST_FOR_EACH_ENTRY(sub, &ctx->sub_ctxs, head) {
       if (sub->sub_ctx_id == sub_ctx_id) {
 	 ctx->sub = sub;
-	 clicbs->make_current(0, sub->gl_context);
+	 vrend_clicbs->make_current(0, sub->gl_context);
 	 break;
       }
    }

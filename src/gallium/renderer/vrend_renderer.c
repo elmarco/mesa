@@ -4188,29 +4188,16 @@ void vrend_renderer_resource_copy_region(struct vrend_context *ctx,
 }
 
 static void vrend_renderer_blit_int(struct vrend_context *ctx,
-                                   uint32_t dst_handle, uint32_t src_handle,
+                                    struct vrend_resource *src_res,
+                                    struct vrend_resource *dst_res,
                                    const struct pipe_blit_info *info)
 {
-   struct vrend_resource *src_res, *dst_res;
    GLbitfield glmask = 0;
    int src_y1, src_y2, dst_y1, dst_y2;
    GLenum filter;
    int n_layers = 1, i;
-   if (ctx->in_error)
-      return;
 
    filter = convert_mag_filter(info->filter);
-   src_res = vrend_renderer_ctx_res_lookup(ctx, src_handle);
-   dst_res = vrend_renderer_ctx_res_lookup(ctx, dst_handle);
-
-   if (!src_res) {
-      report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, src_handle);
-      return;
-   }
-   if (!dst_res) {
-      report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, dst_handle);
-      return;
-   }
 
    if (!vrend_format_can_render(src_res->base.format) ||
        !vrend_format_can_render(dst_res->base.format)) {
@@ -4277,7 +4264,23 @@ void vrend_renderer_blit(struct vrend_context *ctx,
                         uint32_t dst_handle, uint32_t src_handle,
                         const struct pipe_blit_info *info)
 {
-   vrend_renderer_blit_int(ctx, dst_handle, src_handle, info);
+   struct vrend_resource *src_res, *dst_res;
+   src_res = vrend_renderer_ctx_res_lookup(ctx, src_handle);
+   dst_res = vrend_renderer_ctx_res_lookup(ctx, dst_handle);
+
+   if (!src_res) {
+      report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, src_handle);
+      return;
+   }
+   if (!dst_res) {
+      report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, dst_handle);
+      return;
+   }
+
+   if (ctx->in_error)
+      return;
+
+   vrend_renderer_blit_int(ctx, src_res, dst_res, info);
 }
 
 int vrend_renderer_create_fence(int client_fence_id, uint32_t ctx_id)

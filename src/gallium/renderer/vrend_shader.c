@@ -696,7 +696,7 @@ static void translate_tex(struct dump_ctx *ctx,
    bool is_shad = false;
    char buf[512];
    char offbuf[64] = {0};
-   char bias[64] = {0};
+   char bias[128] = {0};
    int sampler_index;
    char *tex_ext;
 
@@ -742,7 +742,7 @@ static void translate_tex(struct dump_ctx *ctx,
           inst->Texture.Texture != TGSI_TEXTURE_BUFFER &&
           inst->Texture.Texture != TGSI_TEXTURE_2D_MSAA &&
           inst->Texture.Texture != TGSI_TEXTURE_2D_ARRAY_MSAA)
-         snprintf(bias, 64, ", int(%s.w)", srcs[0]);
+         snprintf(bias, 128, ", int(%s.w)", srcs[0]);
       snprintf(buf, 255, "%s = %s(%s(textureSize(%s%s)));\n", dsts[0], dstconv, dtypeprefix, srcs[sampler_index], bias);
       emit_buf(ctx, buf);
       return;
@@ -851,7 +851,7 @@ static void translate_tex(struct dump_ctx *ctx,
          snprintf(bias, 64, ", int(%s.w)", srcs[0]);
       }
    } else if (inst->Instruction.Opcode == TGSI_OPCODE_TXD) {
-      snprintf(bias, 64, ", %s%s, %s%s", srcs[1], gwm, srcs[2], gwm);
+      snprintf(bias, 128, ", %s%s, %s%s", srcs[1], gwm, srcs[2], gwm);
       sampler_index = 3;
    }
    else

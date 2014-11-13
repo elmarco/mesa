@@ -56,8 +56,9 @@ struct vrend_blitter_ctx {
     
     GLuint vs;
     GLuint vs_pos_only;
+    GLuint fs_texfetch_col[PIPE_MAX_TEXTURE_TYPES];
     GLuint fs_texfetch_depth[PIPE_MAX_TEXTURE_TYPES];
-
+    GLuint fs_texfetch_depth_msaa[PIPE_MAX_TEXTURE_TYPES];
     GLuint fb_id;
 
     unsigned dst_width;
@@ -99,7 +100,56 @@ static bool blit_build_vs_passthrough(struct vrend_blitter_ctx *blit_ctx)
     return true;
 }
 
-static GLuint blit_build_frag_tex_writedepth(struct vrend_blitter_ctx *blit_ctx, int tgsi_tex_target, unsigned nr_samples)
+static GLuint blit_build_frag_tex_col(struct vrend_blitter_ctx *blit_ctx, int tgsi_tex_target)
+{
+    GLuint fs_id;
+    char shader_buf[4096];
+    int is_shad;
+    const char *twm;
+
+    switch (tgsi_tex_target) {
+    case TGSI_TEXTURE_1D:
+    case TGSI_TEXTURE_BUFFER:
+        twm = ".x";
+        break;
+    case TGSI_TEXTURE_1D_ARRAY:
+    case TGSI_TEXTURE_2D:
+    case TGSI_TEXTURE_RECT:
+    case TGSI_TEXTURE_2D_MSAA:
+    default:
+        twm = ".xy";
+        break;
+    case TGSI_TEXTURE_SHADOW1D:
+    case TGSI_TEXTURE_SHADOW2D:
+    case TGSI_TEXTURE_SHADOW1D_ARRAY:
+    case TGSI_TEXTURE_SHADOWRECT:
+    case TGSI_TEXTURE_3D:
+    case TGSI_TEXTURE_CUBE:
+    case TGSI_TEXTURE_2D_ARRAY:
+    case TGSI_TEXTURE_2D_ARRAY_MSAA:
+        twm = ".xyz";
+        break;
+    case TGSI_TEXTURE_SHADOWCUBE:
+    case TGSI_TEXTURE_SHADOW2D_ARRAY:
+    case TGSI_TEXTURE_SHADOWCUBE_ARRAY:
+    case TGSI_TEXTURE_CUBE_ARRAY:
+        twm = "";
+        break;
+    }
+
+    snprintf(shader_buf, 4096, fs_texfetch_col, vrend_shader_samplertypeconv(tgsi_tex_target, &is_shad), twm, "");
+
+    fs_id = glCreateShader(GL_FRAGMENT_SHADER);
+
+    if (!build_and_check(fs_id, shader_buf)) {
+        glDeleteShader(fs_id);
+        return 0;
+    }
+
+    return fs_id;
+}
+
+static GLuint blit_build_frag_tex_writedepth(struct vrend_blitter_ctx *blit_ctx, int tgsi_tex_target)
 {
     GLuint fs_id;
     char shader_buf[4096];
@@ -148,19 +198,75 @@ static GLuint blit_build_frag_tex_writedepth(struct vrend_blitter_ctx *blit_ctx,
     return fs_id;
 }
 
+static GLuint blit_build_frag_blit_msaa_depth(struct vrend_blitter_ctx *blit_ctx, int tgsi_tex_target)
+{
+    GLuint fs_id;
+    char shader_buf[4096];
+    int is_shad;
+    const char *twm;
+    
+    switch (tgsi_tex_target) {
+    case TGSI_TEXTURE_2D_MSAA:
+        twm = ".xy";
+        break;
+    case TGSI_TEXTURE_2D_ARRAY_MSAA:
+        twm = ".xyz";
+        break;
+    default:
+        return 0;
+    }
+
+    snprintf(shader_buf, 4096, fs_texfetch_ds_msaa, vrend_shader_samplertypeconv(tgsi_tex_target, &is_shad), twm);
+
+    fs_id = glCreateShader(GL_FRAGMENT_SHADER);
+
+    if (!build_and_check(fs_id, shader_buf)) {
+        glDeleteShader(fs_id);
+        return 0;
+    }
+
+    return fs_id;
+}
+
 static GLuint blit_get_frag_tex_writedepth(struct vrend_blitter_ctx *blit_ctx, int pipe_tex_target, unsigned nr_samples)
 {
     assert(pipe_tex_target < PIPE_MAX_TEXTURE_TYPES);
 
     if (nr_samples > 1) {
-        return 0;
+        GLuint *shader = &blit_ctx->fs_texfetch_depth_msaa[pipe_tex_target];
+
+        if (!*shader) {
+            unsigned tgsi_tex = util_pipe_tex_to_tgsi_tex(pipe_tex_target, nr_samples);
+
+            *shader = blit_build_frag_blit_msaa_depth(blit_ctx, tgsi_tex);
+        }
+        return *shader;
+
     } else {
         GLuint *shader = &blit_ctx->fs_texfetch_depth[pipe_tex_target];
 
         if (!*shader) {
             unsigned tgsi_tex = util_pipe_tex_to_tgsi_tex(pipe_tex_target, 0);
 
-            *shader = blit_build_frag_tex_writedepth(blit_ctx, tgsi_tex, 0);
+            *shader = blit_build_frag_tex_writedepth(blit_ctx, tgsi_tex);
+        }
+        return *shader;
+    }
+}
+
+static GLuint blit_get_frag_tex_col(struct vrend_blitter_ctx *blit_ctx, int pipe_tex_target, unsigned nr_samples)
+{
+    assert(pipe_tex_target < PIPE_MAX_TEXTURE_TYPES);
+
+    if (nr_samples > 1) {
+        return 0;
+    } else {
+        GLuint *shader = &blit_ctx->fs_texfetch_col[pipe_tex_target];
+
+        if (!*shader) {
+            unsigned tgsi_tex = util_pipe_tex_to_tgsi_tex(pipe_tex_target, 0);
+
+            *shader = blit_build_frag_tex_col(blit_ctx, tgsi_tex);
         }
         return *shader;
     }
@@ -275,11 +381,27 @@ static void blitter_set_texcoords(struct vrend_blitter_ctx *blit_ctx,
                                   int x1, int y1, int x2, int y2)
 {
    float coord[4];
-
+   int i;
    get_texcoords(src_res, level, x1, y1, x2, y2, coord);
 
    set_texcoords_in_vertices(coord, &blit_ctx->vertices[0][1][0], 8);
 
+   switch (src_res->base.target) {
+   case PIPE_TEXTURE_3D:
+      {
+         float r = layer / (float)u_minify(src_res->base.depth0,
+                                           level);
+         for (i = 0; i < 4; i++)
+            blit_ctx->vertices[i][1][2] = r; /*r*/
+      }
+      break;
+   case PIPE_TEXTURE_2D:
+       for (i = 0; i < 4; i++) {
+           blit_ctx->vertices[i][1][3] = (float) sample; /*r*/
+       }
+       break;
+   default:;
+   }
 }
 
 static void set_dsa_keep_depth_stencil(void)
@@ -304,13 +426,33 @@ void vrend_renderer_blit_gl(struct vrend_context *ctx,
                             const struct pipe_blit_info *info)
 {
     struct vrend_blitter_ctx *blit_ctx = &vrend_blit_ctx;
+    unsigned src_samples = src_res->base.nr_samples;
+    unsigned dst_samples = dst_res->base.nr_samples;
     GLuint prog_id;
     GLuint fs_id;
     GLint lret;
     GLenum filter;
     GLuint pos_loc, tc_loc;
     GLuint samp_loc;
-    int src_z = 0;
+    boolean has_depth, has_stencil, has_color;
+    bool blit_stencil, blit_depth, blit_color;
+    int dst_z;
+    const struct util_format_description *src_desc =
+       util_format_description(src_res->base.format);
+    const struct util_format_description *dst_desc =
+       util_format_description(dst_res->base.format);
+
+    has_color = src_desc->colorspace != UTIL_FORMAT_COLORSPACE_ZS &&
+        dst_desc->colorspace != UTIL_FORMAT_COLORSPACE_ZS;
+    has_depth = util_format_has_depth(src_desc) &&
+        util_format_has_depth(dst_desc);
+    has_stencil = util_format_has_stencil(src_desc) &&
+        util_format_has_stencil(dst_desc);
+
+    blit_color = has_color && (info->mask & PIPE_MASK_RGBA);
+    blit_depth = has_depth && (info->mask & PIPE_MASK_Z);
+    blit_stencil = has_stencil && (info->mask & PIPE_MASK_S) & 0;
+
     filter = convert_mag_filter(info->filter);
     vrend_renderer_init_blit_ctx(blit_ctx);
 
@@ -322,17 +464,14 @@ void vrend_renderer_blit_gl(struct vrend_context *ctx,
                           info->dst.box.x + info->dst.box.width,
                           info->dst.box.y + info->dst.box.height, 0);
 
-    blitter_set_texcoords(blit_ctx, src_res, info->src.level,
-                          info->src.box.z + src_z, 0,
-                          info->src.box.x, info->src.box.y,
-                          info->src.box.x + info->src.box.width,
-                          info->src.box.y + info->src.box.height);
-    
-    glBufferData(GL_ARRAY_BUFFER, sizeof(blit_ctx->vertices), blit_ctx->vertices, GL_STATIC_DRAW);
+
     prog_id = glCreateProgram();
     glAttachShader(prog_id, blit_ctx->vs);
 
-    fs_id = blit_get_frag_tex_writedepth(blit_ctx, src_res->base.target, 0);
+    if (blit_depth || blit_stencil)
+        fs_id = blit_get_frag_tex_writedepth(blit_ctx, src_res->base.target, src_res->base.nr_samples);
+    else
+        fs_id = blit_get_frag_tex_col(blit_ctx, src_res->base.target, src_res->base.nr_samples);
     glAttachShader(prog_id, fs_id);
 
     glLinkProgram(prog_id);
@@ -378,5 +517,23 @@ void vrend_renderer_blit_gl(struct vrend_context *ctx,
 
     set_dsa_write_depth_keep_stencil();
 
-    glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+    for (dst_z = 0; dst_z < info->dst.box.depth; dst_z++) {
+       float dst2src_scale = info->src.box.depth / (float)info->dst.box.depth;
+       float dst_offset = ((info->src.box.depth - 1) -
+                           (info->dst.box.depth - 1) * dst2src_scale) * 0.5;
+       float src_z = (dst_z + dst_offset) * dst2src_scale;
+
+       glBindFramebuffer(GL_FRAMEBUFFER_EXT, blit_ctx->fb_id);
+       vrend_fb_bind_texture(dst_res, 0, info->dst.level, dst_z);
+
+       glDrawBuffer(GL_COLOR_ATTACHMENT0_EXT);
+       blitter_set_texcoords(blit_ctx, src_res, info->src.level,
+                             info->src.box.z + src_z, 0,
+                             info->src.box.x, info->src.box.y,
+                             info->src.box.x + info->src.box.width,
+                             info->src.box.y + info->src.box.height);
+
+       glBufferData(GL_ARRAY_BUFFER, sizeof(blit_ctx->vertices), blit_ctx->vertices, GL_STATIC_DRAW);
+       glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+    }
 }

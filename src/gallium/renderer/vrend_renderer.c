@@ -114,6 +114,7 @@ struct global_renderer_state {
 
    boolean have_robustness;
    boolean have_multisample;
+   boolean have_ms_scaled_blit;
    GLuint vaoid;
 
    struct pipe_rasterizer_state hw_rs_state;
@@ -2970,6 +2971,8 @@ void vrend_renderer_init(struct vrend_if_cbs *cbs)
    
    if (glewIsSupported("GL_EXT_framebuffer_multisample") && glewIsSupported("GL_ARB_texture_multisample")) {
       vrend_state.have_multisample = true;
+      if (glewIsSupported("GL_EXT_framebuffer_multisample_blit_scaled"))
+         vrend_state.have_ms_scaled_blit = TRUE;
    }
 
    /* callbacks for when we are cleaning up the object table */
@@ -4151,9 +4154,14 @@ void vrend_renderer_resource_copy_region(struct vrend_context *ctx,
    }
 
    glBindFramebuffer(GL_FRAMEBUFFER_EXT, ctx->sub->blit_fb_ids[0]);
+   /* clean out fb ids */
+   glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_STENCIL_ATTACHMENT,
+                             GL_TEXTURE_2D, 0, 0);
    vrend_fb_bind_texture(src_res, 0, src_level, src_box->z);
       
    glBindFramebuffer(GL_FRAMEBUFFER_EXT, ctx->sub->blit_fb_ids[1]);
+   glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_STENCIL_ATTACHMENT,
+                             GL_TEXTURE_2D, 0, 0);
    vrend_fb_bind_texture(dst_res, 0, dst_level, dstz);
    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, ctx->sub->blit_fb_ids[1]);
 
@@ -4199,18 +4207,38 @@ static void vrend_renderer_blit_int(struct vrend_context *ctx,
    int n_layers = 1, i;
    bool use_gl = false;
 
+   filter = convert_mag_filter(info->filter);
+
    if (!vrend_format_can_render(src_res->base.format) ||
        !vrend_format_can_render(dst_res->base.format)) {
       fprintf(stderr, "%s: possible fail due to formats %d vs %d: %s\n", __func__, src_res->base.format, dst_res->base.format, ctx->debug_name);
-      use_gl = true;
    }
+
+   /* glBlitFramebuffer - can support depth stencil with NEAREST
+      which we use for mipmaps */
+   if ((info->mask & (PIPE_MASK_Z | PIPE_MASK_S)) && info->filter == PIPE_TEX_FILTER_LINEAR)
+       use_gl = true;
+
+   /* for scaled MS blits we either need extensions or hand roll */
+   if (src_res->base.nr_samples > 1 &&
+       src_res->base.nr_samples != dst_res->base.nr_samples &&
+       (info->src.box.width != info->dst.box.width ||
+        info->src.box.height != info->dst.box.height)) {
+      if (vrend_state.have_ms_scaled_blit)
+         filter = GL_SCALED_RESOLVE_NICEST_EXT;
+      else
+         use_gl = true;
+   }
+
+   /* for 3D mipmapped blits - hand roll time */
+   if (info->src.box.depth != info->dst.box.depth)
+      use_gl = true;
 
    if (use_gl) {
       vrend_renderer_blit_gl(ctx, src_res, dst_res, info);
       vrend_clicbs->make_current(0, ctx->sub->gl_context);
       return;
    }
-   filter = convert_mag_filter(info->filter);
 
    if (info->mask & PIPE_MASK_Z)
       glmask |= GL_DEPTH_BUFFER_BIT;
@@ -4242,11 +4270,18 @@ static void vrend_renderer_blit_int(struct vrend_context *ctx,
    } else
       glDisable(GL_SCISSOR_TEST);
 
+   glBindFramebuffer(GL_FRAMEBUFFER_EXT, ctx->sub->blit_fb_ids[0]);
+   glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_STENCIL_ATTACHMENT,
+                             GL_TEXTURE_2D, 0, 0);
+   glBindFramebuffer(GL_FRAMEBUFFER_EXT, ctx->sub->blit_fb_ids[1]);
+   glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_STENCIL_ATTACHMENT,
+                             GL_TEXTURE_2D, 0, 0);
    if (info->src.box.depth == info->dst.box.depth)
       n_layers = info->dst.box.depth;
    for (i = 0; i < n_layers; i++) {
       glBindFramebuffer(GL_FRAMEBUFFER_EXT, ctx->sub->blit_fb_ids[0]);
-
+      glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_STENCIL_ATTACHMENT,
+                                GL_TEXTURE_2D, 0, 0);
       vrend_fb_bind_texture(src_res, 0, info->src.level, info->src.box.z + i);
 
       glBindFramebuffer(GL_FRAMEBUFFER_EXT, ctx->sub->blit_fb_ids[1]);

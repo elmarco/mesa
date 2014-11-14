@@ -407,6 +407,18 @@ static void blitter_set_texcoords(struct vrend_blitter_ctx *blit_ctx,
             blit_ctx->vertices[i][1][2] = r; /*r*/
       }
       break;
+
+   case PIPE_TEXTURE_1D_ARRAY:
+      for (i = 0; i < 4; i++)
+         blit_ctx->vertices[i][1][1] = (float) layer; /*t*/
+      break;
+
+   case PIPE_TEXTURE_2D_ARRAY:
+      for (i = 0; i < 4; i++) {
+         blit_ctx->vertices[i][1][2] = (float) layer;  /*r*/
+         blit_ctx->vertices[i][1][3] = (float) sample; /*q*/
+      }
+      break;
    case PIPE_TEXTURE_CUBE_ARRAY:
       for (i = 0; i < 4; i++)
          blit_ctx->vertices[i][1][3] = (float) ((unsigned)layer / 6); /*w*/

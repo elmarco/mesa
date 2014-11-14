@@ -695,7 +695,7 @@ static void translate_tex(struct dump_ctx *ctx,
    char *twm, *gwm, *txfi;
    bool is_shad = false;
    char buf[512];
-   char offbuf[64] = {0};
+   char offbuf[128] = {0};
    char bias[128] = {0};
    int sampler_index;
    char *tex_ext;
@@ -905,7 +905,7 @@ static void translate_tex(struct dump_ctx *ctx,
       }
 
       if (inst->Instruction.Opcode == TGSI_OPCODE_TXL || inst->Instruction.Opcode == TGSI_OPCODE_TXL2 || inst->Instruction.Opcode == TGSI_OPCODE_TXD) {
-         char tmp[64];
+         char tmp[128];
          strcpy(tmp, offbuf);
          strcpy(offbuf, bias);
          strcpy(bias, tmp);

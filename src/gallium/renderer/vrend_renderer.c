@@ -4209,10 +4209,13 @@ static void vrend_renderer_blit_int(struct vrend_context *ctx,
 
    filter = convert_mag_filter(info->filter);
 
-   if (!vrend_format_can_render(src_res->base.format) ||
-       !vrend_format_can_render(dst_res->base.format)) {
-      fprintf(stderr, "%s: possible fail due to formats %d vs %d: %s\n", __func__, src_res->base.format, dst_res->base.format, ctx->debug_name);
-   }
+   /* if we can't make FBO's use the fallback path */
+   if (!vrend_format_can_render(src_res->base.format) &&
+       !vrend_format_is_ds(src_res->base.format))
+      use_gl = true;
+   if (!vrend_format_can_render(dst_res->base.format) &&
+       !vrend_format_is_ds(dst_res->base.format))
+      use_gl = true;
 
    /* glBlitFramebuffer - can support depth stencil with NEAREST
       which we use for mipmaps */

@@ -4274,11 +4274,19 @@ static void vrend_renderer_blit_int(struct vrend_context *ctx,
       glDisable(GL_SCISSOR_TEST);
 
    glBindFramebuffer(GL_FRAMEBUFFER_EXT, ctx->sub->blit_fb_ids[0]);
-   glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_STENCIL_ATTACHMENT,
-                             GL_TEXTURE_2D, 0, 0);
+   if (info->mask & PIPE_MASK_RGBA)
+      glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_STENCIL_ATTACHMENT,
+                                GL_TEXTURE_2D, 0, 0);
+   else
+      glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0,
+                                GL_TEXTURE_2D, 0, 0);
    glBindFramebuffer(GL_FRAMEBUFFER_EXT, ctx->sub->blit_fb_ids[1]);
-   glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_STENCIL_ATTACHMENT,
-                             GL_TEXTURE_2D, 0, 0);
+   if (info->mask & PIPE_MASK_RGBA)
+      glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_STENCIL_ATTACHMENT,
+                                GL_TEXTURE_2D, 0, 0);
+   else if (info->mask & (PIPE_MASK_Z | PIPE_MASK_S))
+      glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0,
+                                GL_TEXTURE_2D, 0, 0);
    if (info->src.box.depth == info->dst.box.depth)
       n_layers = info->dst.box.depth;
    for (i = 0; i < n_layers; i++) {

@@ -1111,11 +1111,15 @@ void vrend_set_framebuffer_state(struct vrend_context *ctx,
    ctx->sub->old_nr_cbufs = old_num;
 
    for (i = 0; i < nr_cbufs; i++) {
-      surf = vrend_object_lookup(ctx->sub->object_hash, surf_handle[i], VIRGL_OBJECT_SURFACE);
-      if (!surf) {
-         report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_SURFACE, surf_handle[i]);
-         return;
-      }
+      if (surf_handle[i] != 0) {
+         surf = vrend_object_lookup(ctx->sub->object_hash, surf_handle[i], VIRGL_OBJECT_SURFACE);
+         if (!surf) {
+            report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_SURFACE, surf_handle[i]);
+            return;
+         }
+      } else
+         surf = NULL;
+
       if (ctx->sub->surf[i] != surf) {
          vrend_surface_reference(&ctx->sub->surf[i], surf);
          vrend_hw_set_color_surface(ctx, i);
@@ -1138,8 +1142,16 @@ void vrend_set_framebuffer_state(struct vrend_context *ctx,
        new_ibf = ctx->sub->zsurf->texture->y_0_top ? TRUE : FALSE;
    } 
    else {
-       new_height = u_minify(ctx->sub->surf[0]->texture->base.height0, ctx->sub->surf[0]->val0);
-       new_ibf = ctx->sub->surf[0]->texture->y_0_top ? TRUE : FALSE;
+       surf = NULL;
+       for (i = 0; i < ctx->sub->nr_cbufs; i++) {
+           if (ctx->sub->surf[i]) {
+               surf = ctx->sub->surf[i];
+               break;
+           }
+       }
+       assert(surf);
+       new_height = u_minify(surf->texture->base.height0, surf->val0);
+       new_ibf = surf->texture->y_0_top ? TRUE : FALSE;
    }
 
    if (new_height != -1) {

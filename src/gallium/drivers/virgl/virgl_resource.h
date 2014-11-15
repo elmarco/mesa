@@ -36,6 +36,7 @@ struct virgl_texture {
 struct virgl_transfer {
    struct pipe_transfer base;
    uint32_t offset;
+   struct virgl_resource *resolve_tmp;
 };
 
 void virgl_resource_destroy(struct pipe_screen *screen,

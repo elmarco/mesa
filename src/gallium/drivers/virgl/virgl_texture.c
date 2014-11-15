@@ -139,13 +139,13 @@ static void *virgl_texture_transfer_map(struct pipe_context *ctx,
       /* we want to do a resolve blit into the temporary */
       hw_res = trans->resolve_tmp->hw_res;
       offset = 0;
-      trans->resolve_tmp = NULL;
    } else {
       offset = vrend_get_tex_image_offset(vtex, level, box->z);
 
       offset += box->y / util_format_get_blockheight(format) * trans->base.stride +
       box->x / util_format_get_blockwidth(format) * util_format_get_blocksize(format);
       hw_res = vtex->base.hw_res;
+      trans->resolve_tmp = NULL;
    }
    ptr = vs->vws->resource_map(vs->vws, hw_res);
    if (!ptr) {

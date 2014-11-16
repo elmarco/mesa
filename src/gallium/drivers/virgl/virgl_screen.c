@@ -99,8 +99,10 @@ virgl_get_param(struct pipe_screen *screen, enum pipe_cap param)
    case PIPE_CAP_MAX_TEXTURE_ARRAY_LAYERS:
       return vscreen->caps.caps.v1.max_texture_array_layers;
    case PIPE_CAP_MIN_TEXEL_OFFSET:
+   case PIPE_CAP_MIN_TEXTURE_GATHER_OFFSET:
       return -8;
    case PIPE_CAP_MAX_TEXEL_OFFSET:
+   case PIPE_CAP_MAX_TEXTURE_GATHER_OFFSET:
       return 7;
    case PIPE_CAP_CONDITIONAL_RENDER:
       return vscreen->caps.caps.v1.bset.conditional_render;
@@ -171,7 +173,11 @@ virgl_get_param(struct pipe_screen *screen, enum pipe_cap param)
    case PIPE_CAP_MAX_TEXTURE_GATHER_COMPONENTS:
    case PIPE_CAP_TEXTURE_GATHER_SM5:
    case PIPE_CAP_BUFFER_MAP_PERSISTENT_COHERENT:
+   case PIPE_CAP_SAMPLE_SHADING:
+   case PIPE_CAP_FAKE_SW_MSAA:
       return 0;
+   case PIPE_CAP_TEXTURE_QUERY_LOD:
+      return 1;
    }
    /* should only get here on unhandled cases */
    debug_printf("Unexpected PIPE_CAP %d query\n", param);

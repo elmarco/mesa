@@ -273,7 +273,7 @@ iter_declaration(struct tgsi_iterate_context *iter,
          if (iter->processor.Processor == TGSI_PROCESSOR_FRAGMENT ||
              iter->processor.Processor == TGSI_PROCESSOR_GEOMETRY) {
             if (iter->processor.Processor == TGSI_PROCESSOR_FRAGMENT &&
-                ctx->key->fs_inputs_from_gs)
+                ctx->key->gs_present)
                name_prefix = "out";
             else
                name_prefix = "ex";

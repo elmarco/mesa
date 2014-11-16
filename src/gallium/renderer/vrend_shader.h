@@ -58,7 +58,7 @@ struct vrend_shader_key {
    uint8_t alpha_test;
    uint8_t clip_plane_enable;
    float alpha_ref_val;
-   boolean fs_inputs_from_gs;
+   boolean gs_present;
 };
   
 struct vrend_shader_cfg {

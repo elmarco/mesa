@@ -1684,7 +1684,7 @@ static INLINE void vrend_fill_shader_key(struct vrend_context *ctx,
    key->coord_replace = ctx->sub->rs_state.point_quad_rasterization ? ctx->sub->rs_state.sprite_coord_enable : 0;
 
    if (ctx->sub->gs)
-      key->fs_inputs_from_gs = true;
+      key->gs_present = true;
 }
 
 static INLINE int conv_shader_type(int type)

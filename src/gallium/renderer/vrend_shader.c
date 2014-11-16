@@ -183,7 +183,8 @@ iter_declaration(struct tgsi_iterate_context *iter,
    char *name_prefix = "";
    bool add_two_side = false;
 
-   ctx->prog_type = iter->processor.Processor;
+   if (ctx->prog_type == -1)
+      ctx->prog_type = iter->processor.Processor;
    switch (decl->Declaration.File) {
    case TGSI_FILE_INPUT:
       i = ctx->num_inputs++;
@@ -964,6 +965,8 @@ iter_instruction(struct tgsi_iterate_context *iter,
    bool stprefix = false;
    bool override_no_wm[4];
 
+   if (ctx->prog_type == -1)
+      ctx->prog_type = iter->processor.Processor;
    if (dtype == TGSI_TYPE_SIGNED || dtype == TGSI_TYPE_UNSIGNED ||
        stype == TGSI_TYPE_SIGNED || stype == TGSI_TYPE_UNSIGNED)
       ctx->has_ints = TRUE;
@@ -1880,6 +1883,7 @@ char *vrend_convert_shader(struct vrend_shader_cfg *cfg,
    ctx.iter.epilog = NULL;
    ctx.key = key;
    ctx.cfg = cfg;
+   ctx.prog_type = -1;
 
    /* if we are in core profile mode we should use GLSL 1.40 */
    if (cfg->use_core_profile && cfg->glsl_version >= 140)

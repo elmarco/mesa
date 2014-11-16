@@ -204,7 +204,9 @@ virgl_get_shader_param(struct pipe_screen *screen, unsigned shader, enum pipe_sh
       case PIPE_SHADER_CAP_INDIRECT_CONST_ADDR:
          return 1;
       case PIPE_SHADER_CAP_MAX_INPUTS:
-         return 16;
+         if (vscreen->caps.caps.v1.glsl_level < 150)
+            return 16;
+         return shader == PIPE_SHADER_VERTEX ? 16 : 32;
       case PIPE_SHADER_CAP_MAX_CONSTS:
          return 4096;
       case PIPE_SHADER_CAP_MAX_TEMPS:

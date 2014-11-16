@@ -135,6 +135,7 @@ static int vrend_decode_create_stream_output_target(struct vrend_decode_ctx *ctx
 
    vrend_create_so_target(ctx->grctx, handle, res_handle, buffer_offset,
                           buffer_size);
+   return 0;
 }
 
 static void vrend_decode_set_framebuffer_state(struct vrend_decode_ctx *ctx)

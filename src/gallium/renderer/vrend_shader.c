@@ -1860,7 +1860,7 @@ static boolean fill_interpolants(struct dump_ctx *ctx, struct vrend_shader_info 
 
    if (!ctx->num_interps)
       return TRUE;
-   if (ctx->prog_type == TGSI_PROCESSOR_VERTEX)
+   if (ctx->prog_type == TGSI_PROCESSOR_VERTEX || ctx->prog_type == TGSI_PROCESSOR_GEOMETRY)
       return TRUE;
 
    sinfo->interpinfo = calloc(ctx->num_interps, sizeof(struct vrend_interp_info));

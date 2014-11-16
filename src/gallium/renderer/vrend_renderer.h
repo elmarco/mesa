@@ -162,6 +162,10 @@ void vrend_create_sampler_view(struct vrend_context *ctx,
                                uint32_t res_handle, uint32_t format,
                                uint32_t val0, uint32_t val1, uint32_t swizzle_packed);
 
+void vrend_create_sampler_state(struct vrend_context *ctx,
+                                uint32_t handle,
+                                struct pipe_sampler_state *templ);
+
 void vrend_create_so_target(struct vrend_context *ctx,
                             uint32_t handle,
                             uint32_t res_handle,

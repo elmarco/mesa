@@ -112,6 +112,7 @@ struct global_renderer_state {
    struct vrend_context *current_hw_ctx;
    struct list_head waiting_query_list;
 
+   boolean have_samplers;
    boolean have_robustness;
    boolean have_multisample;
    boolean have_ms_scaled_blit;
@@ -198,8 +199,9 @@ struct vrend_surface {
    struct vrend_resource *texture;
 };
 
-struct vrend_sampler {
-
+struct vrend_sampler_state {
+   struct pipe_sampler_state base;
+   GLuint id;
 };
 
 struct vrend_so_target {
@@ -286,7 +288,7 @@ struct vrend_sub_context {
 
    struct vrend_constants consts[PIPE_SHADER_TYPES];
    bool const_dirty[PIPE_SHADER_TYPES];
-   struct pipe_sampler_state *sampler_state[PIPE_SHADER_TYPES][PIPE_MAX_SAMPLERS];
+   struct vrend_sampler_state *sampler_state[PIPE_SHADER_TYPES][PIPE_MAX_SAMPLERS];
 
    struct pipe_constant_buffer cbs[PIPE_SHADER_TYPES][PIPE_MAX_CONSTANT_BUFFERS];
    uint32_t const_bufs_used_mask[PIPE_SHADER_TYPES];
@@ -907,6 +909,90 @@ static void vrend_destroy_so_target_object(void *obj_ptr)
    struct vrend_so_target *target = obj_ptr;
 
    vrend_so_target_reference(&target, NULL);
+}
+
+static void vrend_destroy_sampler_state_object(void *obj_ptr)
+{
+   struct vrend_sampler_state *state = obj_ptr;
+
+   glDeleteSamplers(1, &state->id);
+   FREE(state);
+}
+
+static GLuint convert_wrap(int wrap)
+{
+   switch(wrap){
+   case PIPE_TEX_WRAP_REPEAT: return GL_REPEAT;
+   case PIPE_TEX_WRAP_CLAMP: if (use_core_profile == 0) return GL_CLAMP; else return GL_CLAMP_TO_EDGE;
+
+   case PIPE_TEX_WRAP_CLAMP_TO_EDGE: return GL_CLAMP_TO_EDGE;
+   case PIPE_TEX_WRAP_CLAMP_TO_BORDER: return GL_CLAMP_TO_BORDER;
+
+   case PIPE_TEX_WRAP_MIRROR_REPEAT: return GL_MIRRORED_REPEAT;
+   case PIPE_TEX_WRAP_MIRROR_CLAMP: return GL_MIRROR_CLAMP_EXT;
+   case PIPE_TEX_WRAP_MIRROR_CLAMP_TO_EDGE: return GL_MIRROR_CLAMP_TO_EDGE_EXT;
+   case PIPE_TEX_WRAP_MIRROR_CLAMP_TO_BORDER: return GL_MIRROR_CLAMP_TO_BORDER_EXT;
+   default:
+      assert(0);
+      return -1;
+   }
+} 
+
+static inline GLenum convert_mag_filter(unsigned int filter)
+{
+   if (filter == PIPE_TEX_FILTER_NEAREST)
+      return GL_NEAREST;
+   return GL_LINEAR;
+}
+
+static inline GLenum convert_min_filter(unsigned int filter, unsigned int mip_filter)
+{
+   if (mip_filter == PIPE_TEX_MIPFILTER_NONE)
+      return convert_mag_filter(filter);
+   else if (mip_filter == PIPE_TEX_MIPFILTER_LINEAR) {
+      if (filter == PIPE_TEX_FILTER_NEAREST)
+         return GL_NEAREST_MIPMAP_LINEAR;
+      else
+         return GL_LINEAR_MIPMAP_LINEAR;
+   } else if (mip_filter == PIPE_TEX_MIPFILTER_NEAREST) {
+      if (filter == PIPE_TEX_FILTER_NEAREST)
+         return GL_NEAREST_MIPMAP_NEAREST;
+      else
+         return GL_LINEAR_MIPMAP_NEAREST;
+   }
+   assert(0);
+   return 0;
+}
+
+void vrend_create_sampler_state(struct vrend_context *ctx,
+                                uint32_t handle,
+                                struct pipe_sampler_state *templ)
+{
+   struct vrend_sampler_state *state = CALLOC_STRUCT(vrend_sampler_state);
+
+   if (!state)
+      return;
+
+   state->base = *templ;
+
+   if (vrend_state.have_samplers) {
+      glGenSamplers(1, &state->id);
+
+      glSamplerParameteri(state->id, GL_TEXTURE_WRAP_S, convert_wrap(templ->wrap_s));
+      glSamplerParameteri(state->id, GL_TEXTURE_WRAP_T, convert_wrap(templ->wrap_t));
+      glSamplerParameteri(state->id, GL_TEXTURE_WRAP_R, convert_wrap(templ->wrap_r));
+      glSamplerParameterf(state->id, GL_TEXTURE_MIN_FILTER, convert_min_filter(templ->min_img_filter, templ->min_mip_filter));
+      glSamplerParameterf(state->id, GL_TEXTURE_MAG_FILTER, convert_mag_filter(templ->mag_img_filter));
+      glSamplerParameterf(state->id, GL_TEXTURE_MIN_LOD, templ->min_lod);
+      glSamplerParameterf(state->id, GL_TEXTURE_MAX_LOD, templ->max_lod);
+      glSamplerParameterf(state->id, GL_TEXTURE_LOD_BIAS, templ->lod_bias);
+      glSamplerParameteri(state->id, GL_TEXTURE_COMPARE_MODE, templ->compare_mode ? GL_COMPARE_R_TO_TEXTURE : GL_NONE);
+      glSamplerParameteri(state->id, GL_TEXTURE_COMPARE_FUNC, GL_NEVER + templ->compare_func);
+
+      glSamplerParameterIuiv(state->id, GL_TEXTURE_BORDER_COLOR, templ->border_color.ui);
+   }
+   vrend_renderer_object_insert(ctx, state, sizeof(struct vrend_sampler_state), handle,
+                                VIRGL_OBJECT_SAMPLER_STATE);
 }
 
 static inline GLenum to_gl_swizzle(int swizzle)
@@ -2777,25 +2863,6 @@ void vrend_object_bind_rasterizer(struct vrend_context *ctx,
    vrend_hw_emit_rs(ctx);
 }
 
-static GLuint convert_wrap(int wrap)
-{
-   switch(wrap){
-   case PIPE_TEX_WRAP_REPEAT: return GL_REPEAT;
-   case PIPE_TEX_WRAP_CLAMP: if (use_core_profile == 0) return GL_CLAMP; else return GL_CLAMP_TO_EDGE;
-
-   case PIPE_TEX_WRAP_CLAMP_TO_EDGE: return GL_CLAMP_TO_EDGE;
-   case PIPE_TEX_WRAP_CLAMP_TO_BORDER: return GL_CLAMP_TO_BORDER;
-
-   case PIPE_TEX_WRAP_MIRROR_REPEAT: return GL_MIRRORED_REPEAT;
-   case PIPE_TEX_WRAP_MIRROR_CLAMP: return GL_MIRROR_CLAMP_EXT;
-   case PIPE_TEX_WRAP_MIRROR_CLAMP_TO_EDGE: return GL_MIRROR_CLAMP_TO_EDGE_EXT;
-   case PIPE_TEX_WRAP_MIRROR_CLAMP_TO_BORDER: return GL_MIRROR_CLAMP_TO_BORDER_EXT;
-   default:
-      assert(0);
-      return -1;
-   }
-} 
-
 void vrend_bind_sampler_states(struct vrend_context *ctx,
                                uint32_t shader_type,
                                uint32_t start_slot,
@@ -2803,7 +2870,7 @@ void vrend_bind_sampler_states(struct vrend_context *ctx,
                                uint32_t *handles)
 {
    int i;
-   struct pipe_sampler_state *state;
+   struct vrend_sampler_state *state;
 
    ctx->sub->num_sampler_states[shader_type] = num_states;
 
@@ -2818,31 +2885,7 @@ void vrend_bind_sampler_states(struct vrend_context *ctx,
    ctx->sub->sampler_state_dirty = TRUE;
 }
 
-static inline GLenum convert_mag_filter(unsigned int filter)
-{
-   if (filter == PIPE_TEX_FILTER_NEAREST)
-      return GL_NEAREST;
-   return GL_LINEAR;
-}
 
-static inline GLenum convert_min_filter(unsigned int filter, unsigned int mip_filter)
-{
-   if (mip_filter == PIPE_TEX_MIPFILTER_NONE)
-      return convert_mag_filter(filter);
-   else if (mip_filter == PIPE_TEX_MIPFILTER_LINEAR) {
-      if (filter == PIPE_TEX_FILTER_NEAREST)
-         return GL_NEAREST_MIPMAP_LINEAR;
-      else
-         return GL_LINEAR_MIPMAP_LINEAR;
-   } else if (mip_filter == PIPE_TEX_MIPFILTER_NEAREST) {
-      if (filter == PIPE_TEX_FILTER_NEAREST)
-         return GL_NEAREST_MIPMAP_NEAREST;
-      else
-         return GL_LINEAR_MIPMAP_NEAREST;
-   }
-   assert(0);
-   return 0;
-}
 
 static void vrend_apply_sampler_state(struct vrend_context *ctx, 
                                       struct vrend_resource *res,
@@ -2850,7 +2893,8 @@ static void vrend_apply_sampler_state(struct vrend_context *ctx,
                                       int id)
 {
    struct vrend_texture *tex = (struct vrend_texture *)res;
-   struct pipe_sampler_state *state = ctx->sub->sampler_state[shader_type][id];
+   struct vrend_sampler_state *vstate = ctx->sub->sampler_state[shader_type][id];
+   struct pipe_sampler_state *state = &vstate->base;
    bool set_all = FALSE;
    GLenum target = tex->base.target;
 
@@ -2865,6 +2909,11 @@ static void vrend_apply_sampler_state(struct vrend_context *ctx,
 
    if (target == GL_TEXTURE_BUFFER) {
       tex->state = *state;
+      return;
+   }
+
+   if (vrend_state.have_samplers) {
+      glBindSampler(id, vstate->id);
       return;
    }
 
@@ -2974,6 +3023,8 @@ void vrend_renderer_init(struct vrend_if_cbs *cbs)
    else
       fprintf(stderr,"WARNING: running without ARB robustness in place may crash\n");
 
+   if (gl_ver >= 33 || glewIsSupported("GL_ARB_sampler_objects"))
+      vrend_state.have_samplers = TRUE;
    if (gl_ver >= 33 || glewIsSupported("GL_ARB_shader_bit_encoding"))
       vrend_state.have_bit_encoding = TRUE;
    if (gl_ver >= 31)
@@ -2995,6 +3046,7 @@ void vrend_renderer_init(struct vrend_if_cbs *cbs)
    vrend_object_set_destroy_callback(VIRGL_OBJECT_GS, vrend_destroy_shader_object);
    vrend_object_set_destroy_callback(VIRGL_OBJECT_SAMPLER_VIEW, vrend_destroy_sampler_view_object);
    vrend_object_set_destroy_callback(VIRGL_OBJECT_STREAMOUT_TARGET, vrend_destroy_so_target_object);
+   vrend_object_set_destroy_callback(VIRGL_OBJECT_SAMPLER_STATE, vrend_destroy_sampler_state_object);
 
    vrend_build_format_list();
 

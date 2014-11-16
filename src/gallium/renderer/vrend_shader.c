@@ -1629,6 +1629,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
    case TGSI_OPCODE_EMIT:
       if (ctx->so && ctx->key->gs_present)
             emit_so_movs(ctx);
+      emit_clip_dist_movs(ctx);
       snprintf(buf, 255, "EmitVertex();\n");
       emit_buf(ctx, buf);
       break;
@@ -1806,6 +1807,13 @@ static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
          }
          snprintf(buf, 255, "out float gl_ClipDistance[%d];\n", ctx->num_clip_dist ? ctx->num_clip_dist : 8);
          strcat(glsl_final, buf);
+         snprintf(buf, 255, "vec4 clip_dist_temp[2];\n");
+         strcat(glsl_final, buf);
+      }
+   }
+
+   if (ctx->prog_type == TGSI_PROCESSOR_GEOMETRY) {
+      if (ctx->num_clip_dist) {
          snprintf(buf, 255, "vec4 clip_dist_temp[2];\n");
          strcat(glsl_final, buf);
       }

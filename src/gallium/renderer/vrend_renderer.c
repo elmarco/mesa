@@ -4314,6 +4314,16 @@ static void vrend_renderer_blit_int(struct vrend_context *ctx,
        !vrend_format_is_ds(dst_res->base.format))
       use_gl = true;
 
+   /* different depth formats */
+   if (vrend_format_is_ds(src_res->base.format) &&
+       vrend_format_is_ds(dst_res->base.format)) {
+      if (src_res->base.format != dst_res->base.format) {
+         if (!(src_res->base.format == PIPE_FORMAT_S8_UINT_Z24_UNORM &&
+               (dst_res->base.format == PIPE_FORMAT_Z24X8_UNORM))) {
+            use_gl = true;
+         }
+      }
+   }
    /* glBlitFramebuffer - can support depth stencil with NEAREST
       which we use for mipmaps */
    if ((info->mask & (PIPE_MASK_Z | PIPE_MASK_S)) && info->filter == PIPE_TEX_FILTER_LINEAR)

@@ -420,6 +420,12 @@ iter_declaration(struct tgsi_iterate_context *iter,
             ctx->outputs[i].override_no_wm = TRUE;
             name_prefix = "gl_PointSize";
             break;
+         } else if (iter->processor.Processor == TGSI_PROCESSOR_GEOMETRY) {
+            ctx->outputs[i].glsl_predefined_no_emit = TRUE;
+            ctx->outputs[i].glsl_no_index = TRUE;
+            ctx->outputs[i].override_no_wm = TRUE;
+            name_prefix = "gl_PointSize";
+            break;
          }
       case TGSI_SEMANTIC_LAYER:
          if (iter->processor.Processor == TGSI_PROCESSOR_GEOMETRY) {

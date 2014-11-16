@@ -1171,8 +1171,12 @@ iter_instruction(struct tgsi_iterate_context *iter,
       } else if (src->Register.File == TGSI_FILE_SYSTEM_VALUE) {
          for (j = 0; j < ctx->num_system_values; j++)
             if (ctx->system_values[j].first == src->Register.Index) {
-               snprintf(srcs[i], 255, "%s%s", prefix, ctx->system_values[j].glsl_name);
+               if (ctx->system_values[j].name == TGSI_SEMANTIC_VERTEXID)
+                  snprintf(srcs[i], 255, "uvec4(%s)", ctx->system_values[j].glsl_name);
+               else
+                  snprintf(srcs[i], 255, "%s%s", prefix, ctx->system_values[j].glsl_name);
                override_no_wm[i] = ctx->system_values[j].override_no_wm;
+               break;
             }
       }
    }

@@ -2946,7 +2946,7 @@ static void vrend_apply_sampler_state(struct vrend_context *ctx,
 
    if (vrend_state.have_samplers) {
       glBindSampler(id, vstate->id);
-      glTexParameteri(vstate->id, GL_TEXTURE_SRGB_DECODE_EXT,
+      glSamplerParameteri(vstate->id, GL_TEXTURE_SRGB_DECODE_EXT,
                       srgb_decode);
       return;
    }

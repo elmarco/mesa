@@ -1652,6 +1652,8 @@ static INLINE void vrend_fill_shader_key(struct vrend_context *ctx,
       int i;
       boolean add_alpha_test = true;
       for (i = 0; i < ctx->sub->nr_cbufs; i++) {
+         if (!ctx->sub->surf[i])
+            continue;
          if (util_format_is_pure_integer(ctx->sub->surf[i]->format))
             add_alpha_test = false;
       }

@@ -311,6 +311,7 @@ iter_declaration(struct tgsi_iterate_context *iter,
       ctx->outputs[i].glsl_predefined_no_emit = FALSE;
       ctx->outputs[i].glsl_no_index = FALSE;
       ctx->outputs[i].override_no_wm = FALSE;
+
       switch (ctx->outputs[i].name) {
       case TGSI_SEMANTIC_POSITION:
          if (iter->processor.Processor == TGSI_PROCESSOR_VERTEX ||
@@ -376,6 +377,14 @@ iter_declaration(struct tgsi_iterate_context *iter,
             ctx->outputs[i].glsl_no_index = TRUE;
             ctx->outputs[i].override_no_wm = TRUE;
             name_prefix = "gl_PointSize";
+            break;
+         }
+      case TGSI_SEMANTIC_LAYER:
+         if (iter->processor.Processor == TGSI_PROCESSOR_GEOMETRY) {
+            ctx->outputs[i].glsl_predefined_no_emit = TRUE;
+            ctx->outputs[i].glsl_no_index = TRUE;
+            ctx->outputs[i].override_no_wm = TRUE;
+            name_prefix = "gl_Layer";
             break;
          }
       case TGSI_SEMANTIC_GENERIC:
@@ -1025,6 +1034,11 @@ iter_instruction(struct tgsi_iterate_context *iter,
                   snprintf(dsts[i], 255, "clip_dist_temp[%d]", ctx->outputs[j].sid);
                } else {
                   snprintf(dsts[i], 255, "%s%s", ctx->outputs[j].glsl_name, ctx->outputs[j].override_no_wm ? "" : writemask);
+                  if (ctx->outputs[j].name == TGSI_SEMANTIC_LAYER) {
+                     if (!strcmp(dtypeprefix, ""))
+                        dtypeprefix = "floatBitsToInt";
+                     snprintf(dstconv, 6, "int");
+                  }
                   if (ctx->outputs[j].name == TGSI_SEMANTIC_PSIZE) {
                      snprintf(dstconv, 6, "float");
                      break;

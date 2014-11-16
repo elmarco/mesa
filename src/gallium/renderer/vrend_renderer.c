@@ -1092,16 +1092,28 @@ void vrend_fb_bind_texture(struct vrend_resource *res,
     case GL_TEXTURE_2D_ARRAY:
     case GL_TEXTURE_2D_MULTISAMPLE_ARRAY:
     case GL_TEXTURE_CUBE_MAP_ARRAY:
-        glFramebufferTextureLayer(GL_FRAMEBUFFER_EXT, attachment,
-                                  res->id, level, layer);
+        if (layer == 0xffffffff)
+            glFramebufferTexture(GL_FRAMEBUFFER_EXT, attachment,
+                                 res->id, level);
+        else
+            glFramebufferTextureLayer(GL_FRAMEBUFFER_EXT, attachment,
+                                      res->id, level, layer);
         break;
     case GL_TEXTURE_3D:
-        glFramebufferTexture3DEXT(GL_FRAMEBUFFER_EXT, attachment,
-                                  res->target, res->id, level, layer);
+        if (layer == 0xffffffff)
+            glFramebufferTexture(GL_FRAMEBUFFER_EXT, attachment,
+                                 res->id, level);
+        else
+            glFramebufferTexture3DEXT(GL_FRAMEBUFFER_EXT, attachment,
+                                      res->target, res->id, level, layer);
         break;
     case GL_TEXTURE_CUBE_MAP:
-        glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, attachment,
-                                  GL_TEXTURE_CUBE_MAP_POSITIVE_X + layer, res->id, level);
+        if (layer == 0xffffffff)
+            glFramebufferTexture(GL_FRAMEBUFFER_EXT, attachment,
+                                 res->id, level);
+        else
+            glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, attachment,
+                                      GL_TEXTURE_CUBE_MAP_POSITIVE_X + layer, res->id, level);
         break;
     case GL_TEXTURE_1D:
         glFramebufferTexture1DEXT(GL_FRAMEBUFFER_EXT, attachment,
@@ -1146,10 +1158,13 @@ static void vrend_hw_set_color_surface(struct vrend_context *ctx, int index)
       glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, attachment,
                                 GL_TEXTURE_2D, 0, 0);
    } else {
+       int first_layer = ctx->sub->surf[index]->val1 & 0xffff;
+       int last_layer = (ctx->sub->surf[index]->val1 >> 16) & 0xffff;
        tex = ctx->sub->surf[index]->texture;
-       vrend_fb_bind_texture(tex, index, ctx->sub->surf[index]->val0,
-                             ctx->sub->surf[index]->val1 & 0xffff);
 
+
+       vrend_fb_bind_texture(tex, index, ctx->sub->surf[index]->val0,
+                             first_layer != last_layer ? 0xffffffff : first_layer);
    }
 
 

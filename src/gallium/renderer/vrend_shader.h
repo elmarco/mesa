@@ -58,6 +58,7 @@ struct vrend_shader_key {
    uint8_t alpha_test;
    uint8_t clip_plane_enable;
    float alpha_ref_val;
+   boolean fs_inputs_from_gs;
 };
   
 struct vrend_shader_cfg {
@@ -67,7 +68,8 @@ struct vrend_shader_cfg {
 
 boolean vrend_patch_vertex_shader_interpolants(char *program,
                                                struct vrend_shader_info *vs_info,
-                                               struct vrend_shader_info *fs_info);
+                                               struct vrend_shader_info *fs_info,
+   bool is_gs);
 
 char *vrend_convert_shader(struct vrend_shader_cfg *cfg,
                            const struct tgsi_token *tokens,

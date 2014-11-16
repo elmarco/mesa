@@ -271,9 +271,13 @@ iter_declaration(struct tgsi_iterate_context *iter,
          }
       default:
          if (iter->processor.Processor == TGSI_PROCESSOR_FRAGMENT ||
-             iter->processor.Processor == TGSI_PROCESSOR_GEOMETRY)
-            name_prefix = "ex";
-         else
+             iter->processor.Processor == TGSI_PROCESSOR_GEOMETRY) {
+            if (iter->processor.Processor == TGSI_PROCESSOR_FRAGMENT &&
+                ctx->key->fs_inputs_from_gs)
+               name_prefix = "out";
+            else
+               name_prefix = "ex";
+         } else
             name_prefix = "in";
          break;
       }
@@ -381,6 +385,8 @@ iter_declaration(struct tgsi_iterate_context *iter,
       default:
          if (iter->processor.Processor == TGSI_PROCESSOR_VERTEX)
             name_prefix = "ex";
+         else if (iter->processor.Processor == TGSI_PROCESSOR_FRAGMENT)
+            name_prefix = "fsout";
          else
             name_prefix = "out";
          break;
@@ -531,7 +537,7 @@ static void emit_cbuf_writes(struct dump_ctx *ctx)
    int i;
 
    for (i = 1; i < 8; i++) {
-      snprintf(buf, 255, "out_c%d = out_c0;\n", i);
+      snprintf(buf, 255, "fsout_c%d = fsout_c0;\n", i);
       strcat(ctx->glsl_main, buf);
    }
 }
@@ -552,7 +558,7 @@ static void emit_alpha_test(struct dump_ctx *ctx)
    char buf[255];
    char comp_buf[128];
 
-   snprintf(comp_buf, 128, atests[ctx->key->alpha_test], "out_c0.w", ctx->key->alpha_ref_val);
+   snprintf(comp_buf, 128, atests[ctx->key->alpha_test], "fsout_c0.w", ctx->key->alpha_ref_val);
 
    snprintf(buf, 255, "if (!(%s)) {\n\tdiscard;\n}\n", comp_buf);
    strcat(ctx->glsl_main, buf);
@@ -1676,13 +1682,13 @@ static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
    }
    if (ctx->write_all_cbufs) {
       for (i = 0; i < 8; i++) {
-         snprintf(buf, 255, "out vec4 out_c%d;\n", i);
+         snprintf(buf, 255, "out vec4 fsout_c%d;\n", i);
          strcat(glsl_final, buf);
       }
    } else {
       for (i = 0; i < ctx->num_outputs; i++) {
          if (!ctx->outputs[i].glsl_predefined_no_emit) {
-            if (ctx->prog_type == TGSI_PROCESSOR_VERTEX && (ctx->outputs[i].name == TGSI_SEMANTIC_GENERIC || ctx->outputs[i].name == TGSI_SEMANTIC_COLOR || ctx->outputs[i].name == TGSI_SEMANTIC_BCOLOR)) {
+            if ((ctx->prog_type == TGSI_PROCESSOR_VERTEX || ctx->prog_type == TGSI_PROCESSOR_GEOMETRY) && (ctx->outputs[i].name == TGSI_SEMANTIC_GENERIC || ctx->outputs[i].name == TGSI_SEMANTIC_COLOR || ctx->outputs[i].name == TGSI_SEMANTIC_BCOLOR)) {
                ctx->num_interps++;
                prefix = INTERP_PREFIX;
             } else
@@ -1912,7 +1918,7 @@ static void replace_interp(char *program,
 
 boolean vrend_patch_vertex_shader_interpolants(char *program,
                                                struct vrend_shader_info *vs_info,
-                                               struct vrend_shader_info *fs_info)
+                                               struct vrend_shader_info *fs_info, bool is_gs)
 {
    int i;
    const char *pstring;
@@ -1947,7 +1953,7 @@ boolean vrend_patch_vertex_shader_interpolants(char *program,
          }
          break;
       case TGSI_SEMANTIC_GENERIC:
-         snprintf(glsl_name, 64, "ex_g%d", fs_info->interpinfo[i].semantic_index);
+         snprintf(glsl_name, 64, "%s_g%d", is_gs ? "out" : "ex", fs_info->interpinfo[i].semantic_index);
          replace_interp(program, glsl_name, pstring);
          break;
       }

@@ -661,19 +661,28 @@ static struct vrend_linked_shader_program *add_shader_program(struct vrend_conte
   int id;
 
   /* need to rewrite VS code to add interpolation params */
-  if (vs->compiled_fs_id != fs->id) {
-     if (!gs)
+  if ((gs && gs->compiled_fs_id != fs->id) ||
+      (!gs && vs->compiled_fs_id != fs->id)) {
+     boolean ret;
+
+     if (gs)
+        vrend_patch_vertex_shader_interpolants(gs->glsl_prog,
+                                               &gs->sel->sinfo,
+                                               &fs->sel->sinfo, true);
+     else
         vrend_patch_vertex_shader_interpolants(vs->glsl_prog,
                                                &vs->sel->sinfo,
-                                               &fs->sel->sinfo);
-     boolean ret;
-     ret = vrend_compile_shader(ctx, vs);
+                                               &fs->sel->sinfo, false);
+     ret = vrend_compile_shader(ctx, gs ? gs : vs);
      if (ret == FALSE) {
-        glDeleteShader(vs->id);
+        glDeleteShader(gs ? gs->id : vs->id);
         free(sprog);
         return NULL;
      }
-     vs->compiled_fs_id = fs->id;
+     if (gs)
+        gs->compiled_fs_id = fs->id;
+     else
+        vs->compiled_fs_id = fs->id;
   }
 
   prog_id = glCreateProgram();
@@ -1673,6 +1682,9 @@ static INLINE void vrend_fill_shader_key(struct vrend_context *ctx,
    }
    key->invert_fs_origin = !ctx->sub->inverted_fbo_content;
    key->coord_replace = ctx->sub->rs_state.point_quad_rasterization ? ctx->sub->rs_state.sprite_coord_enable : 0;
+
+   if (ctx->sub->gs)
+      key->fs_inputs_from_gs = true;
 }
 
 static INLINE int conv_shader_type(int type)
@@ -1694,7 +1706,7 @@ static int vrend_shader_create(struct vrend_context *ctx,
    shader->compiled_fs_id = 0;
    shader->glsl_prog = vrend_convert_shader(&ctx->shader_cfg, shader->sel->tokens, &key, &shader->sel->sinfo);
    shader->key = key;
-   if (shader->sel->type == PIPE_SHADER_FRAGMENT || shader->sel->type == PIPE_SHADER_GEOMETRY) {
+   if (1) {//shader->sel->type == PIPE_SHADER_FRAGMENT || shader->sel->type == PIPE_SHADER_GEOMETRY) {
       boolean ret;
 
       ret = vrend_compile_shader(ctx, shader);

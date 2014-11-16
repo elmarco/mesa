@@ -2419,6 +2419,8 @@ static void vrend_patch_blend_func(struct vrend_context *ctx)
       return;
 
    for (i = 0; i < ctx->sub->nr_cbufs; i++) {
+      if (!ctx->sub->surf[i])
+         continue;
       if (!util_format_has_alpha(ctx->sub->surf[i]->format))
          break;
    }

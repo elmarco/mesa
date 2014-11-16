@@ -1826,7 +1826,11 @@ static boolean fill_fragment_interpolants(struct dump_ctx *ctx, struct vrend_sha
 
       if (ctx->inputs[i].interpolate == TGSI_INTERPOLATE_COLOR)
          continue;
-      
+
+      if (index >= ctx->num_interps) {
+         fprintf(stderr, "mismatch in number of interps %d %d\n", index, ctx->num_interps);
+         return TRUE;
+      }
       sinfo->interpinfo[index].semantic_name = ctx->inputs[i].name;
       sinfo->interpinfo[index].semantic_index = ctx->inputs[i].sid;
       sinfo->interpinfo[index].interpolate = ctx->inputs[i].interpolate;

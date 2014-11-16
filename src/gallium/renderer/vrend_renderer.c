@@ -3138,7 +3138,6 @@ static void vrend_destroy_sub_context(struct vrend_sub_context *sub)
 bool vrend_destroy_context(struct vrend_context *ctx)
 {
    bool switch_0 = (ctx == vrend_state.current_ctx);
-   int i;
 
    if (switch_0) {
       vrend_state.current_ctx = NULL;

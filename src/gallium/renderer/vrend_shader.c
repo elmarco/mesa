@@ -240,6 +240,15 @@ iter_declaration(struct tgsi_iterate_context *iter,
             break;
          }
          /* fallthrough */
+      case TGSI_SEMANTIC_PRIMID:
+         if (iter->processor.Processor == TGSI_PROCESSOR_GEOMETRY) {
+            name_prefix = "gl_PrimitiveIDIn";
+            ctx->inputs[i].glsl_predefined_no_emit = TRUE;
+            ctx->inputs[i].glsl_no_index = TRUE;
+            ctx->inputs[i].override_no_wm = TRUE;
+            ctx->has_ints = TRUE;
+            break;
+         }
       case TGSI_SEMANTIC_POSITION:
          if (iter->processor.Processor == TGSI_PROCESSOR_FRAGMENT) {
             name_prefix = "gl_FragCoord";
@@ -1093,8 +1102,11 @@ iter_instruction(struct tgsi_iterate_context *iter,
             if (ctx->inputs[j].first == src->Register.Index) {
                if (ctx->key->color_two_side && ctx->inputs[j].name == TGSI_SEMANTIC_COLOR)
                   snprintf(srcs[i], 255, "%s(%s%s%d%s%s)", stypeprefix, prefix, "realcolor", ctx->inputs[j].sid, arrayname, swizzle);
+               else if (ctx->inputs[j].name == TGSI_SEMANTIC_PRIMID)
+                  snprintf(srcs[i], 255, "%s(vec4(intBitsToFloat(%s)))", stypeprefix, ctx->inputs[j].glsl_name);
                else
                   snprintf(srcs[i], 255, "%s(%s%s%s%s)", stypeprefix, prefix, ctx->inputs[j].glsl_name, arrayname, swizzle);
+               override_no_wm[i] = ctx->inputs[j].override_no_wm;
                break;
             }
       }

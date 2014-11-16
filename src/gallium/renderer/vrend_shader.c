@@ -1179,7 +1179,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
          for (j = 0; j < ctx->num_system_values; j++)
             if (ctx->system_values[j].first == src->Register.Index) {
                if (ctx->system_values[j].name == TGSI_SEMANTIC_VERTEXID)
-                  snprintf(srcs[i], 255, "vec4(intBitsToFloat(%s))", ctx->system_values[j].glsl_name);
+                  snprintf(srcs[i], 255, "%s(vec4(intBitsToFloat(%s)))", stypeprefix, ctx->system_values[j].glsl_name);
                else
                   snprintf(srcs[i], 255, "%s%s", prefix, ctx->system_values[j].glsl_name);
                override_no_wm[i] = ctx->system_values[j].override_no_wm;

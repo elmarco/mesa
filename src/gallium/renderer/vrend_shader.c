@@ -1495,7 +1495,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
    case TGSI_OPCODE_END:
       if (iter->processor.Processor == TGSI_PROCESSOR_VERTEX) {
          emit_prescale(ctx);
-         if (ctx->so)
+         if (ctx->so && !ctx->key->gs_present)
             emit_so_movs(ctx);
          emit_clip_dist_movs(ctx);
       } else if (iter->processor.Processor == TGSI_PROCESSOR_GEOMETRY) {
@@ -1540,6 +1540,8 @@ iter_instruction(struct tgsi_iterate_context *iter,
       emit_buf(ctx, buf);
       break;
    case TGSI_OPCODE_EMIT:
+      if (ctx->so && ctx->key->gs_present)
+            emit_so_movs(ctx);
       snprintf(buf, 255, "EmitVertex();\n");
       emit_buf(ctx, buf);
       break;

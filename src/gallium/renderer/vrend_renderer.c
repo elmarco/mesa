@@ -2059,7 +2059,7 @@ void vrend_draw_vbo(struct vrend_context *ctx,
    }
 
    sampler_id = 0;
-   for (shader_type = PIPE_SHADER_VERTEX; shader_type <= PIPE_SHADER_FRAGMENT; shader_type++) {
+   for (shader_type = PIPE_SHADER_VERTEX; shader_type <= (ctx->sub->gs ? PIPE_SHADER_GEOMETRY : PIPE_SHADER_FRAGMENT); shader_type++) {
       int index = 0;
       for (i = 0; i < ctx->sub->views[shader_type].num_views; i++) {
          struct vrend_resource *texture = NULL;

@@ -1786,8 +1786,7 @@ static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
             prefix = get_interp_string(ctx->inputs[i].interpolate, ctx->key->flatshade);
             if (!prefix)
                prefix = "";
-            else
-               ctx->num_interps++;
+            ctx->num_interps++;
          }
 
          if (ctx->prog_type == TGSI_PROCESSOR_GEOMETRY) {

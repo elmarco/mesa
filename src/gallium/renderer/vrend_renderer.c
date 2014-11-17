@@ -669,11 +669,11 @@ static struct vrend_linked_shader_program *add_shader_program(struct vrend_conte
      if (gs)
         vrend_patch_vertex_shader_interpolants(gs->glsl_prog,
                                                &gs->sel->sinfo,
-                                               &fs->sel->sinfo, true);
+                                               &fs->sel->sinfo, true, fs->key.flatshade);
      else
         vrend_patch_vertex_shader_interpolants(vs->glsl_prog,
                                                &vs->sel->sinfo,
-                                               &fs->sel->sinfo, false);
+                                               &fs->sel->sinfo, false, fs->key.flatshade);
      ret = vrend_compile_shader(ctx, gs ? gs : vs);
      if (ret == FALSE) {
         glDeleteShader(gs ? gs->id : vs->id);
@@ -1692,6 +1692,7 @@ static INLINE void vrend_fill_shader_key(struct vrend_context *ctx,
       key->color_two_side = ctx->sub->rs_state.light_twoside;
 
       key->clip_plane_enable = ctx->sub->rs_state.clip_plane_enable;
+      key->flatshade = ctx->sub->rs_state.flatshade ? TRUE : FALSE;
    } else {
       key->add_alpha_test = 0;
       key->pstipple_tex = 0;
@@ -2776,17 +2777,16 @@ static void vrend_hw_emit_rs(struct vrend_context *ctx)
    else
       glDisable(GL_POLYGON_OFFSET_POINT);
 
-   if (use_core_profile == 0) {
-      if (state->flatshade != vrend_state.hw_rs_state.flatshade) {
-         vrend_state.hw_rs_state.flatshade = state->flatshade;
+
+   if (state->flatshade != vrend_state.hw_rs_state.flatshade) {
+      vrend_state.hw_rs_state.flatshade = state->flatshade;
+      if (use_core_profile == 0) {
          if (state->flatshade) {
             glShadeModel(GL_FLAT);
          } else {
             glShadeModel(GL_SMOOTH);
          }
       }
-   } else if (state->flatshade) {
-      report_core_warn(ctx, CORE_PROFILE_WARN_SHADE_MODEL, 0);
    }
 
    if (state->flatshade_first != vrend_state.hw_rs_state.flatshade_first) {
@@ -2914,6 +2914,7 @@ void vrend_object_bind_rasterizer(struct vrend_context *ctx,
 
    ctx->sub->rs_state = *state;
    ctx->sub->scissor_state_dirty = TRUE;
+   ctx->sub->shader_dirty = TRUE;
    vrend_hw_emit_rs(ctx);
 }
 

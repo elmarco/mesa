@@ -1713,7 +1713,7 @@ const char *vrend_shader_samplertypeconv(int sampler_type, int *is_shad)
         }
 }
 
-static const char *get_interp_string(int interpolate)
+static const char *get_interp_string(int interpolate, boolean flatshade)
 {
    switch (interpolate) {
    case TGSI_INTERPOLATE_LINEAR:
@@ -1722,6 +1722,9 @@ static const char *get_interp_string(int interpolate)
       return "smooth ";
    case TGSI_INTERPOLATE_CONSTANT:
       return "flat ";
+   case TGSI_INTERPOLATE_COLOR:
+      if (flatshade)
+         return "flat ";
    }
    return NULL;
 }
@@ -1762,7 +1765,7 @@ static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
          if (ctx->prog_type == TGSI_PROCESSOR_FRAGMENT &&
              (ctx->inputs[i].name == TGSI_SEMANTIC_GENERIC ||
               ctx->inputs[i].name == TGSI_SEMANTIC_COLOR)) {
-            prefix = get_interp_string(ctx->inputs[i].interpolate);
+            prefix = get_interp_string(ctx->inputs[i].interpolate, ctx->key->flatshade);
             if (!prefix)
                prefix = "";
             else
@@ -1911,9 +1914,6 @@ static boolean fill_fragment_interpolants(struct dump_ctx *ctx, struct vrend_sha
           ctx->inputs[i].name != TGSI_SEMANTIC_COLOR)
          continue;
 
-      if (ctx->inputs[i].interpolate == TGSI_INTERPOLATE_COLOR)
-         continue;
-
       if (index >= ctx->num_interps) {
          fprintf(stderr, "mismatch in number of interps %d %d\n", index, ctx->num_interps);
          return TRUE;
@@ -2028,7 +2028,7 @@ static void replace_interp(char *program,
 
 boolean vrend_patch_vertex_shader_interpolants(char *program,
                                                struct vrend_shader_info *vs_info,
-                                               struct vrend_shader_info *fs_info, bool is_gs)
+                                               struct vrend_shader_info *fs_info, bool is_gs, bool flatshade)
 {
    int i;
    const char *pstring;
@@ -2040,7 +2040,7 @@ boolean vrend_patch_vertex_shader_interpolants(char *program,
       return TRUE;
 
    for (i = 0; i < fs_info->num_interps; i++) {
-      pstring = get_interp_string(fs_info->interpinfo[i].interpolate);
+      pstring = get_interp_string(fs_info->interpinfo[i].interpolate, flatshade);
       if (!pstring)
          continue;
 

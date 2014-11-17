@@ -54,6 +54,7 @@ struct vrend_shader_io {
    boolean glsl_no_index;
    boolean glsl_gl_in;
    boolean override_no_wm;
+   boolean is_int;
    char glsl_name[64];
 };
 
@@ -353,6 +354,7 @@ iter_declaration(struct tgsi_iterate_context *iter,
       ctx->outputs[i].glsl_predefined_no_emit = FALSE;
       ctx->outputs[i].glsl_no_index = FALSE;
       ctx->outputs[i].override_no_wm = FALSE;
+      ctx->outputs[i].is_int = FALSE;
 
       switch (ctx->outputs[i].name) {
       case TGSI_SEMANTIC_POSITION:
@@ -432,6 +434,7 @@ iter_declaration(struct tgsi_iterate_context *iter,
             ctx->outputs[i].glsl_predefined_no_emit = TRUE;
             ctx->outputs[i].glsl_no_index = TRUE;
             ctx->outputs[i].override_no_wm = TRUE;
+            ctx->outputs[i].is_int = TRUE;
             name_prefix = "gl_Layer";
             break;
          }
@@ -440,6 +443,7 @@ iter_declaration(struct tgsi_iterate_context *iter,
             ctx->outputs[i].glsl_predefined_no_emit = TRUE;
             ctx->outputs[i].glsl_no_index = TRUE;
             ctx->outputs[i].override_no_wm = TRUE;
+            ctx->outputs[i].is_int = TRUE;
             name_prefix = "gl_PrimitiveID";
             break;
          }
@@ -672,7 +676,7 @@ static void emit_so_movs(struct dump_ctx *ctx)
 {
    char buf[255];
    int i, j;
-   char outtype[6] = {0};
+   char outtype[15] = {0};
    char writemask[6];
    for (i = 0; i < ctx->so->num_outputs; i++) {
       if (ctx->so->output[i].start_component != 0) {
@@ -691,10 +695,13 @@ static void emit_so_movs(struct dump_ctx *ctx)
       } else
          writemask[0] = 0;
       
-      if (ctx->so->output[i].num_components == 1)
-         snprintf(outtype, 6, "float");
-      else
-         snprintf(outtype, 6, "vec%d", ctx->so->output[i].num_components);
+      if (ctx->so->output[i].num_components == 1) {
+         if (ctx->outputs[ctx->so->output[i].register_index].is_int)
+            snprintf(outtype, 15, "intBitsToFloat");
+         else
+            snprintf(outtype, 15, "float");
+      } else
+         snprintf(outtype, 15, "vec%d", ctx->so->output[i].num_components);
 
       if (ctx->so->output[i].register_index >= 255)
          continue;
@@ -1092,8 +1099,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
                   snprintf(dsts[i], 255, "clip_dist_temp[%d]", ctx->outputs[j].sid);
                } else {
                   snprintf(dsts[i], 255, "%s%s", ctx->outputs[j].glsl_name, ctx->outputs[j].override_no_wm ? "" : writemask);
-                  if (ctx->outputs[j].name == TGSI_SEMANTIC_LAYER ||
-                      ctx->outputs[j].name == TGSI_SEMANTIC_PRIMID) {
+                  if (ctx->outputs[j].is_int) {
                      if (!strcmp(dtypeprefix, ""))
                         dtypeprefix = "floatBitsToInt";
                      snprintf(dstconv, 6, "int");

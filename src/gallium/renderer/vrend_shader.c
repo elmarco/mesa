@@ -103,7 +103,7 @@ struct dump_ctx {
    
    struct pipe_stream_output_info *so;
    char **so_names;
-
+   bool write_so_outputs[PIPE_MAX_SO_OUTPUTS];
    bool uses_cube_array;
    bool uses_sampler_ms;
    bool uses_sampler_buf;
@@ -697,12 +697,15 @@ static void emit_so_movs(struct dump_ctx *ctx)
       } else
          writemask[0] = 0;
 
-      if (writemask[0] == 0 && !(ctx->outputs[ctx->so->output[i].register_index].name == TGSI_SEMANTIC_CLIPDIST)) {
+      if (ctx->so->output[i].num_components == 4 && writemask[0] == 0 && !(ctx->outputs[ctx->so->output[i].register_index].name == TGSI_SEMANTIC_CLIPDIST)) {
          ctx->so_names[i] = strdup(ctx->outputs[ctx->so->output[i].register_index].glsl_name);
+         ctx->write_so_outputs[i] = false;
+
       } else {
          char ntemp[8];
-         snprintf(ntemp, 8, "tfout%d\n", i);
+         snprintf(ntemp, 8, "tfout%d", i);
          ctx->so_names[i] = strdup(ntemp);
+         ctx->write_so_outputs[i] = true;
       }
       if (ctx->so->output[i].num_components == 1) {
          if (ctx->outputs[ctx->so->output[i].register_index].is_int)
@@ -720,7 +723,7 @@ static void emit_so_movs(struct dump_ctx *ctx)
          snprintf(buf, 255, "tfout%d = %s(clip_dist_temp[%d]%s);\n", i, outtype, ctx->outputs[ctx->so->output[i].register_index].sid,
                   writemask);
       } else {
-         if (writemask[0] != 0)
+         if (ctx->write_so_outputs[i])
             snprintf(buf, 255, "tfout%d = %s(%s%s);\n", i, outtype, ctx->outputs[ctx->so->output[i].register_index].glsl_name, writemask);
       }
       strcat(ctx->glsl_main, buf);
@@ -1842,6 +1845,8 @@ static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
    if (ctx->so) {
       char outtype[6] = {0};
       for (i = 0; i < ctx->so->num_outputs; i++) {
+         if (!ctx->write_so_outputs[i])
+            continue;
          if (ctx->so->output[i].num_components == 1)
             snprintf(outtype, 6, "float");
          else

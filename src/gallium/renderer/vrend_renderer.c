@@ -694,8 +694,10 @@ static struct vrend_linked_shader_program *add_shader_program(struct vrend_conte
   if (gs) {
      if (gs->id > 0)
         glAttachShader(prog_id, gs->id);
+     set_stream_out_varyings(prog_id, &gs->sel->sinfo);
   }
-  set_stream_out_varyings(prog_id, &vs->sel->sinfo);
+  else
+     set_stream_out_varyings(prog_id, &vs->sel->sinfo);
   glAttachShader(prog_id, fs->id);
 
   if (fs->sel->sinfo.num_outputs > 1) {

@@ -5049,7 +5049,11 @@ void vrend_renderer_fill_caps(uint32_t set, uint32_t version,
    if (use_core_profile == 0) {
       caps->v1.prim_mask |= (1 << PIPE_PRIM_QUADS) | (1 << PIPE_PRIM_QUAD_STRIP) | (1 << PIPE_PRIM_POLYGON);
    }
-   /* TODO add GL 3.2 types */
+   if (caps->v1.glsl_level >= 150)
+      caps->v1.prim_mask |= (1 << PIPE_PRIM_LINES_ADJACENCY) |
+         (1 << PIPE_PRIM_LINE_STRIP_ADJACENCY) |
+         (1 << PIPE_PRIM_TRIANGLES_ADJACENCY) |
+         (1 << PIPE_PRIM_TRIANGLE_STRIP_ADJACENCY);
 
    for (i = 0; i < VIRGL_FORMAT_MAX; i++) {
       uint32_t offset = i / 32;

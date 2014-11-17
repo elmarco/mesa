@@ -48,6 +48,7 @@ struct vrend_shader_info {
 
    struct vrend_interp_info *interpinfo;
    int gs_out_prim;
+   char **so_names;
 };
 
 struct vrend_shader_key {

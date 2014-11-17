@@ -489,12 +489,15 @@ static void vrend_shader_destroy(struct vrend_shader *shader)
 static void vrend_destroy_shader_selector(struct vrend_shader_selector *sel)
 {
    struct vrend_shader *p = sel->current, *c;
-
+   int i;
    while (p) {
       c = p->next_variant;
       vrend_shader_destroy(p);
       p = c;
    }
+   for (i = 0; i < sel->sinfo.so_info.num_outputs; i++)
+      free(sel->sinfo.so_names[i]);
+   free(sel->sinfo.so_names);
    free(sel->sinfo.interpinfo);
    free(sel->tokens);
    free(sel);
@@ -627,24 +630,24 @@ static void vrend_stencil_test_enable(GLboolean stencil_test_enable)
    }
 }
 
-static void set_stream_out_varyings(int prog_id, struct pipe_stream_output_info *vs_so)
+static void set_stream_out_varyings(int prog_id, struct vrend_shader_info *sinfo)
 {
+   struct pipe_stream_output_info *so = &sinfo->so_info;
    char *varyings[PIPE_MAX_SHADER_OUTPUTS];
    char tmp[64];
    int i;
-   if (!vs_so->num_outputs)
+   
+   if (!so->num_outputs)
       return;
 
-   for (i = 0; i < vs_so->num_outputs; i++) {
-      snprintf(tmp, 64, "tfout%d", i);
-
-      varyings[i] = strdup(tmp);
+   for (i = 0; i < so->num_outputs; i++) {
+      varyings[i] = strdup(sinfo->so_names[i]);
    }
 
-   glTransformFeedbackVaryings(prog_id, vs_so->num_outputs,
+   glTransformFeedbackVaryings(prog_id, so->num_outputs,
                                (const GLchar **)varyings, GL_INTERLEAVED_ATTRIBS_EXT);
 
-   for (i = 0; i < vs_so->num_outputs; i++)
+   for (i = 0; i < so->num_outputs; i++)
       if (varyings[i])
          free(varyings[i]);
 }
@@ -692,7 +695,7 @@ static struct vrend_linked_shader_program *add_shader_program(struct vrend_conte
      if (gs->id > 0)
         glAttachShader(prog_id, gs->id);
   }
-  set_stream_out_varyings(prog_id, &vs->sel->sinfo.so_info);
+  set_stream_out_varyings(prog_id, &vs->sel->sinfo);
   glAttachShader(prog_id, fs->id);
 
   if (fs->sel->sinfo.num_outputs > 1) {

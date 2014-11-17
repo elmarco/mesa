@@ -102,6 +102,8 @@ struct dump_ctx {
    int num_address;
    
    struct pipe_stream_output_info *so;
+   char **so_names;
+
    bool uses_cube_array;
    bool uses_sampler_ms;
    bool uses_sampler_buf;
@@ -694,7 +696,14 @@ static void emit_so_movs(struct dump_ctx *ctx)
          writemask[wm_idx] = '\0';
       } else
          writemask[0] = 0;
-      
+
+      if (writemask[0] == 0 && !(ctx->outputs[ctx->so->output[i].register_index].name == TGSI_SEMANTIC_CLIPDIST)) {
+         ctx->so_names[i] = strdup(ctx->outputs[ctx->so->output[i].register_index].glsl_name);
+      } else {
+         char ntemp[8];
+         snprintf(ntemp, 8, "tfout%d\n", i);
+         ctx->so_names[i] = strdup(ntemp);
+      }
       if (ctx->so->output[i].num_components == 1) {
          if (ctx->outputs[ctx->so->output[i].register_index].is_int)
             snprintf(outtype, 15, "intBitsToFloat");
@@ -706,11 +715,13 @@ static void emit_so_movs(struct dump_ctx *ctx)
       if (ctx->so->output[i].register_index >= 255)
          continue;
 
+      buf[0] = 0;
       if (ctx->outputs[ctx->so->output[i].register_index].name == TGSI_SEMANTIC_CLIPDIST) {
          snprintf(buf, 255, "tfout%d = %s(clip_dist_temp[%d]%s);\n", i, outtype, ctx->outputs[ctx->so->output[i].register_index].sid,
                   writemask);
       } else {
-         snprintf(buf, 255, "tfout%d = %s(%s%s);\n", i, outtype, ctx->outputs[ctx->so->output[i].register_index].glsl_name, writemask);
+         if (writemask[0] != 0)
+            snprintf(buf, 255, "tfout%d = %s(%s%s);\n", i, outtype, ctx->outputs[ctx->so->output[i].register_index].glsl_name, writemask);
       }
       strcat(ctx->glsl_main, buf);
    }
@@ -1975,7 +1986,9 @@ char *vrend_convert_shader(struct vrend_shader_cfg *cfg,
 
    if (sinfo->so_info.num_outputs) {
       ctx.so = &sinfo->so_info;
-   }
+      ctx.so_names = calloc(sinfo->so_info.num_outputs, sizeof(char *));
+   } else
+      ctx.so_names = NULL;
 
    ctx.glsl_main = malloc(65536);
    ctx.glsl_main[0] = '\0';
@@ -2006,6 +2019,7 @@ char *vrend_convert_shader(struct vrend_shader_cfg *cfg,
    sinfo->shadow_samp_mask = ctx.shadow_samp_mask;
    sinfo->glsl_ver = ctx.glsl_ver_required;
    sinfo->gs_out_prim = ctx.gs_out_prim;
+   sinfo->so_names = ctx.so_names;
    return glsl_final;
 }
 

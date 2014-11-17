@@ -120,6 +120,7 @@ struct dump_ctx {
    boolean has_ints;
    boolean has_instanceid;
    int indent_level;
+   int num_in_clip_dist;
    int num_clip_dist;
 
    int glsl_ver_required;
@@ -275,7 +276,7 @@ iter_declaration(struct tgsi_iterate_context *iter,
             ctx->inputs[i].glsl_predefined_no_emit = TRUE;
             ctx->inputs[i].glsl_no_index = TRUE;
             ctx->inputs[i].glsl_gl_in = TRUE;
-            ctx->num_clip_dist += 4;
+            ctx->num_in_clip_dist += 4;
             break;
          }
       case TGSI_SEMANTIC_POSITION:
@@ -381,6 +382,9 @@ iter_declaration(struct tgsi_iterate_context *iter,
          ctx->outputs[i].glsl_predefined_no_emit = TRUE;
          ctx->outputs[i].glsl_no_index = TRUE;
          ctx->num_clip_dist += 4;
+         if (iter->processor.Processor == TGSI_PROCESSOR_VERTEX &&
+             ctx->key->gs_present)
+            ctx->glsl_ver_required = 150;
          break;
       case TGSI_SEMANTIC_CLIPVERTEX:
          name_prefix = "gl_ClipVertex";
@@ -1828,15 +1832,26 @@ static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
             snprintf(buf, 255, "uniform vec4 clipp[8];\n");
             strcat(glsl_final, buf);
          }
-         snprintf(buf, 255, "out float gl_ClipDistance[%d];\n", ctx->num_clip_dist ? ctx->num_clip_dist : 8);
-         strcat(glsl_final, buf);
+         if (ctx->key->gs_present) {
+            snprintf(buf, 255, "out gl_PerVertex {\n vec4 gl_Position;\n float gl_PointSize;\n float gl_ClipDistance[%d];\n};\n", ctx->num_clip_dist ? ctx->num_clip_dist : 8);
+            strcat(glsl_final, buf);
+         } else {
+            snprintf(buf, 255, "out float gl_ClipDistance[%d];\n", ctx->num_clip_dist ? ctx->num_clip_dist : 8);
+            strcat(glsl_final, buf);
+         }
          snprintf(buf, 255, "vec4 clip_dist_temp[2];\n");
          strcat(glsl_final, buf);
       }
    }
 
    if (ctx->prog_type == TGSI_PROCESSOR_GEOMETRY) {
+      if (ctx->num_in_clip_dist) {
+         snprintf(buf, 255, "in gl_PerVertex {\n vec4 gl_Position;\n float gl_PointSize; \n float gl_ClipDistance[%d];\n} gl_in[];\n", ctx->num_clip_dist);
+         strcat(glsl_final, buf);
+      }
       if (ctx->num_clip_dist) {
+         snprintf(buf, 255, "out float gl_ClipDistance[%d];\n", ctx->num_clip_dist);
+         strcat(glsl_final, buf);
          snprintf(buf, 255, "vec4 clip_dist_temp[2];\n");
          strcat(glsl_final, buf);
       }

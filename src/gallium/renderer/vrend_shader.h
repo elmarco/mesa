@@ -47,6 +47,7 @@ struct vrend_shader_info {
    struct pipe_stream_output_info so_info;
 
    struct vrend_interp_info *interpinfo;
+   int gs_out_prim;
 };
 
 struct vrend_shader_key {

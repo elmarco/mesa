@@ -2005,6 +2005,7 @@ char *vrend_convert_shader(struct vrend_shader_cfg *cfg,
    sinfo->num_outputs = ctx.num_outputs;
    sinfo->shadow_samp_mask = ctx.shadow_samp_mask;
    sinfo->glsl_ver = ctx.glsl_ver_required;
+   sinfo->gs_out_prim = ctx.gs_out_prim;
    return glsl_final;
 }
 

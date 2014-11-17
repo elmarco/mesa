@@ -1956,6 +1956,21 @@ static void vrend_update_viewport_state(struct vrend_context *ctx)
    vrend_state.viewport_dirty = FALSE;
 }
 
+static GLenum get_gs_xfb_mode(GLenum mode)
+{
+   switch (mode) {
+   case GL_POINTS:
+      return GL_POINTS;
+   case GL_LINE_STRIP:
+      return GL_LINES;
+   case GL_TRIANGLE_STRIP:
+      return GL_TRIANGLES;
+   default:
+      fprintf(stderr, "illegal gs transform feedback mode %d\n", mode);
+      return GL_POINTS;
+   }
+}
+
 static GLenum get_xfb_mode(GLenum mode)
 {
    switch (mode) {
@@ -2266,7 +2281,10 @@ void vrend_draw_vbo(struct vrend_context *ctx,
 //   vrend_ctx_restart_queries(ctx);
 
    if (ctx->sub->num_so_targets) {
-      glBeginTransformFeedback(get_xfb_mode(info->mode));
+      if (ctx->sub->gs)
+         glBeginTransformFeedback(get_gs_xfb_mode(ctx->sub->gs->sinfo.gs_out_prim));
+      else
+         glBeginTransformFeedback(get_xfb_mode(info->mode));
    }
 
    if (info->primitive_restart) {

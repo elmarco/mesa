@@ -5025,10 +5025,15 @@ void vrend_renderer_fill_caps(uint32_t set, uint32_t version,
       caps->v1.bset.shader_stencil_export = 1;
 
    /* we only support up to GLSL 1.40 features now */
-   if (use_core_profile)
-      caps->v1.glsl_level = 140;
-   else
-      caps->v1.glsl_level = 130;
+   caps->v1.glsl_level = 130;
+   if (use_core_profile) {
+      if (gl_ver == 31)
+         caps->v1.glsl_level = 140;
+      else if (gl_ver == 32)
+         caps->v1.glsl_level = 150;
+      else if (gl_ver >= 33)
+         caps->v1.glsl_level = 330;
+   }
 
    if (glewIsSupported("GL_EXT_texture_mirror_clamp"))
       caps->v1.bset.mirror_clamp = true;

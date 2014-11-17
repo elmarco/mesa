@@ -702,12 +702,12 @@ static struct vrend_linked_shader_program *add_shader_program(struct vrend_conte
 
   if (fs->sel->sinfo.num_outputs > 1) {
      if (util_blend_state_is_dual(&ctx->sub->blend_state, 0)) {
-        glBindFragDataLocationIndexed(prog_id, 0, 0, "out_c0");
-        glBindFragDataLocationIndexed(prog_id, 0, 1, "out_c1");
+        glBindFragDataLocationIndexed(prog_id, 0, 0, "fsout_c0");
+        glBindFragDataLocationIndexed(prog_id, 0, 1, "fsout_c1");
         sprog->dual_src_linked = true;
      } else {
-        glBindFragDataLocationIndexed(prog_id, 0, 0, "out_c0");
-        glBindFragDataLocationIndexed(prog_id, 1, 0, "out_c1");
+        glBindFragDataLocationIndexed(prog_id, 0, 0, "fsout_c0");
+        glBindFragDataLocationIndexed(prog_id, 1, 0, "fsout_c1");
         sprog->dual_src_linked = false;
      }
   } else

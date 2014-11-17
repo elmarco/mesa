@@ -412,8 +412,9 @@ static void __report_context_error(const char *fname, struct vrend_context *ctx,
 #define CORE_PROFILE_WARN_POLYGON_MODE 2
 #define CORE_PROFILE_WARN_TWO_SIDE 3
 #define CORE_PROFILE_WARN_CLAMP 4
+#define CORE_PROFILE_WARN_SHADE_MODEL 5
 
-static const char *vrend_core_profile_warn_strings[] = { "None", "Stipple", "Polygon Mode", "Two Side", "Clamping" };
+static const char *vrend_core_profile_warn_strings[] = { "None", "Stipple", "Polygon Mode", "Two Side", "Clamping", "Shade Model" };
 
 static void __report_core_warn(const char *fname, struct vrend_context *ctx, enum virgl_ctx_errors error, uint32_t value)
 {
@@ -2774,14 +2775,18 @@ static void vrend_hw_emit_rs(struct vrend_context *ctx)
       glEnable(GL_POLYGON_OFFSET_POINT);
    else
       glDisable(GL_POLYGON_OFFSET_POINT);
-   
-   if (state->flatshade != vrend_state.hw_rs_state.flatshade) {
-      vrend_state.hw_rs_state.flatshade = state->flatshade;
-      if (state->flatshade) {
-         glShadeModel(GL_FLAT);
-      } else {
-         glShadeModel(GL_SMOOTH);
+
+   if (use_core_profile == 0) {
+      if (state->flatshade != vrend_state.hw_rs_state.flatshade) {
+         vrend_state.hw_rs_state.flatshade = state->flatshade;
+         if (state->flatshade) {
+            glShadeModel(GL_FLAT);
+         } else {
+            glShadeModel(GL_SMOOTH);
+         }
       }
+   } else if (state->flatshade) {
+      report_core_warn(ctx, CORE_PROFILE_WARN_SHADE_MODEL, 0);
    }
 
    if (state->flatshade_first != vrend_state.hw_rs_state.flatshade_first) {

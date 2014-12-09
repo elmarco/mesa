@@ -31,7 +31,7 @@ AM_CPPFLAGS = \
         -DGALLIUM_SOFTPIPE
 
 dridir = $(DRI_DRIVER_INSTALL_DIR)
-dri_LTLIBRARIES = virtio_gpu_dri.la
+dri_LTLIBRARIES = virtio-gpu_dri.la
 
 virtio_gpu_dri_la_SOURCES = \
 	target.c
@@ -60,4 +60,4 @@ endif
 # a while by putting a link to the driver into /lib of the build tree.
 all-local: virtio-gpu_dri.la
 	$(MKDIR_P) $(top_builddir)/$(LIB_DIR)/gallium
-	ln -f .libs/virtio_gpu_dri.so $(top_builddir)/$(LIB_DIR)/gallium/virtio_gpu_dri.so
+	ln -f .libs/virtio-gpu_dri.so $(top_builddir)/$(LIB_DIR)/gallium/virtio-gpu_dri.so

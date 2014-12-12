@@ -302,9 +302,9 @@ uint32_t virgl_egl_get_gbm_format(uint32_t format)
 {
    switch (format) {
    case VIRGL_FORMAT_B8G8R8X8_UNORM:
-      return GBM_FORMAT_XRGB8888;
+      return GBM_FORMAT_XBGR8888;
    case VIRGL_FORMAT_B8G8R8A8_UNORM:
-      return GBM_FORMAT_ARGB8888;
+      return GBM_FORMAT_ABGR8888;
    default:
       fprintf(stderr, "unknown format to convert to GBM %d\n", format);
       return 0;

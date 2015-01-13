@@ -168,8 +168,8 @@ struct virgl_egl *virgl_egl_init(void)
         if (!virgl_egl_has_extension_in_string(extension_list, "EGL_KHR_surfaceless_context"))
             goto fail;
 
-d->have_mesa_drm_image = false;
-d->have_mesa_dma_buf_img_export = false;
+	d->have_mesa_drm_image = false;
+	d->have_mesa_dma_buf_img_export = false;
         if (virgl_egl_has_extension_in_string(extension_list, "EGL_MESA_drm_image"))
            d->have_mesa_drm_image = true;
 
@@ -219,16 +219,17 @@ void virgl_egl_destroy(struct virgl_egl *d)
         free(d);
 }
 
-virgl_renderer_gl_context virgl_egl_create_context(struct virgl_egl *ve)
+virgl_renderer_gl_context virgl_egl_create_context(struct virgl_egl *ve, struct virgl_gl_ctx_param *vparams)
 {
     EGLContext eglctx;
-    static const EGLint ctx_att[] = {
-	EGL_CONTEXT_CLIENT_VERSION, 2,
+    EGLint ctx_att[] = {
+        EGL_CONTEXT_CLIENT_VERSION, vparams->major_ver,
+        EGL_CONTEXT_MINOR_VERSION_KHR, vparams->minor_ver,
 	EGL_NONE
     };
     eglctx = eglCreateContext(ve->egl_display,
 			      ve->egl_conf,
-                              ve->egl_ctx,
+                              vparams->shared ? ve->egl_ctx : EGL_NO_CONTEXT,
 			      ctx_att);
     return (virgl_renderer_gl_context)eglctx;
 }

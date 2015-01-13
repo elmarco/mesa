@@ -24,12 +24,13 @@
 #ifndef VIRGL_EGL_H
 #define VIRGL_EGL_H
 
+#include "vrend_renderer.h"
 struct virgl_egl;
 
 struct virgl_egl *virgl_egl_init(void);
 void virgl_egl_destroy(struct virgl_egl *ve);
 
-virgl_renderer_gl_context virgl_egl_create_context(struct virgl_egl *ve);
+virgl_renderer_gl_context virgl_egl_create_context(struct virgl_egl *ve, struct virgl_gl_ctx_param *vparams);
 void virgl_egl_destroy_context(struct virgl_egl *ve, virgl_renderer_gl_context virglctx);
 int virgl_egl_make_context_current(struct virgl_egl *ve, virgl_renderer_gl_context virglctx);
 virgl_renderer_gl_context virgl_egl_get_current_context(struct virgl_egl *ve);

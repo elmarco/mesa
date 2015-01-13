@@ -213,7 +213,7 @@ static virgl_renderer_gl_context create_gl_context(int scanout_idx, struct virgl
 {
     struct virgl_renderer_gl_ctx_param vparam;
     if (use_egl_context)
-        return virgl_egl_create_context(egl_info);
+        return virgl_egl_create_context(egl_info, param);
     vparam.version = 1;
     vparam.shared = param->shared;
     vparam.major_ver = param->major_ver;

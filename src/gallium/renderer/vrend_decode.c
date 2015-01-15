@@ -24,6 +24,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
+#include <errno.h>
 #include <epoxy/gl.h>
 
 #include "util/u_memory.h"
@@ -70,9 +71,10 @@ static int vrend_decode_create_shader(struct vrend_decode_ctx *ctx, uint32_t typ
    uint32_t shader_offset;
    unsigned num_tokens;
    uint8_t *shd_text;
-   if (!state)
-      return NULL;
    
+   if (!state)
+      return ENOMEM;
+
    num_tokens = get_buf_entry(ctx, VIRGL_OBJ_SHADER_NUM_TOKENS);
 
    if (num_tokens == 0)
@@ -81,7 +83,7 @@ static int vrend_decode_create_shader(struct vrend_decode_ctx *ctx, uint32_t typ
    tokens = calloc(num_tokens + 10, sizeof(struct tgsi_token));
    if (!tokens) {
       free(state);
-      return -1;
+      return ENOMEM;
    }
 
    state->stream_output.num_outputs = get_buf_entry(ctx, VIRGL_OBJ_SHADER_SO_NUM_OUTPUTS);
@@ -108,7 +110,7 @@ static int vrend_decode_create_shader(struct vrend_decode_ctx *ctx, uint32_t typ
       fprintf(stderr,"failed to translate\n %s\n", shd_text);
       free(tokens);
       free(state);
-      return -1;
+      return EINVAL;
    }
 
    state->tokens = tokens;
@@ -125,17 +127,19 @@ static int vrend_decode_create_shader(struct vrend_decode_ctx *ctx, uint32_t typ
    return 0;
 }
 
-static int vrend_decode_create_stream_output_target(struct vrend_decode_ctx *ctx, uint32_t handle)
+static int vrend_decode_create_stream_output_target(struct vrend_decode_ctx *ctx, uint32_t handle, uint16_t length)
 {
    uint32_t res_handle, buffer_size, buffer_offset;
+
+   if (length != VIRGL_OBJ_STREAMOUT_SIZE)
+      return EINVAL;
 
    res_handle = get_buf_entry(ctx, VIRGL_OBJ_STREAMOUT_RES_HANDLE);
    buffer_offset = get_buf_entry(ctx, VIRGL_OBJ_STREAMOUT_BUFFER_OFFSET);
    buffer_size = get_buf_entry(ctx, VIRGL_OBJ_STREAMOUT_BUFFER_SIZE);
 
-   vrend_create_so_target(ctx->grctx, handle, res_handle, buffer_offset,
-                          buffer_size);
-   return 0;
+   return vrend_create_so_target(ctx->grctx, handle, res_handle, buffer_offset,
+                                 buffer_size);
 }
 
 static void vrend_decode_set_framebuffer_state(struct vrend_decode_ctx *ctx)
@@ -287,11 +291,20 @@ static void vrend_decode_draw_vbo(struct vrend_decode_ctx *ctx)
    vrend_draw_vbo(ctx->grctx, &info);
 }
 
-static void vrend_decode_create_blend(struct vrend_decode_ctx *ctx, uint32_t handle, uint16_t length)
+static int vrend_decode_create_blend(struct vrend_decode_ctx *ctx, uint32_t handle, uint16_t length)
 {
-   struct pipe_blend_state *blend_state = CALLOC_STRUCT(pipe_blend_state);
+   struct pipe_blend_state *blend_state;
    uint32_t tmp;
    int i;
+
+   if (length != VIRGL_OBJ_BLEND_SIZE) {
+      return EINVAL;
+   }
+
+   blend_state = CALLOC_STRUCT(pipe_blend_state);
+   if (!blend_state)
+      return ENOMEM;
+
    tmp = get_buf_entry(ctx, VIRGL_OBJ_BLEND_S0);
    blend_state->independent_blend_enable = (tmp & 1);
    blend_state->logicop_enable = (tmp >> 1) & 0x1;
@@ -314,15 +327,27 @@ static void vrend_decode_create_blend(struct vrend_decode_ctx *ctx, uint32_t han
       blend_state->rt[i].colormask = (tmp >> 27) & 0xf;
    }
 
-   vrend_renderer_object_insert(ctx->grctx, blend_state, sizeof(struct pipe_blend_state), handle,
-                      VIRGL_OBJECT_BLEND);
+   tmp = vrend_renderer_object_insert(ctx->grctx, blend_state, sizeof(struct pipe_blend_state), handle,
+                                      VIRGL_OBJECT_BLEND);
+   if (tmp == 0) {
+      FREE(blend_state);
+      return ENOMEM;
+   }
+   return 0;
 }
 
-static void vrend_decode_create_dsa(struct vrend_decode_ctx *ctx, uint32_t handle, uint16_t length)
+static int vrend_decode_create_dsa(struct vrend_decode_ctx *ctx, uint32_t handle, uint16_t length)
 {
    int i;
-   struct pipe_depth_stencil_alpha_state *dsa_state = CALLOC_STRUCT(pipe_depth_stencil_alpha_state);
+   struct pipe_depth_stencil_alpha_state *dsa_state;
    uint32_t tmp;
+
+   if (length != VIRGL_OBJ_DSA_SIZE)
+      return EINVAL;
+
+   dsa_state = CALLOC_STRUCT(pipe_depth_stencil_alpha_state);
+   if (!dsa_state)
+      return ENOMEM;
    
    tmp = get_buf_entry(ctx, VIRGL_OBJ_DSA_S0);
    dsa_state->depth.enabled = tmp & 0x1;
@@ -346,14 +371,26 @@ static void vrend_decode_create_dsa(struct vrend_decode_ctx *ctx, uint32_t handl
    tmp = get_buf_entry(ctx, VIRGL_OBJ_DSA_ALPHA_REF);
    dsa_state->alpha.ref_value = uif(tmp);
 
-   vrend_renderer_object_insert(ctx->grctx, dsa_state, sizeof(struct pipe_depth_stencil_alpha_state), handle,
-                      VIRGL_OBJECT_DSA);
+   tmp = vrend_renderer_object_insert(ctx->grctx, dsa_state, sizeof(struct pipe_depth_stencil_alpha_state), handle,
+                                      VIRGL_OBJECT_DSA);
+   if (tmp == 0) {
+      FREE(dsa_state);
+      return ENOMEM;
+   }
+   return 0;
 }
 
-static void vrend_decode_create_rasterizer(struct vrend_decode_ctx *ctx, uint32_t handle, uint16_t length)
+static int vrend_decode_create_rasterizer(struct vrend_decode_ctx *ctx, uint32_t handle, uint16_t length)
 {
-   struct pipe_rasterizer_state *rs_state = CALLOC_STRUCT(pipe_rasterizer_state);
+   struct pipe_rasterizer_state *rs_state;
    uint32_t tmp;
+
+   if (length != VIRGL_OBJ_RS_SIZE)
+      return EINVAL;
+
+   rs_state = CALLOC_STRUCT(pipe_rasterizer_state);
+   if (!rs_state)
+      return ENOMEM;
 
    tmp = get_buf_entry(ctx, VIRGL_OBJ_RS_S0);
 #define ebit(name, bit) rs_state->name = (tmp >> bit) & 0x1
@@ -399,40 +436,55 @@ static void vrend_decode_create_rasterizer(struct vrend_decode_ctx *ctx, uint32_
    rs_state->offset_scale = uif(get_buf_entry(ctx, VIRGL_OBJ_RS_OFFSET_SCALE));
    rs_state->offset_clamp = uif(get_buf_entry(ctx, VIRGL_OBJ_RS_OFFSET_CLAMP));
    
-   
-   vrend_renderer_object_insert(ctx->grctx, rs_state, sizeof(struct pipe_rasterizer_state), handle,
+   tmp = vrend_renderer_object_insert(ctx->grctx, rs_state, sizeof(struct pipe_rasterizer_state), handle,
                       VIRGL_OBJECT_RASTERIZER);
+   if (tmp == 0) {
+      FREE(rs_state);
+      return ENOMEM;
+   }
+   return 0;
 }
 
-static void vrend_decode_create_surface(struct vrend_decode_ctx *ctx, uint32_t handle)
+static int vrend_decode_create_surface(struct vrend_decode_ctx *ctx, uint32_t handle, uint16_t length)
 {
    uint32_t res_handle, format, val0, val1;
+   int ret;
+
+   if (length != VIRGL_OBJ_SURFACE_SIZE)
+      return EINVAL;
+   
    res_handle = get_buf_entry(ctx, VIRGL_OBJ_SURFACE_RES_HANDLE);
    format = get_buf_entry(ctx, VIRGL_OBJ_SURFACE_FORMAT);
    /* decide later if these are texture or buffer */
    val0 = get_buf_entry(ctx, VIRGL_OBJ_SURFACE_BUFFER_FIRST_ELEMENT);
    val1 = get_buf_entry(ctx, VIRGL_OBJ_SURFACE_BUFFER_LAST_ELEMENT);
-   vrend_create_surface(ctx->grctx, handle, res_handle, format, val0, val1);
+   ret = vrend_create_surface(ctx->grctx, handle, res_handle, format, val0, val1);
+   return ret;
 }
 
-static void vrend_decode_create_sampler_view(struct vrend_decode_ctx *ctx, uint32_t handle)
+static int vrend_decode_create_sampler_view(struct vrend_decode_ctx *ctx, uint32_t handle, uint16_t length)
 {
    uint32_t res_handle, format, val0, val1, swizzle_packed;
 
+   if (length != VIRGL_OBJ_SAMPLER_VIEW_SIZE)
+      return EINVAL;
+   
    res_handle = get_buf_entry(ctx, VIRGL_OBJ_SAMPLER_VIEW_RES_HANDLE);
    format = get_buf_entry(ctx, VIRGL_OBJ_SAMPLER_VIEW_FORMAT);
    val0 = get_buf_entry(ctx, VIRGL_OBJ_SAMPLER_VIEW_BUFFER_FIRST_ELEMENT);
    val1 = get_buf_entry(ctx, VIRGL_OBJ_SAMPLER_VIEW_BUFFER_LAST_ELEMENT);
    swizzle_packed = get_buf_entry(ctx, VIRGL_OBJ_SAMPLER_VIEW_SWIZZLE);
-   vrend_create_sampler_view(ctx->grctx, handle, res_handle, format, val0, val1,swizzle_packed);
+   return vrend_create_sampler_view(ctx->grctx, handle, res_handle, format, val0, val1,swizzle_packed);
 }
 
-static void vrend_decode_create_sampler_state(struct vrend_decode_ctx *ctx, uint32_t handle, uint16_t length)
+static int vrend_decode_create_sampler_state(struct vrend_decode_ctx *ctx, uint32_t handle, uint16_t length)
 {
    struct pipe_sampler_state state;
    int i;
    uint32_t tmp;
 
+   if (length != VIRGL_OBJ_SAMPLER_STATE_SIZE)
+      return EINVAL;
    tmp = get_buf_entry(ctx, VIRGL_OBJ_SAMPLER_STATE_S0);
    state.wrap_s = tmp & 0x7;
    state.wrap_t = (tmp >> 3) & 0x7;
@@ -449,19 +501,20 @@ static void vrend_decode_create_sampler_state(struct vrend_decode_ctx *ctx, uint
 
    for (i = 0; i < 4; i++)
       state.border_color.ui[i] = get_buf_entry(ctx, VIRGL_OBJ_SAMPLER_STATE_BORDER_COLOR(i));
-   vrend_create_sampler_state(ctx->grctx, handle, &state);
+   return vrend_create_sampler_state(ctx->grctx, handle, &state);
 }
 
-static void vrend_decode_create_ve(struct vrend_decode_ctx *ctx, uint32_t handle, uint16_t length)
+static int vrend_decode_create_ve(struct vrend_decode_ctx *ctx, uint32_t handle, uint16_t length)
 {
    struct pipe_vertex_element *ve;
    int num_elements;
    int i;
+   int ret;
 
    num_elements = (length - 1) / 4;
    ve = calloc(num_elements, sizeof(struct pipe_vertex_element));
    if (!ve)
-      return;
+      return ENOMEM;
       
    for (i = 0; i < num_elements; i++) {
       ve[i].src_offset = get_buf_entry(ctx, VIRGL_OBJ_VERTEX_ELEMENTS_V0_SRC_OFFSET(i));
@@ -470,64 +523,79 @@ static void vrend_decode_create_ve(struct vrend_decode_ctx *ctx, uint32_t handle
       ve[i].src_format = get_buf_entry(ctx, VIRGL_OBJ_VERTEX_ELEMENTS_V0_SRC_FORMAT(i));
    }
 
-   vrend_create_vertex_elements_state(ctx->grctx, handle, num_elements,
-                                      ve);
+   ret = vrend_create_vertex_elements_state(ctx->grctx, handle, num_elements,
+                                            ve);
+   if (ret) {
+      FREE(ve);
+   }
+   return ret;
 }
 
-static void vrend_decode_create_query(struct vrend_decode_ctx *ctx, uint32_t handle)
+static int vrend_decode_create_query(struct vrend_decode_ctx *ctx, uint32_t handle, uint16_t length)
 {
    uint32_t query_type;
    uint32_t res_handle;
    uint32_t offset;
+
+   if (length != VIRGL_OBJ_QUERY_SIZE)
+      return EINVAL;
+   
    query_type = get_buf_entry(ctx, VIRGL_OBJ_QUERY_TYPE);
    offset = get_buf_entry(ctx, VIRGL_OBJ_QUERY_OFFSET);
    res_handle = get_buf_entry(ctx, VIRGL_OBJ_QUERY_RES_HANDLE);
 
-   vrend_create_query(ctx->grctx, handle, query_type, res_handle, offset);
+   return vrend_create_query(ctx->grctx, handle, query_type, res_handle, offset);
 }
 
-static void vrend_decode_create_object(struct vrend_decode_ctx *ctx)
+static void vrend_decode_create_object(struct vrend_decode_ctx *ctx, int length)
 {
    uint32_t header = get_buf_entry(ctx, VIRGL_OBJ_CREATE_HEADER);
    uint32_t handle = get_buf_entry(ctx, VIRGL_OBJ_CREATE_HANDLE);
-   uint16_t length;
    uint8_t obj_type = (header >> 8) & 0xff;
-
-   length = header >> 16;
-
+   int ret = 0;
+   /* has to be at least 3 length */
+   if (length < 3) {
+      vrend_report_buffer_error(ctx->grctx);
+      return;
+   }
    switch (obj_type){
    case VIRGL_OBJECT_BLEND:
-      vrend_decode_create_blend(ctx, handle, length);
+      ret = vrend_decode_create_blend(ctx, handle, length);
       break;
    case VIRGL_OBJECT_DSA:
-      vrend_decode_create_dsa(ctx, handle, length);
+      ret = vrend_decode_create_dsa(ctx, handle, length);
       break;
    case VIRGL_OBJECT_RASTERIZER:
-      vrend_decode_create_rasterizer(ctx, handle, length);
+      ret = vrend_decode_create_rasterizer(ctx, handle, length);
       break;
    case VIRGL_OBJECT_VS:
    case VIRGL_OBJECT_GS:
    case VIRGL_OBJECT_FS:
-      vrend_decode_create_shader(ctx, obj_type, handle, length);
+      ret = vrend_decode_create_shader(ctx, obj_type, handle, length);
       break;
    case VIRGL_OBJECT_VERTEX_ELEMENTS:
-      vrend_decode_create_ve(ctx, handle, length);
+      ret = vrend_decode_create_ve(ctx, handle, length);
       break;
    case VIRGL_OBJECT_SURFACE:
-      vrend_decode_create_surface(ctx, handle);
+      ret = vrend_decode_create_surface(ctx, handle, length);
       break;
    case VIRGL_OBJECT_SAMPLER_VIEW:
-      vrend_decode_create_sampler_view(ctx, handle);
+      ret = vrend_decode_create_sampler_view(ctx, handle, length);
       break;
    case VIRGL_OBJECT_SAMPLER_STATE:
-      vrend_decode_create_sampler_state(ctx, handle, length);
+      ret = vrend_decode_create_sampler_state(ctx, handle, length);
       break;
    case VIRGL_OBJECT_QUERY:
-      vrend_decode_create_query(ctx, handle);
+      ret = vrend_decode_create_query(ctx, handle, length);
       break;
    case VIRGL_OBJECT_STREAMOUT_TARGET:
-      vrend_decode_create_stream_output_target(ctx, handle);
+      ret = vrend_decode_create_stream_output_target(ctx, handle, length);
       break;
+   }
+
+   if (ret == EINVAL) {
+      vrend_report_buffer_error(ctx->grctx);
+      return;
    }
 }
 
@@ -879,7 +947,7 @@ void vrend_decode_block(uint32_t ctx_id, uint32_t *block, int ndw)
       
       switch (header & 0xff) {
       case VIRGL_CCMD_CREATE_OBJECT:
-         vrend_decode_create_object(gdctx);
+         vrend_decode_create_object(gdctx, len);
          break;
       case VIRGL_CCMD_BIND_OBJECT:
          vrend_decode_bind_object(gdctx);

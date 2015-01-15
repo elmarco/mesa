@@ -153,33 +153,34 @@ void vrend_renderer_resource_create(struct vrend_renderer_resource_create_args *
 
 void vrend_renderer_resource_unref(uint32_t handle);
 
-void vrend_create_surface(struct vrend_context *ctx,
-                          uint32_t handle,
-                          uint32_t res_handle, uint32_t format,
-                          uint32_t val0, uint32_t val1);
-void vrend_create_sampler_view(struct vrend_context *ctx,
+int vrend_create_surface(struct vrend_context *ctx,
+                         uint32_t handle,
+                         uint32_t res_handle, uint32_t format,
+                         uint32_t val0, uint32_t val1);
+int vrend_create_sampler_view(struct vrend_context *ctx,
+                              uint32_t handle,
+                              uint32_t res_handle, uint32_t format,
+                              uint32_t val0, uint32_t val1, uint32_t swizzle_packed);
+
+int vrend_create_sampler_state(struct vrend_context *ctx,
                                uint32_t handle,
-                               uint32_t res_handle, uint32_t format,
-                               uint32_t val0, uint32_t val1, uint32_t swizzle_packed);
+                               struct pipe_sampler_state *templ);
 
-void vrend_create_sampler_state(struct vrend_context *ctx,
-                                uint32_t handle,
-                                struct pipe_sampler_state *templ);
+int vrend_create_so_target(struct vrend_context *ctx,
+                           uint32_t handle,
+                           uint32_t res_handle,
+                           uint32_t buffer_offset,
+                           uint32_t buffer_size);
 
-void vrend_create_so_target(struct vrend_context *ctx,
-                            uint32_t handle,
-                            uint32_t res_handle,
-                            uint32_t buffer_offset,
-                            uint32_t buffer_size);
 void vrend_set_streamout_targets(struct vrend_context *ctx,
                                  uint32_t append_bitmask,
                                  uint32_t num_targets,
                                  uint32_t *handles);
 
-void vrend_create_vertex_elements_state(struct vrend_context *ctx,
-                                        uint32_t handle,
-                                        unsigned num_elements,
-                                        const struct pipe_vertex_element *elements);
+int vrend_create_vertex_elements_state(struct vrend_context *ctx,
+                                       uint32_t handle,
+                                       unsigned num_elements,
+                                       const struct pipe_vertex_element *elements);
 void vrend_bind_vertex_elements_state(struct vrend_context *ctx,
                                       uint32_t handle);
 
@@ -298,13 +299,13 @@ void vrend_renderer_check_queries(void);
 void vrend_stop_current_queries(void);
 
 boolean vrend_hw_switch_context(struct vrend_context *ctx, boolean now);
-void vrend_renderer_object_insert(struct vrend_context *ctx, void *data,
+uint32_t vrend_renderer_object_insert(struct vrend_context *ctx, void *data,
                                  uint32_t size, uint32_t handle, enum virgl_object_type type);
 void vrend_renderer_object_destroy(struct vrend_context *ctx, uint32_t handle);
 
-void vrend_create_query(struct vrend_context *ctx, uint32_t handle,
-                        uint32_t query_type, uint32_t res_handle,
-                        uint32_t offset);
+int vrend_create_query(struct vrend_context *ctx, uint32_t handle,
+                       uint32_t query_type, uint32_t res_handle,
+                       uint32_t offset);
 
 void vrend_begin_query(struct vrend_context *ctx, uint32_t handle);
 void vrend_end_query(struct vrend_context *ctx, uint32_t handle);

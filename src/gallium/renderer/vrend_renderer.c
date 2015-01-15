@@ -25,6 +25,7 @@
 #include <epoxy/gl.h>
 
 #include <stdio.h>
+#include <errno.h>
 #include "pipe/p_shader_tokens.h"
 
 #include "pipe/p_context.h"
@@ -883,19 +884,20 @@ static void vrend_apply_sampler_state(struct vrend_context *ctx,
 
 void vrend_update_stencil_state(struct vrend_context *ctx);
 
-void vrend_create_surface(struct vrend_context *ctx,
-                          uint32_t handle,
-                          uint32_t res_handle, uint32_t format,
-                          uint32_t val0, uint32_t val1)
+int vrend_create_surface(struct vrend_context *ctx,
+                         uint32_t handle,
+                         uint32_t res_handle, uint32_t format,
+                         uint32_t val0, uint32_t val1)
    
 {
    struct vrend_surface *surf;
    struct vrend_resource *res;
+   uint32_t ret_handle;
 
    res = vrend_renderer_ctx_res_lookup(ctx, res_handle);
    if (!res) {
       report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, res_handle);
-      return;
+      return EINVAL;
    }
 
    surf = CALLOC_STRUCT(vrend_surface);
@@ -907,7 +909,12 @@ void vrend_create_surface(struct vrend_context *ctx,
 
    vrend_resource_reference(&surf->texture, res);
 
-   vrend_object_insert(ctx->sub->object_hash, surf, sizeof(*surf), handle, VIRGL_OBJECT_SURFACE);
+   ret_handle = vrend_renderer_object_insert(ctx, surf, sizeof(*surf), handle, VIRGL_OBJECT_SURFACE);
+   if (ret_handle == 0) {
+      FREE(surf);
+      return ENOMEM;
+   }
+   return 0;
 }
 
 static void vrend_destroy_surface_object(void *obj_ptr)
@@ -984,14 +991,15 @@ static inline GLenum convert_min_filter(unsigned int filter, unsigned int mip_fi
    return 0;
 }
 
-void vrend_create_sampler_state(struct vrend_context *ctx,
-                                uint32_t handle,
-                                struct pipe_sampler_state *templ)
+int vrend_create_sampler_state(struct vrend_context *ctx,
+                               uint32_t handle,
+                               struct pipe_sampler_state *templ)
 {
    struct vrend_sampler_state *state = CALLOC_STRUCT(vrend_sampler_state);
+   int ret_handle;
 
    if (!state)
-      return;
+      return ENOMEM;
 
    state->base = *templ;
 
@@ -1011,8 +1019,15 @@ void vrend_create_sampler_state(struct vrend_context *ctx,
 
       glSamplerParameterIuiv(state->id, GL_TEXTURE_BORDER_COLOR, templ->border_color.ui);
    }
-   vrend_renderer_object_insert(ctx, state, sizeof(struct vrend_sampler_state), handle,
-                                VIRGL_OBJECT_SAMPLER_STATE);
+   ret_handle = vrend_renderer_object_insert(ctx, state, sizeof(struct vrend_sampler_state), handle,
+                                             VIRGL_OBJECT_SAMPLER_STATE);
+   if (!ret_handle) {
+      if (vrend_state.have_samplers)
+         glDeleteSamplers(1, &state->id);
+      FREE(state);
+      return ENOMEM;
+   }
+   return 0;
 }
 
 static inline GLenum to_gl_swizzle(int swizzle)
@@ -1028,21 +1043,25 @@ static inline GLenum to_gl_swizzle(int swizzle)
    assert(0);
    return 0;
 }
-void vrend_create_sampler_view(struct vrend_context *ctx,
-                               uint32_t handle,
-                               uint32_t res_handle, uint32_t format,
-                               uint32_t val0, uint32_t val1, uint32_t swizzle_packed)
+
+int vrend_create_sampler_view(struct vrend_context *ctx,
+                              uint32_t handle,
+                              uint32_t res_handle, uint32_t format,
+                              uint32_t val0, uint32_t val1, uint32_t swizzle_packed)
 {
    struct vrend_sampler_view *view;
    struct vrend_resource *res;
-
+   int ret_handle;
    res = vrend_renderer_ctx_res_lookup(ctx, res_handle);
    if (!res) {
       report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, res_handle);
-      return;
+      return EINVAL;
    }
    
    view = CALLOC_STRUCT(vrend_sampler_view);
+   if (!view)
+      return ENOMEM;
+
    pipe_reference_init(&view->reference, 1);
    view->res_handle = res_handle;
    view->format = format;
@@ -1077,7 +1096,12 @@ void vrend_create_sampler_view(struct vrend_context *ctx,
      view->gl_swizzle_b = to_gl_swizzle(tex_conv_table[format].swizzle[2]);
      view->gl_swizzle_a = to_gl_swizzle(tex_conv_table[format].swizzle[3]);
    }
-   vrend_object_insert(ctx->sub->object_hash, view, sizeof(*view), handle, VIRGL_OBJECT_SAMPLER_VIEW);
+   ret_handle = vrend_renderer_object_insert(ctx, view, sizeof(*view), handle, VIRGL_OBJECT_SAMPLER_VIEW);
+   if (ret_handle == 0) {
+      FREE(view);
+      return ENOMEM;
+   }
+   return 0;
 }
 
 void vrend_fb_bind_texture(struct vrend_resource *res,
@@ -1345,15 +1369,19 @@ void vrend_set_viewport_state(struct vrend_context *ctx,
    }
 }
 
-void vrend_create_vertex_elements_state(struct vrend_context *ctx,
-                                        uint32_t handle,
-                                        unsigned num_elements,
-                                        const struct pipe_vertex_element *elements)
+int vrend_create_vertex_elements_state(struct vrend_context *ctx,
+                                       uint32_t handle,
+                                       unsigned num_elements,
+                                       const struct pipe_vertex_element *elements)
 {
    struct vrend_vertex_element_array *v = CALLOC_STRUCT(vrend_vertex_element_array);
    const struct util_format_description *desc;
    GLenum type;
    int i;
+   uint32_t ret_handle;
+
+   if (!v)
+      return ENOMEM;
 
    v->count = num_elements;
    for (i = 0; i < num_elements; i++) {
@@ -1399,7 +1427,7 @@ void vrend_create_vertex_elements_state(struct vrend_context *ctx,
       if (type == GL_FALSE) {
          report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_VERTEX_FORMAT, elements[i].src_format);
          FREE(v);
-         return;
+         return EINVAL;
       }
 
       v->elements[i].type = type;
@@ -1411,8 +1439,13 @@ void vrend_create_vertex_elements_state(struct vrend_context *ctx,
          v->elements[i].nr_chan = desc->nr_channels;
    }
 
-   vrend_object_insert(ctx->sub->object_hash, v, sizeof(struct vrend_vertex_element), handle,
-                      VIRGL_OBJECT_VERTEX_ELEMENTS);
+   ret_handle = vrend_renderer_object_insert(ctx, v, sizeof(struct vrend_vertex_element), handle,
+                              VIRGL_OBJECT_VERTEX_ELEMENTS);
+   if (!ret_handle) {
+      FREE(v);
+      return ENOMEM;
+   }
+   return 0;
 }
 
 void vrend_bind_vertex_elements_state(struct vrend_context *ctx,
@@ -1818,7 +1851,7 @@ void vrend_create_vs(struct vrend_context *ctx,
 
    sel = vrend_create_shader_state(ctx, vs, PIPE_SHADER_VERTEX);
 
-   vrend_object_insert(ctx->sub->object_hash, sel, sizeof(*sel), handle, VIRGL_OBJECT_VS);
+   vrend_renderer_object_insert(ctx, sel, sizeof(*sel), handle, VIRGL_OBJECT_VS);
 
    return;
 }
@@ -1831,7 +1864,7 @@ void vrend_create_gs(struct vrend_context *ctx,
 
    sel = vrend_create_shader_state(ctx, gs, PIPE_SHADER_GEOMETRY);
 
-   vrend_object_insert(ctx->sub->object_hash, sel, sizeof(*sel), handle, VIRGL_OBJECT_GS);
+   vrend_renderer_object_insert(ctx, sel, sizeof(*sel), handle, VIRGL_OBJECT_GS);
 
    return;
 }
@@ -1844,7 +1877,7 @@ void vrend_create_fs(struct vrend_context *ctx,
 
    sel = vrend_create_shader_state(ctx, fs, PIPE_SHADER_FRAGMENT);
 
-   vrend_object_insert(ctx->sub->object_hash, sel, sizeof(*sel), handle, VIRGL_OBJECT_FS);
+   vrend_renderer_object_insert(ctx, sel, sizeof(*sel), handle, VIRGL_OBJECT_FS);
 
    return;
 }
@@ -4694,10 +4727,10 @@ vrend_renderer_object_destroy(struct vrend_context *ctx, uint32_t handle)
    vrend_object_remove(ctx->sub->object_hash, handle, 0);
 }
 
-void vrend_renderer_object_insert(struct vrend_context *ctx, void *data,
+uint32_t vrend_renderer_object_insert(struct vrend_context *ctx, void *data,
                                  uint32_t size, uint32_t handle, enum virgl_object_type type)
 {
-   vrend_object_insert(ctx->sub->object_hash, data, size, handle, type);
+   return vrend_object_insert(ctx->sub->object_hash, data, size, handle, type);
 }
 
 static struct vrend_nontimer_hw_query *vrend_create_hw_query(struct vrend_query *query)
@@ -4715,22 +4748,22 @@ static struct vrend_nontimer_hw_query *vrend_create_hw_query(struct vrend_query 
 }
 
 
-void vrend_create_query(struct vrend_context *ctx, uint32_t handle,
-                        uint32_t query_type, uint32_t res_handle,
-                        uint32_t offset)
+int vrend_create_query(struct vrend_context *ctx, uint32_t handle,
+                       uint32_t query_type, uint32_t res_handle,
+                       uint32_t offset)
 {
    struct vrend_query *q;
    struct vrend_resource *res;
-
+   uint32_t ret_handle;
    res = vrend_renderer_ctx_res_lookup(ctx, res_handle);
    if (!res) {
       report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, res_handle);
-      return;
+      return EINVAL;
    }
 
    q = CALLOC_STRUCT(vrend_query);
    if (!q)
-      return;
+      return ENOMEM;
 
    list_inithead(&q->waiting_queries);
    list_inithead(&q->ctx_queries);
@@ -4767,8 +4800,13 @@ void vrend_create_query(struct vrend_context *ctx, uint32_t handle,
    if (vrend_is_timer_query(q->gltype))
       glGenQueries(1, &q->timer_query_id);
 
-   vrend_renderer_object_insert(ctx, q, sizeof(struct vrend_query), handle,
-                               VIRGL_OBJECT_QUERY);
+   ret_handle = vrend_renderer_object_insert(ctx, q, sizeof(struct vrend_query), handle,
+                                             VIRGL_OBJECT_QUERY);
+   if (!ret_handle) {
+      FREE(q);
+      return ENOMEM;
+   }
+   return 0;
 }
 
 static void vrend_destroy_query(struct vrend_query *query)
@@ -4899,24 +4937,24 @@ void vrend_render_condition(struct vrend_context *ctx,
    
 }
 
-void vrend_create_so_target(struct vrend_context *ctx,
-                            uint32_t handle,
-                            uint32_t res_handle,
-                            uint32_t buffer_offset,
-                            uint32_t buffer_size)
+int vrend_create_so_target(struct vrend_context *ctx,
+                           uint32_t handle,
+                           uint32_t res_handle,
+                           uint32_t buffer_offset,
+                           uint32_t buffer_size)
 {
    struct vrend_so_target *target;
    struct vrend_resource *res;
-
+   int ret_handle;
    res = vrend_renderer_ctx_res_lookup(ctx, res_handle);
    if (!res) {
       report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_RESOURCE, res_handle);
-      return;
+      return EINVAL;
    }
 
    target = CALLOC_STRUCT(vrend_so_target);
    if (!target)
-      return;
+      return ENOMEM;
 
    pipe_reference_init(&target->reference, 1);
    target->res_handle = res_handle;
@@ -4925,8 +4963,13 @@ void vrend_create_so_target(struct vrend_context *ctx,
 
    vrend_resource_reference(&target->buffer, res);
 
-   vrend_object_insert(ctx->sub->object_hash, target, sizeof(*target), handle,
-                       VIRGL_OBJECT_STREAMOUT_TARGET);
+   ret_handle = vrend_renderer_object_insert(ctx, target, sizeof(*target), handle,
+                                             VIRGL_OBJECT_STREAMOUT_TARGET);
+   if (ret_handle) {
+      FREE(target);
+      return ENOMEM;
+   }
+   return 0;
 }
 
 static void vrender_get_glsl_version(int *glsl_version)

@@ -868,8 +868,14 @@ void vrend_decode_block(uint32_t ctx_id, uint32_t *block, int ndw)
 
    while (gdctx->ds->buf_offset < gdctx->ds->buf_total) {
       uint32_t header = gdctx->ds->buf[gdctx->ds->buf_offset];
+      uint32_t len = header >> 16;
 
-//      fprintf(stderr,"[%d] cmd is %d (obj %d) len %d\n", gdctx->ds->buf_offset, header & 0xff, (header >> 8 & 0xff), (header >> 16));
+      /* check if the guest is doing something bad */
+      if (gdctx->ds->buf_offset + len + 1 > gdctx->ds->buf_total) {
+         vrend_report_buffer_error(gdctx->grctx);
+         break;
+      }
+//      fprintf(stderr,"[%d] cmd is %d (obj %d) len %d\n", gdctx->ds->buf_offset, header & 0xff, (header >> 8 & 0xff), (len));
       
       switch (header & 0xff) {
       case VIRGL_CCMD_CREATE_OBJECT:
@@ -891,22 +897,22 @@ void vrend_decode_block(uint32_t ctx_id, uint32_t *block, int ndw)
          vrend_decode_set_framebuffer_state(gdctx);
          break;
       case VIRGL_CCMD_SET_VERTEX_BUFFERS:
-         vrend_decode_set_vertex_buffers(gdctx, header >> 16);
+         vrend_decode_set_vertex_buffers(gdctx, len);
          break;
       case VIRGL_CCMD_RESOURCE_INLINE_WRITE:
-         vrend_decode_resource_inline_write(gdctx, header >> 16);
+         vrend_decode_resource_inline_write(gdctx, len);
          break;
       case VIRGL_CCMD_SET_VIEWPORT_STATE:
          vrend_decode_set_viewport_state(gdctx);
          break;
       case VIRGL_CCMD_SET_SAMPLER_VIEWS:
-         vrend_decode_set_sampler_views(gdctx, header >> 16);
+         vrend_decode_set_sampler_views(gdctx, len);
          break;
       case VIRGL_CCMD_SET_INDEX_BUFFER:
          vrend_decode_set_index_buffer(gdctx);
          break;
       case VIRGL_CCMD_SET_CONSTANT_BUFFER:
-         vrend_decode_set_constant_buffer(gdctx, header >> 16);
+         vrend_decode_set_constant_buffer(gdctx, len);
          break;
       case VIRGL_CCMD_SET_STENCIL_REF:
          vrend_decode_set_stencil_ref(gdctx);
@@ -924,7 +930,7 @@ void vrend_decode_block(uint32_t ctx_id, uint32_t *block, int ndw)
          vrend_decode_resource_copy_region(gdctx);
          break;
       case VIRGL_CCMD_BIND_SAMPLER_STATES:
-         vrend_decode_bind_sampler_states(gdctx, header >> 16);
+         vrend_decode_bind_sampler_states(gdctx, len);
          break;
       case VIRGL_CCMD_BEGIN_QUERY:
          vrend_decode_begin_query(gdctx);
@@ -945,7 +951,7 @@ void vrend_decode_block(uint32_t ctx_id, uint32_t *block, int ndw)
          vrend_decode_set_sample_mask(gdctx);
          break;
       case VIRGL_CCMD_SET_STREAMOUT_TARGETS:
-         vrend_decode_set_streamout_targets(gdctx, header >> 16);
+         vrend_decode_set_streamout_targets(gdctx, len);
          break;
       case VIRGL_CCMD_SET_RENDER_CONDITION:
 	 vrend_decode_set_render_condition(gdctx);
@@ -963,7 +969,7 @@ void vrend_decode_block(uint32_t ctx_id, uint32_t *block, int ndw)
          vrend_decode_destroy_sub_ctx(gdctx);
          break;
       }
-      gdctx->ds->buf_offset += (header >> 16) + 1;
+      gdctx->ds->buf_offset += (len) + 1;
       
    }
 

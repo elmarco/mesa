@@ -407,6 +407,11 @@ static void __report_context_error(const char *fname, struct vrend_context *ctx,
 }
 #define report_context_error(ctx, error, value) __report_context_error(__func__, ctx, error, value)
 
+void vrend_report_buffer_error(struct vrend_context *ctx)
+{
+   report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_CMD_BUFFER, 0);
+}
+
 #define CORE_PROFILE_WARN_NONE 0
 #define CORE_PROFILE_WARN_STIPPLE 1
 #define CORE_PROFILE_WARN_POLYGON_MODE 2

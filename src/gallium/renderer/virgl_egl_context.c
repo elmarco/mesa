@@ -260,7 +260,7 @@ int virgl_egl_get_fd_for_texture(struct virgl_egl *ve, uint32_t tex_id, int *fd)
    EGLint stride;
    EGLBoolean b;
 
-   image = eglCreateImageKHR(ve->egl_display, ve->egl_ctx, EGL_GL_TEXTURE_2D_KHR, (EGLClientBuffer)(unsigned long)tex_id, NULL);
+   image = eglCreateImageKHR(ve->egl_display, eglGetCurrentContext(), EGL_GL_TEXTURE_2D_KHR, (EGLClientBuffer)(unsigned long)tex_id, NULL);
 
    if (!image)
       return -1;

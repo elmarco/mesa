@@ -56,11 +56,8 @@ clear layered rendering - need to handle layered framebuffer bind
 
 geometry shader support - need to handle input/output naming in light of geom shaders.
 
-mipmap generation for 3D textures is broken due to the blitter code not handling it right
-we probably should make the renderer blitter use the 3D paths in some cases where glBlitFramebuffer
-can't deal. 3D texture and Depth textures
-
 rgtc and compressed mipmaps - getteximage fails due to blit
+not sure how to blit these yet
 
 base instance + draw elements + draw instanced  + instanced arrays
 - these seem to be primconvert related - need to see if upstream fixed them
@@ -72,3 +69,16 @@ piglit tests to definitely investigate:
 =======================================
 
 compressed texture readbacks - s3tc/rgtc
+some issues with uploading to compressed textures - not sure how to solve it -
+
+done
+====
+using our own blitter - fixed 3D texture mipmaps and depth texture issues
+mipmap generation for 3D textures is broken due to the blitter code not handling it right
+we probably should make the renderer blitter use the 3D paths in some cases where glBlitFramebuffer
+can't deal. 3D texture and Depth textures
+used for scaled MS blits as well if we don't have extension
+
+fixed issue with tex-miplevel-selection shadow requires sampler state
+
+fixed issue with misc colorbufs

@@ -205,12 +205,12 @@ static int vrend_decode_set_viewport_state(struct vrend_decode_ctx *ctx, int len
 
 static int vrend_decode_set_index_buffer(struct vrend_decode_ctx *ctx, int length)
 {
-   if (length != 2 && length != 4)
+   if (length != 1 && length != 3)
       return EINVAL;
    vrend_set_index_buffer(ctx->grctx,
                           get_buf_entry(ctx, VIRGL_SET_INDEX_BUFFER_HANDLE),
-                          get_buf_entry(ctx, VIRGL_SET_INDEX_BUFFER_INDEX_SIZE),
-                          get_buf_entry(ctx, VIRGL_SET_INDEX_BUFFER_OFFSET));
+                          (length == 3) ? get_buf_entry(ctx, VIRGL_SET_INDEX_BUFFER_INDEX_SIZE) : 0,
+                          (length == 3) ? get_buf_entry(ctx, VIRGL_SET_INDEX_BUFFER_OFFSET) : 0);
    return 0;
 }
 
@@ -639,7 +639,7 @@ static int vrend_decode_bind_object(struct vrend_decode_ctx *ctx, uint16_t lengt
    uint32_t handle = get_buf_entry(ctx, VIRGL_OBJ_BIND_HANDLE);
    uint8_t obj_type = (header >> 8) & 0xff;
 
-   if (length != 2)
+   if (length != 1)
       return EINVAL;
 
    switch (obj_type) {
@@ -1020,7 +1020,7 @@ void vrend_decode_block(uint32_t ctx_id, uint32_t *block, int ndw)
       ret = 0;
       /* check if the guest is doing something bad */
       if (gdctx->ds->buf_offset + len + 1 > gdctx->ds->buf_total) {
-         vrend_report_buffer_error(gdctx->grctx);
+         vrend_report_buffer_error(gdctx->grctx, 0);
          break;
       }
 //      fprintf(stderr,"[%d] cmd is %d (obj %d) len %d\n", gdctx->ds->buf_offset, header & 0xff, (header >> 8 & 0xff), (len));
@@ -1119,7 +1119,7 @@ void vrend_decode_block(uint32_t ctx_id, uint32_t *block, int ndw)
       }
 
       if (ret == EINVAL) {
-         vrend_report_buffer_error(gdctx->grctx);
+         vrend_report_buffer_error(gdctx->grctx, header);
          break;
       }
       if (ret == ENOMEM)

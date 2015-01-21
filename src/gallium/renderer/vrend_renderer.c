@@ -3949,6 +3949,29 @@ static void vrend_transfer_send_readpixels(struct vrend_resource *res,
    }
 }
 
+static bool check_tsend_bounds(struct vrend_resource *res,
+                               uint32_t level, struct pipe_box *box)
+{
+
+   if (box->width > u_minify(res->base.width0, level))
+       return false;
+   if (box->x > u_minify(res->base.width0, level))
+       return false;
+   if (box->width + box->x > u_minify(res->base.width0, level))
+       return false;
+
+   if (box->height > u_minify(res->base.height0, level))
+       return false;
+   if (box->y > u_minify(res->base.height0, level))
+       return false;
+   if (box->height + box->y > u_minify(res->base.height0, level))
+       return false;
+
+   /* bounds checks TODO,
+      box depth / box->z and array layers */
+   return true;
+}
+
 void vrend_renderer_transfer_send_iov(uint32_t res_handle, uint32_t ctx_id,
                                      uint32_t level, uint32_t stride,
                                      uint32_t layer_stride,
@@ -3965,12 +3988,6 @@ void vrend_renderer_transfer_send_iov(uint32_t res_handle, uint32_t ctx_id,
       return;
    }
 
-   if (box->width + box->x > u_minify(res->base.width0, level) ||
-       box->height + box->y > u_minify(res->base.height0, level))
-       return;
-
-   vrend_hw_switch_context(vrend_lookup_renderer_ctx(0), TRUE);
-
    if (res->iov && (!iov || num_iovs == 0)) {
       iov = res->iov;
       num_iovs = res->num_iovs;
@@ -3981,16 +3998,25 @@ void vrend_renderer_transfer_send_iov(uint32_t res_handle, uint32_t ctx_id,
       return;
    }
 
+   if (!check_tsend_bounds(res, level, box))
+      return;
+
    if (res->target == 0 && res->ptr) {
       uint32_t send_size = box->width * util_format_get_blocksize(res->base.format);      
       vrend_transfer_write_return(res->ptr + box->x, send_size, offset, iov, num_iovs);
-   } else if (res->target == GL_ELEMENT_ARRAY_BUFFER_ARB ||
-              res->target == GL_ARRAY_BUFFER_ARB ||
-              res->target == GL_TRANSFORM_FEEDBACK_BUFFER ||
-              res->target == GL_TEXTURE_BUFFER ||
-              res->target == GL_UNIFORM_BUFFER) {
+      return;
+   }
+
+   vrend_hw_switch_context(vrend_lookup_renderer_ctx(0), TRUE);
+
+   if (res->target == GL_ELEMENT_ARRAY_BUFFER_ARB ||
+       res->target == GL_ARRAY_BUFFER_ARB ||
+       res->target == GL_TRANSFORM_FEEDBACK_BUFFER ||
+       res->target == GL_TEXTURE_BUFFER ||
+       res->target == GL_UNIFORM_BUFFER) {
       uint32_t send_size = box->width * util_format_get_blocksize(res->base.format);      
       void *data;
+
       glBindBufferARB(res->target, res->id);
       data = glMapBufferRange(res->target, box->x, box->width, GL_MAP_READ_BIT);
       if (!data)

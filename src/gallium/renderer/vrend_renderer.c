@@ -3294,10 +3294,14 @@ void vrend_renderer_resource_detach_iov(int res_handle,
    res->num_iovs = 0;
 }
 
-void vrend_renderer_resource_create(struct vrend_renderer_resource_create_args *args, struct iovec *iov, uint32_t num_iovs)
+int vrend_renderer_resource_create(struct vrend_renderer_resource_create_args *args, struct iovec *iov, uint32_t num_iovs)
 {
    struct vrend_resource *gr = (struct vrend_resource *)CALLOC_STRUCT(vrend_texture);
    int level;
+   int ret;
+
+   if (!gr)
+      return ENOMEM;
 
    gr->handle = args->handle;
    gr->iov = iov;
@@ -3319,6 +3323,10 @@ void vrend_renderer_resource_create(struct vrend_renderer_resource_create_args *
    if (args->bind == PIPE_BIND_CUSTOM) {
       /* custom shuold only be for buffers */
       gr->ptr = malloc(args->width);
+      if (!gr->ptr) {
+         FREE(gr);
+         return ENOMEM;
+      }
    } else if (args->bind == PIPE_BIND_INDEX_BUFFER) {
       gr->target = GL_ELEMENT_ARRAY_BUFFER_ARB;
       glGenBuffersARB(1, &gr->id);
@@ -3369,7 +3377,7 @@ void vrend_renderer_resource_create(struct vrend_renderer_resource_create_args *
       gltype = tex_conv_table[args->format].gltype;
       if (internalformat == 0) {
          fprintf(stderr,"unknown format is %d\n", args->format);
-         return;
+         return EINVAL;
       }
 
       if (args->nr_samples > 1) {
@@ -3425,7 +3433,12 @@ void vrend_renderer_resource_create(struct vrend_renderer_resource_create_args *
       gt->cur_swizzle_r = gt->cur_swizzle_g = gt->cur_swizzle_b = gt->cur_swizzle_a = -1;
    }
 
-   vrend_resource_insert(gr, sizeof(*gr), args->handle);
+   ret = vrend_resource_insert(gr, sizeof(*gr), args->handle);
+   if (ret == 0) {
+      vrend_renderer_resource_destroy(gr);
+      return ENOMEM;
+   }
+   return 0;
 }
 
 void vrend_renderer_resource_destroy(struct vrend_resource *res)

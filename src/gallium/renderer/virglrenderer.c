@@ -46,8 +46,7 @@
 
 int virgl_renderer_resource_create(struct virgl_renderer_resource_create_args *args, struct iovec *iov, uint32_t num_iovs)
 {
-   vrend_renderer_resource_create((struct vrend_renderer_resource_create_args *)args, iov, num_iovs);
-   return 0;
+   return vrend_renderer_resource_create((struct vrend_renderer_resource_create_args *)args, iov, num_iovs);
 }
 
 void virgl_renderer_resource_unref(uint32_t res_handle)

@@ -670,6 +670,9 @@ static struct vrend_linked_shader_program *add_shader_program(struct vrend_conte
   GLint lret;
   int id;
 
+  if (!sprog)
+     return NULL;
+
   /* need to rewrite VS code to add interpolation params */
   if ((gs && gs->compiled_fs_id != fs->id) ||
       (!gs && vs->compiled_fs_id != fs->id)) {

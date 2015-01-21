@@ -1649,7 +1649,7 @@ void vrend_set_single_sampler_view(struct vrend_context *ctx,
 
          glBindTexture(GL_TEXTURE_BUFFER, view->texture->tbo_tex_id);
          internalformat = tex_conv_table[view->format].internalformat;
-	glTexBuffer(GL_TEXTURE_BUFFER, internalformat, view->texture->id);
+         glTexBuffer(GL_TEXTURE_BUFFER, internalformat, view->texture->id);
       }
    }
 

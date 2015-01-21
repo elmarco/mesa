@@ -90,17 +90,10 @@ void vrend_renderer_init(struct vrend_if_cbs *cbs);
 
 void vrend_insert_format(struct vrend_format_table *entry, uint32_t bindings);
 void vrend_insert_format_swizzle(int override_format, struct vrend_format_table *entry, uint32_t bindings, uint8_t swizzle[4]);
-void vrend_create_vs(struct vrend_context *ctx,
-                     uint32_t handle,
-                     const struct pipe_shader_state *vs);
-
-void vrend_create_gs(struct vrend_context *ctx,
-                     uint32_t handle,
-                     const struct pipe_shader_state *gs);
-
-void vrend_create_fs(struct vrend_context *ctx,
-                     uint32_t handle,
-                     const struct pipe_shader_state *vs);
+int vrend_create_shader(struct vrend_context *ctx,
+                        uint32_t handle,
+                        const struct pipe_shader_state *vs,
+                        int type);
 
 void vrend_bind_vs(struct vrend_context *ctx,
                    uint32_t handle);

@@ -65,13 +65,17 @@ static int vrend_decode_create_shader(struct vrend_decode_ctx *ctx, uint32_t typ
                               uint32_t handle,
    uint16_t length)
 {
-   struct pipe_shader_state *state = CALLOC_STRUCT(pipe_shader_state);
+   struct pipe_shader_state *state;
    struct tgsi_token *tokens;
-   int i;
+   int i, ret;
    uint32_t shader_offset;
    unsigned num_tokens;
    uint8_t *shd_text;
-   
+
+   if (length < 3)
+      return EINVAL;
+
+   state = CALLOC_STRUCT(pipe_shader_state);
    if (!state)
       return ENOMEM;
 
@@ -115,16 +119,11 @@ static int vrend_decode_create_shader(struct vrend_decode_ctx *ctx, uint32_t typ
 
    state->tokens = tokens;
 
-   if (type == VIRGL_OBJECT_GS)
-      vrend_create_gs(ctx->grctx, handle, state);
-   else if (type == VIRGL_OBJECT_FS)
-      vrend_create_fs(ctx->grctx, handle, state);
-   else
-      vrend_create_vs(ctx->grctx, handle, state);
+   ret = vrend_create_shader(ctx->grctx, handle, state, type);
 
    free(tokens);
    free(state);
-   return 0;
+   return ret;
 }
 
 static int vrend_decode_create_stream_output_target(struct vrend_decode_ctx *ctx, uint32_t handle, uint16_t length)

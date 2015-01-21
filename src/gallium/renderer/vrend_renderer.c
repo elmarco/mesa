@@ -1847,48 +1847,45 @@ static void *vrend_create_shader_state(struct vrend_context *ctx,
    pipe_reference_init(&sel->reference, 1);
 
    r = vrend_shader_select(ctx, sel, NULL);
-   if (r)
+   if (r) {
+      vrend_destroy_shader_selector(sel);
       return NULL;
+   }
    return sel;
 }
 
-void vrend_create_vs(struct vrend_context *ctx,
-                     uint32_t handle,
-                     const struct pipe_shader_state *vs)
+static inline int shader_type_to_pipe_type(int type)
 {
-   struct vrend_shader_selector *sel;
-
-   sel = vrend_create_shader_state(ctx, vs, PIPE_SHADER_VERTEX);
-
-   vrend_renderer_object_insert(ctx, sel, sizeof(*sel), handle, VIRGL_OBJECT_VS);
-
-   return;
+   switch (type) {
+   case VIRGL_OBJECT_GS:
+      return PIPE_SHADER_GEOMETRY;
+   case VIRGL_OBJECT_VS:
+      return PIPE_SHADER_VERTEX;
+   case VIRGL_OBJECT_FS:
+      return PIPE_SHADER_FRAGMENT;
+   }
+   return 0;
 }
 
-void vrend_create_gs(struct vrend_context *ctx,
-                     uint32_t handle,
-                     const struct pipe_shader_state *gs)
+int vrend_create_shader(struct vrend_context *ctx,
+                        uint32_t handle, const struct pipe_shader_state *ss,
+                        int type)
 {
    struct vrend_shader_selector *sel;
+   int ret_handle;
 
-   sel = vrend_create_shader_state(ctx, gs, PIPE_SHADER_GEOMETRY);
+   sel = vrend_create_shader_state(ctx, ss, shader_type_to_pipe_type(type));
+   if (sel == NULL)
+      return ENOMEM;
 
-   vrend_renderer_object_insert(ctx, sel, sizeof(*sel), handle, VIRGL_OBJECT_GS);
+   ret_handle = vrend_renderer_object_insert(ctx, sel, sizeof(*sel), handle, type);
+   if (ret_handle == 0) {
+      vrend_destroy_shader_selector(sel);
+      return ENOMEM;
+   }
 
-   return;
-}
+   return 0;
 
-void vrend_create_fs(struct vrend_context *ctx,
-                     uint32_t handle,
-                     const struct pipe_shader_state *fs)
-{
-   struct vrend_shader_selector *sel;
-
-   sel = vrend_create_shader_state(ctx, fs, PIPE_SHADER_FRAGMENT);
-
-   vrend_renderer_object_insert(ctx, sel, sizeof(*sel), handle, VIRGL_OBJECT_FS);
-
-   return;
 }
 
 void vrend_bind_vs(struct vrend_context *ctx,

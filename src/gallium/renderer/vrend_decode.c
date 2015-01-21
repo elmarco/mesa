@@ -216,13 +216,15 @@ static int vrend_decode_set_index_buffer(struct vrend_decode_ctx *ctx, int lengt
 
 static int vrend_decode_set_constant_buffer(struct vrend_decode_ctx *ctx, uint16_t length)
 {
-   uint32_t shader = get_buf_entry(ctx, VIRGL_SET_CONSTANT_BUFFER_SHADER_TYPE);
-   uint32_t index = get_buf_entry(ctx, VIRGL_SET_CONSTANT_BUFFER_INDEX);
+   uint32_t shader;
+   uint32_t index;
    int nc = (length - 2);
 
    if (length < 2)
       return EINVAL;
 
+   shader = get_buf_entry(ctx, VIRGL_SET_CONSTANT_BUFFER_SHADER_TYPE);
+   index = get_buf_entry(ctx, VIRGL_SET_CONSTANT_BUFFER_INDEX);
    vrend_set_constants(ctx->grctx, shader, index, nc, get_buf_ptr(ctx, VIRGL_SET_CONSTANT_BUFFER_DATA_START));
    return 0;
 }
@@ -247,6 +249,10 @@ static int vrend_decode_set_vertex_buffers(struct vrend_decode_ctx *ctx, uint16_
    int i;
 
    if (length < 3)
+      return EINVAL;
+
+   /* must be a multiple of 3 */
+   if (length % 3)
       return EINVAL;
 
    num_vbo = (length / 3);
@@ -286,6 +292,9 @@ static int vrend_decode_resource_inline_write(struct vrend_decode_ctx *ctx, uint
    uint32_t res_handle = get_buf_entry(ctx, VIRGL_RESOURCE_IW_RES_HANDLE);
    uint32_t level, usage, stride, layer_stride;
    void *data;
+
+   if (length < 12)
+      return EINVAL;
 
    level = get_buf_entry(ctx, VIRGL_RESOURCE_IW_LEVEL);
    usage = get_buf_entry(ctx, VIRGL_RESOURCE_IW_USAGE);
@@ -547,6 +556,12 @@ static int vrend_decode_create_ve(struct vrend_decode_ctx *ctx, uint32_t handle,
    int num_elements;
    int i;
    int ret;
+
+   if (length < 1)
+      return EINVAL;
+
+   if ((length - 1) % 4)
+      return EINVAL;
 
    num_elements = (length - 1) / 4;
    ve = calloc(num_elements, sizeof(struct pipe_vertex_element));
@@ -849,35 +864,51 @@ static int vrend_decode_blit(struct vrend_decode_ctx *ctx, int length)
    return 0;
 }
 
-static void vrend_decode_bind_sampler_states(struct vrend_decode_ctx *ctx, int length)
+static int vrend_decode_bind_sampler_states(struct vrend_decode_ctx *ctx, int length)
 {
    uint32_t shader_type = get_buf_entry(ctx, VIRGL_BIND_SAMPLER_STATES_SHADER_TYPE);
    uint32_t start_slot = get_buf_entry(ctx, VIRGL_BIND_SAMPLER_STATES_START_SLOT);
-   uint32_t num_states = length - 1;
+   uint32_t num_states = length - 2;
+
+   if (length < 2)
+      return EINVAL;
 
    vrend_bind_sampler_states(ctx->grctx, shader_type, start_slot, num_states,
 			     get_buf_ptr(ctx, VIRGL_BIND_SAMPLER_STATES_S0_HANDLE));
+   return 0;
 }
 
-static void vrend_decode_begin_query(struct vrend_decode_ctx *ctx)
+static int vrend_decode_begin_query(struct vrend_decode_ctx *ctx, int length)
 {
    uint32_t handle = get_buf_entry(ctx, VIRGL_QUERY_BEGIN_HANDLE);
 
+   if (length != 1)
+      return EINVAL;
+
    vrend_begin_query(ctx->grctx, handle);
+   return 0;
 }
 
-static void vrend_decode_end_query(struct vrend_decode_ctx *ctx)
+static int vrend_decode_end_query(struct vrend_decode_ctx *ctx, int length)
 {
    uint32_t handle = get_buf_entry(ctx, VIRGL_QUERY_END_HANDLE);
 
+   if (length != 1)
+      return EINVAL;
+
    vrend_end_query(ctx->grctx, handle);
+   return 0;
 }
 
-static void vrend_decode_get_query_result(struct vrend_decode_ctx *ctx)
+static int vrend_decode_get_query_result(struct vrend_decode_ctx *ctx, int length)
 {
    uint32_t handle = get_buf_entry(ctx, VIRGL_QUERY_RESULT_HANDLE);
    uint32_t wait = get_buf_entry(ctx, VIRGL_QUERY_RESULT_WAIT);
+
+   if (length != 2)
+      return EINVAL;
    vrend_get_query_result(ctx->grctx, handle, wait);
+   return 0;
 }
 
 static int vrend_decode_set_render_condition(struct vrend_decode_ctx *ctx, int length)
@@ -892,25 +923,34 @@ static int vrend_decode_set_render_condition(struct vrend_decode_ctx *ctx, int l
    return 0;
 }
 
-static void vrend_decode_set_sub_ctx(struct vrend_decode_ctx *ctx)
+static int vrend_decode_set_sub_ctx(struct vrend_decode_ctx *ctx, int length)
 {
    uint32_t ctx_sub_id = get_buf_entry(ctx, 1);
 
+   if (length != 1)
+      return EINVAL;
    vrend_renderer_set_sub_ctx(ctx->grctx, ctx_sub_id);
+   return 0;
 }
 
-static void vrend_decode_create_sub_ctx(struct vrend_decode_ctx *ctx)
+static int vrend_decode_create_sub_ctx(struct vrend_decode_ctx *ctx, int length)
 {
    uint32_t ctx_sub_id = get_buf_entry(ctx, 1);
 
+   if (length != 1)
+      return EINVAL;
    vrend_renderer_create_sub_ctx(ctx->grctx, ctx_sub_id);
+   return 0;
 }
 
-static void vrend_decode_destroy_sub_ctx(struct vrend_decode_ctx *ctx)
+static int vrend_decode_destroy_sub_ctx(struct vrend_decode_ctx *ctx, int length)
 {
    uint32_t ctx_sub_id = get_buf_entry(ctx, 1);
 
+   if (length != 1)
+      return EINVAL;
    vrend_renderer_destroy_sub_ctx(ctx->grctx, ctx_sub_id);
+   return 0;
 }
 
 static int vrend_decode_set_streamout_targets(struct vrend_decode_ctx *ctx,
@@ -1078,16 +1118,16 @@ void vrend_decode_block(uint32_t ctx_id, uint32_t *block, int ndw)
          ret = vrend_decode_resource_copy_region(gdctx, len);
          break;
       case VIRGL_CCMD_BIND_SAMPLER_STATES:
-         vrend_decode_bind_sampler_states(gdctx, len);
+         ret = vrend_decode_bind_sampler_states(gdctx, len);
          break;
       case VIRGL_CCMD_BEGIN_QUERY:
-         vrend_decode_begin_query(gdctx);
+         ret = vrend_decode_begin_query(gdctx, len);
          break;
       case VIRGL_CCMD_END_QUERY:
-         vrend_decode_end_query(gdctx);
+         ret = vrend_decode_end_query(gdctx, len);
          break;
       case VIRGL_CCMD_GET_QUERY_RESULT:
-         vrend_decode_get_query_result(gdctx);
+         ret = vrend_decode_get_query_result(gdctx, len);
          break;
       case VIRGL_CCMD_SET_POLYGON_STIPPLE:
          ret = vrend_decode_set_polygon_stipple(gdctx, len);
@@ -1108,13 +1148,13 @@ void vrend_decode_block(uint32_t ctx_id, uint32_t *block, int ndw)
          ret = vrend_decode_set_uniform_buffer(gdctx, len);
          break;
       case VIRGL_CCMD_SET_SUB_CTX:
-         vrend_decode_set_sub_ctx(gdctx);
+         ret = vrend_decode_set_sub_ctx(gdctx, len);
          break;
       case VIRGL_CCMD_CREATE_SUB_CTX:
-         vrend_decode_create_sub_ctx(gdctx);
+         ret = vrend_decode_create_sub_ctx(gdctx, len);
          break;
       case VIRGL_CCMD_DESTROY_SUB_CTX:
-         vrend_decode_destroy_sub_ctx(gdctx);
+         ret = vrend_decode_destroy_sub_ctx(gdctx, len);
          break;
       }
 

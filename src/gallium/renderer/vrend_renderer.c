@@ -904,6 +904,9 @@ int vrend_create_surface(struct vrend_context *ctx,
    }
 
    surf = CALLOC_STRUCT(vrend_surface);
+   if (!surf)
+      return ENOMEM;
+
    surf->res_handle = res_handle;
    surf->format = format;
    surf->val0 = val0;
@@ -1834,6 +1837,9 @@ static void *vrend_create_shader_state(struct vrend_context *ctx,
 {
    struct vrend_shader_selector *sel = CALLOC_STRUCT(vrend_shader_selector);
    int r;
+
+   if (!sel)
+      return NULL;
 
    sel->type = pipe_shader_type;
    sel->sinfo.so_info = state->stream_output;
@@ -3245,6 +3251,9 @@ struct vrend_context *vrend_create_context(int id, uint32_t nlen, const char *de
    struct vrend_context *grctx = CALLOC_STRUCT(vrend_context);
    struct virgl_gl_ctx_param ctx_params;
 
+   if (!grctx)
+      return NULL;
+
    if (nlen) {
       strncpy(grctx->debug_name, debug_name, 64);
    }
@@ -3639,6 +3648,8 @@ void vrend_renderer_transfer_write_iov(uint32_t res_handle,
          send_size = util_format_get_nblocks(res->base.format, box->width,
                                              box->height) * elsize * box->depth;
          data = malloc(send_size);
+         if (!data)
+            return;
          copy_transfer_data(&res->base, iov, num_iovs, data, stride,
                             box, offset, invert);
       } else {
@@ -3886,8 +3897,10 @@ static void vrend_transfer_send_readpixels(struct vrend_resource *res,
 
    if (need_temp) {
       data = malloc(send_size);
-      if (!data)
+      if (!data) {
          fprintf(stderr,"malloc failed %d\n", send_size);
+         return;
+      }
    } else
       data = myptr;
 
@@ -5210,6 +5223,9 @@ void *vrend_renderer_get_cursor_contents(uint32_t res_handle, uint32_t *width, u
    size = util_format_get_nblocks(res->base.format, res->base.width0, res->base.height0) * blsize;
    data = malloc(size);
    data2 = malloc(size);
+
+   if (!data || !data2)
+      return NULL;
 
    glBindTexture(res->target, res->id);
    glGetnTexImageARB(res->target, 0, format, type, size, data);

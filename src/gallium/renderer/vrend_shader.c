@@ -27,6 +27,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
+#include <errno.h>
 #include "vrend_shader.h"
 extern int vrend_dump_shaders;
 /*
@@ -178,6 +179,21 @@ static inline boolean fs_emit_layout(struct dump_ctx *ctx)
    return FALSE;
 }
 
+static char *strcat_realloc(char *str, const char *catstr)
+{
+   str = realloc(str, strlen(str) + strlen(catstr) + 1);
+   if (!str)
+      return NULL;
+   strcat(str, catstr);
+   return str;
+}
+
+static char *add_str_to_glsl_main(struct dump_ctx *ctx, char *buf)
+{
+   ctx->glsl_main = strcat_realloc(ctx->glsl_main, buf);
+   return ctx->glsl_main;
+}
+
 static boolean
 iter_declaration(struct tgsi_iterate_context *iter,
                  struct tgsi_full_declaration *decl )
@@ -297,7 +313,7 @@ iter_declaration(struct tgsi_iterate_context *iter,
          if (iter->processor.Processor == TGSI_PROCESSOR_FRAGMENT) {
             if (ctx->front_face_emitted) {
                ctx->num_inputs--;
-               return 0;
+               return TRUE;
             }
             name_prefix = "gl_FrontFacing";
             ctx->inputs[i].glsl_predefined_no_emit = TRUE;
@@ -607,15 +623,19 @@ static char get_swiz_char(int swiz)
    return 0;
 }
 
-static void emit_cbuf_writes(struct dump_ctx *ctx)
+static int emit_cbuf_writes(struct dump_ctx *ctx)
 {
    char buf[255];
    int i;
+   char *sret;
 
    for (i = 1; i < 8; i++) {
       snprintf(buf, 255, "fsout_c%d = fsout_c0;\n", i);
-      strcat(ctx->glsl_main, buf);
+      sret = add_str_to_glsl_main(ctx, buf);
+      if (!sret)
+         return ENOMEM;
    }
+   return 0;
 }
 
 static const char *atests[PIPE_FUNC_ALWAYS + 1] = {
@@ -629,61 +649,76 @@ static const char *atests[PIPE_FUNC_ALWAYS + 1] = {
    "true",
 };
 
-static void emit_alpha_test(struct dump_ctx *ctx)
+static int emit_alpha_test(struct dump_ctx *ctx)
 {
    char buf[255];
    char comp_buf[128];
-
+   char *sret;
    snprintf(comp_buf, 128, atests[ctx->key->alpha_test], "fsout_c0.w", ctx->key->alpha_ref_val);
 
    snprintf(buf, 255, "if (!(%s)) {\n\tdiscard;\n}\n", comp_buf);
-   strcat(ctx->glsl_main, buf);
-
+   sret = add_str_to_glsl_main(ctx, buf);
+   if (!sret)
+      return ENOMEM;
+   return 0;
 }
 
-static void emit_pstipple_pass(struct dump_ctx *ctx)
+static int emit_pstipple_pass(struct dump_ctx *ctx)
 {
    char buf[255];
-
+   char *sret;
    snprintf(buf, 255, "stip_temp = texture(pstipple_sampler, vec2(gl_FragCoord.x / 32, gl_FragCoord.y / 32)).x;\n");
-   strcat(ctx->glsl_main, buf);
+   sret = add_str_to_glsl_main(ctx, buf);
+   if (!sret)
+      return ENOMEM;
    snprintf(buf, 255, "if (stip_temp > 0) {\n\tdiscard;\n}\n");
-   strcat(ctx->glsl_main, buf);
+   sret = add_str_to_glsl_main(ctx, buf);
+   return sret ? 0 : ENOMEM;
 }
 
-static void emit_color_select(struct dump_ctx *ctx)
+static int emit_color_select(struct dump_ctx *ctx)
 {
    char buf[255];
-
+   char *sret = NULL;
+   
    if (!ctx->key->color_two_side)
-      return;
+      return 0;
 
    if (ctx->color_in_mask & 1) {
       snprintf(buf, 255, "realcolor0 = gl_FrontFacing ? ex_c0 : ex_bc0;\n");
-      strcat(ctx->glsl_main, buf);
+      sret = add_str_to_glsl_main(ctx, buf);
    }
    if (ctx->color_in_mask & 2) {
       snprintf(buf, 255, "realcolor1 = gl_FrontFacing ? ex_c1 : ex_bc1;\n");
-      strcat(ctx->glsl_main, buf);
+      sret = add_str_to_glsl_main(ctx, buf);
    }
+   return sret ? 0 : ENOMEM;
 }
 
-static void emit_prescale(struct dump_ctx *ctx)
+static int emit_prescale(struct dump_ctx *ctx)
 {
    char buf[255];
-
+   char *sret;
+   
    snprintf(buf, 255, "gl_Position.y = gl_Position.y * winsys_adjust.y;\n");
-   strcat(ctx->glsl_main, buf);
+   sret = add_str_to_glsl_main(ctx, buf);
+   if (!sret)
+      return ENOMEM;
    snprintf(buf, 255, "gl_Position.z = dot(gl_Position, vec4(0.0, 0.0, winsys_adjust.zw));\n");
-   strcat(ctx->glsl_main, buf);
+   sret = add_str_to_glsl_main(ctx, buf);
+   if (!sret)
+      return ENOMEM;
+   return 0;
 }
 
-static void emit_so_movs(struct dump_ctx *ctx)
+static int emit_so_movs(struct dump_ctx *ctx)
 {
    char buf[255];
    int i, j;
    char outtype[15] = {0};
    char writemask[6];
+   char *sret;
+
    for (i = 0; i < ctx->so->num_outputs; i++) {
       if (ctx->so->output[i].start_component != 0) {
          int wm_idx = 0;
@@ -730,23 +765,28 @@ static void emit_so_movs(struct dump_ctx *ctx)
          if (ctx->write_so_outputs[i])
             snprintf(buf, 255, "tfout%d = %s(%s%s);\n", i, outtype, ctx->outputs[ctx->so->output[i].register_index].glsl_name, writemask);
       }
-      strcat(ctx->glsl_main, buf);
+      sret = add_str_to_glsl_main(ctx, buf);
+      if (!sret)
+         return ENOMEM;
    }
-
+   return 0;
 }
 
-static void emit_clip_dist_movs(struct dump_ctx *ctx)
+static int emit_clip_dist_movs(struct dump_ctx *ctx)
 {
    char buf[255];
    int i;
+   char *sret;
 
    if (ctx->num_clip_dist == 0 && ctx->key->clip_plane_enable) {
       for (i = 0; i < 8; i++) {
          snprintf(buf, 255, "gl_ClipDistance[%d] = dot(%s, clipp[%d]);\n", i, ctx->has_clipvertex ? "clipv_tmp" : "gl_Position", i);
-         strcat(ctx->glsl_main, buf);
+         sret = add_str_to_glsl_main(ctx, buf);
+         if (!sret)
+            return ENOMEM;
       }
-      return;
-   } 
+      return 0;
+   }
    for (i = 0; i < ctx->num_clip_dist; i++) {
       int clipidx = i < 4 ? 0 : 1;
       char swiz = i & 3;
@@ -759,11 +799,12 @@ static void emit_clip_dist_movs(struct dump_ctx *ctx)
       }
       snprintf(buf, 255, "gl_ClipDistance[%d] = clip_dist_temp[%d].%c;\n",
                i, clipidx, wm);
-      strcat(ctx->glsl_main, buf);
+      sret = add_str_to_glsl_main(ctx, buf);
+      if (!sret)
+         return ENOMEM;
    }
+   return 0;
 }
-
-
 
 #define emit_arit_op2(op) snprintf(buf, 255, "%s = %s(%s((%s %s %s))%s);\n", dsts[0], dstconv, dtypeprefix, srcs[0], op, srcs[1], writemask)
 #define emit_op1(op) snprintf(buf, 255, "%s = %s(%s(%s(%s)));\n", dsts[0], dstconv, dtypeprefix, op, srcs[0])
@@ -771,16 +812,26 @@ static void emit_clip_dist_movs(struct dump_ctx *ctx)
 
 #define emit_ucompare(op) snprintf(buf, 255, "%s = %s(uintBitsToFloat(%s(%s(%s, %s)%s) * %s(0xffffffff)));\n", dsts[0], dstconv, udstconv, op, srcs[0], srcs[1], writemask, udstconv)
 
-static void emit_buf(struct dump_ctx *ctx, char *buf)
+static int emit_buf(struct dump_ctx *ctx, char *buf)
 {
    int i;
-   for (i = 0; i < ctx->indent_level; i++)
-      strcat(ctx->glsl_main, "\t");
+   char *sret;
+   for (i = 0; i < ctx->indent_level; i++) {
+      sret = add_str_to_glsl_main(ctx, "\t");
+      if (!sret)
+         return ENOMEM;
+   }
 
-   strcat(ctx->glsl_main, buf);
+   sret = add_str_to_glsl_main(ctx, buf);
+   return sret ? 0 : ENOMEM;
 }
 
-static void translate_tex(struct dump_ctx *ctx,
+#define EMIT_BUF_WITH_RET(ctx, buf) do { \
+   int ret = emit_buf((ctx), (buf)); \
+   if (ret) return FALSE; \
+   } while(0)
+
+static int translate_tex(struct dump_ctx *ctx,
                           struct tgsi_full_instruction *inst,
                           int sreg_index,
                           char srcs[4][255],
@@ -841,8 +892,7 @@ static void translate_tex(struct dump_ctx *ctx,
           inst->Texture.Texture != TGSI_TEXTURE_2D_ARRAY_MSAA)
          snprintf(bias, 128, ", int(%s.w)", srcs[0]);
       snprintf(buf, 255, "%s = %s(%s(textureSize(%s%s)));\n", dsts[0], dstconv, dtypeprefix, srcs[sampler_index], bias);
-      emit_buf(ctx, buf);
-      return;
+      return emit_buf(ctx, buf);
    }
 
    switch (inst->Texture.Texture) {
@@ -1023,7 +1073,7 @@ static void translate_tex(struct dump_ctx *ctx,
       snprintf(buf, 255, "%s = %s(vec4(vec4(texture%s(%s, %s%s%s%s)) * %sshadmask%d + %sshadadd%d)%s);\n", dsts[0], dstconv, tex_ext, srcs[sampler_index], srcs[0], twm, offbuf, bias, cname, src->Register.Index, cname, src->Register.Index, writemask);
    } else
       snprintf(buf, 255, "%s = %s(texture%s(%s, %s%s%s%s)%s);\n", dsts[0], dstconv, tex_ext, srcs[sampler_index], srcs[0], twm, offbuf, bias, ctx->outputs[0].override_no_wm ? "" : writemask);
-   emit_buf(ctx, buf);
+   return emit_buf(ctx, buf);
 }
 
 static boolean
@@ -1044,6 +1094,8 @@ iter_instruction(struct tgsi_iterate_context *iter,
    char *dtypeprefix="", *stypeprefix = "";
    bool stprefix = false;
    bool override_no_wm[4];
+   char *sret;
+   int ret;
 
    if (ctx->prog_type == -1)
       ctx->prog_type = iter->processor.Processor;
@@ -1080,9 +1132,14 @@ iter_instruction(struct tgsi_iterate_context *iter,
    }
 
    if (instno == 0) {
-      strcat(ctx->glsl_main, "void main(void)\n{\n");
-      if (iter->processor.Processor == TGSI_PROCESSOR_FRAGMENT)
-         emit_color_select(ctx);
+      sret = add_str_to_glsl_main(ctx, "void main(void)\n{\n");
+      if (!sret)
+         return FALSE;
+      if (iter->processor.Processor == TGSI_PROCESSOR_FRAGMENT) {
+         ret = emit_color_select(ctx);
+         if (ret)
+            return FALSE;
+      }
    }
    for (i = 0; i < inst->Instruction.NumDstRegs; i++) {
       const struct tgsi_full_dst_register *dst = &inst->Dst[i];
@@ -1301,224 +1358,224 @@ iter_instruction(struct tgsi_iterate_context *iter,
    switch (inst->Instruction.Opcode) {
    case TGSI_OPCODE_SQRT:
       snprintf(buf, 255, "%s = sqrt(vec4(%s))%s;\n", dsts[0], srcs[0], writemask);
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_LRP:
       snprintf(buf, 255, "%s = mix(vec4(%s), vec4(%s), vec4(%s))%s;\n", dsts[0], srcs[2], srcs[1], srcs[0], writemask);
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_DP2:
       snprintf(buf, 255, "%s = %s(dot(vec2(%s), vec2(%s)));\n", dsts[0], dstconv, srcs[0], srcs[1]);
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_DP3:
       snprintf(buf, 255, "%s = %s(dot(vec3(%s), vec3(%s)));\n", dsts[0], dstconv, srcs[0], srcs[1]);
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_DP4:
       snprintf(buf, 255, "%s = %s(dot(vec4(%s), vec4(%s)));\n", dsts[0], dstconv, srcs[0], srcs[1]);
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_DPH:
       snprintf(buf, 255, "%s = %s(dot(vec4(vec3(%s), 1.0), vec4(%s)));\n", dsts[0], dstconv, srcs[0], srcs[1]);
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_MAX:
    case TGSI_OPCODE_IMAX:
    case TGSI_OPCODE_UMAX:
       snprintf(buf, 255, "%s = %s(%s(max(%s, %s)));\n", dsts[0], dstconv, dtypeprefix, srcs[0], srcs[1]);
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_MIN:
    case TGSI_OPCODE_IMIN:
    case TGSI_OPCODE_UMIN:
       snprintf(buf, 255, "%s = %s(%s(min(%s, %s)));\n", dsts[0], dstconv, dtypeprefix, srcs[0], srcs[1]);
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_ABS:
    case TGSI_OPCODE_IABS:
       emit_op1("abs");
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_KILL_IF:
       snprintf(buf, 255, "if (any(lessThan(%s, vec4(0.0))))\ndiscard;\n", srcs[0]);
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_IF:
    case TGSI_OPCODE_UIF:
       snprintf(buf, 255, "if (any(bvec4(%s))) {\n", srcs[0]);
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       ctx->indent_level++;
       break;
    case TGSI_OPCODE_ELSE:
       snprintf(buf, 255, "} else {\n");
       ctx->indent_level--;
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       ctx->indent_level++;
       break;
    case TGSI_OPCODE_ENDIF:
       snprintf(buf, 255, "}\n");
       ctx->indent_level--;
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_KILL:
       snprintf(buf, 255, "discard;\n");
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_DST:
       snprintf(buf, 512, "%s = vec4(1.0, %s.y * %s.y, %s.z, %s.w);\n", dsts[0],
                srcs[0], srcs[1], srcs[0], srcs[1]);
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_LIT:
       snprintf(buf, 512, "%s = %s(vec4(1.0, max(%s.x, 0.0), step(0.0, %s.x) * pow(max(0.0, %s.y), clamp(%s.w, -128.0, 128.0)), 1.0)%s);\n", dsts[0], dstconv, srcs[0], srcs[0], srcs[0], srcs[0], writemask);
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_EX2:
       emit_op1("exp2");
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_LG2:
       emit_op1("log2");
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_EXP:
       snprintf(buf, 512, "%s = %s(vec4(pow(2.0, floor(%s.x)), %s.x - floor(%s.x), exp2(%s.x), 1.0)%s);\n", dsts[0], dstconv, srcs[0], srcs[0], srcs[0], srcs[0], writemask);
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_LOG:
       snprintf(buf, 512, "%s = %s(vec4(floor(log2(%s.x)), %s.x / pow(2.0, floor(log2(%s.x))), log2(%s.x), 1.0)%s);\n", dsts[0], dstconv, srcs[0], srcs[0], srcs[0], srcs[0], writemask);
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_COS:
       emit_op1("cos");
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_SIN:
       emit_op1("sin");
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_SCS:
       snprintf(buf, 255, "%s = %s(vec4(cos(%s.x), sin(%s.x), 0, 1)%s);\n", dsts[0], dstconv,
                srcs[0], srcs[0], writemask);
-      emit_buf(ctx, buf);      
+      EMIT_BUF_WITH_RET(ctx, buf);      
       break;
    case TGSI_OPCODE_DDX:
       emit_op1("dFdx");
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_DDY:
       emit_op1("dFdy");
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_RCP:
       snprintf(buf, 255, "%s = %s(1.0/(%s));\n", dsts[0], dstconv, srcs[0]);
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_FLR:
       emit_op1("floor");
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_ROUND:
       emit_op1("round");
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_ISSG:
       emit_op1("sign");
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_CEIL:
       emit_op1("ceil");
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_FRC:
       emit_op1("fract");
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_TRUNC:
       emit_op1("trunc");
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_SSG:
       emit_op1("sign");
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_RSQ:
       snprintf(buf, 255, "%s = %s(inversesqrt(%s.x));\n", dsts[0], dstconv, srcs[0]);
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_MOV:
       snprintf(buf, 255, "%s = %s(%s(%s%s));\n", dsts[0], dstconv, dtypeprefix, srcs[0], override_no_wm[0] ? "" : writemask);
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_ADD:
       emit_arit_op2("+");
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_UADD:
       snprintf(buf, 255, "%s = %s(%s(ivec4((uvec4(%s) + uvec4(%s))))%s);\n", dsts[0], dstconv, dtypeprefix, srcs[0], srcs[1], writemask);
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_SUB:
       emit_arit_op2("-");
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_MUL:
       emit_arit_op2("*");
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_DIV:
       emit_arit_op2("/");
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_UMUL:
       snprintf(buf, 255, "%s = %s(%s((uvec4(%s) * uvec4(%s)))%s);\n", dsts[0], dstconv, dtypeprefix, srcs[0], srcs[1], writemask);
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_UMOD:
       snprintf(buf, 255, "%s = %s(%s((uvec4(%s) %% uvec4(%s)))%s);\n", dsts[0], dstconv, dtypeprefix, srcs[0], srcs[1], writemask);
-      strcat(ctx->glsl_main, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_IDIV:
       snprintf(buf, 255, "%s = %s(%s((ivec4(%s) / ivec4(%s)))%s);\n", dsts[0], dstconv, dtypeprefix, srcs[0], srcs[1], writemask);
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_UDIV:
       snprintf(buf, 255, "%s = %s(%s((uvec4(%s) / uvec4(%s)))%s);\n", dsts[0], dstconv, dtypeprefix, srcs[0], srcs[1], writemask);
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_ISHR:
    case TGSI_OPCODE_USHR:
       emit_arit_op2(">>");
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_SHL:
       emit_arit_op2("<<");
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_MAD:
       snprintf(buf, 255, "%s = %s((%s * %s + %s)%s);\n", dsts[0], dstconv, srcs[0], srcs[1], srcs[2], writemask);
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_UMAD:
       snprintf(buf, 255, "%s = %s(%s((%s * %s + %s)%s));\n", dsts[0], dstconv, dtypeprefix, srcs[0], srcs[1], srcs[2], writemask);
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_OR:
       emit_arit_op2("|");
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_AND:
       emit_arit_op2("&");
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_XOR:
       emit_arit_op2("^");
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_MOD:
       emit_arit_op2("%");
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_TEX:
    case TGSI_OPCODE_TEX2:
@@ -1530,136 +1587,156 @@ iter_instruction(struct tgsi_iterate_context *iter,
    case TGSI_OPCODE_TXF:
    case TGSI_OPCODE_TXP:
    case TGSI_OPCODE_TXQ:
-      translate_tex(ctx, inst, sreg_index, srcs, dsts, writemask, dstconv, dtypeprefix);
+      ret = translate_tex(ctx, inst, sreg_index, srcs, dsts, writemask, dstconv, dtypeprefix);
+      if (ret)
+         return FALSE;
       break;
    case TGSI_OPCODE_I2F:
       snprintf(buf, 255, "%s = %s(ivec4(%s));\n", dsts[0], dstconv, srcs[0]);
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_U2F:
       snprintf(buf, 255, "%s = %s(uvec4(%s));\n", dsts[0], dstconv, srcs[0]);
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_F2I:
       snprintf(buf, 255, "%s = %s(%s(ivec4(%s)));\n", dsts[0], dstconv, dtypeprefix, srcs[0]);      
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_F2U:
       snprintf(buf, 255, "%s = %s(%s(uvec4(%s)));\n", dsts[0], dstconv, dtypeprefix, srcs[0]);      
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_NOT:
       snprintf(buf, 255, "%s = %s(uintBitsToFloat(~(uvec4(%s))));\n", dsts[0], dstconv, srcs[0]);
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_INEG:
       snprintf(buf, 255, "%s = %s(intBitsToFloat(-(ivec4(%s))));\n", dsts[0], dstconv, srcs[0]);
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_SEQ:
       emit_compare("equal");
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_USEQ:
    case TGSI_OPCODE_FSEQ:
       emit_ucompare("equal");
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_SLT:
       emit_compare("lessThan");
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_ISLT:
    case TGSI_OPCODE_USLT:
    case TGSI_OPCODE_FSLT:
       emit_ucompare("lessThan");
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_SNE:
       emit_compare("notEqual");
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_USNE:
    case TGSI_OPCODE_FSNE:
       emit_ucompare("notEqual");
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_SGE:
       emit_compare("greaterThanEqual");
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_ISGE:
    case TGSI_OPCODE_USGE:
    case TGSI_OPCODE_FSGE:
       emit_ucompare("greaterThanEqual");
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_POW:
       snprintf(buf, 255, "%s = %s(pow(%s, %s));\n", dsts[0], dstconv, srcs[0], srcs[1]);
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_CMP:
    case TGSI_OPCODE_UCMP:
       snprintf(buf, 255, "%s = mix(%s, %s, greaterThanEqual(%s, vec4(0.0)))%s;\n", dsts[0], srcs[1], srcs[2], srcs[0], writemask);
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_END:
       if (iter->processor.Processor == TGSI_PROCESSOR_VERTEX) {
-         emit_prescale(ctx);
-         if (ctx->so && !ctx->key->gs_present)
-            emit_so_movs(ctx);
-         emit_clip_dist_movs(ctx);
+         ret = emit_prescale(ctx);
+         if (ret)
+            return FALSE;
+         if (ctx->so && !ctx->key->gs_present) {
+            ret = emit_so_movs(ctx);
+            if (ret)
+               return FALSE;
+         }
+         ret = emit_clip_dist_movs(ctx);
+         if (ret)
+            return FALSE;
       } else if (iter->processor.Processor == TGSI_PROCESSOR_GEOMETRY) {
 
       } else if (iter->processor.Processor == TGSI_PROCESSOR_FRAGMENT) {
-         if (ctx->key->pstipple_tex)
-            emit_pstipple_pass(ctx);
-         if (ctx->key->add_alpha_test)
-            emit_alpha_test(ctx);
-         if (ctx->write_all_cbufs)
-            emit_cbuf_writes(ctx);
+         if (ctx->key->pstipple_tex) {
+            ret = emit_pstipple_pass(ctx);
+            if (ret)
+               return FALSE;
+         }
+         if (ctx->key->add_alpha_test) {
+            ret = emit_alpha_test(ctx);
+            if (ret)
+               return FALSE;
+         }
+         if (ctx->write_all_cbufs) {
+            ret = emit_cbuf_writes(ctx);
+            if (ret)
+               return FALSE;
+         }
       }
-      strcat(ctx->glsl_main, "}\n");
+      sret = add_str_to_glsl_main(ctx, "}\n");
+      if (!sret)
+         return FALSE;
       break;
    case TGSI_OPCODE_RET:
-      strcat(ctx->glsl_main, "return;\n");
+      EMIT_BUF_WITH_RET(ctx, "return;\n");
       break;
    case TGSI_OPCODE_ARL:
       snprintf(buf, 255, "addr0 = int(floor(%s)%s);\n", srcs[0], writemask);
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_UARL:
       snprintf(buf, 255, "addr0 = int(%s);\n", srcs[0]);
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_XPD:
       snprintf(buf, 255, "%s = %s(cross(vec3(%s), vec3(%s)));\n", dsts[0], dstconv, srcs[0], srcs[1]);
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_BGNLOOP:
       snprintf(buf, 255, "do {\n");
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       ctx->indent_level++;
       break;
    case TGSI_OPCODE_ENDLOOP:
       ctx->indent_level--;
       snprintf(buf, 255, "} while(true);\n");
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_BRK:
       snprintf(buf, 255, "break;\n");
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_EMIT:
       if (ctx->so && ctx->key->gs_present)
             emit_so_movs(ctx);
       emit_clip_dist_movs(ctx);
       snprintf(buf, 255, "EmitVertex();\n");
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    case TGSI_OPCODE_ENDPRIM:
       snprintf(buf, 255, "EndPrimitive();\n");
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
       break;
    default:
       fprintf(stderr,"failed to convert opcode %d\n", inst->Instruction.Opcode);
@@ -1668,7 +1745,7 @@ iter_instruction(struct tgsi_iterate_context *iter,
 
    if (inst->Instruction.Saturate == TGSI_SAT_ZERO_ONE) {
       snprintf(buf, 255, "%s = clamp(%s, 0.0, 1.0);\n", dsts[0], dsts[0]);
-      emit_buf(ctx, buf);
+      EMIT_BUF_WITH_RET(ctx, buf);
    }
      
    return TRUE;
@@ -1680,30 +1757,37 @@ prolog(struct tgsi_iterate_context *iter)
    return TRUE;
 }
 
-static void emit_header(struct dump_ctx *ctx, char *glsl_final)
+#define STRCAT_WITH_RET(mainstr, buf) do {              \
+      (mainstr) = strcat_realloc((mainstr), (buf));     \
+      if ((mainstr) == NULL) return NULL;               \
+   } while(0)
+
+static char *emit_header(struct dump_ctx *ctx, char *glsl_hdr)
 {
    if (ctx->prog_type == TGSI_PROCESSOR_GEOMETRY || ctx->glsl_ver_required == 150)
-      strcat(glsl_final, "#version 150\n");
+      STRCAT_WITH_RET(glsl_hdr, "#version 150\n");
+
    else if (ctx->glsl_ver_required == 140)
-      strcat(glsl_final, "#version 140\n");
+      STRCAT_WITH_RET(glsl_hdr, "#version 140\n");
    else
-      strcat(glsl_final, "#version 130\n");
+      STRCAT_WITH_RET(glsl_hdr, "#version 130\n");
    if (ctx->prog_type == TGSI_PROCESSOR_VERTEX && vrend_shader_use_explicit)
-      strcat(glsl_final, "#extension GL_ARB_explicit_attrib_location : enable\n");
+      STRCAT_WITH_RET(glsl_hdr, "#extension GL_ARB_explicit_attrib_location : enable\n");
    if (ctx->prog_type == TGSI_PROCESSOR_FRAGMENT && fs_emit_layout(ctx))
-      strcat(glsl_final, "#extension GL_ARB_fragment_coord_conventions : enable\n");
+      STRCAT_WITH_RET(glsl_hdr, "#extension GL_ARB_fragment_coord_conventions : enable\n");
    if (ctx->glsl_ver_required < 140 && ctx->uses_sampler_rect)
-      strcat(glsl_final, "#extension GL_ARB_texture_rectangle : require\n");
+      STRCAT_WITH_RET(glsl_hdr, "#extension GL_ARB_texture_rectangle : require\n");
    if (ctx->uses_cube_array)
-      strcat(glsl_final, "#extension GL_ARB_texture_cube_map_array : require\n");
+      STRCAT_WITH_RET(glsl_hdr, "#extension GL_ARB_texture_cube_map_array : require\n");
    if (ctx->has_ints)
-      strcat(glsl_final, "#extension GL_ARB_shader_bit_encoding : require\n");
+      STRCAT_WITH_RET(glsl_hdr, "#extension GL_ARB_shader_bit_encoding : require\n");
    if (ctx->uses_sampler_ms)
-      strcat(glsl_final, "#extension GL_ARB_texture_multisample : require\n");
+      STRCAT_WITH_RET(glsl_hdr, "#extension GL_ARB_texture_multisample : require\n");
    if (ctx->has_instanceid)
-      strcat(glsl_final, "#extension GL_ARB_draw_instanced : require\n");
+      STRCAT_WITH_RET(glsl_hdr, "#extension GL_ARB_draw_instanced : require\n");
    if (ctx->num_ubo)
-      strcat(glsl_final, "#extension GL_ARB_uniform_buffer_object : require\n");
+      STRCAT_WITH_RET(glsl_hdr, "#extension GL_ARB_uniform_buffer_object : require\n");
+   return glsl_hdr;
 }
 
 const char *vrend_shader_samplertypeconv(int sampler_type, int *is_shad)
@@ -1747,7 +1831,7 @@ static const char *get_interp_string(int interpolate, boolean flatshade)
    return NULL;
 }
 
-static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
+static char *emit_ios(struct dump_ctx *ctx, char *glsl_hdr)
 {
    int i;
    char buf[255];
@@ -1765,20 +1849,20 @@ static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
                   upper_left ? "origin_upper_left" : "",
                   comma,
                   ctx->fs_pixel_center ? "pixel_center_integer" : "");
-         strcat(glsl_final, buf);
+         STRCAT_WITH_RET(glsl_hdr, buf);
       }
    }
    if (ctx->prog_type == TGSI_PROCESSOR_GEOMETRY) {
       snprintf(buf, 255, "layout(%s) in;\n", prim_to_name(ctx->gs_in_prim));
-      strcat(glsl_final, buf);
+      STRCAT_WITH_RET(glsl_hdr, buf);
                snprintf(buf, 255, "layout(%s, max_vertices = %d) out;\n", prim_to_name(ctx->gs_out_prim), ctx->gs_max_out_verts);
-      strcat(glsl_final, buf);
+      STRCAT_WITH_RET(glsl_hdr, buf);
    }
    for (i = 0; i < ctx->num_inputs; i++) {
       if (!ctx->inputs[i].glsl_predefined_no_emit) { 
          if (ctx->prog_type == TGSI_PROCESSOR_VERTEX && vrend_shader_use_explicit) {
             snprintf(buf, 255, "layout(location=%d) ", ctx->inputs[i].first);
-            strcat(glsl_final, buf);
+            STRCAT_WITH_RET(glsl_hdr, buf);
          }
          if (ctx->prog_type == TGSI_PROCESSOR_FRAGMENT &&
              (ctx->inputs[i].name == TGSI_SEMANTIC_GENERIC ||
@@ -1794,13 +1878,13 @@ static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
          } else
             postfix[0] = 0;
          snprintf(buf, 255, "%sin vec4 %s%s;\n", prefix, ctx->inputs[i].glsl_name, postfix);
-         strcat(glsl_final, buf);
+         STRCAT_WITH_RET(glsl_hdr, buf);
       }
    }
    if (ctx->write_all_cbufs) {
       for (i = 0; i < 8; i++) {
          snprintf(buf, 255, "out vec4 fsout_c%d;\n", i);
-         strcat(glsl_final, buf);
+         STRCAT_WITH_RET(glsl_hdr, buf);
       }
    } else {
       for (i = 0; i < ctx->num_outputs; i++) {
@@ -1812,47 +1896,47 @@ static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
                prefix = "";
             /* ugly leave spaces to patch interp in later */
             snprintf(buf, 255, "%sout vec4 %s;\n", prefix, ctx->outputs[i].glsl_name);
-            strcat(glsl_final, buf);
+            STRCAT_WITH_RET(glsl_hdr, buf);
          }
       }
    }
 
    if (ctx->prog_type == TGSI_PROCESSOR_VERTEX) {
       snprintf(buf, 255, "uniform vec4 winsys_adjust;\n");
-      strcat(glsl_final, buf);
+      STRCAT_WITH_RET(glsl_hdr, buf);
 
       if (ctx->has_clipvertex) {
             snprintf(buf, 255, "vec4 clipv_tmp;\n");
-            strcat(glsl_final, buf);
+            STRCAT_WITH_RET(glsl_hdr, buf);
       }
       if (ctx->num_clip_dist || ctx->key->clip_plane_enable) {
 
          if (ctx->key->clip_plane_enable) {
             snprintf(buf, 255, "uniform vec4 clipp[8];\n");
-            strcat(glsl_final, buf);
+            STRCAT_WITH_RET(glsl_hdr, buf);
          }
          if (ctx->key->gs_present) {
             snprintf(buf, 255, "out gl_PerVertex {\n vec4 gl_Position;\n float gl_PointSize;\n float gl_ClipDistance[%d];\n};\n", ctx->num_clip_dist ? ctx->num_clip_dist : 8);
-            strcat(glsl_final, buf);
+            STRCAT_WITH_RET(glsl_hdr, buf);
          } else {
             snprintf(buf, 255, "out float gl_ClipDistance[%d];\n", ctx->num_clip_dist ? ctx->num_clip_dist : 8);
-            strcat(glsl_final, buf);
+            STRCAT_WITH_RET(glsl_hdr, buf);
          }
          snprintf(buf, 255, "vec4 clip_dist_temp[2];\n");
-         strcat(glsl_final, buf);
+         STRCAT_WITH_RET(glsl_hdr, buf);
       }
    }
 
    if (ctx->prog_type == TGSI_PROCESSOR_GEOMETRY) {
       if (ctx->num_in_clip_dist) {
          snprintf(buf, 255, "in gl_PerVertex {\n vec4 gl_Position;\n float gl_PointSize; \n float gl_ClipDistance[%d];\n} gl_in[];\n", ctx->num_clip_dist);
-         strcat(glsl_final, buf);
+         STRCAT_WITH_RET(glsl_hdr, buf);
       }
       if (ctx->num_clip_dist) {
          snprintf(buf, 255, "out float gl_ClipDistance[%d];\n", ctx->num_clip_dist);
-         strcat(glsl_final, buf);
+         STRCAT_WITH_RET(glsl_hdr, buf);
          snprintf(buf, 255, "vec4 clip_dist_temp[2];\n");
-         strcat(glsl_final, buf);
+         STRCAT_WITH_RET(glsl_hdr, buf);
       }
    }
    
@@ -1866,39 +1950,39 @@ static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
          else
             snprintf(outtype, 6, "vec%d", ctx->so->output[i].num_components);
          snprintf(buf, 255, "out %s tfout%d;\n", outtype, i);
-         strcat(glsl_final, buf);
+         STRCAT_WITH_RET(glsl_hdr, buf);
       }
    }
    if (ctx->num_temps) {
       snprintf(buf, 255, "vec4 temps[%d];\n", ctx->num_temps);
-      strcat(glsl_final, buf);
+      STRCAT_WITH_RET(glsl_hdr, buf);
    }
 
    for (i = 0; i < ctx->num_address; i++) {
       snprintf(buf, 255, "int addr%d;\n", i);
-      strcat(glsl_final, buf);
+      STRCAT_WITH_RET(glsl_hdr, buf);
    }
    if (ctx->num_consts) {
       const char *cname = tgsi_proc_to_prefix(ctx->prog_type);
       snprintf(buf, 255, "uniform uvec4 %sconst0[%d];\n", cname, ctx->num_consts);
-      strcat(glsl_final, buf);
+      STRCAT_WITH_RET(glsl_hdr, buf);
    }
 
    if (ctx->key->color_two_side) {
       if (ctx->color_in_mask & 1) {
          snprintf(buf, 255, "vec4 realcolor0;\n");
-         strcat(glsl_final, buf);
+         STRCAT_WITH_RET(glsl_hdr, buf);
       }
       if (ctx->color_in_mask & 2) {
          snprintf(buf, 255, "vec4 realcolor1;\n");
-         strcat(glsl_final, buf);
+         STRCAT_WITH_RET(glsl_hdr, buf);
       }
    }
    if (ctx->num_ubo) {
       for (i = 0; i < ctx->num_ubo; i++) {
          const char *cname = tgsi_proc_to_prefix(ctx->prog_type);
          snprintf(buf, 255, "uniform %subo%d { vec4 %subo%dcontents[%d]; };\n", cname, ctx->ubo_idx[i], cname, ctx->ubo_idx[i], ctx->ubo_sizes[i]);
-         strcat(glsl_final, buf);
+         STRCAT_WITH_RET(glsl_hdr, buf);
       }
    }
    for (i = 0; i < 32; i++) {
@@ -1915,12 +1999,12 @@ static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
 
          sname = tgsi_proc_to_prefix(ctx->prog_type);
          snprintf(buf, 255, "uniform sampler%s %ssamp%d;\n", stc, sname, i);
-         strcat(glsl_final, buf);
+         STRCAT_WITH_RET(glsl_hdr, buf);
          if (is_shad) {
             snprintf(buf, 255, "uniform vec4 %sshadmask%d;\n", sname, i);
-            strcat(glsl_final, buf);
+            STRCAT_WITH_RET(glsl_hdr, buf);
             snprintf(buf, 255, "uniform vec4 %sshadadd%d;\n", sname, i);
-            strcat(glsl_final, buf);
+            STRCAT_WITH_RET(glsl_hdr, buf);
             ctx->shadow_samp_mask |= (1 << i);
          }
       }
@@ -1928,8 +2012,9 @@ static void emit_ios(struct dump_ctx *ctx, char *glsl_final)
    if (ctx->prog_type == TGSI_PROCESSOR_FRAGMENT &&
        ctx->key->pstipple_tex == true) {
       snprintf(buf, 255, "uniform sampler2D pstipple_sampler;\nfloat stip_temp;\n");
-      strcat(glsl_final, buf);
+      STRCAT_WITH_RET(glsl_hdr, buf);
    }
+   return glsl_hdr;
 }
 
 static boolean fill_fragment_interpolants(struct dump_ctx *ctx, struct vrend_shader_info *sinfo)
@@ -1985,8 +2070,9 @@ char *vrend_convert_shader(struct vrend_shader_cfg *cfg,
                            struct vrend_shader_info *sinfo)
 {
    struct dump_ctx ctx;
-   char *glsl_final;
-   boolean ret;
+   char *glsl_final = NULL;
+   boolean bret;
+   char *glsl_hdr = NULL;
 
    memset(&ctx, 0, sizeof(struct dump_ctx));
    ctx.iter.prolog = prolog;
@@ -2006,28 +2092,48 @@ char *vrend_convert_shader(struct vrend_shader_cfg *cfg,
    if (sinfo->so_info.num_outputs) {
       ctx.so = &sinfo->so_info;
       ctx.so_names = calloc(sinfo->so_info.num_outputs, sizeof(char *));
+      if (!ctx.so_names)
+         goto fail;
    } else
       ctx.so_names = NULL;
 
-   ctx.glsl_main = malloc(65536);
+   ctx.glsl_main = malloc(4096);
+   if (!ctx.glsl_main)
+      goto fail;
+
    ctx.glsl_main[0] = '\0';
-   tgsi_iterate_shader(tokens, &ctx.iter);
+   bret = tgsi_iterate_shader(tokens, &ctx.iter);
+   if (bret == FALSE)
+      goto fail;
 
-   glsl_final = malloc(65536);
+   glsl_hdr = malloc(1024);
+   if (!glsl_hdr)
+      goto fail;
+   glsl_hdr[0] = '\0';
+   glsl_hdr = emit_header(&ctx, glsl_hdr);
+   if (!glsl_hdr)
+      goto fail;
+
+   glsl_hdr = emit_ios(&ctx, glsl_hdr);
+   if (!glsl_hdr)
+      goto fail;
+
+   glsl_final = malloc(strlen(glsl_hdr) + strlen(ctx.glsl_main) + 1);
+   if (!glsl_final)
+      goto fail;
+
    glsl_final[0] = '\0';
-   emit_header(&ctx, glsl_final);
-   emit_ios(&ctx, glsl_final);
 
-   ret = fill_interpolants(&ctx, sinfo);
-   if (ret == FALSE) {
-      free(ctx.glsl_main);
-      free(glsl_final);
-      return NULL;
-   }
+   bret = fill_interpolants(&ctx, sinfo);
+   if (bret == FALSE)
+      goto fail;
+
+   strcat(glsl_final, glsl_hdr);
    strcat(glsl_final, ctx.glsl_main);
    if (vrend_dump_shaders)
       fprintf(stderr,"GLSL: %s\n", glsl_final);
    free(ctx.glsl_main);
+   free(glsl_hdr);
    sinfo->num_ucp = ctx.key->clip_plane_enable ? 8 : 0;
    sinfo->samplers_used_mask = ctx.samplers_used;
    sinfo->num_consts = ctx.num_consts;
@@ -2040,6 +2146,12 @@ char *vrend_convert_shader(struct vrend_shader_cfg *cfg,
    sinfo->gs_out_prim = ctx.gs_out_prim;
    sinfo->so_names = ctx.so_names;
    return glsl_final;
+ fail:
+   free(ctx.glsl_main);
+   free(glsl_final);
+   free(glsl_hdr);
+   free(ctx.so_names);
+   return NULL;
 }
 
 static void replace_interp(char *program,

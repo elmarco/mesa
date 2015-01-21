@@ -1771,6 +1771,11 @@ static int vrend_shader_create(struct vrend_context *ctx,
    shader->id = glCreateShader(conv_shader_type(shader->sel->type));
    shader->compiled_fs_id = 0;
    shader->glsl_prog = vrend_convert_shader(&ctx->shader_cfg, shader->sel->tokens, &key, &shader->sel->sinfo);
+   if (!shader->glsl_prog) {
+      report_context_error(ctx, VIRGL_ERROR_CTX_ILLEGAL_SHADER, 0);
+      glDeleteShader(shader->id);
+      return -1;
+   }
    shader->key = key;
    if (1) {//shader->sel->type == PIPE_SHADER_FRAGMENT || shader->sel->type == PIPE_SHADER_GEOMETRY) {
       boolean ret;

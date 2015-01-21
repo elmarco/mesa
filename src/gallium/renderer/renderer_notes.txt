@@ -1,4 +1,13 @@
 
+TODO list:
+=========
+securing the interface:
+
+length checking on parsing the command stream from Mesa
+shader parser to tgsi needs review and better error handling?
+GLSL generator needs better bounds checking
+DMA transfer interfaces need specifying and bounds checking.
+
 To use GL 3.x in the renderer we need to handle the deprecated stuff - 
 
 two sided rendering - normals in shader or something - execute shader twice.

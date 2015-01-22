@@ -640,7 +640,6 @@ static void set_stream_out_varyings(int prog_id, struct vrend_shader_info *sinfo
 {
    struct pipe_stream_output_info *so = &sinfo->so_info;
    char *varyings[PIPE_MAX_SHADER_OUTPUTS];
-   char tmp[64];
    int i;
    
    if (!so->num_outputs)
@@ -3251,7 +3250,6 @@ bool vrend_destroy_context(struct vrend_context *ctx)
 struct vrend_context *vrend_create_context(int id, uint32_t nlen, const char *debug_name)
 {
    struct vrend_context *grctx = CALLOC_STRUCT(vrend_context);
-   struct virgl_gl_ctx_param ctx_params;
 
    if (!grctx)
       return NULL;

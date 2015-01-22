@@ -840,7 +840,7 @@ static int translate_tex(struct dump_ctx *ctx,
                           const char *dstconv,
                           const char *dtypeprefix)
 {
-   char *twm, *gwm, *txfi;
+   char *twm, *gwm = NULL, *txfi;
    bool is_shad = false;
    char buf[512];
    char offbuf[128] = {0};

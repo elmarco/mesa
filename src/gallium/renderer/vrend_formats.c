@@ -289,7 +289,7 @@ static void vrend_add_formats(struct vrend_format_table *table, int num_entries)
       if (util_format_is_depth_or_stencil(table[i].format)) {
          GLenum attachment;
 
-         if (table[i].format == PIPE_FORMAT_Z24X8_UNORM || table[i].format == PIPE_FORMAT_Z32_UNORM || table[i].format == PIPE_FORMAT_Z16_UNORM || table[i].format == PIPE_FORMAT_Z32_FLOAT)
+         if (table[i].format == VIRGL_FORMAT_Z24X8_UNORM || table[i].format == VIRGL_FORMAT_Z32_UNORM || table[i].format == VIRGL_FORMAT_Z16_UNORM || table[i].format == VIRGL_FORMAT_Z32_FLOAT)
             attachment = GL_DEPTH_ATTACHMENT;
          else
             attachment = GL_DEPTH_STENCIL_ATTACHMENT;

@@ -431,13 +431,14 @@ static void blitter_set_texcoords(struct vrend_blitter_ctx *blit_ctx,
    default:;
    }
 }
-
+#if 0
 static void set_dsa_keep_depth_stencil(void)
 {
     glDisable(GL_STENCIL_TEST);
     glDisable(GL_DEPTH_TEST);
     glDepthMask(GL_FALSE);
 }
+#endif
 
 static void set_dsa_write_depth_keep_stencil(void)
 {
@@ -454,30 +455,25 @@ void vrend_renderer_blit_gl(struct vrend_context *ctx,
                             const struct pipe_blit_info *info)
 {
     struct vrend_blitter_ctx *blit_ctx = &vrend_blit_ctx;
-    unsigned src_samples = src_res->base.nr_samples;
-    unsigned dst_samples = dst_res->base.nr_samples;
     GLuint prog_id;
     GLuint fs_id;
     GLint lret;
     GLenum filter;
     GLuint pos_loc, tc_loc;
     GLuint samp_loc;
-    boolean has_depth, has_stencil, has_color;
-    bool blit_stencil, blit_depth, blit_color;
+    boolean has_depth, has_stencil;
+    bool blit_stencil, blit_depth;
     int dst_z;
     const struct util_format_description *src_desc =
        util_format_description(src_res->base.format);
     const struct util_format_description *dst_desc =
        util_format_description(dst_res->base.format);
 
-    has_color = src_desc->colorspace != UTIL_FORMAT_COLORSPACE_ZS &&
-        dst_desc->colorspace != UTIL_FORMAT_COLORSPACE_ZS;
     has_depth = util_format_has_depth(src_desc) &&
         util_format_has_depth(dst_desc);
     has_stencil = util_format_has_stencil(src_desc) &&
         util_format_has_stencil(dst_desc);
 
-    blit_color = has_color && (info->mask & PIPE_MASK_RGBA);
     blit_depth = has_depth && (info->mask & PIPE_MASK_Z);
     blit_stencil = has_stencil && (info->mask & PIPE_MASK_S) & 0;
 

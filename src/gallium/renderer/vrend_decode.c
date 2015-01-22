@@ -110,7 +110,7 @@ static int vrend_decode_create_shader(struct vrend_decode_ctx *ctx, uint32_t typ
    shd_text = get_buf_ptr(ctx, shader_offset);
    if (vrend_dump_shaders)
       fprintf(stderr,"shader\n%s\n", shd_text);
-   if (!tgsi_text_translate(shd_text, tokens, num_tokens + 10)) {
+   if (!tgsi_text_translate((const char *)shd_text, tokens, num_tokens + 10)) {
       fprintf(stderr,"failed to translate\n %s\n", shd_text);
       free(tokens);
       free(state);
@@ -1032,7 +1032,6 @@ struct vrend_context *vrend_lookup_renderer_ctx(uint32_t ctx_id)
 
 void vrend_decode_block(uint32_t ctx_id, uint32_t *block, int ndw)
 {
-   int i = 0;
    struct vrend_decode_ctx *gdctx;
    boolean bret;
    int ret;

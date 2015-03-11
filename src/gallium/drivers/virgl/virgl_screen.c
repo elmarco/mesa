@@ -290,12 +290,22 @@ static boolean
 virgl_is_vertex_format_supported(struct pipe_screen *screen,
                                  enum pipe_format format)
 {
+   struct virgl_screen *vscreen = virgl_screen(screen);
    const struct util_format_description *format_desc;
    int i;
 
    format_desc = util_format_description(format);
    if (!format_desc)
       return FALSE;
+
+   if (format == PIPE_FORMAT_R11G11B10_FLOAT) {
+      int vformat = VIRGL_FORMAT_R11G11B10_FLOAT;
+      int big = vformat / 32;
+      int small = vformat % 32;
+      if (!(vscreen->caps.caps.v1.vertexbuffer.bitmask[big] & (1 << small)))
+         return FALSE;
+      return TRUE;
+   }
 
    /* Find the first non-VOID channel. */
    for (i = 0; i < 4; i++) {

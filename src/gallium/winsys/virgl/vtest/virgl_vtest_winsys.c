@@ -113,6 +113,11 @@ static int virgl_vtest_winsys_submit_cmd(struct virgl_winsys *vws, struct virgl_
    return virgl_vtest_submit_cmd(vtws, cbuf);
 }
 
+static void virgl_vtest_emit_res(struct virgl_winsys *vws, struct virgl_cmd_buf *buf, struct virgl_hw_res *res, boolean write_buffer)
+{
+
+}
+
 static int virgl_vtest_get_caps(struct virgl_winsys *vws, struct virgl_drm_caps *caps)
 {
    struct virgl_vtest_winsys *vtws = virgl_vtest_winsys(vws);
@@ -149,7 +154,8 @@ virgl_vtest_winsys_wrap(struct sw_winsys *sws)
    vws->base.cmd_buf_create = virgl_vtest_cmd_buf_create;
    vws->base.cmd_buf_destroy = virgl_vtest_cmd_buf_destroy;
    vws->base.submit_cmd = virgl_vtest_winsys_submit_cmd;
-   
+
+   vws->base.emit_res = virgl_vtest_emit_res;
    vws->base.get_caps = virgl_vtest_get_caps;
    return &vws->base;
 }

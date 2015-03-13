@@ -90,3 +90,16 @@ int virgl_vtest_send_resource_create(struct virgl_vtest_winsys *vws,
 
    return 0;
 }
+
+int virgl_vtest_submit_cmd(struct virgl_vtest_winsys *vws,
+                           struct virgl_vtest_cmd_buf *cbuf)
+{
+   uint32_t vtest_hdr[VTEST_HDR_SIZE];
+
+   vtest_hdr[VTEST_CMD_LEN] = cbuf->base.cdw;
+   vtest_hdr[VTEST_CMD_ID] = VCMD_SUBMIT_CMD;
+
+   write(vws->sock_fd, &vtest_hdr, sizeof(vtest_hdr));
+   write(vws->sock_fd, cbuf->buf, cbuf->base.cdw * 4);
+   return 0;
+}

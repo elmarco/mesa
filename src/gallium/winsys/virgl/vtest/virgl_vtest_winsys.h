@@ -53,5 +53,6 @@ int virgl_vtest_send_resource_create(struct virgl_vtest_winsys *vws,
                                      uint32_t array_size,
                                      uint32_t last_level,
                                      uint32_t nr_samples);
-
+int virgl_vtest_submit_cmd(struct virgl_vtest_winsys *vtws,
+                           struct virgl_vtest_cmd_buf *cbuf);
 #endif

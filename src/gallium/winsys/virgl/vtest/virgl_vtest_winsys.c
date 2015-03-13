@@ -104,9 +104,11 @@ static void virgl_vtest_cmd_buf_destroy(struct virgl_cmd_buf *_cbuf)
    FREE(cbuf);
 }
 
-static int virgl_vtest_winsys_submit_cmd(struct virgl_winsys *qws, struct virgl_cmd_buf *_cbuf)
+static int virgl_vtest_winsys_submit_cmd(struct virgl_winsys *vws, struct virgl_cmd_buf *_cbuf)
 {
-   return 0;
+   struct virgl_vtest_winsys *vtws = virgl_vtest_winsys(vws);
+   struct virgl_vtest_cmd_buf *cbuf = (struct virgl_vtest_cmd_buf *)_cbuf;
+   return virgl_vtest_submit_cmd(vtws, cbuf);
 }
 
 static int virgl_vtest_get_caps(struct virgl_winsys *vws, struct virgl_drm_caps *caps)

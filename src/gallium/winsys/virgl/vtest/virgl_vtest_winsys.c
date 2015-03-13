@@ -29,6 +29,7 @@ virgl_vtest_transfer_get(struct virgl_winsys *vws,
 static void virgl_hw_res_destroy(struct virgl_vtest_winsys *vtws,
                                  struct virgl_hw_res *res)
 {
+   virgl_vtest_send_resource_unref(vtws, res->res_handle);
    free(res->ptr);
    FREE(res);
 }
@@ -58,7 +59,7 @@ static struct virgl_hw_res *virgl_vtest_winsys_resource_create(
 {
    struct virgl_vtest_winsys *vtws = virgl_vtest_winsys(vws);
    struct virgl_hw_res *res;
-
+   static int handle = 1;
    res = CALLOC_STRUCT(virgl_hw_res);
    if (!res)
       return NULL;
@@ -69,10 +70,11 @@ static struct virgl_hw_res *virgl_vtest_winsys_resource_create(
       return NULL;
    }
 
-   virgl_vtest_send_resource_create(vtws, target, format, bind, width,
+   virgl_vtest_send_resource_create(vtws, handle, target, format, bind, width,
                                     height, depth, array_size, last_level,
                                     nr_samples);
 
+   res->res_handle = handle++;
    pipe_reference_init(&res->reference, 1);
    return res;
 }

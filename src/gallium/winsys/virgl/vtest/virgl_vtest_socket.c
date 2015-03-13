@@ -58,6 +58,7 @@ int virgl_vtest_send_get_caps(struct virgl_vtest_winsys *vws,
 }
 
 int virgl_vtest_send_resource_create(struct virgl_vtest_winsys *vws,
+                                     uint32_t handle,
                                      enum pipe_texture_target target,
                                      uint32_t format,
                                      uint32_t bind,
@@ -69,7 +70,6 @@ int virgl_vtest_send_resource_create(struct virgl_vtest_winsys *vws,
                                      uint32_t nr_samples)
 {
    uint32_t res_create_buf[VCMD_RES_CREATE_SIZE], vtest_hdr[VTEST_HDR_SIZE];
-   int handle = 1;
 
    vtest_hdr[VTEST_CMD_LEN] = VCMD_RES_CREATE_SIZE;
    vtest_hdr[VTEST_CMD_ID] = VCMD_RESOURCE_CREATE;
@@ -101,5 +101,19 @@ int virgl_vtest_submit_cmd(struct virgl_vtest_winsys *vws,
 
    write(vws->sock_fd, &vtest_hdr, sizeof(vtest_hdr));
    write(vws->sock_fd, cbuf->buf, cbuf->base.cdw * 4);
+   return 0;
+}
+
+int virgl_vtest_send_resource_unref(struct virgl_vtest_winsys *vws,
+                                    uint32_t handle)
+{
+   uint32_t vtest_hdr[VTEST_HDR_SIZE];
+   uint32_t cmd[1];
+   vtest_hdr[VTEST_CMD_LEN] = 1;
+   vtest_hdr[VTEST_CMD_ID] = VCMD_RESOURCE_UNREF;
+
+   cmd[0] = handle;
+   write(vws->sock_fd, &vtest_hdr, sizeof(vtest_hdr));
+   write(vws->sock_fd, &cmd, sizeof(cmd));
    return 0;
 }

@@ -43,7 +43,9 @@ virgl_vtest_winsys(struct virgl_winsys *iws)
 int virgl_vtest_connect(struct virgl_vtest_winsys *vws);
 int virgl_vtest_send_get_caps(struct virgl_vtest_winsys *vws,
                               struct virgl_drm_caps *caps);
+
 int virgl_vtest_send_resource_create(struct virgl_vtest_winsys *vws,
+                                     uint32_t handle,
                                      enum pipe_texture_target target,
                                      uint32_t format,
                                      uint32_t bind,
@@ -53,6 +55,9 @@ int virgl_vtest_send_resource_create(struct virgl_vtest_winsys *vws,
                                      uint32_t array_size,
                                      uint32_t last_level,
                                      uint32_t nr_samples);
+
+int virgl_vtest_send_resource_unref(struct virgl_vtest_winsys *vws,
+                                    uint32_t handle);
 int virgl_vtest_submit_cmd(struct virgl_vtest_winsys *vtws,
                            struct virgl_vtest_cmd_buf *cbuf);
 #endif

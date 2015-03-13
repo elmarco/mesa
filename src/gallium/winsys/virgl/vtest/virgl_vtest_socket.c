@@ -39,16 +39,16 @@ int virgl_vtest_connect(struct virgl_vtest_winsys *vws)
 int virgl_vtest_send_get_caps(struct virgl_vtest_winsys *vws,
                               struct virgl_drm_caps *caps)
 {
-   uint32_t get_caps_buf[2];
-   uint32_t resp_buf[2];
+   uint32_t get_caps_buf[VTEST_HDR_SIZE];
+   uint32_t resp_buf[VTEST_HDR_SIZE];
 
    int ret;
-   get_caps_buf[0] = 1;
-   get_caps_buf[1] = VCMD_GET_CAPS;
+   get_caps_buf[VTEST_CMD_LEN] = 0;
+   get_caps_buf[VTEST_CMD_ID] = VCMD_GET_CAPS;
 
    write(vws->sock_fd, &get_caps_buf, sizeof(get_caps_buf));
 
-   ret = read(vws->sock_fd, resp_buf, 2 * sizeof(uint32_t));
+   ret = read(vws->sock_fd, resp_buf, sizeof(resp_buf));
 
    fprintf(stderr, "ret is %d: %d %d\n", ret, resp_buf[0], resp_buf[1]);
 
@@ -68,23 +68,25 @@ int virgl_vtest_send_resource_create(struct virgl_vtest_winsys *vws,
                                      uint32_t last_level,
                                      uint32_t nr_samples)
 {
-   uint32_t res_create_buf[12];
+   uint32_t res_create_buf[VCMD_RES_CREATE_SIZE], vtest_hdr[VTEST_HDR_SIZE];
    int handle = 1;
 
-   res_create_buf[0] = 11;
-   res_create_buf[1] = VCMD_RESOURCE_CREATE;
+   vtest_hdr[VTEST_CMD_LEN] = VCMD_RES_CREATE_SIZE;
+   vtest_hdr[VTEST_CMD_ID] = VCMD_RESOURCE_CREATE;
 
-   res_create_buf[2] = handle;
-   res_create_buf[3] = target;
-   res_create_buf[4] = format;
-   res_create_buf[5] = bind;
-   res_create_buf[6] = width;
-   res_create_buf[7] = height;
-   res_create_buf[8] = depth;
-   res_create_buf[9] = array_size;
-   res_create_buf[10] = last_level;
-   res_create_buf[11] = nr_samples;
+   res_create_buf[VCMD_RES_CREATE_RES_HANDLE] = handle;
+   res_create_buf[VCMD_RES_CREATE_TARGET] = target;
+   res_create_buf[VCMD_RES_CREATE_FORMAT] = format;
+   res_create_buf[VCMD_RES_CREATE_BIND] = bind;
+   res_create_buf[VCMD_RES_CREATE_WIDTH] = width;
+   res_create_buf[VCMD_RES_CREATE_HEIGHT] = height;
+   res_create_buf[VCMD_RES_CREATE_DEPTH] = depth;
+   res_create_buf[VCMD_RES_CREATE_ARRAY_SIZE] = array_size;
+   res_create_buf[VCMD_RES_CREATE_LAST_LEVEL] = last_level;
+   res_create_buf[VCMD_RES_CREATE_NR_SAMPLES] = nr_samples;
 
+   write(vws->sock_fd, &vtest_hdr, sizeof(vtest_hdr));
    write(vws->sock_fd, &res_create_buf, sizeof(res_create_buf));
+
    return 0;
 }

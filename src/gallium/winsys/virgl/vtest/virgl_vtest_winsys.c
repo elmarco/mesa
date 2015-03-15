@@ -113,9 +113,11 @@ static int virgl_vtest_winsys_submit_cmd(struct virgl_winsys *vws, struct virgl_
    return virgl_vtest_submit_cmd(vtws, cbuf);
 }
 
-static void virgl_vtest_emit_res(struct virgl_winsys *vws, struct virgl_cmd_buf *buf, struct virgl_hw_res *res, boolean write_buffer)
+static void virgl_vtest_emit_res(struct virgl_winsys *vws, struct virgl_cmd_buf *_cbuf, struct virgl_hw_res *res, boolean write_buf)
 {
-
+   struct virgl_vtest_cmd_buf *cbuf = (struct virgl_vtest_cmd_buf *)_cbuf;
+   if (write_buf)
+      cbuf->base.buf[cbuf->base.cdw++] = res->res_handle;
 }
 
 static int virgl_vtest_get_caps(struct virgl_winsys *vws, struct virgl_drm_caps *caps)

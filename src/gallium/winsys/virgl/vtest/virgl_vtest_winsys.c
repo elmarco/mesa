@@ -121,6 +121,27 @@ virgl_cache_flush(struct virgl_vtest_winsys *vtws)
    pipe_mutex_unlock(vtws->mutex);
 }
 
+static void
+virgl_cache_list_check_free(struct virgl_vtest_winsys *vtws)
+{
+   struct list_head *curr, *next;
+   struct virgl_hw_res *res;
+   int64_t now;
+
+   now = os_time_get();
+   curr = vtws->delayed.next;
+   next = curr->next;
+   while (curr != &vtws->delayed) {
+      res = LIST_ENTRY(struct virgl_hw_res, curr, head);
+      if (!os_time_timeout(res->start, res->end, now))
+         break;
+
+      LIST_DEL(&res->head);
+      virgl_hw_res_destroy(vtws, res);
+      curr = next;
+      next = curr->next;
+   }
+}
 
 static void virgl_vtest_resource_reference(struct virgl_vtest_winsys *vtws,
                                            struct virgl_hw_res **dres,
@@ -128,7 +149,18 @@ static void virgl_vtest_resource_reference(struct virgl_vtest_winsys *vtws,
 {
    struct virgl_hw_res *old = *dres;
    if (pipe_reference(&(*dres)->reference, &sres->reference)) {
-      virgl_hw_res_destroy(vtws, old);
+      if (!can_cache_resource(old)) {
+         virgl_hw_res_destroy(vtws, old);
+      } else {
+         pipe_mutex_lock(vtws->mutex);
+         virgl_cache_list_check_free(vtws);
+
+         old->start = os_time_get();
+         old->end = old->start + vtws->usecs;
+         LIST_ADDTAIL(&old->head, &vtws->delayed);
+         vtws->num_delayed++;
+         pipe_mutex_unlock(vtws->mutex);
+      }
    }
    *dres = sres;
 }

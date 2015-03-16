@@ -543,16 +543,22 @@ static void virgl_vtest_flush_frontbuffer(struct virgl_winsys *vws,
    struct pipe_box box;
    void *map;
    uint32_t size;
+   uint32_t offset = 0;
    int elsize = util_format_get_blocksize(res->format);
    if (!res->dt)
       return;
 
    memset(&box, 0, sizeof(box));
 
-   box.z = layer;
-   box.width = res->width;
-   box.height = res->height;
-   box.depth = 1;
+   if (sub_box) {
+      box = *sub_box;
+      offset = (res->stride * box.y) + box.x * elsize;
+   } else {
+      box.z = layer;
+      box.width = res->width;
+      box.height = res->height;
+      box.depth = 1;
+   }
 
    size = vtest_get_transfer_size(res, &box, res->stride, 0, level);
 
@@ -562,7 +568,7 @@ static void virgl_vtest_flush_frontbuffer(struct virgl_winsys *vws,
    /* execute a transfer */
    virgl_vtest_send_transfer_cmd(vtws, VCMD_TRANSFER_GET, res->res_handle,
                                  level, res->stride, 0, &box, size);
-   virgl_vtest_recv_transfer_get_data(vtws, map, size);
+   virgl_vtest_recv_transfer_get_data(vtws, map + offset, size);
    vtws->sws->displaytarget_unmap(vtws->sws, res->dt);
 
    vtws->sws->displaytarget_display(vtws->sws, res->dt, winsys_drawable_handle, sub_box);

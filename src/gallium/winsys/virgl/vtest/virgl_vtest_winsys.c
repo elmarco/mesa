@@ -447,6 +447,7 @@ static int virgl_vtest_winsys_submit_cmd(struct virgl_winsys *vws, struct virgl_
 
    virgl_vtest_release_all_res(vtws, cbuf);
    memset(cbuf->is_handle_added, 0, sizeof(cbuf->is_handle_added));
+   cbuf->base.cdw = 0;
    return ret;
 }
 

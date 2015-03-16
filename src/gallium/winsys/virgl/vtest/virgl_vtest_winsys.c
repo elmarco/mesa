@@ -203,6 +203,7 @@ static struct virgl_hw_res *virgl_vtest_winsys_resource_create(
       }
    }
 
+   res->bind = bind;
    res->format = format;
    res->height = height;
    res->width = width;

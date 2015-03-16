@@ -37,8 +37,11 @@ static int virgl_block_read(int fd, void *buf, int size)
    left = size;
    do {
       ret = read(fd, ptr, left);
-      if (ret < 0)
-         return -errno;
+      if (ret <= 0) {
+         fprintf(stderr, "lost connection to rendering server on %d read %d %d\n", size, ret, errno);
+         abort();
+         return ret < 0 ? -errno : 0;
+      }
       left -= ret;
       ptr += ret;
    } while (left);

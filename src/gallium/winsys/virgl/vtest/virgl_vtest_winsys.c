@@ -9,6 +9,8 @@
 #include "state_tracker/drm_driver.h"
 #include "os/os_time.h"
 
+static void *virgl_vtest_resource_map(struct virgl_winsys *vws, struct virgl_hw_res *res);
+static void virgl_vtest_resource_unmap(struct virgl_winsys *vws, struct virgl_hw_res *res);
 static INLINE boolean can_cache_resource(struct virgl_hw_res *res)
 {
    return res->cacheable == TRUE;
@@ -46,6 +48,7 @@ virgl_vtest_transfer_put(struct virgl_winsys *vws,
 {
    struct virgl_vtest_winsys *vtws = virgl_vtest_winsys(vws);
    uint32_t size;
+   void *ptr;
 
    size = vtest_get_transfer_size(res, box, stride, layer_stride, level);
    fprintf(stderr, "transfer put %d\n", size);
@@ -53,7 +56,9 @@ virgl_vtest_transfer_put(struct virgl_winsys *vws,
    virgl_vtest_send_transfer_cmd(vtws, VCMD_TRANSFER_PUT, res->res_handle,
                                  level, stride, layer_stride,
                                  box, size);
-   virgl_vtest_send_transfer_put_data(vtws, res->ptr + buf_offset, size);
+   ptr = virgl_vtest_resource_map(vws, res);
+   virgl_vtest_send_transfer_put_data(vtws, ptr + buf_offset, size);
+   virgl_vtest_resource_unmap(vws, res);
    return 0;
 }
 
@@ -66,6 +71,7 @@ virgl_vtest_transfer_get(struct virgl_winsys *vws,
 {
    struct virgl_vtest_winsys *vtws = virgl_vtest_winsys(vws);
    uint32_t size;
+   void *ptr;
 
    size = vtest_get_transfer_size(res, box, stride, layer_stride, level);
    fprintf(stderr, "transfer get %d\n", size);
@@ -74,7 +80,10 @@ virgl_vtest_transfer_get(struct virgl_winsys *vws,
                                  level, stride, layer_stride,
                                  box, size);
 
-   virgl_vtest_recv_transfer_get_data(vtws, res->ptr + buf_offset, size);
+
+   ptr = virgl_vtest_resource_map(vws, res);
+   virgl_vtest_recv_transfer_get_data(vtws, ptr + buf_offset, size);
+   virgl_vtest_resource_unmap(vws, res);
    return 0;
 }
 

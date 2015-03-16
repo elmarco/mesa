@@ -5,6 +5,7 @@
 #include "pipe/p_compiler.h"
 #include "pipe/p_defines.h"
 #include "pipe/p_state.h"
+#include "state_tracker/sw_winsys.h"
 #include "../drm/virgl_hw.h"
 #include "virgl/virgl_winsys.h"
 
@@ -24,6 +25,12 @@ struct virgl_hw_res {
 
    void *ptr;
    int size;
+
+   uint32_t format;
+   uint32_t dt_stride;
+   uint32_t height;
+
+   struct sw_displaytarget *dt;
 };
 
 struct virgl_vtest_cmd_buf {
@@ -60,4 +67,11 @@ int virgl_vtest_send_resource_unref(struct virgl_vtest_winsys *vws,
                                     uint32_t handle);
 int virgl_vtest_submit_cmd(struct virgl_vtest_winsys *vtws,
                            struct virgl_vtest_cmd_buf *cbuf);
+
+int virgl_vtest_send_transfer_cmd(struct virgl_vtest_winsys *vws,
+                                  uint32_t vcmd,
+                                  uint32_t handle,
+                                  uint32_t level, uint32_t stride,
+                                  uint32_t layer_stride, const struct pipe_box *box,
+                                  uint32_t offset, void *data);
 #endif

@@ -9,20 +9,30 @@
 
 static int
 virgl_vtest_transfer_put(struct virgl_winsys *vws,
-                      struct virgl_hw_res *res,
-                      const struct pipe_box *box,
-                      uint32_t stride, uint32_t layer_stride,
-                      uint32_t buf_offset, uint32_t level)
+                         struct virgl_hw_res *res,
+                         const struct pipe_box *box,
+                         uint32_t stride, uint32_t layer_stride,
+                         uint32_t buf_offset, uint32_t level)
 {
+   struct virgl_vtest_winsys *vtws = virgl_vtest_winsys(vws);
+
+   virgl_vtest_send_transfer_cmd(vtws, VCMD_TRANSFER_PUT, res->res_handle,
+                                 level, stride, layer_stride,
+                                 box, buf_offset, NULL);
    return 0;
 }
+
 static int
 virgl_vtest_transfer_get(struct virgl_winsys *vws,
-                      struct virgl_hw_res *res,
-                      const struct pipe_box *box,
-                      uint32_t stride, uint32_t layer_stride,
-                      uint32_t buf_offset, uint32_t level)
+                         struct virgl_hw_res *res,
+                         const struct pipe_box *box,
+                         uint32_t stride, uint32_t layer_stride,
+                         uint32_t buf_offset, uint32_t level)
 {
+   struct virgl_vtest_winsys *vtws = virgl_vtest_winsys(vws);
+   virgl_vtest_send_transfer_cmd(vtws, VCMD_TRANSFER_GET, res->res_handle,
+                                 level, stride, layer_stride,
+                                 box, buf_offset, NULL);
    return 0;
 }
 
@@ -30,6 +40,8 @@ static void virgl_hw_res_destroy(struct virgl_vtest_winsys *vtws,
                                  struct virgl_hw_res *res)
 {
    virgl_vtest_send_resource_unref(vtws, res->res_handle);
+   if (res->dt)
+      vtws->sws->displaytarget_destroy(vtws->sws, res->dt);
    free(res->ptr);
    FREE(res);
 }
@@ -60,16 +72,30 @@ static struct virgl_hw_res *virgl_vtest_winsys_resource_create(
    struct virgl_vtest_winsys *vtws = virgl_vtest_winsys(vws);
    struct virgl_hw_res *res;
    static int handle = 1;
+   uint32_t stride;
    res = CALLOC_STRUCT(virgl_hw_res);
    if (!res)
       return NULL;
 
-   res->ptr = malloc(size);
-   if (!res->ptr) {
-      FREE(res);
-      return NULL;
+   if (bind & (PIPE_BIND_DISPLAY_TARGET | PIPE_BIND_SCANOUT)) {
+      res->dt = vtws->sws->displaytarget_create(vtws->sws,
+                                                bind,
+                                                format,
+                                                width,
+                                                height,
+                                                64,
+                                                &res->dt_stride);
+
+   } else {
+      res->ptr = malloc(size);
+      if (!res->ptr) {
+         FREE(res);
+         return NULL;
+      }
    }
 
+   res->format = format;
+   res->height = height;
    virgl_vtest_send_resource_create(vtws, handle, target, format, bind, width,
                                     height, depth, array_size, last_level,
                                     nr_samples);
@@ -125,6 +151,39 @@ static int virgl_vtest_get_caps(struct virgl_winsys *vws, struct virgl_drm_caps 
    struct virgl_vtest_winsys *vtws = virgl_vtest_winsys(vws);
    return virgl_vtest_send_get_caps(vtws, caps);
 }
+
+static void virgl_vtest_flush_frontbuffer(struct virgl_winsys *vws,
+                                          struct virgl_hw_res *res,
+                                          unsigned level, unsigned layer,
+                                          void *winsys_drawable_handle,
+                                          struct pipe_box *sub_box)
+{
+   struct virgl_vtest_winsys *vtws = virgl_vtest_winsys(vws);
+   struct pipe_box box;
+   void *map;
+
+   fprintf(stderr," flush front buffer %p %d %d %p %d\n", res, level, layer, winsys_drawable_handle, res->res_handle);
+
+   if (!res->dt)
+      return;
+
+   memset(&box, 0, sizeof(box));
+
+   box.z = layer;
+   box.width = 256;
+   box.height = 256;
+   box.depth = 1;
+
+   map = vtws->sws->displaytarget_map(vtws->sws, res->dt, 0);
+
+   /* execute a transfer */
+   virgl_vtest_send_transfer_cmd(vtws, VCMD_TRANSFER_GET, res->res_handle,
+                                 level, 0, 0, &box, 0, NULL);
+   vtws->sws->displaytarget_unmap(vtws->sws, res->dt);
+
+   vtws->sws->displaytarget_display(vtws->sws, res->dt, winsys_drawable_handle, sub_box);
+}
+
 static void
 virgl_vtest_winsys_destroy(struct virgl_winsys *vws)
 {
@@ -159,5 +218,7 @@ virgl_vtest_winsys_wrap(struct sw_winsys *sws)
 
    vws->base.emit_res = virgl_vtest_emit_res;
    vws->base.get_caps = virgl_vtest_get_caps;
+
+   vws->base.flush_frontbuffer = virgl_vtest_flush_frontbuffer;
    return &vws->base;
 }

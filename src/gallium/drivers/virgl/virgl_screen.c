@@ -446,6 +446,13 @@ static void virgl_flush_frontbuffer(struct pipe_screen *screen,
                                       unsigned level, unsigned layer,
                                     void *winsys_drawable_handle, struct pipe_box *sub_box)
 {
+   struct virgl_screen *vscreen = virgl_screen(screen);
+   struct virgl_winsys *vws = vscreen->vws;
+   struct virgl_resource *vres = (struct virgl_resource *)res;
+
+   if (vws->flush_frontbuffer)
+      vws->flush_frontbuffer(vws, vres->hw_res, level, layer, winsys_drawable_handle,
+                             sub_box);
 }
 
 static void virgl_fence_reference(struct pipe_screen *screen,

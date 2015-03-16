@@ -76,6 +76,12 @@ struct virgl_winsys {
                            struct pipe_fence_handle **dst,
                            struct pipe_fence_handle *src);
 
+   /* for sw paths */
+   void (*flush_frontbuffer)(struct virgl_winsys *vws,
+                             struct virgl_hw_res *res,
+                             unsigned level, unsigned layer,
+                             void *winsys_drawable_handle,
+                             struct pipe_box *sub_box);
 };
 
 

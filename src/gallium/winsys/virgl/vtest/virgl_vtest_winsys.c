@@ -19,7 +19,7 @@ static INLINE boolean can_cache_resource(struct virgl_hw_res *res)
 static uint32_t vtest_get_transfer_size(struct virgl_hw_res *res,
                                         const struct pipe_box *box,
                                         uint32_t stride, uint32_t layer_stride,
-                                        uint32_t level)
+                                        uint32_t level, uint32_t *valid_stride_p)
 {
    uint32_t valid_stride, valid_layer_stride;
    int elsize = util_format_get_blocksize(res->format);
@@ -36,6 +36,7 @@ static uint32_t vtest_get_transfer_size(struct virgl_hw_res *res,
          valid_layer_stride = layer_stride;
    }
 
+   *valid_stride_p = valid_stride;
    return valid_layer_stride * box->depth;
 }
 
@@ -49,8 +50,9 @@ virgl_vtest_transfer_put(struct virgl_winsys *vws,
    struct virgl_vtest_winsys *vtws = virgl_vtest_winsys(vws);
    uint32_t size;
    void *ptr;
+   uint32_t valid_stride;
 
-   size = vtest_get_transfer_size(res, box, stride, layer_stride, level);
+   size = vtest_get_transfer_size(res, box, stride, layer_stride, level, &valid_stride);
 
    virgl_vtest_send_transfer_cmd(vtws, VCMD_TRANSFER_PUT, res->res_handle,
                                  level, stride, layer_stride,
@@ -71,8 +73,9 @@ virgl_vtest_transfer_get(struct virgl_winsys *vws,
    struct virgl_vtest_winsys *vtws = virgl_vtest_winsys(vws);
    uint32_t size;
    void *ptr;
+   uint32_t valid_stride;
 
-   size = vtest_get_transfer_size(res, box, stride, layer_stride, level);
+   size = vtest_get_transfer_size(res, box, stride, layer_stride, level, &valid_stride);
 
    virgl_vtest_send_transfer_cmd(vtws, VCMD_TRANSFER_GET, res->res_handle,
                                  level, stride, layer_stride,
@@ -80,7 +83,7 @@ virgl_vtest_transfer_get(struct virgl_winsys *vws,
 
 
    ptr = virgl_vtest_resource_map(vws, res);
-   virgl_vtest_recv_transfer_get_data(vtws, ptr + buf_offset, size);
+   virgl_vtest_recv_transfer_get_data(vtws, ptr + buf_offset, size, valid_stride, box, res->format);
    virgl_vtest_resource_unmap(vws, res);
    return 0;
 }
@@ -543,7 +546,7 @@ static void virgl_vtest_flush_frontbuffer(struct virgl_winsys *vws,
    struct pipe_box box;
    void *map;
    uint32_t size;
-   uint32_t offset = 0;
+   uint32_t offset = 0, valid_stride;
    int elsize = util_format_get_blocksize(res->format);
    if (!res->dt)
       return;
@@ -560,7 +563,7 @@ static void virgl_vtest_flush_frontbuffer(struct virgl_winsys *vws,
       box.depth = 1;
    }
 
-   size = vtest_get_transfer_size(res, &box, res->stride, 0, level);
+   size = vtest_get_transfer_size(res, &box, res->stride, 0, level, &valid_stride);
 
    virgl_vtest_busy_wait(vtws, res->res_handle, VCMD_BUSY_WAIT_FLAG_WAIT);
    map = vtws->sws->displaytarget_map(vtws->sws, res->dt, 0);
@@ -568,7 +571,7 @@ static void virgl_vtest_flush_frontbuffer(struct virgl_winsys *vws,
    /* execute a transfer */
    virgl_vtest_send_transfer_cmd(vtws, VCMD_TRANSFER_GET, res->res_handle,
                                  level, res->stride, 0, &box, size);
-   virgl_vtest_recv_transfer_get_data(vtws, map + offset, size);
+   virgl_vtest_recv_transfer_get_data(vtws, map + offset, size, valid_stride, &box, res->format);
    vtws->sws->displaytarget_unmap(vtws->sws, res->dt);
 
    vtws->sws->displaytarget_display(vtws->sws, res->dt, winsys_drawable_handle, sub_box);

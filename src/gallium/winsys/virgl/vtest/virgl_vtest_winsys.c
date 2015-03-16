@@ -22,15 +22,15 @@ static uint32_t vtest_get_transfer_size(struct virgl_hw_res *res,
                                         uint32_t level, uint32_t *valid_stride_p)
 {
    uint32_t valid_stride, valid_layer_stride;
-   int elsize = util_format_get_blocksize(res->format);
 
-   valid_stride = box->width * elsize;
+   valid_stride = util_format_get_stride(res->format, box->width);
    if (stride) {
       if (box->height > 1)
          valid_stride = stride;
    }
 
-   valid_layer_stride = util_format_get_nblocks(res->format, valid_stride / elsize, box->height) * elsize;
+   valid_layer_stride = util_format_get_2d_size(res->format, valid_stride,
+                                                box->height);
    if (layer_stride) {
       if (box->depth > 1)
          valid_layer_stride = layer_stride;
@@ -547,7 +547,6 @@ static void virgl_vtest_flush_frontbuffer(struct virgl_winsys *vws,
    void *map;
    uint32_t size;
    uint32_t offset = 0, valid_stride;
-   int elsize = util_format_get_blocksize(res->format);
    if (!res->dt)
       return;
 
@@ -555,7 +554,7 @@ static void virgl_vtest_flush_frontbuffer(struct virgl_winsys *vws,
 
    if (sub_box) {
       box = *sub_box;
-      offset = (res->stride * box.y) + box.x * elsize;
+      offset = (res->stride * (box.y / util_format_get_blockheight(res->format))) + (box.x / util_format_get_blockwidth(res->format)) * util_format_get_blocksize(res->format);
    } else {
       box.z = layer;
       box.width = res->width;

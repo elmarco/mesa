@@ -199,18 +199,18 @@ int virgl_vtest_recv_transfer_get_data(struct virgl_vtest_winsys *vws,
                                        uint32_t stride,
                                        const struct pipe_box *box, uint32_t format)
 {
-   int elsize = util_format_get_blocksize(format);
    void *line = malloc(stride);
-   int h = box->height;
    void *ptr = data;
+   int hblocks = util_format_get_nblocksy(format, box->height);
 
    line = malloc(stride);
-   while (h) {
+   while (hblocks) {
       virgl_block_read(vws->sock_fd, line, stride);
-      memcpy(ptr, line, box->width * elsize);
+      memcpy(ptr, line, util_format_get_stride(format, box->width));
       ptr += stride;
-      h--;
+      hblocks--;
    }
+   free(line);
    return 0;
 }
 

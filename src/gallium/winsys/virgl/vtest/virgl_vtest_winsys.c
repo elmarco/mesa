@@ -51,7 +51,6 @@ virgl_vtest_transfer_put(struct virgl_winsys *vws,
    void *ptr;
 
    size = vtest_get_transfer_size(res, box, stride, layer_stride, level);
-   fprintf(stderr, "transfer put %d\n", size);
 
    virgl_vtest_send_transfer_cmd(vtws, VCMD_TRANSFER_PUT, res->res_handle,
                                  level, stride, layer_stride,
@@ -74,7 +73,6 @@ virgl_vtest_transfer_get(struct virgl_winsys *vws,
    void *ptr;
 
    size = vtest_get_transfer_size(res, box, stride, layer_stride, level);
-   fprintf(stderr, "transfer get %d\n", size);
 
    virgl_vtest_send_transfer_cmd(vtws, VCMD_TRANSFER_GET, res->res_handle,
                                  level, stride, layer_stride,
@@ -557,8 +555,6 @@ static void virgl_vtest_flush_frontbuffer(struct virgl_winsys *vws,
    box.depth = 1;
 
    size = vtest_get_transfer_size(res, &box, res->stride, 0, level);
-
-   fprintf(stderr," flush front buffer %p %d %d %p %d = %d\n", res, level, layer, winsys_drawable_handle, res->res_handle, size);
 
    virgl_vtest_busy_wait(vtws, res->res_handle, VCMD_BUSY_WAIT_FLAG_WAIT);
    map = vtws->sws->displaytarget_map(vtws->sws, res->dt, 0);

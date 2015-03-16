@@ -85,8 +85,8 @@ int virgl_vtest_send_get_caps(struct virgl_vtest_winsys *vws,
    virgl_block_write(vws->sock_fd, &get_caps_buf, sizeof(get_caps_buf));
 
    ret = virgl_block_read(vws->sock_fd, resp_buf, sizeof(resp_buf));
-
-   fprintf(stderr, "ret is %d: %d %d\n", ret, resp_buf[0], resp_buf[1]);
+   if (ret <= 0)
+      return 0;
 
    ret = virgl_block_read(vws->sock_fd, &caps->caps, sizeof(union virgl_caps));
 

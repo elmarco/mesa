@@ -22,6 +22,8 @@
 
 #define VCMD_SUBMIT_CMD 6
 
+#define VCMD_RESOURCE_BUSY_WAIT 7
+
 /* get caps */
 /* 0 length cmd */
 /* resp VCMD_GET_CAPS + caps */
@@ -52,7 +54,12 @@
 #define VCMD_TRANSFER_WIDTH 7
 #define VCMD_TRANSFER_HEIGHT 8
 #define VCMD_TRANSFER_DEPTH 9
-#define VCMD_TRANSFER_OFFSET 10
-#define VCMD_TRANSFER_DATA 11
+#define VCMD_TRANSFER_DATA_SIZE 10
+
+#define VCMD_BUSY_WAIT_FLAG_WAIT 1
+
+#define VCMD_BUSY_WAIT_SIZE 2
+#define VCMD_BUSY_WAIT_HANDLE 0
+#define VCMD_BUSY_WAIT_FLAGS 1
 
 #endif

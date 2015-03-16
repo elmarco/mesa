@@ -155,12 +155,14 @@ int virgl_vtest_send_transfer_cmd(struct virgl_vtest_winsys *vws,
                                   uint32_t vcmd,
                                   uint32_t handle,
                                   uint32_t level, uint32_t stride,
-                                  uint32_t layer_stride, const struct pipe_box *box,
-                                  uint32_t offset, void *data)
+                                  uint32_t layer_stride,
+                                  const struct pipe_box *box,
+                                  uint32_t data_size)
 {
    uint32_t vtest_hdr[VTEST_HDR_SIZE];
    uint32_t cmd[VCMD_TRANSFER_HDR_SIZE];
-   vtest_hdr[VTEST_CMD_LEN] = VCMD_TRANSFER_HDR_SIZE;
+   bool is_put = (vcmd == VCMD_TRANSFER_PUT);
+   vtest_hdr[VTEST_CMD_LEN] = VCMD_TRANSFER_HDR_SIZE + (is_put ? (data_size + 3 / 4) : 0);
    vtest_hdr[VTEST_CMD_ID] = vcmd;
 
    cmd[0] = handle;
@@ -173,9 +175,44 @@ int virgl_vtest_send_transfer_cmd(struct virgl_vtest_winsys *vws,
    cmd[7] = box->width;
    cmd[8] = box->height;
    cmd[9] = box->depth;
-   cmd[10] = offset;
+   cmd[10] = data_size;
    virgl_block_write(vws->sock_fd, &vtest_hdr, sizeof(vtest_hdr));
    virgl_block_write(vws->sock_fd, &cmd, sizeof(cmd));
 
    return 0;
+}
+
+int virgl_vtest_send_transfer_put_data(struct virgl_vtest_winsys *vws,
+                                       void *data,
+                                       uint32_t data_size)
+{
+   return virgl_block_write(vws->sock_fd, data, data_size);
+}
+
+int virgl_vtest_recv_transfer_get_data(struct virgl_vtest_winsys *vws,
+                                       void *data,
+                                       uint32_t data_size)
+{
+   return virgl_block_read(vws->sock_fd, data, data_size);
+}
+
+int virgl_vtest_busy_wait(struct virgl_vtest_winsys *vws, int handle,
+                          int flags)
+{
+   uint32_t vtest_hdr[VTEST_HDR_SIZE];
+   uint32_t cmd[VCMD_BUSY_WAIT_SIZE];
+   uint32_t result[1];
+   int ret;
+   vtest_hdr[VTEST_CMD_LEN] = VCMD_BUSY_WAIT_SIZE;
+   vtest_hdr[VTEST_CMD_ID] = VCMD_RESOURCE_BUSY_WAIT;
+   cmd[VCMD_BUSY_WAIT_HANDLE] = handle;
+   cmd[VCMD_BUSY_WAIT_FLAGS] = flags;
+
+   virgl_block_write(vws->sock_fd, &vtest_hdr, sizeof(vtest_hdr));
+   virgl_block_write(vws->sock_fd, &cmd, sizeof(cmd));
+
+   ret = virgl_block_read(vws->sock_fd, vtest_hdr, sizeof(vtest_hdr));
+
+   ret = virgl_block_read(vws->sock_fd, result, sizeof(result));
+   return result[0];
 }

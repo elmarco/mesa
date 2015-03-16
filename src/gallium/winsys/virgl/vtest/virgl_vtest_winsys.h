@@ -36,6 +36,7 @@ struct virgl_hw_res {
 
    uint32_t format;
    uint32_t stride;
+   uint32_t width;
    uint32_t height;
 
    struct sw_displaytarget *dt;

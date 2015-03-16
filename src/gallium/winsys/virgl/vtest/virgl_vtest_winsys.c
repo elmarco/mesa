@@ -173,6 +173,7 @@ static struct virgl_hw_res *virgl_vtest_winsys_resource_create(
 
    res->format = format;
    res->height = height;
+   res->width = width;
    virgl_vtest_send_resource_create(vtws, handle, target, format, bind, width,
                                     height, depth, array_size, last_level,
                                     nr_samples);
@@ -508,7 +509,7 @@ static void virgl_vtest_flush_frontbuffer(struct virgl_winsys *vws,
    memset(&box, 0, sizeof(box));
 
    box.z = layer;
-   box.width = res->stride / elsize;
+   box.width = res->width;
    box.height = res->height;
    box.depth = 1;
 
@@ -521,7 +522,7 @@ static void virgl_vtest_flush_frontbuffer(struct virgl_winsys *vws,
 
    /* execute a transfer */
    virgl_vtest_send_transfer_cmd(vtws, VCMD_TRANSFER_GET, res->res_handle,
-                                 level, 0, 0, &box, size);
+                                 level, res->stride, 0, &box, size);
    virgl_vtest_recv_transfer_get_data(vtws, map, size);
    vtws->sws->displaytarget_unmap(vtws->sws, res->dt);
 

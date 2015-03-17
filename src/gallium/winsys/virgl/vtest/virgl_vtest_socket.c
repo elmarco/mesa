@@ -9,6 +9,7 @@
 #include <sys/un.h>
 #include <unistd.h>
 
+#include <os/os_process.h>
 #include <util/u_format.h>
 /* connect to remote socket */
 #define VTEST_SOCKET_NAME "/tmp/.virgl_test"
@@ -49,6 +50,33 @@ static int virgl_block_read(int fd, void *buf, int size)
    return size;
 }
 
+static int virgl_vtest_send_init(struct virgl_vtest_winsys *vws)
+{
+   uint32_t buf[VTEST_HDR_SIZE];
+   const char *nstr = "virtest";
+   char cmdline[64];
+   int ret;
+
+   ret = os_get_process_name(cmdline, 63);
+   if (ret == FALSE)
+      strcpy(cmdline, nstr);
+#if defined(__GLIBC__) || defined(__CYGWIN__)
+   if (!strcmp(cmdline, "shader_runner")) {
+      const char *name;
+      /* hack to get better testname */
+      name = program_invocation_short_name;
+      name += strlen(name) + 1;
+      strncpy(cmdline, name, 63);
+   }
+#endif
+   buf[VTEST_CMD_LEN] = strlen(cmdline) + 1;
+   buf[VTEST_CMD_ID] = VCMD_CREATE_RENDERER;
+
+   virgl_block_write(vws->sock_fd, &buf, sizeof(buf));
+   virgl_block_write(vws->sock_fd, (void *)cmdline, strlen(cmdline) + 1);
+   return 0;
+}
+
 int virgl_vtest_connect(struct virgl_vtest_winsys *vws)
 {
    struct sockaddr_un un;
@@ -70,6 +98,7 @@ int virgl_vtest_connect(struct virgl_vtest_winsys *vws)
    } while (ret == -EINTR);
 
    vws->sock_fd = sock;
+   virgl_vtest_send_init(vws);
    return 0;
 }
 

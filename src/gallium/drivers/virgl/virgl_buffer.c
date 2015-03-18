@@ -33,6 +33,8 @@ static void *virgl_buffer_transfer_map(struct pipe_context *ctx,
       ctx->flush(ctx, NULL, 0);
    else if ((usage & PIPE_TRANSFER_READ) && (vbuf->on_list == TRUE))
       ctx->flush(ctx, NULL, 0);
+   else if ((usage & PIPE_TRANSFER_READ) && (resource->bind == PIPE_BIND_STREAM_OUTPUT))
+      ctx->flush(ctx, NULL, 0);
 
    trans = util_slab_alloc(&vctx->texture_transfer_pool);
    if (trans == NULL)

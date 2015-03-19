@@ -348,6 +348,10 @@ int virgl_encoder_draw_vbo(struct virgl_context *ctx,
    virgl_encoder_write_dword(ctx->cbuf, info->restart_index);
    virgl_encoder_write_dword(ctx->cbuf, info->min_index);
    virgl_encoder_write_dword(ctx->cbuf, info->max_index);
+   if (info->count_from_stream_output)
+      virgl_encoder_write_dword(ctx->cbuf, info->count_from_stream_output->buffer_size);
+   else
+      virgl_encoder_write_dword(ctx->cbuf, 0);
    return 0;
 }
 

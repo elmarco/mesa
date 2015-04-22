@@ -528,8 +528,11 @@ virgl_create_screen(struct virgl_winsys *vws)
 
    virgl_init_screen_resource_functions(&screen->base);
 
-   vws->get_caps(vws, &screen->caps);
-
+   if (vws->get_caps(vws, &screen->caps) < 0) {
+      debug_printf("Failed to get caps\n");
+      FREE(screen);
+      return NULL;
+   }
 
    util_format_s3tc_init();
    return &screen->base;

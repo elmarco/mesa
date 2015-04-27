@@ -305,6 +305,11 @@ virgl_texture_from_handle(struct virgl_screen *vs,
    vrend_resource_layout(tex, &size);
 
    tex->base.hw_res = vs->vws->resource_create_from_handle(vs->vws, whandle);
+   if (!tex->base.hw_res) {
+      FREE(tex);
+      return NULL;
+   }
+
    return &tex->base.u.b;
 }
 

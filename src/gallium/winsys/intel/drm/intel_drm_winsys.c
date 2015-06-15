@@ -314,14 +314,14 @@ intel_winsys_import_handle(struct intel_winsys *winsys,
    int err;
 
    switch (handle->type) {
-   case DRM_API_HANDLE_TYPE_SHARED:
+   case WINSYS_HANDLE_TYPE_SHARED:
       {
          const uint32_t gem_name = handle->handle;
          bo = drm_intel_bo_gem_create_from_name(winsys->bufmgr,
                name, gem_name);
       }
       break;
-   case DRM_API_HANDLE_TYPE_FD:
+   case WINSYS_HANDLE_TYPE_FD:
       {
          const int fd = (int) handle->handle;
          bo = drm_intel_bo_gem_create_from_prime(winsys->bufmgr,
@@ -359,7 +359,7 @@ intel_winsys_export_handle(struct intel_winsys *winsys,
    int err = 0;
 
    switch (handle->type) {
-   case DRM_API_HANDLE_TYPE_SHARED:
+   case WINSYS_HANDLE_TYPE_SHARED:
       {
          uint32_t name;
 
@@ -368,10 +368,10 @@ intel_winsys_export_handle(struct intel_winsys *winsys,
             handle->handle = name;
       }
       break;
-   case DRM_API_HANDLE_TYPE_KMS:
+   case WINSYS_HANDLE_TYPE_KMS:
       handle->handle = gem_bo(bo)->handle;
       break;
-   case DRM_API_HANDLE_TYPE_FD:
+   case WINSYS_HANDLE_TYPE_FD:
       {
          int fd;
 

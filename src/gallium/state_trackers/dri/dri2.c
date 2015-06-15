@@ -349,9 +349,9 @@ dri2_allocate_buffer(__DRIscreen *sPriv,
 
    memset(&whandle, 0, sizeof(whandle));
    if (screen->can_share_buffer)
-      whandle.type = DRM_API_HANDLE_TYPE_SHARED;
+      whandle.type = WINSYS_HANDLE_TYPE_SHARED;
    else
-      whandle.type = DRM_API_HANDLE_TYPE_KMS;
+      whandle.type = WINSYS_HANDLE_TYPE_KMS;
 
    screen->base.screen->resource_get_handle(screen->base.screen,
          buffer->resource, &whandle);
@@ -534,9 +534,9 @@ dri2_allocate_textures(struct dri_context *ctx,
          whandle.handle = buf->name;
          whandle.stride = buf->pitch;
          if (screen->can_share_buffer)
-            whandle.type = DRM_API_HANDLE_TYPE_SHARED;
+            whandle.type = WINSYS_HANDLE_TYPE_SHARED;
          else
-            whandle.type = DRM_API_HANDLE_TYPE_KMS;
+            whandle.type = WINSYS_HANDLE_TYPE_KMS;
          drawable->textures[statt] =
             screen->base.screen->resource_from_handle(screen->base.screen,
                   &templ, &whandle);
@@ -778,7 +778,7 @@ dri2_create_image_from_name(__DRIscreen *_screen,
    struct winsys_handle whandle;
 
    memset(&whandle, 0, sizeof(whandle));
-   whandle.type = DRM_API_HANDLE_TYPE_SHARED;
+   whandle.type = WINSYS_HANDLE_TYPE_SHARED;
    whandle.handle = name;
 
    return dri2_create_image_from_winsys(_screen, width, height, format,
@@ -796,7 +796,7 @@ dri2_create_image_from_fd(__DRIscreen *_screen,
       return NULL;
 
    memset(&whandle, 0, sizeof(whandle));
-   whandle.type = DRM_API_HANDLE_TYPE_FD;
+   whandle.type = WINSYS_HANDLE_TYPE_FD;
    whandle.handle = (unsigned)fd;
 
    return dri2_create_image_from_winsys(_screen, width, height, format,
@@ -897,25 +897,25 @@ dri2_query_image(__DRIimage *image, int attrib, int *value)
 
    switch (attrib) {
    case __DRI_IMAGE_ATTRIB_STRIDE:
-      whandle.type = DRM_API_HANDLE_TYPE_KMS;
+      whandle.type = WINSYS_HANDLE_TYPE_KMS;
       image->texture->screen->resource_get_handle(image->texture->screen,
             image->texture, &whandle);
       *value = whandle.stride;
       return GL_TRUE;
    case __DRI_IMAGE_ATTRIB_HANDLE:
-      whandle.type = DRM_API_HANDLE_TYPE_KMS;
+      whandle.type = WINSYS_HANDLE_TYPE_KMS;
       image->texture->screen->resource_get_handle(image->texture->screen,
          image->texture, &whandle);
       *value = whandle.handle;
       return GL_TRUE;
    case __DRI_IMAGE_ATTRIB_NAME:
-      whandle.type = DRM_API_HANDLE_TYPE_SHARED;
+      whandle.type = WINSYS_HANDLE_TYPE_SHARED;
       image->texture->screen->resource_get_handle(image->texture->screen,
          image->texture, &whandle);
       *value = whandle.handle;
       return GL_TRUE;
    case __DRI_IMAGE_ATTRIB_FD:
-      whandle.type= DRM_API_HANDLE_TYPE_FD;
+      whandle.type= WINSYS_HANDLE_TYPE_FD;
       image->texture->screen->resource_get_handle(image->texture->screen,
          image->texture, &whandle);
       *value = whandle.handle;

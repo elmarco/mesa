@@ -979,10 +979,10 @@ static struct pb_buffer *radeon_winsys_bo_from_handle(struct radeon_winsys *rws,
      * The list of pairs is guarded by a mutex, of course. */
     pipe_mutex_lock(mgr->bo_handles_mutex);
 
-    if (whandle->type == DRM_API_HANDLE_TYPE_SHARED) {
+    if (whandle->type == WINSYS_HANDLE_TYPE_SHARED) {
         /* First check if there already is an existing bo for the handle. */
         bo = util_hash_table_get(mgr->bo_names, (void*)(uintptr_t)whandle->handle);
-    } else if (whandle->type == DRM_API_HANDLE_TYPE_FD) {
+    } else if (whandle->type == WINSYS_HANDLE_TYPE_FD) {
         /* We must first get the GEM handle, as fds are unreliable keys */
         r = drmPrimeFDToHandle(ws->fd, whandle->handle, &handle);
         if (r)
@@ -1006,7 +1006,7 @@ static struct pb_buffer *radeon_winsys_bo_from_handle(struct radeon_winsys *rws,
         goto fail;
     }
 
-    if (whandle->type == DRM_API_HANDLE_TYPE_SHARED) {
+    if (whandle->type == WINSYS_HANDLE_TYPE_SHARED) {
         struct drm_gem_open open_arg = {};
         memset(&open_arg, 0, sizeof(open_arg));
         /* Open the BO. */
@@ -1018,7 +1018,7 @@ static struct pb_buffer *radeon_winsys_bo_from_handle(struct radeon_winsys *rws,
         handle = open_arg.handle;
         size = open_arg.size;
         bo->flink_name = whandle->handle;
-    } else if (whandle->type == DRM_API_HANDLE_TYPE_FD) {
+    } else if (whandle->type == WINSYS_HANDLE_TYPE_FD) {
         size = lseek(whandle->handle, 0, SEEK_END);
         /* 
          * Could check errno to determine whether the kernel is new enough, but
@@ -1112,7 +1112,7 @@ static boolean radeon_winsys_bo_get_handle(struct pb_buffer *buffer,
 
     memset(&flink, 0, sizeof(flink));
 
-    if (whandle->type == DRM_API_HANDLE_TYPE_SHARED) {
+    if (whandle->type == WINSYS_HANDLE_TYPE_SHARED) {
         if (!bo->flink_name) {
             flink.handle = bo->handle;
 
@@ -1127,9 +1127,9 @@ static boolean radeon_winsys_bo_get_handle(struct pb_buffer *buffer,
             pipe_mutex_unlock(bo->mgr->bo_handles_mutex);
         }
         whandle->handle = bo->flink_name;
-    } else if (whandle->type == DRM_API_HANDLE_TYPE_KMS) {
+    } else if (whandle->type == WINSYS_HANDLE_TYPE_KMS) {
         whandle->handle = bo->handle;
-    } else if (whandle->type == DRM_API_HANDLE_TYPE_FD) {
+    } else if (whandle->type == WINSYS_HANDLE_TYPE_FD) {
         if (drmPrimeHandleToFD(bo->rws->fd, bo->handle, DRM_CLOEXEC, (int*)&whandle->handle))
             return FALSE;
     }

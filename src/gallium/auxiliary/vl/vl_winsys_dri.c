@@ -223,7 +223,7 @@ vl_screen_texture_from_drawable(struct vl_screen *vscreen, Drawable drawable)
    }
 
    memset(&dri2_handle, 0, sizeof(dri2_handle));
-   dri2_handle.type = DRM_API_HANDLE_TYPE_SHARED;
+   dri2_handle.type = WINSYS_HANDLE_TYPE_SHARED;
    dri2_handle.handle = back_left->name;
    dri2_handle.stride = back_left->pitch;
 

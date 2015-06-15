@@ -490,12 +490,12 @@ vc4_screen_bo_get_handle(struct pipe_screen *pscreen,
         whandle->stride = stride;
 
         switch (whandle->type) {
-        case DRM_API_HANDLE_TYPE_SHARED:
+        case WINSYS_HANDLE_TYPE_SHARED:
                 return vc4_bo_flink(bo, &whandle->handle);
-        case DRM_API_HANDLE_TYPE_KMS:
+        case WINSYS_HANDLE_TYPE_KMS:
                 whandle->handle = bo->handle;
                 return TRUE;
-        case DRM_API_HANDLE_TYPE_FD:
+        case WINSYS_HANDLE_TYPE_FD:
                 whandle->handle = vc4_bo_get_dmabuf(bo);
                 return whandle->handle != -1;
         }
@@ -510,9 +510,9 @@ vc4_screen_bo_from_handle(struct pipe_screen *pscreen,
         struct vc4_screen *screen = vc4_screen(pscreen);
 
         switch (whandle->type) {
-        case DRM_API_HANDLE_TYPE_SHARED:
+        case WINSYS_HANDLE_TYPE_SHARED:
                 return vc4_bo_open_name(screen, whandle->handle, whandle->stride);
-        case DRM_API_HANDLE_TYPE_FD:
+        case WINSYS_HANDLE_TYPE_FD:
                 return vc4_bo_open_dmabuf(screen, whandle->handle, whandle->stride);
         default:
                 fprintf(stderr,

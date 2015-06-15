@@ -254,11 +254,11 @@ vmw_drm_surface_from_handle(struct svga_winsys_screen *sws,
     int i;
 
     switch (whandle->type) {
-    case DRM_API_HANDLE_TYPE_SHARED:
-    case DRM_API_HANDLE_TYPE_KMS:
+    case WINSYS_HANDLE_TYPE_SHARED:
+    case WINSYS_HANDLE_TYPE_KMS:
        handle = whandle->handle;
        break;
-    case DRM_API_HANDLE_TYPE_FD:
+    case WINSYS_HANDLE_TYPE_FD:
        ret = drmPrimeFDToHandle(vws->ioctl.drm_fd, whandle->handle,
                                 &handle);
        if (ret) {
@@ -283,7 +283,7 @@ vmw_drm_surface_from_handle(struct svga_winsys_screen *sws,
     /*
      * Need to close the handle we got from prime.
      */
-    if (whandle->type == DRM_API_HANDLE_TYPE_FD)
+    if (whandle->type == WINSYS_HANDLE_TYPE_FD)
        vmw_ioctl_surface_destroy(vws, handle);
 
     if (ret) {
@@ -359,11 +359,11 @@ vmw_drm_surface_get_handle(struct svga_winsys_screen *sws,
     whandle->stride = stride;
 
     switch (whandle->type) {
-    case DRM_API_HANDLE_TYPE_SHARED:
-    case DRM_API_HANDLE_TYPE_KMS:
+    case WINSYS_HANDLE_TYPE_SHARED:
+    case WINSYS_HANDLE_TYPE_KMS:
        whandle->handle = vsrf->sid;
        break;
-    case DRM_API_HANDLE_TYPE_FD:
+    case WINSYS_HANDLE_TYPE_FD:
        ret = drmPrimeHandleToFD(vws->ioctl.drm_fd, vsrf->sid, DRM_CLOEXEC,
 				(int *)&whandle->handle);
        if (ret) {

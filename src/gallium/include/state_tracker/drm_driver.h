@@ -3,41 +3,11 @@
 #define _DRM_DRIVER_H_
 
 #include "pipe/p_compiler.h"
+#include "state_tracker/winsys_handle.h"
 
 struct pipe_screen;
 struct pipe_context;
 struct pipe_resource;
-
-#define DRM_API_HANDLE_TYPE_SHARED 0
-#define DRM_API_HANDLE_TYPE_KMS    1
-#define DRM_API_HANDLE_TYPE_FD     2
-
-
-/**
- * For use with pipe_screen::{texture_from_handle|texture_get_handle}.
- */
-struct winsys_handle
-{
-   /**
-    * Input for texture_from_handle, valid values are
-    * DRM_API_HANDLE_TYPE_SHARED or DRM_API_HANDLE_TYPE_FD.
-    * Input to texture_get_handle,
-    * to select handle for kms, flink, or prime.
-    */
-   unsigned type;
-   /**
-    * Input to texture_from_handle.
-    * Output for texture_get_handle.
-    */
-   unsigned handle;
-   /**
-    * Input to texture_from_handle.
-    * Output for texture_get_handle.
-    */
-   unsigned stride;
-};
-
-
 
 /**
  * Configuration queries.

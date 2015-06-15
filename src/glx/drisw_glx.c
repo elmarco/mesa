@@ -305,6 +305,32 @@ swrastGetImage(__DRIdrawable * read,
    ximage->data = NULL;
 }
 
+static void
+swrastGetImageShm(__DRIdrawable * read,
+                  int x, int y, int w, int h,
+                  int shmid, void *loaderPrivate)
+{
+   struct drisw_drawable *prp = loaderPrivate;
+   __GLXDRIdrawable *pread = &(prp->base);
+   Display *dpy = pread->psc->dpy;
+   Drawable readable;
+   XImage *ximage;
+
+   if (!prp->ximage || shmid != prp->shminfo.shmid) {
+      if (!XCreateDrawable(prp, shmid, dpy))
+         return;
+   }
+   readable = pread->xDrawable;
+
+   ximage = prp->ximage;
+   ximage->data = prp->shminfo.shmaddr; /* no offset */
+   ximage->width = w;
+   ximage->height = h;
+   ximage->bytes_per_line = bytes_per_line(w * ximage->bits_per_pixel, 32);
+
+   XShmGetImage(dpy, readable, ximage, x, y, ~0L);
+}
+
 static __DRIswrastLoaderExtension swrastLoaderExtension = {
    .base = {__DRI_SWRAST_LOADER, 3 },
 
@@ -313,6 +339,7 @@ static __DRIswrastLoaderExtension swrastLoaderExtension = {
    .getImage            = swrastGetImage,
    .putImage2           = swrastPutImage2,
    .putImageShm         = swrastPutImageShm,
+   .getImageShm         = swrastGetImageShm,
 };
 
 static const __DRIextension *loader_extensions[] = {

@@ -100,6 +100,26 @@ get_image(__DRIdrawable *dPriv, int x, int y, int width, int height, void *data)
                     data, dPriv->loaderPrivate);
 }
 
+static INLINE bool
+get_image_shm(__DRIdrawable *dPriv, int x, int y, int width, int height,
+              struct pipe_resource *res)
+{
+   __DRIscreen *sPriv = dPriv->driScreenPriv;
+   const __DRIswrastLoaderExtension *loader = sPriv->swrast_loader;
+   struct winsys_handle whandle;
+
+   whandle.type = WINSYS_HANDLE_TYPE_SHMID;
+
+   if (loader->base.version < 3 || !loader->getImageShm)
+      return FALSE;
+
+   if (!res->screen->resource_get_handle(res->screen, res, &whandle))
+      return FALSE;
+
+   loader->getImageShm(dPriv, x, y, width, height, whandle.handle, dPriv->loaderPrivate);
+   return TRUE;
+}
+
 static void
 drisw_update_drawable_info(struct dri_drawable *drawable)
 {
@@ -328,7 +348,8 @@ drisw_update_tex_buffer(struct dri_drawable *drawable,
                            x, y, w, h, &transfer);
 
    /* Copy the Drawable content to the mapped texture buffer */
-   get_image(dPriv, x, y, w, h, map);
+   if (!get_image_shm(dPriv, x, y, w, h, res))
+      get_image(dPriv, x, y, w, h, map);
 
    /* The pipe transfer has a pitch rounded up to the nearest 64 pixels.
       get_image() has a pitch rounded up to 4 bytes.  */

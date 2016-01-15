@@ -614,18 +614,19 @@ static void virgl_vtest_flush_frontbuffer(struct virgl_winsys *vws,
 
    size = vtest_get_transfer_size(res, &box, res->stride, 0, level, &valid_stride);
 
-   virgl_vtest_busy_wait(vtws, res->res_handle, VCMD_BUSY_WAIT_FLAG_WAIT);
-   map = vtws->sws->displaytarget_map(vtws->sws, res->dt, 0);
+   if (!getenv("VTEST_NO_FLUSH")) {
+      virgl_vtest_busy_wait(vtws, res->res_handle, VCMD_BUSY_WAIT_FLAG_WAIT);
+      map = vtws->sws->displaytarget_map(vtws->sws, res->dt, 0);
 
-   /* execute a transfer */
-   virgl_vtest_send_transfer_cmd(vtws, VCMD_TRANSFER_GET, res->res_handle,
-                                 level, res->stride, 0, &box, size);
-   virgl_vtest_recv_transfer_get_data(vtws, map + offset, size, valid_stride,
-                                      &box, res->format);
-   vtws->sws->displaytarget_unmap(vtws->sws, res->dt);
-
-   vtws->sws->displaytarget_display(vtws->sws, res->dt, winsys_drawable_handle,
+      /* execute a transfer */
+      virgl_vtest_send_transfer_cmd(vtws, VCMD_TRANSFER_GET, res->res_handle,
+                                    level, res->stride, 0, &box, size);
+      virgl_vtest_recv_transfer_get_data(vtws, map + offset, size, valid_stride,
+                                         &box, res->format);
+      vtws->sws->displaytarget_unmap(vtws->sws, res->dt);
+      vtws->sws->displaytarget_display(vtws->sws, res->dt, winsys_drawable_handle,
                                     sub_box);
+   }
 }
 
 static void
